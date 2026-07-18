@@ -1,0 +1,2803 @@
+"""Supervised fallback, evidence compilation, verification, and promotion."""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Iterable, Mapping, Sequence
+import hashlib
+import os
+import re
+import sqlite3
+import time
+import unicodedata
+import uuid
+from typing import Any, Literal
+
+from .artifacts import (
+    ARTIFACT_MAX_BYTES,
+    ArtifactDocument,
+    build_digest,
+    build_exact_lookup,
+    execute,
+    validate_artifact,
+)
+from .errors import (
+    CandidateSourceError,
+    ConflictError,
+    IntegrityError,
+    NotFoundError,
+    StateError,
+    ValidationError,
+)
+from .json_value import (
+    CANONICALIZER,
+    DEFAULT_MAX_BYTES,
+    CanonicalJSON,
+    JSONValue,
+    canonicalize,
+    parse_json,
+)
+from .models import (
+    CandidateRequest,
+    CompilePolicy,
+    CompileResult,
+    FallbackFailed,
+    InProgress,
+    Outcome,
+    Promotion,
+    ProposalView,
+    ReconciliationRequired,
+    Rejected,
+    Resolved,
+    ReviewRequired,
+    VerificationReport,
+)
+from .source import CandidateSource
+from .store import Store
+
+_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}\Z")
+_REQUEST_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}\Z")
+_UNSET = object()
+_RECEIPT_MAX_BYTES = 3 * DEFAULT_MAX_BYTES
+_MAX_SQLITE_INTEGER = 2**63 - 1
+
+AuthorityCheck = Callable[[str, str, str, str], bool]
+
+
+def _name(value: str, label: str) -> str:
+    if type(value) is not str or _NAME.fullmatch(value) is None:
+        raise ValidationError(
+            f"{label} must be 1-128 ASCII letters, digits, '.', '_', ':', '/', or '-'"
+        )
+    return value
+
+
+def _request_id(value: str) -> str:
+    if type(value) is not str or _REQUEST_ID.fullmatch(value) is None:
+        raise ValidationError("request_id must be a bounded ASCII identifier")
+    return value
+
+
+def _text(value: str, label: str, *, maximum: int = 512, allow_empty: bool = False) -> str:
+    if type(value) is not str or (not allow_empty and not value):
+        raise ValidationError(f"{label} must be {'text' if allow_empty else 'non-empty text'}")
+    try:
+        encoded = value.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise ValidationError(f"{label} must contain valid Unicode scalar values") from exc
+    if len(encoded) > maximum or any(
+        unicodedata.category(char) in {"Cc", "Cf", "Zl", "Zp"} for char in value
+    ):
+        raise ValidationError(f"{label} must be control-free and at most {maximum} UTF-8 bytes")
+    return value
+
+
+def _bounded_int(value: int, label: str, *, minimum: int, maximum: int) -> int:
+    if type(value) is not int or not minimum <= value <= maximum:
+        raise ValidationError(f"{label} must be an integer between {minimum} and {maximum}")
+    return value
+
+
+def _new_id(prefix: str) -> str:
+    return f"{prefix}_{uuid.uuid4().hex}"
+
+
+def _digest_strings(label: str, values: Sequence[str]) -> str:
+    digest = hashlib.sha256()
+    for value in (label,):
+        encoded = value.encode("utf-8")
+        digest.update(len(encoded).to_bytes(8, "big"))
+        digest.update(encoded)
+    for value in values:
+        encoded = value.encode("utf-8")
+        digest.update(len(encoded).to_bytes(8, "big"))
+        digest.update(encoded)
+    return digest.hexdigest()
+
+
+def _event(
+    connection: sqlite3.Connection,
+    *,
+    partition: str,
+    kind: str,
+    subject_type: str,
+    subject_id: str,
+    payload: Mapping[str, Any],
+    now_us: int,
+) -> int:
+    payload_json = canonicalize(dict(payload), max_bytes=262_144).text
+    cursor = connection.execute(
+        """
+        INSERT INTO events(partition, kind, subject_type, subject_id, payload_json, created_at_us)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (partition, kind, subject_type, subject_id, payload_json, now_us),
+    )
+    if cursor.lastrowid is None:
+        raise IntegrityError("audit event did not receive a sequence")
+    return int(cursor.lastrowid)
+
+
+def _policy_from_text(text: str) -> CompilePolicy:
+    value = parse_json(text, max_bytes=16_384).value
+    if type(value) is not dict:
+        raise IntegrityError("stored policy is not an object")
+    try:
+        return CompilePolicy.from_json(value)
+    except ValidationError as exc:
+        raise IntegrityError("stored policy is invalid") from exc
+
+
+class System:
+    """Local learning loop.
+
+    All returned values are pure data. A caller may apply a ``Resolved`` plan only
+    after its own live authorization/policy gate. The optional authority callback
+    gates actor-bearing control-plane mutations; request routing and reads rely on
+    the embedding application's access control. Without it, database access is the
+    trust boundary.
+    """
+
+    def __init__(
+        self,
+        database: str | os.PathLike[str],
+        *,
+        candidate_source: CandidateSource | None = None,
+        authority: AuthorityCheck | None = None,
+        clock_us: Callable[[], int] | None = None,
+        generation_lease_seconds: int = 120,
+    ) -> None:
+        generation_lease_seconds = _bounded_int(
+            generation_lease_seconds,
+            "generation_lease_seconds",
+            minimum=1,
+            maximum=3_600,
+        )
+        if candidate_source is not None and not callable(
+            getattr(candidate_source, "propose", None)
+        ):
+            raise ValidationError("candidate_source must provide a callable propose method")
+        if authority is not None and not callable(authority):
+            raise ValidationError("authority must be callable")
+        if clock_us is not None and not callable(clock_us):
+            raise ValidationError("clock_us must be callable")
+        self.store = Store(database)
+        self.candidate_source = candidate_source
+        self._authority = authority
+        self._clock_us = clock_us if clock_us is not None else (lambda: time.time_ns() // 1_000)
+        self._lease_us = generation_lease_seconds * 1_000_000
+
+    def _now(self) -> int:
+        now = self._clock_us()
+        if (
+            type(now) is not int
+            or now < 0
+            or now > _MAX_SQLITE_INTEGER - self._lease_us
+        ):
+            raise StateError("clock must return a lease-safe signed 64-bit microsecond timestamp")
+        return now
+
+    def _authorize(self, partition: str, actor: str, action: str, subject: str) -> None:
+        if self._authority is not None:
+            allowed = self._authority(partition, actor, action, subject)
+            if allowed is not True:
+                close = getattr(allowed, "close", None)
+                if callable(close):
+                    close()
+                raise StateError(f"actor is not authorized for {action}")
+
+    # -- operation revisions -------------------------------------------------
+
+    def register_operation(
+        self,
+        partition: str,
+        operation: str,
+        *,
+        policy: CompilePolicy | None = None,
+        registered_by: str = "local-system",
+    ) -> int:
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        registered_by = _text(registered_by, "registered_by", maximum=256)
+        self._authorize(partition, registered_by, "operation.register", operation)
+        if policy is None:
+            policy = CompilePolicy()
+        elif type(policy) is not CompilePolicy:
+            raise ValidationError("policy must be a CompilePolicy")
+        policy_json = canonicalize(policy.as_json(), max_bytes=16_384)
+        now = self._now()
+        with self.store.transaction(write=True) as connection:
+            existing = connection.execute(
+                "SELECT revision, policy_hash FROM operations WHERE partition = ? AND name = ?",
+                (partition, operation),
+            ).fetchone()
+            if existing is not None:
+                if existing["policy_hash"] == policy_json.digest:
+                    return int(existing["revision"])
+                raise ConflictError("operation exists with a different policy; revise it explicitly")
+            connection.execute(
+                """
+                INSERT INTO operations(
+                    partition, name, revision, policy_json, policy_hash,
+                    created_at_us, updated_at_us
+                ) VALUES (?, ?, 1, ?, ?, ?, ?)
+                """,
+                (partition, operation, policy_json.text, policy_json.digest, now, now),
+            )
+            _event(
+                connection,
+                partition=partition,
+                kind="operation.registered",
+                subject_type="operation",
+                subject_id=f"{partition}/{operation}@1",
+                payload={"policy_hash": policy_json.digest, "registered_by": registered_by},
+                now_us=now,
+            )
+        return 1
+
+    def revise_operation(
+        self,
+        partition: str,
+        operation: str,
+        *,
+        policy: CompilePolicy,
+        revised_by: str,
+    ) -> int:
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        revised_by = _text(revised_by, "revised_by", maximum=256)
+        self._authorize(partition, revised_by, "operation.revise", operation)
+        if type(policy) is not CompilePolicy:
+            raise ValidationError("policy must be a CompilePolicy")
+        policy_json = canonicalize(policy.as_json(), max_bytes=16_384)
+        now = self._now()
+        with self.store.transaction(write=True) as connection:
+            current = connection.execute(
+                "SELECT revision, policy_hash FROM operations WHERE partition = ? AND name = ?",
+                (partition, operation),
+            ).fetchone()
+            if current is None:
+                raise NotFoundError("operation is not registered in this partition")
+            previous = int(current["revision"])
+            revision = previous + 1
+            connection.execute(
+                """
+                UPDATE operations
+                SET revision = ?, policy_json = ?, policy_hash = ?, updated_at_us = ?
+                WHERE partition = ? AND name = ? AND revision = ?
+                """,
+                (
+                    revision,
+                    policy_json.text,
+                    policy_json.digest,
+                    now,
+                    partition,
+                    operation,
+                    previous,
+                ),
+            )
+            connection.execute(
+                """
+                UPDATE artifacts
+                SET status = 'retired', promotion_hash = NULL,
+                    status_reason = 'operation revised'
+                WHERE partition = ? AND operation = ? AND operation_revision = ?
+                  AND status IN ('draft', 'verified', 'promoted')
+                """,
+                (partition, operation, previous),
+            )
+            invalidated_generators = connection.execute(
+                """
+                UPDATE requests
+                SET status = 'failed', error_code = 'operation_revised',
+                    lease_owner = NULL, lease_until_us = NULL, updated_at_us = ?
+                WHERE partition = ? AND operation = ? AND operation_revision = ?
+                  AND status = 'generating'
+                """,
+                (now, partition, operation, previous),
+            ).rowcount
+            _event(
+                connection,
+                partition=partition,
+                kind="operation.revised",
+                subject_type="operation",
+                subject_id=f"{partition}/{operation}@{revision}",
+                payload={
+                    "previous_revision": previous,
+                    "policy_hash": policy_json.digest,
+                    "revised_by": revised_by,
+                    "invalidated_generators": invalidated_generators,
+                },
+                now_us=now,
+            )
+        return revision
+
+    # -- routing + supervised fallback --------------------------------------
+
+    def handle(
+        self,
+        partition: str,
+        operation: str,
+        input_value: object,
+        *,
+        request_id: str | None = None,
+        retry_failed: bool = False,
+    ) -> Outcome:
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        if type(retry_failed) is not bool:
+            raise ValidationError("retry_failed must be a boolean")
+        request_id = _request_id(_new_id("req") if request_id is None else request_id)
+        input_json = canonicalize(input_value)
+        now = self._now()
+        owner = _new_id("lease")
+
+        with self.store.transaction(write=True) as connection:
+            request = connection.execute(
+                "SELECT * FROM requests WHERE partition = ? AND id = ?",
+                (partition, request_id),
+            ).fetchone()
+            if request is not None:
+                if (
+                    request["partition"] != partition
+                    or request["operation"] != operation
+                    or request["input_json"] != input_json.text
+                ):
+                    raise ConflictError("request_id is already bound to different immutable content")
+                if not self._request_revision_is_current(request, connection):
+                    return self._outcome(request, now, connection)
+                if request["status"] == "generating" and int(request["lease_until_us"] or 0) <= now:
+                    connection.execute(
+                        """
+                        UPDATE requests
+                        SET lease_owner = ?, lease_until_us = ?, attempts = attempts + 1,
+                            updated_at_us = ?
+                        WHERE partition = ? AND id = ? AND status = 'generating'
+                        """,
+                        (owner, now + self._lease_us, now, partition, request_id),
+                    )
+                    revision = int(request["operation_revision"])
+                elif request["status"] == "failed" and retry_failed:
+                    connection.execute(
+                        """
+                        UPDATE requests
+                        SET status = 'generating', error_code = NULL, lease_owner = ?,
+                            lease_until_us = ?, attempts = attempts + 1, updated_at_us = ?
+                        WHERE partition = ? AND id = ? AND status = 'failed'
+                        """,
+                        (owner, now + self._lease_us, now, partition, request_id),
+                    )
+                    revision = int(request["operation_revision"])
+                else:
+                    return self._outcome(request, now, connection)
+            else:
+                registered = connection.execute(
+                    "SELECT * FROM operations WHERE partition = ? AND name = ?",
+                    (partition, operation),
+                ).fetchone()
+                if registered is None:
+                    raise NotFoundError("operation is not registered in this partition")
+                revision = int(registered["revision"])
+                artifacts = connection.execute(
+                    """
+                    SELECT * FROM artifacts
+                    WHERE partition = ? AND operation = ? AND operation_revision = ?
+                      AND input_hash = ? AND status = 'promoted'
+                    """,
+                    (partition, operation, revision, input_json.digest),
+                ).fetchall()
+                if len(artifacts) > 1:
+                    ids = [str(row["id"]) for row in artifacts]
+                    connection.executemany(
+                        """
+                        UPDATE artifacts SET status = 'suspended', promotion_hash = NULL,
+                            status_reason = ? WHERE id = ?
+                        """,
+                        [("ambiguous active scope", artifact_id) for artifact_id in ids],
+                    )
+                    _event(
+                        connection,
+                        partition=partition,
+                        kind="artifact.ambiguity_quarantined",
+                        subject_type="operation",
+                        subject_id=f"{partition}/{operation}@{revision}",
+                        payload={"artifact_ids": ids},
+                        now_us=now,
+                    )
+                    artifacts = []
+                if artifacts:
+                    artifact_row = artifacts[0]
+                    try:
+                        artifact = self._artifact_from_row(artifact_row)
+                        self._validate_promoted(connection, artifact_row)
+                        execution = execute(
+                            artifact,
+                            partition=partition,
+                            operation=operation,
+                            operation_revision=revision,
+                            input_json=input_json,
+                        )
+                    except (IntegrityError, ValidationError):
+                        connection.execute(
+                            """
+                            UPDATE artifacts
+                            SET status = 'suspended', promotion_hash = NULL,
+                                status_reason = 'runtime integrity failure'
+                            WHERE id = ? AND status = 'promoted'
+                            """,
+                            (artifact_row["id"],),
+                        )
+                        _event(
+                            connection,
+                            partition=partition,
+                            kind="artifact.integrity_quarantined",
+                            subject_type="artifact",
+                            subject_id=str(artifact_row["id"]),
+                            payload={},
+                            now_us=now,
+                        )
+                    else:
+                        if execution.matched:
+                            output_json = canonicalize(execution.output)
+                            connection.execute(
+                                """
+                                INSERT INTO requests(
+                                    id, partition, operation, operation_revision, input_json,
+                                    input_hash, status, output_json, source_kind, artifact_id,
+                                    created_at_us, updated_at_us
+                                ) VALUES (?, ?, ?, ?, ?, ?, 'resolved', ?, 'artifact', ?, ?, ?)
+                                """,
+                                (
+                                    request_id,
+                                    partition,
+                                    operation,
+                                    revision,
+                                    input_json.text,
+                                    input_json.digest,
+                                    output_json.text,
+                                    artifact_row["id"],
+                                    now,
+                                    now,
+                                ),
+                            )
+                            _event(
+                                connection,
+                                partition=partition,
+                                kind="request.resolved_by_artifact",
+                                subject_type="request",
+                                subject_id=request_id,
+                                payload={"artifact_id": str(artifact_row["id"])},
+                                now_us=now,
+                            )
+                            return Resolved(
+                                request_id=request_id,
+                                output=output_json.value,
+                                source="artifact",
+                                artifact_id=str(artifact_row["id"]),
+                            )
+                connection.execute(
+                    """
+                    INSERT INTO requests(
+                        id, partition, operation, operation_revision, input_json, input_hash,
+                        status, lease_owner, lease_until_us, created_at_us, updated_at_us
+                    ) VALUES (?, ?, ?, ?, ?, ?, 'generating', ?, ?, ?, ?)
+                    """,
+                    (
+                        request_id,
+                        partition,
+                        operation,
+                        revision,
+                        input_json.text,
+                        input_json.digest,
+                        owner,
+                        now + self._lease_us,
+                        now,
+                        now,
+                    ),
+                )
+
+        if self.candidate_source is None:
+            return self._fail_generation(partition, request_id, owner, "candidate_source_unavailable")
+        try:
+            candidate = self.candidate_source.propose(
+                CandidateRequest(
+                    partition=partition,
+                    operation=operation,
+                    operation_revision=revision,
+                    request_id=request_id,
+                    input=input_json.value,
+                )
+            )
+            proposed = canonicalize(candidate.output)
+            provenance = canonicalize(dict(candidate.provenance), max_bytes=65_536)
+            if type(provenance.value) is not dict:
+                raise ValidationError("candidate provenance must be a JSON object")
+        except CandidateSourceError:
+            return self._fail_generation(partition, request_id, owner, "candidate_source_error")
+        except Exception:
+            # Custom adapter failures remain inert and do not leak details into audit data.
+            return self._fail_generation(partition, request_id, owner, "candidate_source_error")
+
+        proposal_id = _new_id("prop")
+        completed = self._now()
+        with self.store.transaction(write=True) as connection:
+            request = connection.execute(
+                "SELECT * FROM requests WHERE partition = ? AND id = ?",
+                (partition, request_id),
+            ).fetchone()
+            if request is None:
+                raise IntegrityError("reserved request disappeared")
+            if request["status"] != "generating" or request["lease_owner"] != owner:
+                return self._outcome(request, completed, connection)
+            if not self._request_revision_is_current(request, connection):
+                connection.execute(
+                    """
+                    UPDATE requests
+                    SET status = 'failed', error_code = 'operation_revised',
+                        lease_owner = NULL, lease_until_us = NULL, updated_at_us = ?
+                    WHERE partition = ? AND id = ? AND status = 'generating'
+                      AND lease_owner = ?
+                    """,
+                    (completed, partition, request_id, owner),
+                )
+                refreshed = connection.execute(
+                    "SELECT * FROM requests WHERE partition = ? AND id = ?",
+                    (partition, request_id),
+                ).fetchone()
+                if refreshed is None:
+                    raise IntegrityError("invalidated request disappeared")
+                return self._outcome(refreshed, completed, connection)
+            status_sequence = _event(
+                connection,
+                partition=partition,
+                kind="proposal.created",
+                subject_type="proposal",
+                subject_id=proposal_id,
+                payload={"request_id": request_id},
+                now_us=completed,
+            )
+            connection.execute(
+                """
+                INSERT INTO proposals(
+                    id, partition, request_id, proposed_output_json, proposed_output_hash,
+                    provenance_json, provenance_hash, status, created_at_us, status_sequence
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+                """,
+                (
+                    proposal_id,
+                    partition,
+                    request_id,
+                    proposed.text,
+                    proposed.digest,
+                    provenance.text,
+                    provenance.digest,
+                    completed,
+                    status_sequence,
+                ),
+            )
+            connection.execute(
+                """
+                UPDATE requests
+                SET status = 'pending', proposal_id = ?, lease_owner = NULL,
+                    lease_until_us = NULL, updated_at_us = ?
+                WHERE partition = ? AND id = ?
+                """,
+                (proposal_id, completed, partition, request_id),
+            )
+        return ReviewRequired(request_id=request_id, proposal_id=proposal_id)
+
+    def _fail_generation(
+        self, partition: str, request_id: str, owner: str, code: str
+    ) -> Outcome:
+        now = self._now()
+        with self.store.transaction(write=True) as connection:
+            request = connection.execute(
+                "SELECT * FROM requests WHERE partition = ? AND id = ?",
+                (partition, request_id),
+            ).fetchone()
+            if request is None:
+                raise IntegrityError("reserved request disappeared")
+            if request["status"] != "generating" or request["lease_owner"] != owner:
+                return self._outcome(request, now, connection)
+            connection.execute(
+                """
+                UPDATE requests
+                SET status = 'failed', error_code = ?, lease_owner = NULL,
+                    lease_until_us = NULL, updated_at_us = ?
+                WHERE partition = ? AND id = ?
+                """,
+                (code, now, partition, request_id),
+            )
+            _event(
+                connection,
+                partition=str(request["partition"]),
+                kind="request.fallback_failed",
+                subject_type="request",
+                subject_id=request_id,
+                payload={"code": code},
+                now_us=now,
+            )
+        return FallbackFailed(request_id=request_id, code=code)
+
+    def _outcome(
+        self,
+        request: sqlite3.Row,
+        now_us: int,
+        connection: sqlite3.Connection,
+    ) -> Outcome:
+        status = str(request["status"])
+        request_id = str(request["id"])
+        if status != "rejected" and not self._request_revision_is_current(request, connection):
+            return ReconciliationRequired(
+                request_id=request_id,
+                reason="operation revision changed; submit a new request ID",
+                artifact_id=str(request["artifact_id"]) if request["artifact_id"] else None,
+                example_id=str(request["example_id"]) if request["example_id"] else None,
+            )
+        if status == "resolved":
+            if request["output_json"] is None or request["source_kind"] is None:
+                raise IntegrityError("resolved request is incomplete")
+            stored_output = str(request["output_json"])
+            output: JSONValue = None
+            if request["source_kind"] == "artifact":
+                source_kind: Literal["artifact", "confirmed"] = "artifact"
+                artifact_id = str(request["artifact_id"] or "")
+                artifact_row = connection.execute(
+                    "SELECT * FROM artifacts WHERE id = ?", (artifact_id,)
+                ).fetchone()
+                valid = False
+                if artifact_row is not None and artifact_row["status"] == "promoted":
+                    try:
+                        artifact = self._artifact_from_row(artifact_row)
+                        self._validate_promoted(connection, artifact_row)
+                        input_json = parse_json(str(request["input_json"]))
+                        execution = execute(
+                            artifact,
+                            partition=str(request["partition"]),
+                            operation=str(request["operation"]),
+                            operation_revision=int(request["operation_revision"]),
+                            input_json=input_json,
+                        )
+                        valid = (
+                            execution.matched
+                            and canonicalize(execution.output).text == stored_output
+                        )
+                        if valid:
+                            output = execution.output
+                    except (IntegrityError, ValidationError):
+                        valid = False
+                if not valid:
+                    return ReconciliationRequired(
+                        request_id=request_id,
+                        reason="artifact is no longer active and integrity-valid",
+                        artifact_id=artifact_id or None,
+                    )
+            elif request["source_kind"] == "confirmed":
+                source_kind = "confirmed"
+                example_id = str(request["example_id"] or "")
+                example = connection.execute(
+                    """
+                    SELECT e.*, x.example_id AS revoked
+                    FROM examples AS e
+                    LEFT JOIN example_revocations AS x ON x.example_id = e.id
+                    WHERE e.id = ?
+                    """,
+                    (example_id,),
+                ).fetchone()
+                valid = False
+                if example is not None and example["revoked"] is None:
+                    assessment = self._assess_examples(
+                        [example], CompilePolicy(2, 1, 0)
+                    )
+                    valid = not assessment["integrity_failures"] and (
+                        example["partition"] == request["partition"]
+                        and example["operation"] == request["operation"]
+                        and example["operation_revision"] == request["operation_revision"]
+                        and example["input_json"] == request["input_json"]
+                        and example["output_json"] == stored_output
+                    )
+                    if valid:
+                        output = parse_json(str(example["output_json"])).value
+                if not valid:
+                    return ReconciliationRequired(
+                        request_id=request_id,
+                        reason="confirmed example is missing, revoked, or inconsistent",
+                        example_id=example_id or None,
+                    )
+            else:
+                raise IntegrityError("resolved request has an unknown source kind")
+            return Resolved(
+                request_id=request_id,
+                output=output,
+                source=source_kind,
+                artifact_id=str(request["artifact_id"]) if request["artifact_id"] else None,
+                example_id=str(request["example_id"]) if request["example_id"] else None,
+            )
+        if status == "pending":
+            if not request["proposal_id"]:
+                raise IntegrityError("pending request has no proposal")
+            return ReviewRequired(request_id=request_id, proposal_id=str(request["proposal_id"]))
+        if status == "generating":
+            remaining = max(0, int(request["lease_until_us"] or now_us) - now_us)
+            if remaining == 0:
+                return FallbackFailed(
+                    request_id=request_id,
+                    code="generation_lease_expired",
+                )
+            return InProgress(
+                request_id=request_id,
+                retry_after_seconds=max(1, (remaining + 999_999) // 1_000_000),
+            )
+        if status == "failed":
+            return FallbackFailed(request_id=request_id, code=str(request["error_code"] or "unknown"))
+        if status == "rejected":
+            if not request["proposal_id"]:
+                raise IntegrityError("rejected request has no proposal")
+            return Rejected(request_id=request_id, proposal_id=str(request["proposal_id"]))
+        raise IntegrityError(f"unknown request status: {status}")
+
+    @staticmethod
+    def _request_revision_is_current(
+        request: sqlite3.Row,
+        connection: sqlite3.Connection,
+    ) -> bool:
+        operation = connection.execute(
+            "SELECT revision FROM operations WHERE partition = ? AND name = ?",
+            (request["partition"], request["operation"]),
+        ).fetchone()
+        return operation is not None and int(operation["revision"]) == int(
+            request["operation_revision"]
+        )
+
+    @staticmethod
+    def _proposal_content(
+        row: sqlite3.Row,
+    ) -> tuple[CanonicalJSON, CanonicalJSON, CanonicalJSON]:
+        input_json = parse_json(str(row["input_json"]))
+        proposed = parse_json(str(row["proposed_output_json"]))
+        provenance = parse_json(str(row["provenance_json"]), max_bytes=65_536)
+        if input_json.digest != row["input_hash"]:
+            raise IntegrityError("proposal request input digest mismatch")
+        if proposed.digest != row["proposed_output_hash"]:
+            raise IntegrityError("proposal output digest mismatch")
+        if provenance.digest != row["provenance_hash"]:
+            raise IntegrityError("proposal provenance digest mismatch")
+        return input_json, proposed, provenance
+
+    @staticmethod
+    def _validate_proposal_shape(row: sqlite3.Row) -> None:
+        status = str(row["status"])
+        final_present = row["final_output_json"] is not None
+        final_hash_present = row["final_output_hash"] is not None
+        review_present = (
+            row["reviewer"] is not None
+            and row["review_note"] is not None
+            and row["reviewed_at_us"] is not None
+        )
+        if status == "pending":
+            valid = not final_present and not final_hash_present and not review_present
+            request_status = "pending"
+        elif status == "rejected":
+            valid = not final_present and not final_hash_present and review_present
+            request_status = "rejected"
+        elif status in {"accepted", "corrected"}:
+            valid = final_present and final_hash_present and review_present
+            request_status = "resolved"
+        else:
+            raise IntegrityError("proposal has an unknown status")
+        if not valid:
+            raise IntegrityError("proposal fields do not match its status")
+        if "bound_proposal_id" in row.keys() and (
+            row["bound_proposal_id"] != row["id"]
+            or row["bound_request_status"] != request_status
+        ):
+            raise IntegrityError("proposal and request states are inconsistent")
+
+    def request_status(self, partition: str, request_id: str) -> Outcome:
+        """Poll an existing request without resupplying its immutable input."""
+
+        partition = _name(partition, "partition")
+        request_id = _request_id(request_id)
+        now = self._now()
+        with self.store.transaction() as connection:
+            row = connection.execute(
+                "SELECT * FROM requests WHERE partition = ? AND id = ?",
+                (partition, request_id),
+            ).fetchone()
+            if row is None:
+                raise NotFoundError("request does not exist in this partition")
+            return self._outcome(row, now, connection)
+
+    # -- supervision ---------------------------------------------------------
+
+    def get_proposal(self, partition: str, proposal_id: str) -> ProposalView:
+        partition = _name(partition, "partition")
+        proposal_id = _request_id(proposal_id)
+        with self.store.transaction() as connection:
+            row = connection.execute(
+                """
+                SELECT p.*, r.partition, r.operation, r.operation_revision,
+                       r.input_json, r.input_hash, r.id AS bound_request_id,
+                       r.status AS bound_request_status,
+                       r.proposal_id AS bound_proposal_id
+                FROM proposals AS p
+                JOIN requests AS r ON r.partition = p.partition AND r.id = p.request_id
+                WHERE p.id = ? AND p.partition = ?
+                """,
+                (proposal_id, partition),
+            ).fetchone()
+            if row is None:
+                raise NotFoundError("proposal does not exist in this partition")
+            self._validate_proposal_shape(row)
+            if row["status"] != "pending":
+                raise StateError(f"proposal is already {row['status']}")
+            if (
+                row["bound_request_status"] != "pending"
+                or row["bound_proposal_id"] != proposal_id
+            ):
+                raise IntegrityError("pending proposal is not bound to a pending request")
+            input_json, proposed, provenance = self._proposal_content(row)
+            return ProposalView(
+                id=proposal_id,
+                partition=partition,
+                operation=str(row["operation"]),
+                operation_revision=int(row["operation_revision"]),
+                request_id=str(row["bound_request_id"]),
+                input=input_json.value,
+                proposed_output=proposed.value,
+                provenance=provenance.value,
+                created_at_us=int(row["created_at_us"]),
+            )
+
+    def proposal(self, partition: str, proposal_id: str) -> dict[str, JSONValue]:
+        """Inspect pending or historical proposal state and bound provenance."""
+
+        partition = _name(partition, "partition")
+        proposal_id = _request_id(proposal_id)
+        with self.store.transaction() as connection:
+            row = connection.execute(
+                """
+                SELECT p.*, r.operation, r.operation_revision, r.input_json, r.input_hash,
+                       r.id AS bound_request_id, r.status AS bound_request_status,
+                       r.proposal_id AS bound_proposal_id
+                FROM proposals AS p
+                JOIN requests AS r ON r.partition = p.partition AND r.id = p.request_id
+                WHERE p.id = ? AND p.partition = ?
+                """,
+                (proposal_id, partition),
+            ).fetchone()
+            if row is None:
+                raise NotFoundError("proposal does not exist in this partition")
+            return self._proposal_record(row)
+
+    def proposals(
+        self,
+        partition: str,
+        *,
+        status: str = "pending",
+        after_sequence: int = 0,
+        limit: int = 100,
+    ) -> list[dict[str, JSONValue]]:
+        """Monotonic proposal-state feed ordered by audit transition sequence."""
+
+        partition = _name(partition, "partition")
+        allowed = {"all", "pending", "accepted", "corrected", "rejected"}
+        if type(status) is not str or status not in allowed:
+            raise ValidationError(f"proposal status must be one of {sorted(allowed)!r}")
+        _bounded_int(
+            after_sequence,
+            "after_sequence",
+            minimum=0,
+            maximum=2**63 - 1,
+        )
+        _bounded_int(limit, "limit", minimum=1, maximum=10_000)
+        selected_status = None if status == "all" else status
+        with self.store.transaction() as connection:
+            rows = connection.execute(
+                """
+                SELECT p.*, r.operation, r.operation_revision, r.input_json, r.input_hash,
+                       r.id AS bound_request_id, r.status AS bound_request_status,
+                       r.proposal_id AS bound_proposal_id
+                FROM proposals AS p
+                JOIN requests AS r ON r.partition = p.partition AND r.id = p.request_id
+                WHERE p.partition = ? AND (? IS NULL OR p.status = ?)
+                  AND p.status_sequence > ?
+                ORDER BY p.status_sequence LIMIT ?
+                """,
+                (
+                    partition,
+                    selected_status,
+                    selected_status,
+                    after_sequence,
+                    limit,
+                ),
+            ).fetchall()
+            return [self._proposal_record(row) for row in rows]
+
+    def _proposal_record(self, row: sqlite3.Row) -> dict[str, JSONValue]:
+        self._validate_proposal_shape(row)
+        input_json, proposed, provenance = self._proposal_content(row)
+        final_output = (
+            parse_json(str(row["final_output_json"]))
+            if row["final_output_json"] is not None
+            else None
+        )
+        if final_output is not None and final_output.digest != row["final_output_hash"]:
+            raise IntegrityError("proposal final output digest mismatch")
+        return {
+            "created_at_us": int(row["created_at_us"]),
+            "final_output": final_output.value if final_output is not None else None,
+            "id": str(row["id"]),
+            "input": input_json.value,
+            "operation": str(row["operation"]),
+            "operation_revision": int(row["operation_revision"]),
+            "proposed_output": proposed.value,
+            "provenance": provenance.value,
+            "request_id": str(row["bound_request_id"]),
+            "review_note": str(row["review_note"]) if row["review_note"] is not None else None,
+            "reviewed_at_us": (
+                int(row["reviewed_at_us"]) if row["reviewed_at_us"] is not None else None
+            ),
+            "reviewer": str(row["reviewer"]) if row["reviewer"] is not None else None,
+            "sequence": int(row["status_sequence"]),
+            "status": str(row["status"]),
+        }
+
+    def review(
+        self,
+        partition: str,
+        proposal_id: str,
+        *,
+        reviewer: str,
+        decision: str,
+        corrected_output: object = _UNSET,
+        note: str = "",
+    ) -> Outcome:
+        partition = _name(partition, "partition")
+        proposal_id = _request_id(proposal_id)
+        reviewer = _text(reviewer, "reviewer", maximum=256)
+        note = _text(note, "note", maximum=2_048, allow_empty=True)
+        if type(decision) is not str or decision not in {"accept", "correct", "reject"}:
+            raise ValidationError("decision must be accept, correct, or reject")
+        if decision == "correct" and corrected_output is _UNSET:
+            raise ValidationError("correct requires corrected_output")
+        if decision != "correct" and corrected_output is not _UNSET:
+            raise ValidationError("corrected_output is valid only with decision='correct'")
+        self._authorize(partition, reviewer, f"proposal.{decision}", proposal_id)
+        now = self._now()
+        with self.store.transaction(write=True) as connection:
+            row = connection.execute(
+                """
+                SELECT p.*, r.partition, r.operation, r.operation_revision,
+                       r.input_json, r.input_hash, r.id AS bound_request_id,
+                       r.status AS bound_request_status,
+                       r.proposal_id AS bound_proposal_id
+                FROM proposals AS p
+                JOIN requests AS r ON r.partition = p.partition AND r.id = p.request_id
+                WHERE p.id = ? AND p.partition = ?
+                """,
+                (proposal_id, partition),
+            ).fetchone()
+            if row is None:
+                raise NotFoundError("proposal does not exist in this partition")
+            if row["status"] != "pending":
+                raise StateError(f"proposal is already {row['status']}")
+            current = connection.execute(
+                "SELECT revision FROM operations WHERE partition = ? AND name = ?",
+                (partition, row["operation"]),
+            ).fetchone()
+            if (
+                decision != "reject"
+                and (
+                    current is None
+                    or int(current["revision"]) != int(row["operation_revision"])
+                )
+            ):
+                raise StateError(
+                    "proposal belongs to an obsolete operation revision; reject it or use a new request"
+                )
+            input_json, proposed, _ = self._proposal_content(row)
+            request_id = str(row["bound_request_id"])
+            if decision == "reject":
+                proposal_update = connection.execute(
+                    """
+                    UPDATE proposals
+                    SET status = 'rejected', reviewer = ?, review_note = ?, reviewed_at_us = ?
+                    WHERE id = ? AND status = 'pending'
+                    """,
+                    (reviewer, note, now, proposal_id),
+                )
+                request_update = connection.execute(
+                    """
+                    UPDATE requests SET status = 'rejected', updated_at_us = ?
+                    WHERE partition = ? AND id = ? AND status = 'pending'
+                      AND proposal_id = ?
+                    """,
+                    (now, partition, request_id, proposal_id),
+                )
+                if proposal_update.rowcount != 1 or request_update.rowcount != 1:
+                    raise IntegrityError("proposal rejection transition lost its state binding")
+                status_sequence = _event(
+                    connection,
+                    partition=partition,
+                    kind="proposal.rejected",
+                    subject_type="proposal",
+                    subject_id=proposal_id,
+                    payload={"reviewer": reviewer},
+                    now_us=now,
+                )
+                sequence_update = connection.execute(
+                    "UPDATE proposals SET status_sequence = ? WHERE id = ? AND status = 'rejected'",
+                    (status_sequence, proposal_id),
+                )
+                if sequence_update.rowcount != 1:
+                    raise IntegrityError("proposal rejection sequence was not bound")
+                return Rejected(request_id=request_id, proposal_id=proposal_id)
+
+            final = (
+                canonicalize(corrected_output)
+                if decision == "correct"
+                else proposed
+            )
+            example_id = _new_id("ex")
+            receipt_value: dict[str, JSONValue] = {
+                "confirmed_at_us": now,
+                "example_id": example_id,
+                "format": "cement-confirmation-v1",
+                "input": input_json.value,
+                "note": note,
+                "operation": str(row["operation"]),
+                "operation_revision": int(row["operation_revision"]),
+                "output": final.value,
+                "partition": partition,
+                "proposal_id": proposal_id,
+                "resolution": "corrected" if decision == "correct" else "accepted",
+                "reviewer": reviewer,
+            }
+            receipt = canonicalize(receipt_value, max_bytes=_RECEIPT_MAX_BYTES)
+            proposal_status = "corrected" if decision == "correct" else "accepted"
+            proposal_update = connection.execute(
+                """
+                UPDATE proposals
+                SET status = ?, final_output_json = ?, final_output_hash = ?,
+                    reviewer = ?, review_note = ?, reviewed_at_us = ?
+                WHERE partition = ? AND id = ? AND status = 'pending'
+                """,
+                (
+                    proposal_status,
+                    final.text,
+                    final.digest,
+                    reviewer,
+                    note,
+                    now,
+                    partition,
+                    proposal_id,
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO examples(
+                    id, partition, operation, operation_revision, input_json, input_hash,
+                    output_json, output_hash, reviewer, origin, proposal_id,
+                    receipt_json, receipt_hash, confirmed_at_us
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    example_id,
+                    partition,
+                    row["operation"],
+                    row["operation_revision"],
+                    input_json.text,
+                    input_json.digest,
+                    final.text,
+                    final.digest,
+                    reviewer,
+                    proposal_status,
+                    proposal_id,
+                    receipt.text,
+                    receipt.digest,
+                    now,
+                ),
+            )
+            conflicting_artifacts = connection.execute(
+                """
+                SELECT id FROM artifacts
+                WHERE partition = ? AND operation = ? AND operation_revision = ?
+                  AND input_hash = ? AND input_json = ? AND output_json <> ?
+                  AND status = 'promoted'
+                """,
+                (
+                    partition,
+                    row["operation"],
+                    row["operation_revision"],
+                    input_json.digest,
+                    input_json.text,
+                    final.text,
+                ),
+            ).fetchall()
+            quarantined = tuple(str(item["id"]) for item in conflicting_artifacts)
+            if quarantined:
+                connection.executemany(
+                    """
+                    UPDATE artifacts
+                    SET status = 'suspended', promotion_hash = NULL,
+                        status_reason = 'new confirmed counterexample'
+                    WHERE id = ? AND status = 'promoted'
+                    """,
+                    [(artifact_id,) for artifact_id in quarantined],
+                )
+                for artifact_id in quarantined:
+                    _event(
+                        connection,
+                        partition=partition,
+                        kind="artifact.counterexample",
+                        subject_type="artifact",
+                        subject_id=artifact_id,
+                        payload={"example_id": example_id, "proposal_id": proposal_id},
+                        now_us=now,
+                    )
+            request_update = connection.execute(
+                """
+                UPDATE requests
+                SET status = 'resolved', output_json = ?, source_kind = 'confirmed',
+                    example_id = ?, updated_at_us = ?
+                WHERE partition = ? AND id = ? AND status = 'pending'
+                  AND proposal_id = ?
+                """,
+                (final.text, example_id, now, partition, request_id, proposal_id),
+            )
+            if proposal_update.rowcount != 1 or request_update.rowcount != 1:
+                raise IntegrityError("proposal confirmation transition lost its state binding")
+            status_sequence = _event(
+                connection,
+                partition=partition,
+                kind=f"proposal.{proposal_status}",
+                subject_type="proposal",
+                subject_id=proposal_id,
+                payload={
+                    "example_id": example_id,
+                    "receipt_hash": receipt.digest,
+                    "reviewer": reviewer,
+                    "suspended_artifact_ids": list(quarantined),
+                },
+                now_us=now,
+            )
+            sequence_update = connection.execute(
+                "UPDATE proposals SET status_sequence = ? WHERE id = ? AND status = ?",
+                (status_sequence, proposal_id, proposal_status),
+            )
+            if sequence_update.rowcount != 1:
+                raise IntegrityError("proposal confirmation sequence was not bound")
+        return Resolved(
+            request_id=request_id,
+            output=final.value,
+            source="confirmed",
+            example_id=example_id,
+        )
+
+    # -- deterministic compiler ---------------------------------------------
+
+    def compile(
+        self,
+        partition: str,
+        operation: str,
+        *,
+        compiled_by: str = "local-system",
+    ) -> CompileResult:
+        """Snapshot eligible examples into draft exact-lookup builds.
+
+        The compiler performs no model call and no generalization. Repetition
+        chooses whether an already-confirmed exact behavior is mature enough to
+        become a build; it never invents a wider predicate.
+        """
+
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        compiled_by = _text(compiled_by, "compiled_by", maximum=256)
+        self._authorize(partition, compiled_by, "artifact.compile", operation)
+        now = self._now()
+        created: list[str] = []
+        existing: list[str] = []
+        blocked: list[dict[str, JSONValue]] = []
+        with self.store.transaction(write=True) as connection:
+            registered = connection.execute(
+                "SELECT * FROM operations WHERE partition = ? AND name = ?",
+                (partition, operation),
+            ).fetchone()
+            if registered is None:
+                raise NotFoundError("operation is not registered in this partition")
+            revision = int(registered["revision"])
+            policy = _policy_from_text(str(registered["policy_json"]))
+            if canonicalize(policy.as_json(), max_bytes=16_384).digest != registered["policy_hash"]:
+                raise IntegrityError("operation policy digest mismatch")
+            groups = connection.execute(
+                """
+                SELECT e.input_hash, e.input_json,
+                       COUNT(DISTINCT e.reviewer) AS reviewer_count
+                FROM examples AS e
+                LEFT JOIN example_revocations AS x ON x.example_id = e.id
+                WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
+                  AND x.example_id IS NULL
+                GROUP BY e.input_hash, e.input_json
+                ORDER BY e.input_hash, e.input_json
+                """,
+                (partition, operation, revision),
+            )
+
+            for group in groups:
+                input_hash = str(group["input_hash"])
+                input_text = str(group["input_json"])
+                assessment = self._assess_examples(
+                    self._active_evidence(
+                        connection,
+                        partition=partition,
+                        operation=operation,
+                        revision=revision,
+                        input_hash=input_hash,
+                        input_text=input_text,
+                    ),
+                    policy,
+                    reviewer_count=int(group["reviewer_count"]),
+                )
+                if assessment["integrity_failures"]:
+                    raise IntegrityError(str(assessment["integrity_failures"][0]))
+                failures = list(assessment["policy_failures"])
+                if failures:
+                    blocked.append(
+                        {
+                            "input_hash": input_hash,
+                            "reasons": failures,
+                            "support": int(assessment["support"]),
+                        }
+                    )
+                    continue
+                input_json = parse_json(input_text)
+                output_json = parse_json(str(assessment["output_text"]))
+                try:
+                    artifact = build_exact_lookup(
+                        partition=partition,
+                        operation=operation,
+                        operation_revision=revision,
+                        input_value=input_json.value,
+                        output_value=output_json.value,
+                    )
+                except ValidationError as exc:
+                    blocked.append(
+                        {
+                            "input_hash": input_hash,
+                            "reasons": [f"artifact constraint: {exc}"],
+                            "support": int(assessment["support"]),
+                        }
+                    )
+                    continue
+                snapshot = self._evidence_snapshot(
+                    self._active_evidence(
+                        connection,
+                        partition=partition,
+                        operation=operation,
+                        revision=revision,
+                        input_hash=input_hash,
+                        input_text=input_text,
+                        order_by_id=True,
+                    ),
+                    partition=partition,
+                    operation=operation,
+                    revision=revision,
+                    input_text=input_text,
+                )
+                build_hash = build_digest(
+                    artifact_digest=artifact.digest,
+                    policy_digest=str(registered["policy_hash"]),
+                    evidence_snapshot_digest=snapshot,
+                    support=int(assessment["support"]),
+                    reviewer_count=int(assessment["reviewer_count"]),
+                    span_seconds=int(assessment["span_seconds"]),
+                )
+                found = connection.execute(
+                    """
+                    SELECT id FROM artifacts
+                    WHERE build_hash = ? AND status IN ('building', 'draft', 'verified', 'promoted')
+                    ORDER BY id LIMIT 1
+                    """,
+                    (build_hash,),
+                ).fetchone()
+                if found is not None:
+                    existing.append(str(found["id"]))
+                    continue
+                artifact_id = _new_id("art")
+                connection.execute(
+                    """
+                    INSERT INTO artifacts(
+                        id, partition, operation, operation_revision, input_json, input_hash,
+                        output_json, output_hash, artifact_json, artifact_hash, scope_hash,
+                        build_hash, policy_json, policy_hash, evidence_snapshot_hash, status,
+                        support, reviewer_count, span_seconds, created_at_us
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'building', ?, ?, ?, ?)
+                    """,
+                    (
+                        artifact_id,
+                        partition,
+                        operation,
+                        revision,
+                        input_json.text,
+                        input_json.digest,
+                        output_json.text,
+                        output_json.digest,
+                        artifact.text,
+                        artifact.digest,
+                        artifact.scope_digest,
+                        build_hash,
+                        registered["policy_json"],
+                        registered["policy_hash"],
+                        snapshot,
+                        assessment["support"],
+                        assessment["reviewer_count"],
+                        assessment["span_seconds"],
+                        now,
+                    ),
+                )
+                inserted = connection.execute(
+                    """
+                    INSERT INTO artifact_evidence(artifact_id, example_id)
+                    SELECT ?, e.id FROM examples AS e
+                    LEFT JOIN example_revocations AS x ON x.example_id = e.id
+                    WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
+                      AND e.input_hash = ? AND e.input_json = ? AND x.example_id IS NULL
+                    ORDER BY e.id
+                    """,
+                    (artifact_id, partition, operation, revision, input_hash, input_text),
+                )
+                if inserted.rowcount != int(assessment["support"]):
+                    raise IntegrityError("artifact evidence insertion count changed during compilation")
+                connection.execute(
+                    "UPDATE artifacts SET status = 'draft' WHERE id = ? AND status = 'building'",
+                    (artifact_id,),
+                )
+                _event(
+                    connection,
+                    partition=partition,
+                    kind="artifact.compiled",
+                    subject_type="artifact",
+                    subject_id=artifact_id,
+                    payload={
+                        "artifact_hash": artifact.digest,
+                        "build_hash": build_hash,
+                        "evidence_snapshot_hash": snapshot,
+                        "scope_hash": artifact.scope_digest,
+                        "support": int(assessment["support"]),
+                        "compiled_by": compiled_by,
+                    },
+                    now_us=now,
+                )
+                created.append(artifact_id)
+        return CompileResult(
+            created=tuple(created),
+            existing=tuple(existing),
+            blocked=tuple(blocked),
+        )
+
+    def _assess_examples(
+        self,
+        evidence: Iterable[sqlite3.Row],
+        policy: CompilePolicy,
+        *,
+        reviewer_count: int | None = None,
+    ) -> dict[str, Any]:
+        integrity: list[str] = []
+        reviewers: set[str] = set()
+        support = 0
+        first_input: str | None = None
+        first_output: str | None = None
+        input_conflict = False
+        output_conflict = False
+        earliest: int | None = None
+        latest: int | None = None
+
+        def integrity_failure(message: str) -> None:
+            if len(integrity) < 16:
+                integrity.append(message)
+
+        for row in evidence:
+            support += 1
+            try:
+                input_json = parse_json(str(row["input_json"]))
+                output_json = parse_json(str(row["output_json"]))
+                receipt = parse_json(
+                    str(row["receipt_json"]), max_bytes=_RECEIPT_MAX_BYTES
+                )
+            except ValidationError as exc:
+                integrity_failure(
+                    f"example {row['id']} contains invalid canonical JSON: {exc}"
+                )
+                continue
+            if input_json.digest != row["input_hash"] or output_json.digest != row["output_hash"]:
+                integrity_failure(f"example {row['id']} content digest mismatch")
+            if receipt.digest != row["receipt_hash"]:
+                integrity_failure(f"example {row['id']} receipt digest mismatch")
+            receipt_value = receipt.value
+            if type(receipt_value) is not dict:
+                integrity_failure(f"example {row['id']} receipt is not an object")
+            else:
+                bound = {
+                    "example_id": row["id"],
+                    "partition": row["partition"],
+                    "operation": row["operation"],
+                    "operation_revision": row["operation_revision"],
+                    "reviewer": row["reviewer"],
+                    "confirmed_at_us": row["confirmed_at_us"],
+                }
+                if any(receipt_value.get(key) != value for key, value in bound.items()):
+                    integrity_failure(f"example {row['id']} receipt binding mismatch")
+                try:
+                    if canonicalize(receipt_value.get("input")).text != input_json.text:
+                        integrity_failure(f"example {row['id']} receipt input mismatch")
+                    if canonicalize(receipt_value.get("output")).text != output_json.text:
+                        integrity_failure(f"example {row['id']} receipt output mismatch")
+                except ValidationError:
+                    integrity_failure(f"example {row['id']} receipt payload is invalid")
+            if first_input is None:
+                first_input = input_json.text
+            elif first_input != input_json.text:
+                input_conflict = True
+            if first_output is None:
+                first_output = output_json.text
+            elif first_output != output_json.text:
+                output_conflict = True
+            if reviewer_count is None and len(reviewers) < policy.min_reviewers:
+                reviewers.add(str(row["reviewer"]))
+            timestamp = int(row["confirmed_at_us"])
+            earliest = timestamp if earliest is None else min(earliest, timestamp)
+            latest = timestamp if latest is None else max(latest, timestamp)
+
+        span_seconds = (
+            (latest - earliest) // 1_000_000
+            if earliest is not None and latest is not None and support >= 2
+            else 0
+        )
+        policy_failures: list[str] = []
+        if input_conflict:
+            integrity_failure("evidence hash collision bound multiple canonical inputs")
+        if output_conflict:
+            policy_failures.append("confirmed outputs conflict")
+        if support < policy.min_confirmations:
+            policy_failures.append(
+                f"support {support} is below required {policy.min_confirmations}"
+            )
+        effective_reviewer_count = (
+            len(reviewers) if reviewer_count is None else reviewer_count
+        )
+        if effective_reviewer_count < policy.min_reviewers:
+            policy_failures.append(
+                f"reviewers {effective_reviewer_count} is below required {policy.min_reviewers}"
+            )
+        if span_seconds < policy.min_span_seconds:
+            policy_failures.append(
+                f"span {span_seconds}s is below required {policy.min_span_seconds}s"
+            )
+        return {
+            "integrity_failures": integrity,
+            "policy_failures": policy_failures,
+            "reviewer_count": effective_reviewer_count,
+            "span_seconds": span_seconds,
+            "support": support,
+            "output_text": first_output,
+        }
+
+    @staticmethod
+    def _active_evidence(
+        connection: sqlite3.Connection,
+        *,
+        partition: str,
+        operation: str,
+        revision: int,
+        input_hash: str,
+        input_text: str,
+        order_by_id: bool = False,
+    ) -> sqlite3.Cursor:
+        order = "e.id" if order_by_id else "e.confirmed_at_us, e.id"
+        return connection.execute(
+            f"""
+            SELECT e.* FROM examples AS e
+            LEFT JOIN example_revocations AS x ON x.example_id = e.id
+            WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
+              AND e.input_hash = ? AND e.input_json = ? AND x.example_id IS NULL
+            ORDER BY {order}
+            """,
+            (partition, operation, revision, input_hash, input_text),
+        )
+
+    @staticmethod
+    def _active_reviewer_count(
+        connection: sqlite3.Connection,
+        *,
+        partition: str,
+        operation: str,
+        revision: int,
+        input_hash: str,
+        input_text: str,
+    ) -> int:
+        row = connection.execute(
+            """
+            SELECT COUNT(DISTINCT e.reviewer) FROM examples AS e
+            LEFT JOIN example_revocations AS x ON x.example_id = e.id
+            WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
+              AND e.input_hash = ? AND e.input_json = ? AND x.example_id IS NULL
+            """,
+            (partition, operation, revision, input_hash, input_text),
+        ).fetchone()
+        return int(row[0])
+
+    @staticmethod
+    def _evidence_snapshot(
+        evidence: Iterable[sqlite3.Row],
+        *,
+        partition: str,
+        operation: str,
+        revision: int,
+        input_text: str,
+    ) -> str:
+        digest = hashlib.sha256()
+        for part in (
+            "cement-evidence-snapshot-v1",
+            CANONICALIZER,
+            partition,
+            operation,
+            str(revision),
+            input_text,
+        ):
+            encoded = part.encode("utf-8")
+            digest.update(len(encoded).to_bytes(8, "big"))
+            digest.update(encoded)
+        for row in evidence:
+            for part in (str(row["id"]), str(row["receipt_hash"])):
+                encoded = part.encode("utf-8")
+                digest.update(len(encoded).to_bytes(8, "big"))
+                digest.update(encoded)
+        return digest.hexdigest()
+
+    @staticmethod
+    def _test_snapshot(
+        connection: sqlite3.Connection,
+        report_id: str,
+    ) -> tuple[int, str]:
+        digest = hashlib.sha256()
+        label = b"cement-verification-tests-v1"
+        digest.update(len(label).to_bytes(8, "big"))
+        digest.update(label)
+        count = 0
+        for row in connection.execute(
+            """
+            SELECT test_key, example_id, passed, detail FROM artifact_tests
+            WHERE report_id = ? ORDER BY test_key
+            """,
+            (report_id,),
+        ):
+            count += 1
+            parts = (
+                str(row["test_key"]),
+                "none" if row["example_id"] is None else "example",
+                "" if row["example_id"] is None else str(row["example_id"]),
+                "1" if int(row["passed"]) else "0",
+                str(row["detail"]),
+            )
+            for part in parts:
+                encoded = part.encode("utf-8")
+                digest.update(len(encoded).to_bytes(8, "big"))
+                digest.update(encoded)
+        return count, digest.hexdigest()
+
+    # -- replay verification + atomic promotion ----------------------------
+
+    def verify(
+        self,
+        partition: str,
+        artifact_id: str,
+        *,
+        verified_by: str = "local-system",
+    ) -> VerificationReport:
+        partition = _name(partition, "partition")
+        artifact_id = _request_id(artifact_id)
+        verified_by = _text(verified_by, "verified_by", maximum=256)
+        self._authorize(partition, verified_by, "artifact.verify", artifact_id)
+        now = self._now()
+        report_id = _new_id("report")
+        with self.store.transaction(write=True) as connection:
+            row = connection.execute(
+                "SELECT * FROM artifacts WHERE id = ? AND partition = ?",
+                (artifact_id, partition),
+            ).fetchone()
+            if row is None:
+                raise NotFoundError("artifact does not exist in this partition")
+            artifact: ArtifactDocument | None
+            pending_tests: list[tuple[str, str, str | None, int, str]] = []
+
+            def flush_tests() -> None:
+                if pending_tests:
+                    connection.executemany(
+                        """
+                        INSERT INTO artifact_tests(
+                            report_id, test_key, example_id, passed, detail
+                        ) VALUES (?, ?, ?, ?, ?)
+                        """,
+                        pending_tests,
+                    )
+                    pending_tests.clear()
+
+            def record_test(
+                key: str,
+                example_id: str | None,
+                passed: bool,
+                detail: str,
+            ) -> None:
+                pending_tests.append((report_id, key, example_id, int(passed), detail))
+                if len(pending_tests) >= 512:
+                    flush_tests()
+
+            connection.execute("SAVEPOINT verification_run")
+            try:
+                if row["status"] == "promoted":
+                    self._validate_promoted(connection, row)
+                failures, test_count, artifact = self._run_verification(
+                    connection, row, record_test=record_test
+                )
+                flush_tests()
+            except (IntegrityError, ValidationError) as exc:
+                pending_tests.clear()
+                connection.execute("ROLLBACK TO verification_run")
+                connection.execute("RELEASE verification_run")
+                failures = [f"artifact integrity failure: {exc}"]
+                record_test("artifact-integrity", None, False, failures[0])
+                flush_tests()
+                test_count = 1
+                artifact = None
+            else:
+                connection.execute("RELEASE verification_run")
+            passed = not failures
+            scope_hash = artifact.scope_digest if artifact is not None else str(row["scope_hash"])
+            stored_test_count, test_set_hash = self._test_snapshot(connection, report_id)
+            if stored_test_count != test_count:
+                raise IntegrityError("verification test count changed while recording")
+            details = canonicalize(
+                {
+                    "failures": failures,
+                    "scope_hash": scope_hash,
+                    "tests": test_count,
+                    "verified_by": verified_by,
+                },
+                max_bytes=262_144,
+            )
+            connection.execute(
+                """
+                INSERT INTO test_reports(
+                    id, artifact_id, artifact_hash, build_hash, policy_hash,
+                    evidence_snapshot_hash, passed, details_json, details_hash,
+                    test_count, test_set_hash, created_at_us
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    report_id,
+                    artifact_id,
+                    row["artifact_hash"],
+                    row["build_hash"],
+                    row["policy_hash"],
+                    row["evidence_snapshot_hash"],
+                    int(passed),
+                    details.text,
+                    details.digest,
+                    test_count,
+                    test_set_hash,
+                    now,
+                ),
+            )
+            status = str(row["status"])
+            if passed and status in {"draft", "verified"}:
+                connection.execute(
+                    """
+                    UPDATE artifacts
+                    SET status = 'verified', verified_report_id = ?, status_reason = NULL
+                    WHERE id = ?
+                    """,
+                    (report_id, artifact_id),
+                )
+            elif not passed and status == "promoted":
+                connection.execute(
+                    """
+                    UPDATE artifacts
+                    SET status = 'suspended', promotion_hash = NULL,
+                        status_reason = 'verification failed'
+                    WHERE id = ?
+                    """,
+                    (artifact_id,),
+                )
+            elif not passed and status == "verified":
+                connection.execute(
+                    """
+                    UPDATE artifacts
+                    SET status = 'draft', verified_report_id = NULL,
+                        status_reason = 'verification failed'
+                    WHERE id = ?
+                    """,
+                    (artifact_id,),
+                )
+            _event(
+                connection,
+                partition=partition,
+                kind="artifact.verified" if passed else "artifact.verification_failed",
+                subject_type="artifact",
+                subject_id=artifact_id,
+                payload={
+                    "failures": failures,
+                    "report_id": report_id,
+                    "scope_hash": scope_hash,
+                    "tests": test_count,
+                    "verified_by": verified_by,
+                },
+                now_us=now,
+            )
+        return VerificationReport(
+            id=report_id,
+            artifact_id=artifact_id,
+            scope_hash=scope_hash,
+            passed=passed,
+            tests=test_count,
+            failures=tuple(failures),
+            created_at_us=now,
+        )
+
+    def _run_verification(
+        self,
+        connection: sqlite3.Connection,
+        row: sqlite3.Row,
+        *,
+        record_test: Callable[[str, str | None, bool, str], None] | None = None,
+    ) -> tuple[list[str], int, ArtifactDocument]:
+        failures: list[str] = []
+        test_count = 0
+
+        def test(key: str, example_id: str | None, passed: bool, detail: str) -> None:
+            nonlocal test_count
+            test_count += 1
+            if record_test is not None:
+                record_test(key, example_id, passed, detail)
+        try:
+            artifact = self._artifact_from_row(row)
+        except (IntegrityError, ValidationError) as exc:
+            # A placeholder is needed only for the return type; reparse cannot be trusted.
+            raise IntegrityError(f"artifact integrity failure: {exc}") from exc
+        partition = str(row["partition"])
+        operation = str(row["operation"])
+        revision = int(row["operation_revision"])
+        registered = connection.execute(
+            "SELECT * FROM operations WHERE partition = ? AND name = ?",
+            (partition, operation),
+        ).fetchone()
+        current_ok = (
+            registered is not None
+            and int(registered["revision"]) == revision
+            and registered["policy_hash"] == row["policy_hash"]
+            and registered["policy_json"] == row["policy_json"]
+        )
+        test("operation-current", None, current_ok, "operation revision + policy binding")
+        if not current_ok:
+            failures.append("operation revision or policy is stale")
+        policy = _policy_from_text(str(row["policy_json"]))
+        assessment = self._assess_examples(
+            self._active_evidence(
+                connection,
+                partition=partition,
+                operation=operation,
+                revision=revision,
+                input_hash=str(row["input_hash"]),
+                input_text=str(row["input_json"]),
+            ),
+            policy,
+            reviewer_count=self._active_reviewer_count(
+                connection,
+                partition=partition,
+                operation=operation,
+                revision=revision,
+                input_hash=str(row["input_hash"]),
+                input_text=str(row["input_json"]),
+            ),
+        )
+        if assessment["integrity_failures"]:
+            raise IntegrityError(str(assessment["integrity_failures"][0]))
+        for failure in assessment["policy_failures"]:
+            failures.append(str(failure))
+        snapshot = self._evidence_snapshot(
+            self._active_evidence(
+                connection,
+                partition=partition,
+                operation=operation,
+                revision=revision,
+                input_hash=str(row["input_hash"]),
+                input_text=str(row["input_json"]),
+                order_by_id=True,
+            ),
+            partition=partition,
+            operation=operation,
+            revision=revision,
+            input_text=str(row["input_json"]),
+        )
+        snapshot_ok = snapshot == row["evidence_snapshot_hash"]
+        test("evidence-snapshot", None, snapshot_ok, "immutable evidence snapshot")
+        if not snapshot_ok:
+            failures.append("evidence snapshot changed")
+        else:
+            for field in ("support", "reviewer_count", "span_seconds"):
+                if int(row[field]) != int(assessment[field]):
+                    raise IntegrityError(f"artifact {field} does not match active evidence")
+        input_json = parse_json(str(row["input_json"]))
+        expected_output = str(row["output_json"])
+        replay_failures = 0
+        for example in self._active_evidence(
+            connection,
+            partition=partition,
+            operation=operation,
+            revision=revision,
+            input_hash=str(row["input_hash"]),
+            input_text=str(row["input_json"]),
+            order_by_id=True,
+        ):
+            execution = execute(
+                artifact,
+                partition=partition,
+                operation=operation,
+                operation_revision=revision,
+                input_json=input_json,
+            )
+            ok = (
+                execution.matched
+                and canonicalize(execution.output).text == str(example["output_json"])
+                and str(example["output_json"]) == expected_output
+            )
+            test(
+                f"example:{example['id']}",
+                str(example["id"]),
+                ok,
+                "exact fixture replay",
+            )
+            if not ok:
+                replay_failures += 1
+        if replay_failures:
+            failures.append(f"{replay_failures} exact fixture replay tests failed")
+
+        different_input = canonicalize({"$cement_boundary_probe": artifact.digest})
+        if different_input.text == input_json.text:
+            different_input = canonicalize(["$cement_boundary_probe", artifact.digest])
+        boundary_cases = (
+            (
+                "boundary:partition",
+                execute(
+                    artifact,
+                    partition="cement-boundary" if partition != "cement-boundary" else "cement-boundary-2",
+                    operation=operation,
+                    operation_revision=revision,
+                    input_json=input_json,
+                ),
+            ),
+            (
+                "boundary:operation",
+                execute(
+                    artifact,
+                    partition=partition,
+                    operation="cement-boundary" if operation != "cement-boundary" else "cement-boundary-2",
+                    operation_revision=revision,
+                    input_json=input_json,
+                ),
+            ),
+            (
+                "boundary:revision",
+                execute(
+                    artifact,
+                    partition=partition,
+                    operation=operation,
+                    operation_revision=revision + 1,
+                    input_json=input_json,
+                ),
+            ),
+            (
+                "boundary:input",
+                execute(
+                    artifact,
+                    partition=partition,
+                    operation=operation,
+                    operation_revision=revision,
+                    input_json=different_input,
+                ),
+            ),
+        )
+        for key, execution in boundary_cases:
+            ok = not execution.matched
+            test(key, None, ok, "out-of-scope request must not match")
+            if not ok:
+                failures.append(f"{key} widened scope")
+        return failures, test_count, artifact
+
+    def promote(
+        self,
+        partition: str,
+        artifact_id: str,
+        *,
+        scope_hash: str,
+        promoted_by: str,
+    ) -> Promotion:
+        partition = _name(partition, "partition")
+        artifact_id = _request_id(artifact_id)
+        promoted_by = _text(promoted_by, "promoted_by", maximum=256)
+        if type(scope_hash) is not str or not re.fullmatch(r"[0-9a-f]{64}", scope_hash):
+            raise ValidationError("scope_hash must be a SHA-256 hex digest")
+        self._authorize(partition, promoted_by, "artifact.promote", artifact_id)
+        now = self._now()
+        with self.store.transaction(write=True) as connection:
+            row = connection.execute(
+                "SELECT * FROM artifacts WHERE id = ? AND partition = ?",
+                (artifact_id, partition),
+            ).fetchone()
+            if row is None:
+                raise NotFoundError("artifact does not exist in this partition")
+            if row["status"] != "verified" or not row["verified_report_id"]:
+                raise StateError("artifact must have a current passing verification report")
+            if row["scope_hash"] != scope_hash:
+                raise ConflictError("requested promotion scope does not equal the tested scope")
+            report = connection.execute(
+                "SELECT * FROM test_reports WHERE id = ? AND artifact_id = ?",
+                (row["verified_report_id"], artifact_id),
+            ).fetchone()
+            if report is None or not int(report["passed"]):
+                raise StateError("artifact's bound verification report is missing or failed")
+            report_details = self._validate_report(connection, report)
+            if (
+                type(report_details.value) is not dict
+                or report_details.value.get("scope_hash") != row["scope_hash"]
+            ):
+                raise IntegrityError("verification report scope binding mismatch")
+            for field in (
+                "artifact_hash",
+                "build_hash",
+                "policy_hash",
+                "evidence_snapshot_hash",
+            ):
+                if report[field] != row[field]:
+                    raise IntegrityError(f"verification report {field} binding mismatch")
+            failures, _, artifact = self._run_verification(connection, row)
+            if failures:
+                raise StateError("artifact changed or became stale after verification: " + failures[0])
+            if artifact.scope_digest != scope_hash:
+                raise IntegrityError("artifact scope digest mismatch")
+            previous = connection.execute(
+                """
+                SELECT id FROM artifacts
+                WHERE partition = ? AND operation = ? AND operation_revision = ?
+                  AND input_hash = ? AND status = 'promoted' AND id <> ?
+                """,
+                (
+                    partition,
+                    row["operation"],
+                    row["operation_revision"],
+                    row["input_hash"],
+                    artifact_id,
+                ),
+            ).fetchall()
+            replaced = tuple(str(item["id"]) for item in previous)
+            if previous:
+                connection.executemany(
+                    """
+                    UPDATE artifacts
+                    SET status = 'retired', promotion_hash = NULL,
+                        status_reason = 'replaced by verified build'
+                    WHERE id = ? AND status = 'promoted'
+                    """,
+                    [(item,) for item in replaced],
+                )
+            promotion_hash = _digest_strings(
+                "cement-promotion-v2",
+                (
+                    artifact_id,
+                    str(row["artifact_hash"]),
+                    str(row["build_hash"]),
+                    str(row["policy_hash"]),
+                    str(row["evidence_snapshot_hash"]),
+                    str(row["support"]),
+                    str(row["reviewer_count"]),
+                    str(row["span_seconds"]),
+                    str(row["scope_hash"]),
+                    str(report["id"]),
+                    str(report["details_hash"]),
+                    str(report["test_set_hash"]),
+                    str(report["test_count"]),
+                    str(report["passed"]),
+                    promoted_by,
+                    str(now),
+                ),
+            )
+            connection.execute(
+                """
+                UPDATE artifacts SET status = 'promoted', promoted_by = ?, promoted_at_us = ?,
+                    promotion_hash = ?, status_reason = NULL
+                WHERE id = ? AND status = 'verified'
+                """,
+                (promoted_by, now, promotion_hash, artifact_id),
+            )
+            _event(
+                connection,
+                partition=partition,
+                kind="artifact.promoted",
+                subject_type="artifact",
+                subject_id=artifact_id,
+                payload={
+                    "promoted_by": promoted_by,
+                    "replaced_artifact_ids": list(replaced),
+                    "scope_hash": scope_hash,
+                },
+                now_us=now,
+            )
+        return Promotion(
+            artifact_id=artifact_id,
+            replaced_artifact_ids=replaced,
+            promoted_at_us=now,
+        )
+
+    # -- drift, revocation, inspection --------------------------------------
+
+    def challenge(
+        self,
+        partition: str,
+        operation: str,
+        input_value: object,
+        expected_output: object,
+        *,
+        reviewer: str,
+        note: str = "",
+    ) -> tuple[str, bool]:
+        """Confirm an active scope; quarantine immediately on disagreement.
+
+        Returns ``(example_id, suspended)``.
+        """
+
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        reviewer = _text(reviewer, "reviewer", maximum=256)
+        note = _text(note, "note", maximum=2_048, allow_empty=True)
+        self._authorize(partition, reviewer, "artifact.challenge", operation)
+        input_json = canonicalize(input_value)
+        expected = canonicalize(expected_output)
+        now = self._now()
+        example_id = _new_id("ex")
+
+        quarantined: list[str] = []
+        with self.store.transaction(write=True) as connection:
+            registered = connection.execute(
+                "SELECT revision FROM operations WHERE partition = ? AND name = ?",
+                (partition, operation),
+            ).fetchone()
+            if registered is None:
+                raise NotFoundError("operation is not registered in this partition")
+            revision = int(registered["revision"])
+            rows = connection.execute(
+                """
+                SELECT * FROM artifacts
+                WHERE partition = ? AND operation = ? AND operation_revision = ?
+                  AND input_hash = ? AND status = 'promoted'
+                """,
+                (partition, operation, revision, input_json.digest),
+            ).fetchall()
+            for row in rows:
+                try:
+                    self._artifact_from_row(row)
+                    self._validate_promoted(connection, row)
+                except (IntegrityError, ValidationError):
+                    artifact_id = str(row["id"])
+                    connection.execute(
+                        """
+                        UPDATE artifacts
+                        SET status = 'suspended', promotion_hash = NULL,
+                            status_reason = 'challenge integrity failure'
+                        WHERE id = ? AND status = 'promoted'
+                        """,
+                        (artifact_id,),
+                    )
+                    _event(
+                        connection,
+                        partition=partition,
+                        kind="artifact.integrity_quarantined",
+                        subject_type="artifact",
+                        subject_id=artifact_id,
+                        payload={"source": "challenge"},
+                        now_us=now,
+                    )
+                    quarantined.append(artifact_id)
+        if quarantined:
+            raise StateError("challenge quarantined an integrity-invalid artifact; retry after review")
+
+        with self.store.transaction(write=True) as connection:
+            registered = connection.execute(
+                "SELECT revision FROM operations WHERE partition = ? AND name = ?",
+                (partition, operation),
+            ).fetchone()
+            if registered is None:
+                raise NotFoundError("operation is not registered in this partition")
+            revision = int(registered["revision"])
+            rows = connection.execute(
+                """
+                SELECT * FROM artifacts
+                WHERE partition = ? AND operation = ? AND operation_revision = ?
+                  AND input_hash = ? AND status = 'promoted'
+                """,
+                (partition, operation, revision, input_json.digest),
+            ).fetchall()
+            matches: list[tuple[sqlite3.Row, CanonicalJSON]] = []
+            for row in rows:
+                artifact = self._artifact_from_row(row)
+                self._validate_promoted(connection, row)
+                execution = execute(
+                    artifact,
+                    partition=partition,
+                    operation=operation,
+                    operation_revision=revision,
+                    input_json=input_json,
+                )
+                if execution.matched:
+                    matches.append((row, canonicalize(execution.output)))
+            if len(matches) != 1:
+                raise StateError("challenge requires exactly one active artifact match")
+            artifact_row, observed = matches[0]
+            suspended = observed.text != expected.text
+            receipt = canonicalize(
+                {
+                    "artifact_id": str(artifact_row["id"]),
+                    "confirmed_at_us": now,
+                    "example_id": example_id,
+                    "format": "cement-confirmation-v1",
+                    "input": input_json.value,
+                    "note": note,
+                    "operation": operation,
+                    "operation_revision": revision,
+                    "output": expected.value,
+                    "partition": partition,
+                    "resolution": "challenge",
+                    "reviewer": reviewer,
+                },
+                max_bytes=_RECEIPT_MAX_BYTES,
+            )
+            connection.execute(
+                """
+                INSERT INTO examples(
+                    id, partition, operation, operation_revision, input_json, input_hash,
+                    output_json, output_hash, reviewer, origin, receipt_json, receipt_hash,
+                    confirmed_at_us
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'challenge', ?, ?, ?)
+                """,
+                (
+                    example_id,
+                    partition,
+                    operation,
+                    revision,
+                    input_json.text,
+                    input_json.digest,
+                    expected.text,
+                    expected.digest,
+                    reviewer,
+                    receipt.text,
+                    receipt.digest,
+                    now,
+                ),
+            )
+            if suspended:
+                connection.execute(
+                    """
+                    UPDATE artifacts
+                    SET status = 'suspended', promotion_hash = NULL,
+                        status_reason = 'confirmed counterexample'
+                    WHERE id = ? AND status = 'promoted'
+                    """,
+                    (artifact_row["id"],),
+                )
+            _event(
+                connection,
+                partition=partition,
+                kind="artifact.counterexample" if suspended else "artifact.challenged",
+                subject_type="artifact",
+                subject_id=str(artifact_row["id"]),
+                payload={
+                    "example_id": example_id,
+                    "receipt_hash": receipt.digest,
+                    "reviewer": reviewer,
+                    "suspended": suspended,
+                },
+                now_us=now,
+            )
+        return example_id, suspended
+
+    def revoke_example(
+        self,
+        partition: str,
+        example_id: str,
+        *,
+        revoked_by: str,
+        reason: str,
+    ) -> tuple[str, ...]:
+        partition = _name(partition, "partition")
+        example_id = _request_id(example_id)
+        revoked_by = _text(revoked_by, "revoked_by", maximum=256)
+        reason = _text(reason, "reason", maximum=2_048)
+        self._authorize(partition, revoked_by, "example.revoke", example_id)
+        now = self._now()
+        with self.store.transaction(write=True) as connection:
+            example = connection.execute(
+                "SELECT id FROM examples WHERE id = ? AND partition = ?",
+                (example_id, partition),
+            ).fetchone()
+            if example is None:
+                raise NotFoundError("example does not exist in this partition")
+            try:
+                connection.execute(
+                    """
+                    INSERT INTO example_revocations(example_id, revoked_by, reason, revoked_at_us)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (example_id, revoked_by, reason, now),
+                )
+            except sqlite3.IntegrityError as exc:
+                raise StateError("example is already revoked") from exc
+            dependents = connection.execute(
+                """
+                SELECT a.id FROM artifacts AS a
+                JOIN artifact_evidence AS e ON e.artifact_id = a.id
+                WHERE e.example_id = ? AND a.status IN ('draft', 'verified', 'promoted')
+                ORDER BY a.id
+                """,
+                (example_id,),
+            ).fetchall()
+            suspended = tuple(str(row["id"]) for row in dependents)
+            if suspended:
+                connection.executemany(
+                    """
+                    UPDATE artifacts
+                    SET status = 'suspended', promotion_hash = NULL,
+                        status_reason = 'evidence revoked'
+                    WHERE id = ?
+                    """,
+                    [(artifact_id,) for artifact_id in suspended],
+                )
+            _event(
+                connection,
+                partition=partition,
+                kind="example.revoked",
+                subject_type="example",
+                subject_id=example_id,
+                payload={
+                    "reason": reason,
+                    "revoked_by": revoked_by,
+                    "suspended_artifact_count": len(suspended),
+                    "suspended_artifact_ids": list(suspended[:100]),
+                    "suspended_artifact_ids_hash": _digest_strings(
+                        "cement-id-list-v1", suspended
+                    ),
+                },
+                now_us=now,
+            )
+        return suspended
+
+    def suspend_artifact(
+        self,
+        partition: str,
+        artifact_id: str,
+        *,
+        suspended_by: str,
+        reason: str,
+    ) -> None:
+        partition = _name(partition, "partition")
+        artifact_id = _request_id(artifact_id)
+        suspended_by = _text(suspended_by, "suspended_by", maximum=256)
+        reason = _text(reason, "reason", maximum=2_048)
+        self._authorize(partition, suspended_by, "artifact.suspend", artifact_id)
+        now = self._now()
+        with self.store.transaction(write=True) as connection:
+            row = connection.execute(
+                "SELECT status FROM artifacts WHERE id = ? AND partition = ?",
+                (artifact_id, partition),
+            ).fetchone()
+            if row is None:
+                raise NotFoundError("artifact does not exist in this partition")
+            if row["status"] in {"retired", "suspended"}:
+                raise StateError(f"artifact is already {row['status']}")
+            connection.execute(
+                """
+                UPDATE artifacts SET status = 'suspended', promotion_hash = NULL,
+                    status_reason = ? WHERE id = ?
+                """,
+                (reason, artifact_id),
+            )
+            _event(
+                connection,
+                partition=partition,
+                kind="artifact.suspended",
+                subject_type="artifact",
+                subject_id=artifact_id,
+                payload={"reason": reason, "suspended_by": suspended_by},
+                now_us=now,
+            )
+
+    def operations(self, partition: str) -> list[dict[str, JSONValue]]:
+        partition = _name(partition, "partition")
+        with self.store.transaction() as connection:
+            rows = connection.execute(
+                """
+                SELECT name, revision, policy_json, policy_hash, created_at_us, updated_at_us
+                FROM operations WHERE partition = ? ORDER BY name
+                """,
+                (partition,),
+            ).fetchall()
+            return [
+                {
+                    "created_at_us": int(row["created_at_us"]),
+                    "name": str(row["name"]),
+                    "policy": parse_json(str(row["policy_json"]), max_bytes=16_384).value,
+                    "policy_hash": str(row["policy_hash"]),
+                    "revision": int(row["revision"]),
+                    "updated_at_us": int(row["updated_at_us"]),
+                }
+                for row in rows
+            ]
+
+    def examples(
+        self,
+        partition: str,
+        operation: str,
+        *,
+        include_revoked: bool = False,
+        after_sequence: int = 0,
+        limit: int = 1_000,
+    ) -> list[dict[str, JSONValue]]:
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        if type(include_revoked) is not bool:
+            raise ValidationError("include_revoked must be a boolean")
+        _bounded_int(
+            after_sequence,
+            "after_sequence",
+            minimum=0,
+            maximum=2**63 - 1,
+        )
+        _bounded_int(limit, "limit", minimum=1, maximum=10_000)
+        clause = "" if include_revoked else "AND x.example_id IS NULL"
+        with self.store.transaction() as connection:
+            rows = connection.execute(
+                f"""
+                SELECT e.*, x.revoked_by, x.reason AS revocation_reason, x.revoked_at_us
+                FROM examples AS e
+                LEFT JOIN example_revocations AS x ON x.example_id = e.id
+                WHERE e.partition = ? AND e.operation = ? AND e.sequence > ? {clause}
+                ORDER BY e.sequence LIMIT ?
+                """,
+                (partition, operation, after_sequence, limit),
+            ).fetchall()
+            return [
+                {
+                    "confirmed_at_us": int(row["confirmed_at_us"]),
+                    "id": str(row["id"]),
+                    "input": parse_json(str(row["input_json"])).value,
+                    "operation_revision": int(row["operation_revision"]),
+                    "origin": str(row["origin"]),
+                    "output": parse_json(str(row["output_json"])).value,
+                    "receipt_hash": str(row["receipt_hash"]),
+                    "reviewer": str(row["reviewer"]),
+                    "sequence": int(row["sequence"]),
+                    "revocation": (
+                        {
+                            "at_us": int(row["revoked_at_us"]),
+                            "by": str(row["revoked_by"]),
+                            "reason": str(row["revocation_reason"]),
+                        }
+                        if row["revoked_at_us"] is not None
+                        else None
+                    ),
+                }
+                for row in rows
+            ]
+
+    def artifacts(
+        self,
+        partition: str,
+        operation: str,
+        *,
+        after_sequence: int = 0,
+        limit: int = 1_000,
+    ) -> list[dict[str, JSONValue]]:
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        _bounded_int(
+            after_sequence,
+            "after_sequence",
+            minimum=0,
+            maximum=2**63 - 1,
+        )
+        _bounded_int(limit, "limit", minimum=1, maximum=10_000)
+        with self.store.transaction() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM artifacts
+                WHERE partition = ? AND operation = ? AND sequence > ?
+                ORDER BY sequence LIMIT ?
+                """,
+                (partition, operation, after_sequence, limit),
+            ).fetchall()
+            return [self._artifact_summary(row) for row in rows]
+
+    def artifact(self, partition: str, artifact_id: str) -> dict[str, JSONValue]:
+        partition = _name(partition, "partition")
+        artifact_id = _request_id(artifact_id)
+        with self.store.transaction() as connection:
+            row = connection.execute(
+                "SELECT * FROM artifacts WHERE id = ? AND partition = ?",
+                (artifact_id, partition),
+            ).fetchone()
+            if row is None:
+                raise NotFoundError("artifact does not exist in this partition")
+            self._artifact_from_row(row)
+            if row["status"] == "promoted":
+                self._validate_promoted(connection, row)
+            summary = self._artifact_summary(row)
+            summary["document"] = parse_json(
+                str(row["artifact_json"]), max_bytes=ARTIFACT_MAX_BYTES
+            ).value
+            summary["evidence_ids"] = [
+                str(item["example_id"])
+                for item in connection.execute(
+                    """
+                    SELECT example_id FROM artifact_evidence
+                    WHERE artifact_id = ? ORDER BY example_id
+                    """,
+                    (artifact_id,),
+                ).fetchall()
+            ]
+            return summary
+
+    def report(
+        self,
+        partition: str,
+        report_id: str,
+        *,
+        after_test_key: str = "",
+        test_limit: int = 1_000,
+    ) -> dict[str, JSONValue]:
+        """Inspect immutable verification bindings and a stable test page."""
+
+        partition = _name(partition, "partition")
+        report_id = _request_id(report_id)
+        after_test_key = _text(
+            after_test_key, "after_test_key", maximum=256, allow_empty=True
+        )
+        _bounded_int(test_limit, "test_limit", minimum=1, maximum=10_000)
+        with self.store.transaction() as connection:
+            row = connection.execute(
+                """
+                SELECT r.*, a.partition, a.scope_hash
+                FROM test_reports AS r JOIN artifacts AS a ON a.id = r.artifact_id
+                WHERE r.id = ? AND a.partition = ?
+                """,
+                (report_id, partition),
+            ).fetchone()
+            if row is None:
+                raise NotFoundError("verification report does not exist in this partition")
+            details = self._validate_report(connection, row)
+            tests = connection.execute(
+                """
+                SELECT test_key, example_id, passed, detail FROM artifact_tests
+                WHERE report_id = ? AND test_key > ?
+                ORDER BY test_key LIMIT ?
+                """,
+                (report_id, after_test_key, test_limit),
+            ).fetchall()
+            return {
+                "artifact_hash": str(row["artifact_hash"]),
+                "artifact_id": str(row["artifact_id"]),
+                "build_hash": str(row["build_hash"]),
+                "created_at_us": int(row["created_at_us"]),
+                "details": details.value,
+                "evidence_snapshot_hash": str(row["evidence_snapshot_hash"]),
+                "id": report_id,
+                "passed": bool(row["passed"]),
+                "policy_hash": str(row["policy_hash"]),
+                "sequence": int(row["sequence"]),
+                "scope_hash": str(row["scope_hash"]),
+                "test_count": int(row["test_count"]),
+                "test_set_hash": str(row["test_set_hash"]),
+                "tests": [
+                    {
+                        "detail": str(test["detail"]),
+                        "example_id": (
+                            str(test["example_id"]) if test["example_id"] is not None else None
+                        ),
+                        "key": str(test["test_key"]),
+                        "passed": bool(test["passed"]),
+                    }
+                    for test in tests
+                ],
+            }
+
+    def reports(
+        self,
+        partition: str,
+        *,
+        artifact_id: str | None = None,
+        after_sequence: int = 0,
+        limit: int = 100,
+    ) -> list[dict[str, JSONValue]]:
+        """Monotonic immutable verification-report feed."""
+
+        partition = _name(partition, "partition")
+        if artifact_id is not None:
+            artifact_id = _request_id(artifact_id)
+        _bounded_int(
+            after_sequence,
+            "after_sequence",
+            minimum=0,
+            maximum=2**63 - 1,
+        )
+        _bounded_int(limit, "limit", minimum=1, maximum=10_000)
+        with self.store.transaction() as connection:
+            rows = connection.execute(
+                """
+                SELECT r.*, a.scope_hash FROM test_reports AS r
+                JOIN artifacts AS a ON a.id = r.artifact_id
+                WHERE a.partition = ? AND (? IS NULL OR r.artifact_id = ?)
+                  AND r.sequence > ?
+                ORDER BY r.sequence LIMIT ?
+                """,
+                (
+                    partition,
+                    artifact_id,
+                    artifact_id,
+                    after_sequence,
+                    limit,
+                ),
+            ).fetchall()
+            result: list[dict[str, JSONValue]] = []
+            for row in rows:
+                self._validate_report(connection, row)
+                result.append(
+                    {
+                        "artifact_id": str(row["artifact_id"]),
+                        "build_hash": str(row["build_hash"]),
+                        "created_at_us": int(row["created_at_us"]),
+                        "id": str(row["id"]),
+                        "passed": bool(row["passed"]),
+                        "sequence": int(row["sequence"]),
+                        "scope_hash": str(row["scope_hash"]),
+                        "test_count": int(row["test_count"]),
+                        "test_set_hash": str(row["test_set_hash"]),
+                    }
+                )
+            return result
+
+    def events(
+        self,
+        partition: str,
+        *,
+        after: int = 0,
+        limit: int = 1_000,
+    ) -> list[dict[str, JSONValue]]:
+        """Read events carrying an exact partition binding."""
+
+        partition = _name(partition, "partition")
+        _bounded_int(after, "after", minimum=0, maximum=2**63 - 1)
+        _bounded_int(limit, "limit", minimum=1, maximum=10_000)
+        with self.store.transaction() as connection:
+            # Events deliberately avoid indexing private inputs. Subjects for
+            # operations carry a partition prefix; other records are joined.
+            rows = connection.execute(
+                """
+                SELECT * FROM events
+                WHERE partition = ? AND sequence > ?
+                ORDER BY sequence LIMIT ?
+                """,
+                (partition, after, limit),
+            ).fetchall()
+            return [
+                {
+                    "created_at_us": int(row["created_at_us"]),
+                    "kind": str(row["kind"]),
+                    "payload": parse_json(str(row["payload_json"]), max_bytes=262_144).value,
+                    "sequence": int(row["sequence"]),
+                    "subject_id": str(row["subject_id"]),
+                    "subject_type": str(row["subject_type"]),
+                }
+                for row in rows
+            ]
+
+    @staticmethod
+    def _artifact_summary(row: sqlite3.Row) -> dict[str, JSONValue]:
+        return {
+            "artifact_hash": str(row["artifact_hash"]),
+            "build_hash": str(row["build_hash"]),
+            "created_at_us": int(row["created_at_us"]),
+            "evidence_snapshot_hash": str(row["evidence_snapshot_hash"]),
+            "id": str(row["id"]),
+            "input_hash": str(row["input_hash"]),
+            "operation_revision": int(row["operation_revision"]),
+            "promoted_at_us": (
+                int(row["promoted_at_us"]) if row["promoted_at_us"] is not None else None
+            ),
+            "promotion_hash": str(row["promotion_hash"]) if row["promotion_hash"] else None,
+            "reviewer_count": int(row["reviewer_count"]),
+            "sequence": int(row["sequence"]),
+            "scope_hash": str(row["scope_hash"]),
+            "span_seconds": int(row["span_seconds"]),
+            "status": str(row["status"]),
+            "status_reason": str(row["status_reason"]) if row["status_reason"] else None,
+            "support": int(row["support"]),
+            "verified_report_id": (
+                str(row["verified_report_id"]) if row["verified_report_id"] else None
+            ),
+        }
+
+    @staticmethod
+    def _validate_report(
+        connection: sqlite3.Connection,
+        row: sqlite3.Row,
+        *,
+        verify_test_set: bool = True,
+    ) -> CanonicalJSON:
+        details = parse_json(str(row["details_json"]), max_bytes=262_144)
+        if details.digest != row["details_hash"] or type(details.value) is not dict:
+            raise IntegrityError("verification report details digest mismatch")
+        test_count = int(row["test_count"])
+        if verify_test_set:
+            stored_count, test_set_hash = System._test_snapshot(connection, str(row["id"]))
+            if stored_count != test_count or test_set_hash != row["test_set_hash"]:
+                raise IntegrityError("verification report test set mismatch")
+        elif re.fullmatch(r"[0-9a-f]{64}", str(row["test_set_hash"])) is None:
+            raise IntegrityError("verification report test set digest is invalid")
+        failures = details.value.get("failures")
+        if (
+            details.value.get("tests") != test_count
+            or type(failures) is not list
+            or bool(row["passed"]) == bool(failures)
+        ):
+            raise IntegrityError("verification report outcome binding mismatch")
+        return details
+
+    @staticmethod
+    def _validate_promoted(connection: sqlite3.Connection, row: sqlite3.Row) -> None:
+        if row["status"] != "promoted":
+            raise IntegrityError("artifact is not promoted")
+        if (
+            row["verified_report_id"] is None
+            or row["promoted_by"] is None
+            or row["promoted_at_us"] is None
+            or row["promotion_hash"] is None
+        ):
+            raise IntegrityError("promoted artifact is missing activation bindings")
+        report = connection.execute(
+            "SELECT * FROM test_reports WHERE id = ? AND artifact_id = ?",
+            (row["verified_report_id"], row["id"]),
+        ).fetchone()
+        if report is None or not int(report["passed"]):
+            raise IntegrityError("promoted artifact has no passing bound report")
+        for field in (
+            "artifact_hash",
+            "build_hash",
+            "policy_hash",
+            "evidence_snapshot_hash",
+        ):
+            if report[field] != row[field]:
+                raise IntegrityError(f"promoted artifact report {field} binding mismatch")
+        # Artifact tests and reports are sealed by schema triggers. Promotion
+        # performed the full child-set replay/hash; dispatch verifies its bound
+        # receipt without re-hashing up to one million immutable test rows.
+        details = System._validate_report(connection, report, verify_test_set=False)
+        if type(details.value) is not dict or details.value.get("scope_hash") != row["scope_hash"]:
+            raise IntegrityError("promoted artifact report scope mismatch")
+        expected = _digest_strings(
+            "cement-promotion-v2",
+            (
+                str(row["id"]),
+                str(row["artifact_hash"]),
+                str(row["build_hash"]),
+                str(row["policy_hash"]),
+                str(row["evidence_snapshot_hash"]),
+                str(row["support"]),
+                str(row["reviewer_count"]),
+                str(row["span_seconds"]),
+                str(row["scope_hash"]),
+                str(report["id"]),
+                str(report["details_hash"]),
+                str(report["test_set_hash"]),
+                str(report["test_count"]),
+                str(report["passed"]),
+                str(row["promoted_by"]),
+                str(row["promoted_at_us"]),
+            ),
+        )
+        if expected != row["promotion_hash"]:
+            raise IntegrityError("artifact promotion receipt mismatch")
+        revoked = connection.execute(
+            """
+            SELECT 1 FROM artifact_evidence AS e
+            JOIN example_revocations AS x ON x.example_id = e.example_id
+            WHERE e.artifact_id = ? LIMIT 1
+            """,
+            (row["id"],),
+        ).fetchone()
+        if revoked is not None:
+            raise IntegrityError("promoted artifact depends on revoked evidence")
+        counterexample = connection.execute(
+            """
+            SELECT e.id FROM examples AS e
+            LEFT JOIN example_revocations AS x ON x.example_id = e.id
+            WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
+              AND e.input_hash = ? AND e.input_json = ?
+              AND e.output_json <> ? AND x.example_id IS NULL
+            LIMIT 1
+            """,
+            (
+                row["partition"],
+                row["operation"],
+                row["operation_revision"],
+                row["input_hash"],
+                row["input_json"],
+                row["output_json"],
+            ),
+        ).fetchone()
+        if counterexample is not None:
+            raise IntegrityError("promoted artifact conflicts with active evidence")
+
+    @staticmethod
+    def _artifact_from_row(row: sqlite3.Row) -> ArtifactDocument:
+        parsed = parse_json(str(row["artifact_json"]), max_bytes=ARTIFACT_MAX_BYTES)
+        if parsed.digest != row["artifact_hash"]:
+            raise IntegrityError("artifact document digest mismatch")
+        artifact = validate_artifact(parsed.value)
+        if artifact.digest != row["artifact_hash"] or artifact.scope_digest != row["scope_hash"]:
+            raise IntegrityError("artifact semantic digest mismatch")
+        if (
+            artifact.input.text != row["input_json"]
+            or artifact.input.digest != row["input_hash"]
+            or artifact.output.text != row["output_json"]
+            or artifact.output.digest != row["output_hash"]
+        ):
+            raise IntegrityError("artifact projection mismatch")
+        policy = parse_json(str(row["policy_json"]), max_bytes=16_384)
+        if policy.digest != row["policy_hash"]:
+            raise IntegrityError("artifact policy digest mismatch")
+        expected_build = build_digest(
+            artifact_digest=artifact.digest,
+            policy_digest=policy.digest,
+            evidence_snapshot_digest=str(row["evidence_snapshot_hash"]),
+            support=int(row["support"]),
+            reviewer_count=int(row["reviewer_count"]),
+            span_seconds=int(row["span_seconds"]),
+        )
+        if expected_build != row["build_hash"]:
+            raise IntegrityError("artifact build digest mismatch")
+        scope = artifact.value["scope"]
+        if type(scope) is not dict:
+            raise IntegrityError("artifact scope is malformed")
+        if (
+            scope["partition"] != row["partition"]
+            or scope["operation"] != row["operation"]
+            or scope["operation_revision"] != row["operation_revision"]
+        ):
+            raise IntegrityError("artifact scope projection mismatch")
+        return artifact

@@ -1,0 +1,159 @@
+"""Small immutable public values; all effectful behavior lives in ``System``."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Literal, Mapping, TypeAlias, cast
+
+from .errors import ValidationError
+from .json_value import JSONValue
+
+
+@dataclass(frozen=True, slots=True)
+class CompilePolicy:
+    min_confirmations: int = 3
+    min_reviewers: int = 2
+    min_span_seconds: int = 7 * 24 * 60 * 60
+
+    def __post_init__(self) -> None:
+        if any(
+            type(value) is not int
+            for value in (self.min_confirmations, self.min_reviewers, self.min_span_seconds)
+        ):
+            raise ValidationError("compile policy values must be integers")
+        if not 2 <= self.min_confirmations <= 1_000_000:
+            raise ValidationError("min_confirmations must be between 2 and 1,000,000")
+        if not 1 <= self.min_reviewers <= self.min_confirmations:
+            raise ValidationError("min_reviewers must be positive and no greater than confirmations")
+        if not 0 <= self.min_span_seconds <= 10 * 365 * 24 * 60 * 60:
+            raise ValidationError("min_span_seconds must be between zero and ten years")
+
+    def as_json(self) -> dict[str, JSONValue]:
+        return {
+            "min_confirmations": self.min_confirmations,
+            "min_reviewers": self.min_reviewers,
+            "min_span_seconds": self.min_span_seconds,
+        }
+
+    @classmethod
+    def from_json(cls, value: Mapping[str, JSONValue]) -> "CompilePolicy":
+        expected = {"min_confirmations", "min_reviewers", "min_span_seconds"}
+        if set(value) != expected or any(type(value[key]) is not int for key in expected):
+            raise ValidationError("invalid compile policy document")
+        return cls(
+            min_confirmations=cast(int, value["min_confirmations"]),
+            min_reviewers=cast(int, value["min_reviewers"]),
+            min_span_seconds=cast(int, value["min_span_seconds"]),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class Candidate:
+    # Runtime canonicalization owns JSON validation; ``object`` avoids mutable
+    # container invariance rejecting ordinary ``dict[str, int]`` adapter output.
+    output: object
+    provenance: Mapping[str, object]
+
+
+@dataclass(frozen=True, slots=True)
+class CandidateRequest:
+    partition: str
+    operation: str
+    operation_revision: int
+    request_id: str
+    input: JSONValue
+
+
+@dataclass(frozen=True, slots=True)
+class Resolved:
+    request_id: str
+    output: JSONValue
+    source: Literal["artifact", "confirmed"]
+    artifact_id: str | None = None
+    example_id: str | None = None
+    status: Literal["resolved"] = "resolved"
+
+
+@dataclass(frozen=True, slots=True)
+class ReviewRequired:
+    request_id: str
+    proposal_id: str
+    status: Literal["review_required"] = "review_required"
+
+
+@dataclass(frozen=True, slots=True)
+class InProgress:
+    request_id: str
+    retry_after_seconds: int
+    status: Literal["in_progress"] = "in_progress"
+
+
+@dataclass(frozen=True, slots=True)
+class FallbackFailed:
+    request_id: str
+    code: str
+    status: Literal["fallback_failed"] = "fallback_failed"
+
+
+@dataclass(frozen=True, slots=True)
+class Rejected:
+    request_id: str
+    proposal_id: str
+    status: Literal["rejected"] = "rejected"
+
+
+@dataclass(frozen=True, slots=True)
+class ReconciliationRequired:
+    request_id: str
+    reason: str
+    artifact_id: str | None = None
+    example_id: str | None = None
+    status: Literal["reconciliation_required"] = "reconciliation_required"
+
+
+Outcome: TypeAlias = (
+    Resolved
+    | ReviewRequired
+    | InProgress
+    | FallbackFailed
+    | Rejected
+    | ReconciliationRequired
+)
+
+
+@dataclass(frozen=True, slots=True)
+class ProposalView:
+    id: str
+    partition: str
+    operation: str
+    operation_revision: int
+    request_id: str
+    input: JSONValue
+    proposed_output: JSONValue
+    provenance: JSONValue
+    created_at_us: int
+
+
+@dataclass(frozen=True, slots=True)
+class CompileResult:
+    created: tuple[str, ...]
+    existing: tuple[str, ...]
+    blocked: tuple[dict[str, JSONValue], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class VerificationReport:
+    id: str
+    artifact_id: str
+    scope_hash: str
+    passed: bool
+    tests: int
+    failures: tuple[str, ...]
+    created_at_us: int
+
+
+@dataclass(frozen=True, slots=True)
+class Promotion:
+    artifact_id: str
+    replaced_artifact_ids: tuple[str, ...]
+    promoted_at_us: int
