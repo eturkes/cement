@@ -10,3 +10,10 @@ dist/
 *.db-journal
 *.db-shm
 *.db-wal
+
+# Claude Code local/runtime state (personal; not shared)
+.claude/settings.local.json
+.claude/.headroom_wrap_marker.json
+
+# tokensave index (regenerable via `tokensave init`)
+.tokensave/
