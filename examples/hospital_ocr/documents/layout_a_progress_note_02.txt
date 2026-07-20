@@ -1,0 +1,18 @@
+PHYSICIAN PROGRESS NOTE
+Patient: Marcus Lee
+MRN: MG-100587
+Date: 2026-02-18
+Provider: Dr. Jonah Reed
+
+Subjective:
+Reports intermittent right knee pain after increasing running distance.
+
+Objective:
+No swelling or erythema. Full range of motion.
+Mild tenderness along the medial joint line.
+
+Assessment:
+Overuse-related right knee pain.
+
+Plan:
+Reduce running mileage, use ice after activity, and begin home stretches.

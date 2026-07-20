@@ -1,0 +1,12 @@
+PATIENT INTAKE FORM
+Name: Amelia Brooks
+Date of Birth: 1988-07-19
+Insurance ID: HZN-774201
+Primary Complaint: Persistent headaches after long workdays
+
+Allergies:
+Penicillin
+
+Current Medications:
+Lisinopril 10 mg once daily
+Magnesium supplement once daily

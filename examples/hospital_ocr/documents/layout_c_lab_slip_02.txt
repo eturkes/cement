@@ -1,0 +1,9 @@
+LAB RESULT SLIP
+Patient: Priya Nair
+MRN: MG-200731
+Collection Date: 2026-03-05
+Potassium: 3.8
+Creatinine: 1.1
+
+Interpretation:
+Results are stable compared with the prior collection.

@@ -1,0 +1,9 @@
+LAB RESULT SLIP
+Patient: Luis Ortega
+MRN: MG-200164
+Collection Date: 2026-03-02
+Potassium: 4.2
+Creatinine: 0.9
+
+Interpretation:
+Results are within the laboratory reference ranges.

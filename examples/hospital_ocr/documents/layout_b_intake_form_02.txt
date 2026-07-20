@@ -1,0 +1,12 @@
+PATIENT INTAKE FORM
+Name: Noah Williams
+Date of Birth: 1975-11-03
+Insurance ID: HZN-889416
+Primary Complaint: Left shoulder stiffness for two weeks
+
+Allergies:
+Latex
+
+Current Medications:
+Atorvastatin 20 mg nightly
+Acetaminophen as needed

@@ -1,0 +1,18 @@
+PHYSICIAN PROGRESS NOTE
+Patient: Sofia Patel
+MRN: MG-100913
+Date: 2026-02-21
+Provider: Dr. Amina Shah
+
+Subjective:
+Reports improved sleep but continued mild morning headaches.
+
+Objective:
+Blood pressure 118 over 74. Neurologic examination is nonfocal.
+Hydration appears adequate.
+
+Assessment:
+Tension-type headaches, improving.
+
+Plan:
+Continue sleep routine, hydration, and symptom diary for two weeks.

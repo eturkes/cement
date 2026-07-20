@@ -2,8 +2,8 @@
 
 ## Milestone ledger
 
-- M1 - Hospital OCR-to-JSON example (per-layout extraction plans) - IN-PROGRESS. Units M1.1-M1.4
-  enumerated below; all OPEN.
+- M1 - Hospital OCR-to-JSON example (per-layout extraction plans) - IN-PROGRESS. M1.1 DONE; M1.2-M1.4
+  OPEN (detail below).
 
 Earlier core work and deferred scope are preserved under "Core (completed)" and "Deferred" at the end.
 
@@ -141,13 +141,25 @@ heading). Lab-slip fields (layout C) use string-encoded decimals (e.g. `value_ty
 
 ### Units
 
-- M1.1 OPEN - Corpus + OCR/signature + plan applicator (deterministic pipeline core; no cement
+- M1.1 DONE - Corpus + OCR/signature + plan applicator (deterministic pipeline core; no cement
   dependency). Build the `documents/` corpus (layout A: 3 patients, layout B: 2, layout C: 2) and
   `pipeline.py` with `ocr()`, `layout_signature()`, `apply_plan()`, plus the plan/signature shapes.
   Acceptance: `layout_signature` is byte-identical across patients of one layout and distinct across
   layouts; `apply_plan(plan, ocr)` yields the expected patient fields; every emitted value is
   cement-json-v1 valid (no floats; lab values as strings); the signature contains no patient values. A
   small `if __name__ == "__main__"` self-check (or asserts) demonstrates these.
+  Delivered (banked API - reuse in M1.2/M1.3; verified this session): `examples/hospital_ocr/pipeline.py`
+  exports `ocr(path)`, `layout_signature(ocr_text) -> JSONValue`, `apply_plan(plan, ocr_text) ->
+  dict[str, JSONValue]`, `reference_plan(document_type) -> JSONValue | None`, and `REFERENCE_PLANS` (dict
+  keyed by document_type); plus a local `JSONValue` alias - stdlib only, no `cement_runtime` import.
+  document_types: `physician_progress_note` (layout A; includes a `section`-kind field `assessment`),
+  `patient_intake_form` (layout B), `lab_result_slip` (layout C; decimal analytes `potassium`/
+  `creatinine` carry `value_type` `decimal_string` and extract as strings). Locator kinds:
+  `{"kind":"label","label":..}` and `{"kind":"section","heading":..}`. Signature shape matches the
+  anchor above; byte-equal within a layout, distinct across. Corpus = 7 files under `documents/`
+  (`layout_a_progress_note_0{1,2,3}.txt`, `layout_b_intake_form_0{1,2}.txt`,
+  `layout_c_lab_slip_0{1,2}.txt`). Toolchain: run with `uv run python` (venv is 3.11.15); the only
+  configured gate is `unittest` (no pytest/ruff/mypy). `main=32% (86K/272K)` `impl=25% (67K/272K)`.
 
 - M1.2 OPEN - Plan proposer adapter (`plan_adapter.py`, implements `CandidateSource`).
   `propose(request) -> Candidate` returns the extraction plan + provenance for the signature in
