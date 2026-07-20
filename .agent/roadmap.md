@@ -2,14 +2,14 @@
 
 ## Milestone ledger
 
-- M1 - Hospital OCR-to-JSON example (per-layout extraction plans) - IN-PROGRESS. M1.1-M1.3 DONE; M1.4
-  OPEN (detail below).
+- M1 - Hospital OCR-to-JSON example (per-layout extraction plans) - IMPLEMENTED (units all DONE,
+  unreviewed). M1.1-M1.4 DONE (detail below).
 
 Earlier core work and deferred scope are preserved under "Core (completed)" and "Deferred" at the end.
 
 ## Active milestone - M1: Hospital OCR-to-JSON example (per-layout extraction plans)
 
-Status: IN-PROGRESS. Scope-seed: session plan task - add an example where OCR'd hospital documents
+Status: IMPLEMENTED (units all DONE, unreviewed). Scope-seed: session plan task - add an example where OCR'd hospital documents
 (physician notes, patient information, lab slips) of varied layouts are processed into JSON, showing how
 cement turns per-run bespoke LLM extraction into a single durable pipeline that "learns" over runs.
 
@@ -214,7 +214,7 @@ heading). Lab-slip fields (layout C) use string-encoded decimals (e.g. `value_ty
   regression); no stray db (temp dir under system tmp, self-cleaned + asserted); one new untracked file;
   `pyproject.toml`/`uv.lock` unchanged. `main=55% (151K/272K)` `impl=23% (~63K/272K)`.
 
-- M1.4 OPEN - Example walkthrough README + root docs link.
+- M1.4 DONE - Example walkthrough README + root docs link.
   `examples/hospital_ocr/README.md`: thesis, honest boundary (deterministic plan return, NOT extraction
   correctness), how to run, annotated expected output (captured by actually running the driver), teaching
   points (canonicalize input so recurrence is exact; encode decimals as strings; new layouts are gated
@@ -222,6 +222,23 @@ heading). Lab-slip fields (layout C) use string-encoded decimals (e.g. `value_ty
   `README.md`. Keep markdown lint-clean (backtick-wrap any `<token>` and any adjacent `][` groups).
   Acceptance: the README's expected output matches the driver's real output (no drift); markdown
   diagnostics are clean; the root README links to the example. Depends on M1.1-M1.3.
+  Delivered (verified this session): `examples/hospital_ocr/README.md` (new) + root `README.md` `##
+  Examples` pointer to it. README: title/thesis, Boundary (honest - guarantees deterministic plan return
+  in the exact `(partition, operation, operation_revision, canonical_input)` scope, NOT extraction
+  correctness; states plainly "no cross-layout generalization"), How-it-maps (pipeline `ocr` ->
+  `layout_signature` -> `System.handle` / `PlanProposer.propose` -> `apply_plan`; scope + policy
+  constants; a real layout signature and `reference_plan("physician_progress_note")` plan JSON generated
+  from the live helpers), Run, Expected output (the full driver transcript in a fenced text block),
+  Teaching points, Pointers (`../../README.md`, `../../docs/architecture.md`,
+  `../../docs/adapter-protocol.md`). MAIN independent verification: (1) NO-DRIFT - the driver transcript
+  is deterministic modulo ONE per-run random 32-hex artifact id; the fenced block equals live
+  `run_demo.py` stdout after masking `art_[0-9a-f]{32}` to `art_<hex>` (byte-equal across 3 runs).
+  (2) MARKDOWN clean - markdown is NOT a Serena language here, so the lint used a standalone Marksman LSP
+  client (bundled `marksman server`); an in-repo positive control confirmed it validates links in project
+  mode (.git), then it reported NO diagnostics on both READMEs; plus one H1, no adjacent bracket groups,
+  no unbackticked angle tokens, all three links resolve, and the B01 medications backslash-n stays
+  literal. (3) the root README `## Examples` section links the example. Only project gate is `unittest`
+  (untouched - no Python changed). `main=61% (165K/272K)` `impl=27% (74K/272K)`.
 
 ## Core (completed) - safe learning loop
 

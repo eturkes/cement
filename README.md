@@ -151,6 +151,11 @@ The command adapter protocol is documented in [docs/adapter-protocol.md](docs/ad
 The full state model and trust boundaries are in [docs/architecture.md](docs/architecture.md) and
 [docs/threat-model.md](docs/threat-model.md).
 
+## Examples
+
+[Hospital OCR layout-learning](examples/hospital_ocr/README.md) - offline walkthrough of supervised
+per-layout extraction plans becoming deterministic reuse.
+
 ## Development
 
 ```bash
