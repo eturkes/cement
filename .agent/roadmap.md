@@ -2,7 +2,7 @@
 
 ## Milestone ledger
 
-- M1 - Hospital OCR-to-JSON example (per-layout extraction plans) - IN-PROGRESS. M1.1-M1.2 DONE; M1.3-M1.4
+- M1 - Hospital OCR-to-JSON example (per-layout extraction plans) - IN-PROGRESS. M1.1-M1.3 DONE; M1.4
   OPEN (detail below).
 
 Earlier core work and deferred scope are preserved under "Core (completed)" and "Deferred" at the end.
@@ -183,7 +183,7 @@ heading). Lab-slip fields (layout C) use string-encoded decimals (e.g. `value_ty
   root `unittest` 62 passed (no regression); stdlib + `cement_runtime` + sibling `pipeline` only; one new
   untracked file. `main=35% (96K/272K)` `impl=73% (199K/272K)`.
 
-- M1.3 OPEN - Lifecycle driver + narrative + self-checks (`run_demo.py`, library API).
+- M1.3 DONE - Lifecycle driver + narrative + self-checks (`run_demo.py`, library API).
   Register `document.extraction_plan` with the demo policy, then run the narrative across runs: layout A
   patient 1 -> miss -> review-accept; A patient 2 -> miss -> review-accept; compile -> verify -> promote;
   A patient 3 -> `Resolved(source="artifact")` + apply plan (assert the adapter did not run); then layout
@@ -194,6 +194,25 @@ heading). Lab-slip fields (layout C) use string-encoded decimals (e.g. `value_ty
   Acceptance: `uv run python examples/hospital_ocr/run_demo.py` exits 0; all asserts pass (pre-promotion
   miss, post-promotion `Resolved(source="artifact")`, layout C stays gated); no stray db is left; stdlib +
   `cement_runtime` only. Depends on M1.1, M1.2.
+  Delivered (banked for M1.4; verified this session): `examples/hospital_ocr/run_demo.py` - offline guided
+  lifecycle demo; stdlib (`json`/`os`/`pathlib`/`tempfile`) + `cement_runtime` + sibling
+  `pipeline`/`plan_adapter` only; flat imports (run-as-script puts the file dir on `sys.path`; not
+  package-relative). `main()` drives register -> handle(signature) -> review-accept -> compile -> verify
+  -> promote -> artifact-hit; helpers `CountingSource` (wraps `PlanProposer`, `.calls` proves the adapter
+  is skipped on a hit), `_document`, `_signature_bytes` (byte-equal signature across a layout),
+  `_print_event_trace`. Constants: `PARTITION="mercy-general"`, `OPERATION="document.extraction_plan"`,
+  `DEMO_POLICY=CompilePolicy(2,1,0)` (min_confirmations/min_reviewers/min_span_seconds), reviewer
+  `records-supervisor`, promoter `informatics-lead`. Real driver output M1.4's README must match (no
+  drift): A -> verify(8 tests)/promote -> A03 artifact hit mrn `MG-100913` "Sofia Patel"; B -> same
+  lifecycle -> recur hit insurance_id `HZN-774201` "Amelia Brooks"; C -> 1 confirm -> gated, reason
+  `support 1 is below required 2`; then a 19-event audit trace. DURABLE cement API fact: `System.events()`
+  dicts key the event name under `kind` (NOT `type`); ordered values `operation.registered`,
+  `proposal.created`, `proposal.accepted`, `artifact.compiled`, `artifact.verified`, `artifact.promoted`,
+  `request.resolved_by_artifact`. Gates: only configured project gate is `unittest` (ruff/mypy are NOT
+  project-configured - a prior spec wrongly listed them; provisioned into gitignored `.venv` for a bonus
+  clean pass, no tracked change). Verified: driver RC 0 "All checks passed."; root `unittest` 62 passed (no
+  regression); no stray db (temp dir under system tmp, self-cleaned + asserted); one new untracked file;
+  `pyproject.toml`/`uv.lock` unchanged. `main=55% (151K/272K)` `impl=23% (~63K/272K)`.
 
 - M1.4 OPEN - Example walkthrough README + root docs link.
   `examples/hospital_ocr/README.md`: thesis, honest boundary (deterministic plan return, NOT extraction
