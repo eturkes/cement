@@ -2,7 +2,7 @@
 
 ## Milestone ledger
 
-- M1 - Hospital OCR-to-JSON example (per-layout extraction plans) - IN-PROGRESS. M1.1 DONE; M1.2-M1.4
+- M1 - Hospital OCR-to-JSON example (per-layout extraction plans) - IN-PROGRESS. M1.1-M1.2 DONE; M1.3-M1.4
   OPEN (detail below).
 
 Earlier core work and deferred scope are preserved under "Core (completed)" and "Deferred" at the end.
@@ -161,13 +161,27 @@ heading). Lab-slip fields (layout C) use string-encoded decimals (e.g. `value_ty
   `layout_c_lab_slip_0{1,2}.txt`). Toolchain: run with `uv run python` (venv is 3.11.15); the only
   configured gate is `unittest` (no pytest/ruff/mypy). `main=32% (86K/272K)` `impl=25% (67K/272K)`.
 
-- M1.2 OPEN - Plan proposer adapter (`plan_adapter.py`, implements `CandidateSource`).
+- M1.2 DONE - Plan proposer adapter (`plan_adapter.py`, implements `CandidateSource`).
   `propose(request) -> Candidate` returns the extraction plan + provenance for the signature in
   `request.input`; deterministic, with a "deliberately not an LLM" docstring; returns a best-effort plan
   for an unknown signature so the edge-case path still yields a reviewable proposal.
   Acceptance: for each sample layout, `apply_plan(propose(CandidateRequest(input=sig)).output, ocr)`
   reproduces the expected patient JSON; the output is cement-json-v1 valid; provenance is a JSON object
   identifying the stub. Depends on M1.1.
+  Delivered (banked API - reuse in M1.3; verified this session): `examples/hospital_ocr/plan_adapter.py`
+  exports `PlanProposer` (in-process `CandidateSource`), constructed
+  `PlanProposer(source_id="hospital-ocr-plan-stub")` with no required args. `propose(request) -> Candidate`
+  reads the layout signature from `request.input`. Known `document_type`: `Candidate.output` is a deep copy
+  of `pipeline.reference_plan(document_type)` via `json.loads(json.dumps(...))` (never aliases
+  `REFERENCE_PLANS`), provenance strategy `reference_plan`. Unknown `document_type`: a best-effort plan
+  (`layout="unknown"`) with one `label`-locator field per signature label then one `section`-locator field
+  per heading; field name = `re.sub(r"[^a-z0-9]+","_", v.lower()).strip("_") or "field"`; provenance
+  strategy `best_effort`. `Candidate.provenance` keys: `source_id`, `strategy`, `document_type`,
+  `deliberately_not_an_llm` (cement-json-v1, no floats). `propose` rejects a non-dict signature, a
+  missing/empty `document_type`, and (unknown path) non-string or empty labels/sections. Verified:
+  `uv run python examples/hospital_ocr/plan_adapter.py` RC 0 (7 reference-plan + 1 best-effort proposals);
+  root `unittest` 62 passed (no regression); stdlib + `cement_runtime` + sibling `pipeline` only; one new
+  untracked file. `main=35% (96K/272K)` `impl=73% (199K/272K)`.
 
 - M1.3 OPEN - Lifecycle driver + narrative + self-checks (`run_demo.py`, library API).
   Register `document.extraction_plan` with the demo policy, then run the narrative across runs: layout A
