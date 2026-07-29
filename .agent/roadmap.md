@@ -159,7 +159,7 @@ heading). Lab-slip fields (layout C) use string-encoded decimals (e.g. `value_ty
   anchor above; byte-equal within a layout, distinct across. Corpus = 7 files under `documents/`
   (`layout_a_progress_note_0{1,2,3}.txt`, `layout_b_intake_form_0{1,2}.txt`,
   `layout_c_lab_slip_0{1,2}.txt`). Toolchain: run with `uv run python` (venv is 3.11.15); the only
-  configured gate is `unittest` (no pytest/ruff/mypy). `main=32% (86K/272K)` `impl=25% (67K/272K)`.
+  configured gate is `unittest` (no pytest/ruff/mypy). `main=36% (86K/240K)` `impl=28% (67K/240K)`.
 
 - M1.2 DONE - Plan proposer adapter (`plan_adapter.py`, implements `CandidateSource`).
   `propose(request) -> Candidate` returns the extraction plan + provenance for the signature in
@@ -181,7 +181,7 @@ heading). Lab-slip fields (layout C) use string-encoded decimals (e.g. `value_ty
   missing/empty `document_type`, and (unknown path) non-string or empty labels/sections. Verified:
   `uv run python examples/hospital_ocr/plan_adapter.py` RC 0 (7 reference-plan + 1 best-effort proposals);
   root `unittest` 62 passed (no regression); stdlib + `cement_runtime` + sibling `pipeline` only; one new
-  untracked file. `main=35% (96K/272K)` `impl=73% (199K/272K)`.
+  untracked file. `main=40% (96K/240K)` `impl=83% (199K/240K)`.
 
 - M1.3 DONE - Lifecycle driver + narrative + self-checks (`run_demo.py`, library API).
   Register `document.extraction_plan` with the demo policy, then run the narrative across runs: layout A
@@ -212,7 +212,7 @@ heading). Lab-slip fields (layout C) use string-encoded decimals (e.g. `value_ty
   project-configured - a prior spec wrongly listed them; provisioned into gitignored `.venv` for a bonus
   clean pass, no tracked change). Verified: driver RC 0 "All checks passed."; root `unittest` 62 passed (no
   regression); no stray db (temp dir under system tmp, self-cleaned + asserted); one new untracked file;
-  `pyproject.toml`/`uv.lock` unchanged. `main=55% (151K/272K)` `impl=23% (~63K/272K)`.
+  `pyproject.toml`/`uv.lock` unchanged. `main=63% (151K/240K)` `impl=26% (~63K/240K)`.
 
 - M1.4 DONE - Example walkthrough README + root docs link.
   `examples/hospital_ocr/README.md`: thesis, honest boundary (deterministic plan return, NOT extraction
@@ -238,7 +238,7 @@ heading). Lab-slip fields (layout C) use string-encoded decimals (e.g. `value_ty
   mode (.git), then it reported NO diagnostics on both READMEs; plus one H1, no adjacent bracket groups,
   no unbackticked angle tokens, all three links resolve, and the B01 medications backslash-n stays
   literal. (3) the root README `## Examples` section links the example. Only project gate is `unittest`
-  (untouched - no Python changed). `main=61% (165K/272K)` `impl=27% (74K/272K)`.
+  (untouched - no Python changed). `main=69% (165K/240K)` `impl=31% (74K/240K)`.
 
 ## Core (completed) - safe learning loop
 
