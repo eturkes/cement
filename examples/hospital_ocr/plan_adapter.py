@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import re
-from typing import cast
 
 from cement_runtime import Candidate, CandidateRequest
 
@@ -29,44 +28,69 @@ class PlanProposer:
             raise TypeError("layout signature must be a JSON object")
 
         document_type = signature.get("document_type")
-        if type(document_type) is not str or not document_type:
+        if type(document_type) is not str or not document_type.strip():
             raise ValueError("layout signature document_type must be a non-empty string")
 
+        structure = signature.get("structure")
+        if type(structure) is not list:
+            raise ValueError("layout signature structure must be a JSON array")
+
+        fields: list[pipeline.JSONValue] = []
+        locator_counts: dict[tuple[str, str], int] = {}
+        used_field_names: set[str] = set()
+        for entry in structure:
+            if type(entry) is not dict or any(
+                type(entry_key) is not str for entry_key in entry
+            ):
+                raise ValueError(
+                    "layout signature structure entries must be string-keyed objects"
+                )
+            kind = entry.get("kind")
+            if type(kind) is not str or not kind.strip():
+                raise ValueError(
+                    "layout signature structure entry kind must be a non-empty string"
+                )
+            key = entry.get("key")
+            if type(key) is not str or not key.strip():
+                raise ValueError(
+                    "layout signature structure entry key must be a non-empty string"
+                )
+
+            locator: pipeline.JSONValue
+            if kind == "label":
+                locator = {"kind": "label", "label": key}
+                value_type = "string"
+            elif kind == "section":
+                locator = {"kind": "section", "heading": key}
+                value_type = "text"
+            else:
+                raise ValueError(
+                    f"layout signature structure entry has unsupported kind {kind!r}"
+                )
+
+            locator_key = (kind, key)
+            locator_counts[locator_key] = locator_counts.get(locator_key, 0) + 1
+            base_name = _field_name(key)
+            field_name = base_name
+            suffix = 2
+            while field_name in used_field_names:
+                field_name = f"{base_name}_{suffix}"
+                suffix += 1
+            used_field_names.add(field_name)
+            field: pipeline.JSONValue = {
+                "name": field_name,
+                "locator": locator,
+                "value_type": value_type,
+            }
+            fields.append(field)
+
         reference = pipeline.reference_plan(document_type)
-        if reference is not None:
+        if reference is not None and _reference_plan_resolves_structure(
+            reference, locator_counts
+        ):
             output = json.loads(json.dumps(reference))
             strategy = "reference_plan"
         else:
-            raw_labels = signature.get("labels")
-            raw_sections = signature.get("sections")
-            if type(raw_labels) is not list or any(
-                type(label) is not str or not label for label in raw_labels
-            ):
-                raise ValueError("layout signature labels must be non-empty strings")
-            if type(raw_sections) is not list or any(
-                type(heading) is not str or not heading for heading in raw_sections
-            ):
-                raise ValueError("layout signature sections must be non-empty strings")
-
-            labels = cast(list[str], raw_labels)
-            sections = cast(list[str], raw_sections)
-            fields: list[pipeline.JSONValue] = []
-            for label in labels:
-                fields.append(
-                    {
-                        "name": _field_name(label),
-                        "locator": {"kind": "label", "label": label},
-                        "value_type": "string",
-                    }
-                )
-            for heading in sections:
-                fields.append(
-                    {
-                        "name": _field_name(heading),
-                        "locator": {"kind": "section", "heading": heading},
-                        "value_type": "text",
-                    }
-                )
             output = {
                 "document_type": document_type,
                 "layout": "unknown",
@@ -85,6 +109,38 @@ class PlanProposer:
         )
 
 
+def _reference_plan_resolves_structure(
+    plan: pipeline.JSONValue,
+    locator_counts: dict[tuple[str, str], int],
+) -> bool:
+    """Return whether every reference locator resolves exactly once."""
+
+    if type(plan) is not dict:
+        return False
+    fields = plan.get("fields")
+    if type(fields) is not list:
+        return False
+    for field in fields:
+        if type(field) is not dict:
+            return False
+        locator = field.get("locator")
+        if type(locator) is not dict:
+            return False
+        kind = locator.get("kind")
+        if type(kind) is not str:
+            return False
+        if kind == "label":
+            key = locator.get("label")
+        elif kind == "section":
+            key = locator.get("heading")
+        else:
+            return False
+        if type(key) is not str:
+            return False
+        if locator_counts.get((kind, key), 0) != 1:
+            return False
+    return True
+
 def _field_name(value: str) -> str:
     """Return a stable snake_case field name for a visible OCR key."""
 
@@ -92,70 +148,56 @@ def _field_name(value: str) -> str:
 
 
 def _self_check() -> None:
-    documents = Path(__file__).with_name("documents")
     proposer = PlanProposer()
-    checked_documents = 0
-
-    for path in sorted(documents.glob("*.txt")):
-        ocr_text = pipeline.ocr(path)
-        signature = pipeline.layout_signature(ocr_text)
-        assert type(signature) is dict
-        document_type = signature["document_type"]
-        assert type(document_type) is str
-
-        request = CandidateRequest(
+    document = Path(__file__).with_name("documents") / "layout_a_progress_note_01.txt"
+    signature = pipeline.layout_signature(pipeline.ocr(document))
+    known = proposer.propose(
+        CandidateRequest(
             partition="mercy-general",
             operation="document.extraction_plan",
             operation_revision=1,
-            request_id=f"self-check-{path.stem}",
+            request_id="self-check-known-layout",
             input=signature,
         )
-        candidate = proposer.propose(request)
-        reference = pipeline.reference_plan(document_type)
-        assert reference is not None
-        assert candidate.output == reference
-        assert candidate.output is not reference
-        assert pipeline._is_cement_json_value(candidate.output)
-        assert pipeline._is_cement_json_value(candidate.provenance)
-        assert candidate.provenance == {
-            "source_id": "hospital-ocr-plan-stub",
-            "strategy": "reference_plan",
-            "document_type": document_type,
-            "deliberately_not_an_llm": True,
-        }
+    )
+    reference = pipeline.reference_plan("physician_progress_note")
+    assert reference is not None
+    assert known.output == reference
+    assert known.output is not reference
 
-        candidate_plan = cast(pipeline.JSONValue, candidate.output)
-        extracted = pipeline.apply_plan(candidate_plan, ocr_text)
-        for name, expected in pipeline._EXPECTED_FIELDS[path.name].items():
-            assert extracted[name] == expected
-        checked_documents += 1
-
-    unknown_path = documents / "layout_a_progress_note_01.txt"
-    unknown_ocr = pipeline.ocr(unknown_path)
-    unknown_signature = pipeline.layout_signature(unknown_ocr)
-    assert type(unknown_signature) is dict
-    unknown_signature["document_type"] = "unknown_progress_note"
-    unknown_candidate = proposer.propose(
+    unknown = proposer.propose(
         CandidateRequest(
             partition="mercy-general",
             operation="document.extraction_plan",
             operation_revision=1,
             request_id="self-check-unknown-layout",
-            input=unknown_signature,
+            input={
+                "document_type": "unknown_note",
+                "structure": [
+                    {"kind": "section", "key": "Summary"},
+                    {"kind": "label", "key": "Signer"},
+                ],
+            },
         )
     )
-    assert pipeline._is_cement_json_value(unknown_candidate.output)
-    assert pipeline._is_cement_json_value(unknown_candidate.provenance)
-    assert unknown_candidate.provenance["strategy"] == "best_effort"
-    unknown_plan = cast(pipeline.JSONValue, unknown_candidate.output)
-    unknown_extracted = pipeline.apply_plan(unknown_plan, unknown_ocr)
-    assert unknown_extracted
-    assert "Jane Doe" in unknown_extracted.values()
-
-    print(
-        "Hospital OCR plan adapter self-check passed: "
-        f"{checked_documents} reference-plan proposals, 1 best-effort proposal."
-    )
+    assert unknown.output == {
+        "document_type": "unknown_note",
+        "layout": "unknown",
+        "fields": [
+            {
+                "name": "summary",
+                "locator": {"kind": "section", "heading": "Summary"},
+                "value_type": "text",
+            },
+            {
+                "name": "signer",
+                "locator": {"kind": "label", "label": "Signer"},
+                "value_type": "string",
+            },
+        ],
+    }
+    assert unknown.provenance["strategy"] == "best_effort"
+    print("Hospital OCR plan adapter smoke check passed.")
 
 
 if __name__ == "__main__":

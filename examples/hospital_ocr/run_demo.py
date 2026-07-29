@@ -9,6 +9,7 @@ plan extracts future documents correctly.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -57,6 +58,7 @@ def _document(name: str) -> tuple[str, pipeline.JSONValue]:
 def _signature_bytes(signature: pipeline.JSONValue) -> bytes:
     return json.dumps(
         signature,
+        ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),
     ).encode("utf-8")
@@ -242,6 +244,7 @@ def main() -> None:
 
         print("\n=== Act 4: layout C remains gated after one confirmation ===")
         _, c_signature_01 = _document("layout_c_lab_slip_01.txt")
+        c_input_hash = hashlib.sha256(_signature_bytes(c_signature_01)).hexdigest()
         assert _signature_bytes(c_signature_01) != _signature_bytes(a_signature_01)
         assert _signature_bytes(c_signature_01) != _signature_bytes(b_signature_01)
 
@@ -262,7 +265,15 @@ def main() -> None:
         build_c = system.compile(PARTITION, OPERATION)
         assert not build_c.created
         assert build_c.blocked
-        gated = build_c.blocked[0]
+        gated = next(
+            (
+                record
+                for record in build_c.blocked
+                if record.get("input_hash") == c_input_hash
+            ),
+            None,
+        )
+        assert gated is not None
         assert gated.get("support") == 1
         reasons = gated.get("reasons")
         assert type(reasons) is list
