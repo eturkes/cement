@@ -1,8 +1,9 @@
 # Cement
 
 Cement turns repeatedly supervised LLM answers into narrowly scoped deterministic behavior.
-It is a local Python library and CLI with a durable SQLite ledger. Inputs and outputs are pure JSON;
-provider adapters stay outside the core.
+The goal is to aggregate repeated work into a regular, if large, function that covers many situations
+and edge cases—a goal that would be difficult to achieve without LLMs. Once built and verified, that
+function is deterministic.
 
 The safety boundary is intentionally small: Cement compiles only exact lookups. A promoted artifact
 matches one canonical JSON input inside one partition and one operation revision. This finite scope is
