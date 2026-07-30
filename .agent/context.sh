@@ -5,19 +5,21 @@
 # 240K = auto-compaction point (ACW 273K − 33K; raw 1M = informational); warn 220K. Teammates share it.
 # Usage: context.sh [-p] [<teammate>]
 #   (no arg)   → MAIN, last turn = live occupancy: this session id, else this project's newest transcript
-#   <teammate> → spawned role name (`name` in agent-*.meta.json) or raw agent id, across this project's
-#                sessions — newest match wins, so a live teammate always resolves. Reports the HIGH-WATER
-#                turn, the number unit sizing needs: compaction resets occupancy, and a stopped/dead
-#                teammate trails stripped `{input_tokens:0,output_tokens:0}` turns that read as 0%.
-#   -p         → print the resolved transcript path instead of the gauge; marker polling =
-#                rg '"text":"<MARKER>' "$(.agent/context.sh -p <teammate>)"
+#   <teammate> → spawned role name (`name` in agent-*.meta.json) or raw agent id, at any depth under this
+#                project's sessions (plain + workflow nestings) — newest match wins, so a live teammate
+#                always resolves. Reports the HIGH-WATER turn, the number unit sizing needs: compaction
+#                resets occupancy, and a stopped/dead teammate trails stripped
+#                `{input_tokens:0,output_tokens:0}` turns that read as 0%.
+#   -p         → print the resolved transcript path instead of the gauge; marker polling reads that
+#                transcript's LAST assistant text (a raw grep also hits the spawn prompt + every
+#                `SendMessage` body carrying the marker)
 [ "$1" = "-p" ] && { path_only=1; shift; }
 root="$HOME/.claude/projects"
 proj="$root/$(pwd -P | tr '/.' '-')"
 if [ -n "$1" ]; then
   agent=true # every subagent turn carries isSidechain=true
-  f=$({ jq -r --arg n "$1" 'select((.name//"")==$n)|input_filename' "$proj"/*/subagents/*.meta.json 2>/dev/null |
-    sed 's/\.meta\.json$/.jsonl/'; ls "$proj"/*/subagents/*"$1"*.jsonl 2>/dev/null; } |
+  f=$({ find "$proj" -type f -name '*.meta.json' -exec jq -r --arg n "$1" 'select((.name//"")==$n)|input_filename' {} + 2>/dev/null |
+    sed 's/\.meta\.json$/.jsonl/'; find "$proj" -type f -name "*$1*.jsonl" 2>/dev/null; } |
     sort -u | xargs -r ls -t 2>/dev/null | head -1)
 else
   agent=false

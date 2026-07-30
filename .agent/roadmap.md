@@ -13,9 +13,8 @@
   ordered `structure` list. Review also bound the adapter's reference plans to locator compatibility
   rather than `document_type` alone, made best-effort field names collision-free, and bound the demo's
   recurrence-gate check to layout C's own scope hash. Peak implementing-teammate context across units =
-  33% (78K/240K), range 27-33%; the per-unit `impl=83% (199K/240K)` recorded at M1.2 was that session's
-  MAIN reading, not its teammate's (true value 31%, 76K). Window pressure sits on coordination - MAIN
-  peaked 76-96% across M1 sessions - so size units from `.agent/context.sh <teammate>` readings.
+  33% (78K/240K), range 27-33%; window pressure sits on coordination - MAIN peaked 76-96% across M1
+  sessions - so size units from `.agent/context.sh <teammate>` readings.
 - M2 - UNPLANNED. Scope to be selected from Deferred below.
 
 ## Core (completed)
@@ -33,4 +32,4 @@
 - Owner-selected license + absolute repository/documentation URLs before public publication.
 - Candidate contract enforcement: `Candidate` accepts any `provenance` value (`[]`, `'text'`, `5`, `None`
   stored as-is) despite the documented `Mapping` contract, and `System` coerces a non-`Mapping` to `{}`
-  rather than failing the fallback. Found during M1 review; out of that milestone's scope.
+  rather than failing the fallback.
