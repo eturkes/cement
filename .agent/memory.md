@@ -1,6 +1,7 @@
 # Memory
 
-- Compiler emits exact-lookup artifacts only; scope = partition + operation revision + canonical input. Wider scopes require a future domain verifier — recurrence alone never justifies generalization.
+- README paragraph 1 = authoritative scope source (the goal statement). Alignment work moves the system toward it; the paragraph is never narrowed to match the code. Owner-approved reconciliation arc: M2 function-as-object → M3 trim (LLM-invocation runtime, `authority()` callback, inline-proxy machinery — all three approved for removal) → M4 projection inside the boundary. Function-as-object precedes the trims so M3's pure `resolve` is written once against M2's evaluator.
+- Compiler emits exact-lookup artifacts only; scope = partition + operation revision + canonical input. Wider scopes require a future domain verifier — recurrence alone never justifies generalization. A `cement-function-v1` set of exact entries stays inside that boundary; only M4's projection artifact widens what one entry can cover.
 - Sole configured gate = `uv run python -m unittest discover -s tests -t .`; ruff/mypy stay unconfigured. Example self-checks run only when invoked by hand, so behavior worth protecting belongs in `tests/` (pattern: `tests/test_hospital_ocr_example.py` puts the example dir on `sys.path`, then imports the modules).
 - `System.events()` dicts key the event name under `kind`; there is no `type` field.
 - `examples/hospital_ocr/run_demo.py` prints exactly ONE per-run random `art_<32hex>`; every other line is deterministic → mask `art_[0-9a-f]{32}` before diffing its output.

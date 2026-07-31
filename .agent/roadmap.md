@@ -1,5 +1,32 @@
 # Roadmap
 
+## Scope source
+
+README paragraph 1 is authoritative: aggregate repeated work into a regular, if large, function covering
+many situations and edge cases; once built and verified, that function is deterministic. M2-M4 reconcile
+the project to it. Paragraph 1 states the goal, so alignment work moves the system toward it and never
+narrows the paragraph to fit the code.
+
+Measured gaps driving the arc:
+
+- `that function` has no referent. Verification is per artifact - own fixtures plus 4 negative probes
+  (`system.py` `_run_verification`). No aggregate identity, coverage measure, cross-entry check, or export.
+  An artifact is one input-output pair (`artifacts.py` `build_exact_lookup`). -> M2.
+- `if large` is operationally blocked. `verify <artifact_id>` and `promote <artifact_id> --scope-hash`
+  are per entry (`cli.py`), so N situations cost N human-typed hashes. -> M2.
+- Post-promotion determinism is revocable: revocation, ambiguity, integrity failure, suspension, or a new
+  operation revision move a resolved input to fallback. A sealed ledger-free bundle makes the paragraph's
+  determinism claim literally true. -> M2.
+- Coverage of many situations is produced outside the boundary. Cement supplies the middle lookup; the
+  input projection and output interpretation are unverified caller code
+  (`examples/hospital_ocr/pipeline.py` `layout_signature`, `apply_plan`), and M1 review found three real
+  defects in that projection which no Cement gate reaches. -> M4.
+- Beyond the paragraph: bundled LLM-invocation runtime (`source.py`, `_command_supervisor.py`,
+  `example_adapter.py`, `docs/adapter-protocol.md`), inline-proxy machinery (leases, request-ID
+  idempotency, `in_progress`/`retry_failed`/`fallback_failed`/`reconciliation_required`), and the
+  `authority(partition, actor, action, subject)` callback in a system the README calls not an ACL system.
+  -> M3 trims all three.
+
 ## Milestone ledger
 
 - M1 - Hospital OCR-to-JSON example (per-layout extraction plans) - REVIEWED. Ships
@@ -15,7 +42,57 @@
   recurrence-gate check to layout C's own scope hash. Peak implementing-teammate context across units =
   33% (78K/240K), range 27-33%; window pressure sits on coordination - MAIN peaked 76-96% across M1
   sessions - so size units from `.agent/context-gauge.sh <teammate>` readings.
-- M2 - UNPLANNED. Scope to be selected from Deferred below.
+
+- M2 - Function as object - IN-PROGRESS. Makes the aggregate deterministic function a first-class,
+  verifiable, exportable artifact so paragraph 1's `regular, if large, function` and `once built and
+  verified, that function is deterministic` become checkable properties instead of per-entry claims.
+  Trust boundary stays exact-lookup: a function is a set of exact entries, never a wider predicate.
+  Size every unit against M1 actuals (implementing teammate 27-33%, 66-78K/240K). Gates for every unit:
+  `uv run python -m unittest discover -s tests -t .` plus `uv build`.
+  - u1 OPEN - `src/cement_runtime/function.py`: `cement-function-v1` document (ABI, canonicalizer,
+    partition/operation/operation-revision scope, ordered entries carrying input/output/artifact/report
+    digests), function hash over that ordered content, document validation, and a pure evaluator taking
+    bundle plus canonical input to matched output. Module imports no store and no network. Tests prove
+    byte-identical repeat evaluation, unknown input returns no match, entry reordering keeps one hash,
+    and any tampered field fails closed.
+  - u2 OPEN - set-level verification in `System`: cross-entry properties per-artifact verification cannot
+    see. Duplicate promoted input digest becomes a gate rather than lazy dispatch-time ambiguity
+    quarantine; one ABI and one canonicalizer across the set; every entry carries a passing sealed report
+    and a valid promotion receipt bound to the current operation revision and policy; recomputed function
+    hash matches the stored set. Depends on u1.
+  - u3 OPEN - atomic batch verify and set promotion under one explicitly repeated function hash,
+    retiring the O(N) per-entry `--scope-hash` path as the only way to grow a function. Verify every
+    eligible draft for an operation in one action; promote the resulting set in one immediate
+    transaction whose receipt binds the function hash, each entry's report digest, and the policy.
+    Explicit-repeat safety is preserved: the operator types the set hash once. Depends on u2.
+  - u4 OPEN - coverage and gap reporting plus the `function` CLI surface (`show`, `export`, `eval`,
+    `verify`, `promote`). Honest measures only: promoted entry count, per-entry support and reviewer
+    counts, compile-blocked scopes with reasons, pending proposals, and suspended/retired entries. No
+    domain-coverage claim, since no domain schema exists. Depends on u1-u3.
+  - u5 OPEN - surface realignment: `README.md` claim pass (guarantees, request outcomes, deployment
+    boundary) against what the function object now proves, `docs/architecture.md` contract steps for the
+    function layer, and the hospital example resolving from an exported bundle with no ledger, no adapter,
+    and no LLM, covered by `tests/test_hospital_ocr_example.py`. Owns every documentation edit for M2 so
+    u1-u4 stay code-and-test only. Depends on u1-u4.
+
+- M3 - Trim to paragraph scope - UNPLANNED. Removes behavior outside `turns repeatedly supervised LLM
+  answers into narrowly scoped deterministic behavior`, sequenced after M2 so the pure resolver is
+  written once against M2's evaluator. Seeds: (a) `CandidateSource` protocol stays in core while
+  `CommandCandidateSource`, the subreaper/process-group supervisor, `example_adapter.py`, and
+  `docs/adapter-protocol.md` relocate to an optional example surface; (b) the `authority()` callback goes,
+  keeping reviewer and actor recording, which supervision genuinely requires; (c) the request lifecycle
+  (leases, request-ID idempotency, `in_progress`, `retry_failed`, `fallback_failed`,
+  `reconciliation_required`) is replaced by an explicit proposal submission plus a pure read-only
+  `resolve`, leaving request lifecycle to the caller. Schema fingerprint bumps; no migration path
+  pre-1.0. Plan the split from the M2 close, since M2 reshapes the dispatch path u3 (c) rewrites.
+
+- M4 - Projection inside the boundary - UNPLANNED. Brings the step that actually produces coverage of many
+  situations under supervision and verification: a projection artifact kind mapping raw input to canonical
+  key, replayed against every confirmed raw input plus boundary probes, with counterexample gates and
+  fail-closed behavior on unrecognized input. Open design question for planning: how a projection is
+  verified without a domain oracle. Deferred entries `Typed schemas + verifier plugin ABI` and
+  `Broader finite decision tables / constrained expression IR` seed this milestone. Output interpretation
+  (`apply_plan`-class execution) inside the boundary is a separate later decision.
 
 ## Core (completed)
 
@@ -24,8 +101,8 @@
 
 ## Deferred - contract/deployment expansion
 
-- Typed schemas + verifier plugin ABI.
-- Broader finite decision tables / constrained expression IR.
+- Typed schemas + verifier plugin ABI (M4 seed).
+- Broader finite decision tables / constrained expression IR (M4 seed).
 - Authenticated reviewer identities, encryption, retention, remote registry/signatures.
 - Shadow sampling + production drift telemetry.
 - TypedDict projections + dynamic inspection records.
