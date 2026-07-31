@@ -14,7 +14,7 @@
   rather than `document_type` alone, made best-effort field names collision-free, and bound the demo's
   recurrence-gate check to layout C's own scope hash. Peak implementing-teammate context across units =
   33% (78K/240K), range 27-33%; window pressure sits on coordination - MAIN peaked 76-96% across M1
-  sessions - so size units from `.agent/context.sh <teammate>` readings.
+  sessions - so size units from `.agent/context-gauge.sh <teammate>` readings.
 - M2 - UNPLANNED. Scope to be selected from Deferred below.
 
 ## Core (completed)
