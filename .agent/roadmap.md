@@ -49,17 +49,28 @@ Measured gaps driving the arc:
   Trust boundary stays exact-lookup: a function is a set of exact entries, never a wider predicate.
   Size every unit against M1 actuals (implementing teammate 27-33%, 66-78K/240K). Gates for every unit:
   `uv run python -m unittest discover -s tests -t .` plus `uv build`.
-  - u1 OPEN - `src/cement_runtime/function.py`: `cement-function-v1` document (ABI, canonicalizer,
-    partition/operation/operation-revision scope, ordered entries carrying input/output/artifact/report
-    digests), function hash over that ordered content, document validation, and a pure evaluator taking
-    bundle plus canonical input to matched output. Module imports no store and no network. Tests prove
-    byte-identical repeat evaluation, unknown input returns no match, entry reordering keeps one hash,
-    and any tampered field fails closed.
+  - u1 DONE (main=62% 148K/240K, impl=67% 160K/240K) - `src/cement_runtime/function.py` (397 lines) +
+    `tests/test_function.py` (749 lines, 22 tests; suite 81 -> 103). `cement-function-v1` document with
+    one document-level scope (partition, operation, operation revision, policy hash) and entries carrying
+    full input/output values plus their digests and the ledger's own governance digests (artifact,
+    evidence snapshot, promotion, and both report digests, since no single whole-report digest exists).
+    Function hash = canonical-JSON digest of the whole content object with entries normalized ascending by
+    `input_hash`; the portable document embeds that hash as its sole excluded field, so reordering keeps
+    one hash and a bundle self-checks with no sidecar. Optional `expected_function_hash` adds
+    caller-held-identity binding. Evaluation is digest lookup decided by canonical input text, returning
+    detached output. `ValidationError` = structure/bounds; `IntegrityError` = digest mismatch. Limits:
+    64 MiB, 50_000 entries, 1M items, depth 67 (default canonicalizer walls admit only ~1_600 entries).
   - u2 OPEN - set-level verification in `System`: cross-entry properties per-artifact verification cannot
     see. Duplicate promoted input digest becomes a gate rather than lazy dispatch-time ambiguity
     quarantine; one ABI and one canonicalizer across the set; every entry carries a passing sealed report
     and a valid promotion receipt bound to the current operation revision and policy; recomputed function
-    hash matches the stored set. Depends on u1.
+    hash matches the stored set. Depends on u1. Mapped surface: add one set enumerator/verifier wired at
+    2-3 sites (`_run_verification` has 2 callers, `_validate_promoted` 6, duplicate handling 2) rather
+    than rewriting all six receipt callers; regression surface = 18 named `test_system.py` tests + 2 CLI
+    tests with ~0 semantic edits expected (one literal, `report.tests == 9`, moves if set probes share
+    per-artifact reports); ~6 new cases (duplicate digest, ABI/canonicalizer uniformity, tampered report,
+    invalid receipt/policy, function-hash mismatch, atomic race); touches `system.py`, `function.py`,
+    `tests/test_system.py`, likely `store.py`, `models.py`/`__init__.py`, `tests/test_cli.py`.
   - u3 OPEN - atomic batch verify and set promotion under one explicitly repeated function hash,
     retiring the O(N) per-entry `--scope-hash` path as the only way to grow a function. Verify every
     eligible draft for an operation in one action; promote the resulting set in one immediate
