@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Literal, Mapping, TypeAlias, cast
 
 from .errors import ValidationError
+from .function import FunctionDocument
 from .json_value import JSONValue
 
 
@@ -150,6 +151,31 @@ class VerificationReport:
     tests: int
     failures: tuple[str, ...]
     created_at_us: int
+
+
+@dataclass(frozen=True, slots=True)
+class FunctionCheck:
+    """One stable named decision in promoted-set verification."""
+
+    key: str
+    passed: bool
+    detail: str
+
+
+@dataclass(frozen=True, slots=True)
+class FunctionVerification:
+    """Read-only verification result over one committed promoted-set snapshot.
+
+    A diagnostic hash may survive a failed ledger check; consumers must gate on
+    ``passed``. The result is not a lease, signature, persisted report, semantic
+    replay, or proof of input-domain coverage.
+    """
+
+    passed: bool
+    entries: int
+    document: FunctionDocument | None
+    function_hash: str | None
+    checks: tuple[FunctionCheck, ...]
 
 
 @dataclass(frozen=True, slots=True)

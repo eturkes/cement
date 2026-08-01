@@ -60,22 +60,35 @@ Measured gaps driving the arc:
     caller-held-identity binding. Evaluation is digest lookup decided by canonical input text, returning
     detached output. `ValidationError` = structure/bounds; `IntegrityError` = digest mismatch. Limits:
     64 MiB, 50_000 entries, 1M items, depth 67 (default canonicalizer walls admit only ~1_600 entries).
-  - u2 OPEN - set-level verification in `System`: cross-entry properties per-artifact verification cannot
-    see. Duplicate promoted input digest becomes a gate rather than lazy dispatch-time ambiguity
-    quarantine; one ABI and one canonicalizer across the set; every entry carries a passing sealed report
-    and a valid promotion receipt bound to the current operation revision and policy; recomputed function
-    hash matches the stored set. Depends on u1. Mapped surface: add one set enumerator/verifier wired at
-    2-3 sites (`_run_verification` has 2 callers, `_validate_promoted` 6, duplicate handling 2) rather
-    than rewriting all six receipt callers; regression surface = 18 named `test_system.py` tests + 2 CLI
-    tests with ~0 semantic edits expected (one literal, `report.tests == 9`, moves if set probes share
-    per-artifact reports); ~6 new cases (duplicate digest, ABI/canonicalizer uniformity, tampered report,
-    invalid receipt/policy, function-hash mismatch, atomic race); touches `system.py`, `function.py`,
-    `tests/test_system.py`, likely `store.py`, `models.py`/`__init__.py`, `tests/test_cli.py`.
+  - u2 DONE (main=84% 202K/240K, impl=80% 191K/240K) - `System.verify_function` in `system.py` (+485)
+    plus `FunctionCheck`/`FunctionVerification` in `models.py` (+26) and 31 tests in `test_system.py`
+    (+2041; suite 103 -> 134). Read-only verifier: one `Store.transaction(write=False)`, no schema, no
+    authority call, no event, no persisted identity - u3 owns the receipt that binds a function hash.
+    Five ordered checks (`duplicate-input-digests`, `abi-canonicalizer-uniform`, `sealed-passing-reports`,
+    `current-promotion-receipts`, `function-hash-matches-snapshot`) over all promoted rows for
+    `(partition, operation)`, so a stale-revision row is a reported failure rather than a silent omission.
+    P3 rehashes the full sealed child set at the gate while dispatch keeps its receipt fast path. P5
+    reconstructs the expected document field by field and re-canonicalizes against stored row digests;
+    `expected_function_hash` is optional and is u3's explicit-repeat seam. Empty set passes vacuously with
+    `entries=0`. `function.py`, `store.py`, `cli.py`, `test_cli.py` stay byte-identical; `report.tests == 9`
+    unmoved. Duplicate detection is an explicit gate; `handle`'s lazy quarantine and `challenge`'s
+    cardinality guard stay as post-gate corruption defenses, since the partial unique index plus
+    predecessor retirement make duplicates unreachable through the ordinary API. Known limits: sets within
+    the 50,000-entry count guard are still materialized before the 64 MiB/item bounds apply (streaming
+    deferred); the result binds one committed snapshot and is never a lease.
   - u3 OPEN - atomic batch verify and set promotion under one explicitly repeated function hash,
     retiring the O(N) per-entry `--scope-hash` path as the only way to grow a function. Verify every
     eligible draft for an operation in one action; promote the resulting set in one immediate
     transaction whose receipt binds the function hash, each entry's report digest, and the policy.
     Explicit-repeat safety is preserved: the operator types the set hash once. Depends on u2.
+    Scout (`.scratch/agents/scout-m2u3.md`) sizes this at 170-210K (70-88%) for one implementing teammate,
+    so plan it as two sequential units: u3a settles report/entry/set digest identities plus schema and
+    extracts batch verification and failure semantics (~80-105K); u3b adds the prospective-union assembler,
+    the atomic set-promotion transaction, and race/receipt tests (~90-115K). Resolve first: a set receipt
+    binding the function hash is circular while each entry already carries `promotion_hash`
+    (`function.py:37-46`), so the identity invariant must be settled before any transaction integration.
+    Splitting across simultaneous code-writing tracks collides in the verify/promote/receipt helpers and
+    `test_system.py`; keep `function.py` unchanged unless the identity cycle forces revised entry semantics.
   - u4 OPEN - coverage and gap reporting plus the `function` CLI surface (`show`, `export`, `eval`,
     `verify`, `promote`). Honest measures only: promoted entry count, per-entry support and reviewer
     counts, compile-blocked scopes with reasons, pending proposals, and suspended/retired entries. No

@@ -13,6 +13,7 @@ import uuid
 from typing import Any, Literal
 
 from .artifacts import (
+    ARTIFACT_ABI,
     ARTIFACT_MAX_BYTES,
     ArtifactDocument,
     build_digest,
@@ -28,6 +29,13 @@ from .errors import (
     StateError,
     ValidationError,
 )
+from .function import (
+    FUNCTION_ABI,
+    FUNCTION_MAX_ENTRIES,
+    FunctionEntry,
+    build_function,
+    validate_function,
+)
 from .json_value import (
     CANONICALIZER,
     DEFAULT_MAX_BYTES,
@@ -41,6 +49,8 @@ from .models import (
     CompilePolicy,
     CompileResult,
     FallbackFailed,
+    FunctionCheck,
+    FunctionVerification,
     InProgress,
     Outcome,
     Promotion,
@@ -1604,6 +1614,481 @@ class System:
                 digest.update(len(encoded).to_bytes(8, "big"))
                 digest.update(encoded)
         return count, digest.hexdigest()
+
+    # -- promoted-set verification -----------------------------------------
+
+    @staticmethod
+    def _promoted_function_count(
+        connection: sqlite3.Connection,
+        *,
+        partition: str,
+        operation: str,
+    ) -> int:
+        row = connection.execute(
+            """
+            SELECT COUNT(*) AS entry_count FROM artifacts
+            WHERE partition = ? AND operation = ? AND status = 'promoted'
+            """,
+            (partition, operation),
+        ).fetchone()
+        if row is None or type(row["entry_count"]) is not int:
+            raise IntegrityError("promoted-set count is invalid")
+        return int(row["entry_count"])
+
+    @staticmethod
+    def _promoted_function_rows(
+        connection: sqlite3.Connection,
+        *,
+        partition: str,
+        operation: str,
+    ) -> list[sqlite3.Row]:
+        return connection.execute(
+            """
+            SELECT * FROM artifacts
+            WHERE partition = ? AND operation = ? AND status = 'promoted'
+            ORDER BY operation_revision, input_hash, id
+            """,
+            (partition, operation),
+        ).fetchall()
+
+    def verify_function(
+        self,
+        partition: str,
+        operation: str,
+        *,
+        expected_function_hash: str | None = None,
+    ) -> FunctionVerification:
+        """Verify one committed promoted-set snapshot without mutation.
+
+        A passing result proves exact projection and current ledger bindings only for
+        the read transaction's snapshot. Each accepted entry is compatible with
+        the current artifact ABI and canonicalizer; this is per-entry current
+        compatibility, not a separate relational metadata proof. Consumers must
+        gate on ``passed``: a diagnostic hash may accompany a failed result. This
+        is not a lease, signature, persisted report, semantic replay, or
+        domain-coverage proof.
+        """
+
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        if expected_function_hash is not None and (
+            type(expected_function_hash) is not str
+            or re.fullmatch(r"[0-9a-f]{64}", expected_function_hash) is None
+        ):
+            raise ValidationError("expected_function_hash must be a SHA-256 hex digest")
+
+        def summarized(
+            key: str,
+            failures: list[str],
+            passed_detail: str,
+        ) -> FunctionCheck:
+            if not failures:
+                return FunctionCheck(key=key, passed=True, detail=passed_detail)
+            return FunctionCheck(
+                key=key,
+                passed=False,
+                detail=(
+                    f"{len(failures)} failure(s): "
+                    + "; ".join(failures[:3])
+                ),
+            )
+
+        with self.store.transaction(write=False) as connection:
+            registered = connection.execute(
+                "SELECT * FROM operations WHERE partition = ? AND name = ?",
+                (partition, operation),
+            ).fetchone()
+            if registered is None:
+                raise NotFoundError("operation is not registered in this partition")
+            if type(registered["revision"]) is not int:
+                raise IntegrityError("stored operation revision is invalid")
+            revision = int(registered["revision"])
+            policy_hash = registered["policy_hash"]
+            policy_json = registered["policy_json"]
+            if type(policy_hash) is not str:
+                raise IntegrityError("stored operation policy hash is invalid")
+            if type(policy_json) is not str:
+                raise IntegrityError("stored operation policy JSON is invalid")
+
+            operation_policy_failures: list[str] = []
+            try:
+                policy = _policy_from_text(policy_json)
+                canonical_policy = canonicalize(policy.as_json(), max_bytes=16_384)
+            except (IntegrityError, ValidationError) as exc:
+                operation_policy_failures.append(
+                    f"operation policy is invalid: {exc}"
+                )
+            else:
+                if canonical_policy.text != policy_json:
+                    operation_policy_failures.append(
+                        "operation policy JSON is not canonical"
+                    )
+                if canonical_policy.digest != policy_hash:
+                    operation_policy_failures.append(
+                        "operation policy digest does not match policy_hash"
+                    )
+
+            entry_count = self._promoted_function_count(
+                connection,
+                partition=partition,
+                operation=operation,
+            )
+            if entry_count > FUNCTION_MAX_ENTRIES:
+                skipped = (
+                    f"not evaluated because {entry_count} promoted entries exceed "
+                    f"FUNCTION_MAX_ENTRIES={FUNCTION_MAX_ENTRIES}"
+                )
+                receipt_detail = skipped
+                if operation_policy_failures:
+                    receipt_detail = (
+                        "; ".join(operation_policy_failures) + "; " + skipped
+                    )
+                checks = (
+                    FunctionCheck(
+                        key="duplicate-input-digests",
+                        passed=False,
+                        detail=skipped,
+                    ),
+                    FunctionCheck(
+                        key="abi-canonicalizer-uniform",
+                        passed=False,
+                        detail=skipped,
+                    ),
+                    FunctionCheck(
+                        key="sealed-passing-reports",
+                        passed=False,
+                        detail=skipped,
+                    ),
+                    FunctionCheck(
+                        key="current-promotion-receipts",
+                        passed=False,
+                        detail=receipt_detail,
+                    ),
+                    FunctionCheck(
+                        key="function-hash-matches-snapshot",
+                        passed=False,
+                        detail=(
+                            f"promoted set has {entry_count} entries and exceeds "
+                            f"FUNCTION_MAX_ENTRIES={FUNCTION_MAX_ENTRIES}"
+                        ),
+                    ),
+                )
+                return FunctionVerification(
+                    passed=False,
+                    entries=entry_count,
+                    document=None,
+                    function_hash=None,
+                    checks=checks,
+                )
+
+            rows = self._promoted_function_rows(
+                connection,
+                partition=partition,
+                operation=operation,
+            )
+            if len(rows) != entry_count:
+                raise IntegrityError("promoted-set count changed during enumeration")
+
+            first_digest_source: dict[str, str] = {}
+            duplicate_sources: dict[str, list[str]] = {}
+            for row in rows:
+                digest = str(row["input_hash"])
+                artifact_id = str(row["id"])
+                if digest not in first_digest_source:
+                    first_digest_source[digest] = artifact_id
+                    continue
+                sources = duplicate_sources.setdefault(
+                    digest, [first_digest_source[digest]]
+                )
+                if len(sources) < 3:
+                    sources.append(artifact_id)
+            duplicates = sorted(duplicate_sources.items())
+            if duplicates:
+                preview = "; ".join(
+                    f"{digest}:{','.join(source_ids)}"
+                    for digest, source_ids in duplicates[:3]
+                )
+                duplicate_check = FunctionCheck(
+                    key="duplicate-input-digests",
+                    passed=False,
+                    detail=f"{len(duplicates)} duplicate digest(s): {preview}",
+                )
+            else:
+                duplicate_check = FunctionCheck(
+                    key="duplicate-input-digests",
+                    passed=True,
+                    detail=f"{entry_count} entries have unique input digests",
+                )
+
+            abi_failures: list[str] = []
+            report_failures: list[str] = []
+            receipt_failures = list(operation_policy_failures)
+            projection_failures = [
+                f"operation: {failure}" for failure in operation_policy_failures
+            ]
+            projected: list[tuple[str, str, str, FunctionEntry]] = []
+            for row in rows:
+                artifact_id = str(row["id"])
+                try:
+                    raw_artifact = parse_json(
+                        str(row["artifact_json"]), max_bytes=ARTIFACT_MAX_BYTES
+                    ).value
+                    if type(raw_artifact) is not dict:
+                        raise IntegrityError("artifact document is not an object")
+                    raw_scope = raw_artifact.get("scope")
+                    artifact_abi = raw_artifact.get("abi")
+                    canonicalizer = (
+                        raw_scope.get("canonicalizer")
+                        if type(raw_scope) is dict
+                        else None
+                    )
+                    if artifact_abi != ARTIFACT_ABI or canonicalizer != CANONICALIZER:
+                        abi_failures.append(
+                            f"{artifact_id}: abi={artifact_abi!r}, "
+                            f"canonicalizer={canonicalizer!r}"
+                        )
+                except (IntegrityError, ValidationError) as exc:
+                    abi_failures.append(f"{artifact_id}: {exc}")
+
+                report: sqlite3.Row | None = None
+                if row["verified_report_id"] is not None:
+                    report = connection.execute(
+                        "SELECT * FROM test_reports WHERE id = ? AND artifact_id = ?",
+                        (row["verified_report_id"], artifact_id),
+                    ).fetchone()
+                try:
+                    if report is None or report["passed"] != 1:
+                        raise IntegrityError("missing passing bound report")
+                    details = self._validate_report(
+                        connection, report, verify_test_set=True
+                    )
+                    if type(details.value) is not dict:
+                        raise IntegrityError("report details are not an object")
+                    if details.value.get("scope_hash") != row["scope_hash"]:
+                        raise IntegrityError("report scope binding mismatch")
+                    for field in (
+                        "artifact_hash",
+                        "build_hash",
+                        "policy_hash",
+                        "evidence_snapshot_hash",
+                    ):
+                        if report[field] != row[field]:
+                            raise IntegrityError(f"report {field} binding mismatch")
+                except (IntegrityError, ValidationError) as exc:
+                    report_failures.append(f"{artifact_id}: {exc}")
+
+                artifact: ArtifactDocument | None = None
+                artifact_error: str | None = None
+                try:
+                    artifact = self._artifact_from_row(row)
+                except (IntegrityError, ValidationError) as exc:
+                    artifact_error = str(exc)
+
+                scope_failures: list[str] = []
+                stored_revision = row["operation_revision"]
+                if type(stored_revision) is not int:
+                    scope_failures.append("stored operation revision is not an integer")
+                elif stored_revision != revision:
+                    scope_failures.append(
+                        f"operation revision {stored_revision} does not match current {revision}"
+                    )
+                if row["policy_hash"] != policy_hash:
+                    scope_failures.append(
+                        "policy hash does not match current operation"
+                    )
+                if row["policy_json"] != policy_json:
+                    scope_failures.append(
+                        "policy JSON does not match current operation"
+                    )
+                try:
+                    if artifact is None:
+                        raise IntegrityError(artifact_error or "artifact is invalid")
+                    if scope_failures:
+                        raise IntegrityError("; ".join(scope_failures))
+                    self._validate_promoted(connection, row)
+                except (IntegrityError, ValidationError) as exc:
+                    receipt_failures.append(f"{artifact_id}: {exc}")
+
+                if artifact is None:
+                    projection_failures.append(
+                        f"{artifact_id}: {artifact_error or 'artifact is invalid'}"
+                    )
+                elif report is None:
+                    projection_failures.append(f"{artifact_id}: bound report is missing")
+                elif scope_failures:
+                    projection_failures.append(
+                        f"{artifact_id}: {'; '.join(scope_failures)}"
+                    )
+                else:
+                    entry = FunctionEntry(
+                        input=artifact.input.value,
+                        output=artifact.output.value,
+                        artifact_hash=str(row["artifact_hash"]),
+                        evidence_snapshot_hash=str(
+                            row["evidence_snapshot_hash"]
+                        ),
+                        promotion_hash=str(row["promotion_hash"]),
+                        report_details_hash=str(report["details_hash"]),
+                        report_test_set_hash=str(report["test_set_hash"]),
+                    )
+                    input_json = canonicalize(entry.input)
+                    output_json = canonicalize(entry.output)
+                    if input_json.digest != row["input_hash"]:
+                        projection_failures.append(
+                            f"{artifact_id}: input digest changed during projection"
+                        )
+                    elif output_json.digest != row["output_hash"]:
+                        projection_failures.append(
+                            f"{artifact_id}: output digest changed during projection"
+                        )
+                    else:
+                        projected.append(
+                            (
+                                artifact_id,
+                                input_json.digest,
+                                output_json.digest,
+                                entry,
+                            )
+                        )
+
+            abi_check = summarized(
+                "abi-canonicalizer-uniform",
+                abi_failures,
+                (
+                    f"{entry_count} entries are vacuously compatible with current "
+                    f"{ARTIFACT_ABI} + {CANONICALIZER}"
+                    if entry_count == 0
+                    else f"{entry_count} entries are compatible with current "
+                    f"{ARTIFACT_ABI} + {CANONICALIZER}"
+                ),
+            )
+            report_check = summarized(
+                "sealed-passing-reports",
+                report_failures,
+                f"{entry_count} entries carry passing full-seal reports",
+            )
+            receipt_check = summarized(
+                "current-promotion-receipts",
+                receipt_failures,
+                f"{entry_count} entries carry current valid promotion receipts",
+            )
+            del rows
+
+            document = None
+            function_hash: str | None = None
+            if projection_failures:
+                hash_check = FunctionCheck(
+                    key="function-hash-matches-snapshot",
+                    passed=False,
+                    detail=(
+                        f"{len(projection_failures)} unprojectable entry/entries: "
+                        + "; ".join(projection_failures[:3])
+                    ),
+                )
+            else:
+                try:
+                    document = build_function(
+                        partition=partition,
+                        operation=operation,
+                        operation_revision=revision,
+                        policy_hash=policy_hash,
+                        entries=(item[3] for item in projected),
+                    )
+                    function_hash = document.function_hash
+                    if document.value.get("abi") != FUNCTION_ABI:
+                        raise IntegrityError("function ABI changed during projection")
+                    if document.value.get("canonicalizer") != CANONICALIZER:
+                        raise IntegrityError(
+                            "function canonicalizer changed during projection"
+                        )
+                    if document.value.get("function_hash") != document.function_hash:
+                        raise IntegrityError(
+                            "function hash changed during projection"
+                        )
+                    expected_scope: dict[str, JSONValue] = {
+                        "operation": operation,
+                        "operation_revision": revision,
+                        "partition": partition,
+                        "policy_hash": policy_hash,
+                    }
+                    if document.value.get("scope") != expected_scope:
+                        raise IntegrityError(
+                            "function scope does not equal the promoted snapshot"
+                        )
+                    actual_entries = document.value.get("entries")
+                    if type(actual_entries) is not list:
+                        raise IntegrityError("function entries are not an array")
+                    if len(actual_entries) != len(projected):
+                        raise IntegrityError(
+                            "function entry count does not equal the promoted snapshot"
+                        )
+                    projected.sort(key=lambda item: item[1])
+                    for actual, (
+                        artifact_id,
+                        input_hash,
+                        output_hash,
+                        entry,
+                    ) in zip(actual_entries, projected, strict=True):
+                        expected_entry: dict[str, JSONValue] = {
+                            "artifact_hash": entry.artifact_hash,
+                            "evidence_snapshot_hash": entry.evidence_snapshot_hash,
+                            "input": entry.input,
+                            "input_hash": input_hash,
+                            "output": entry.output,
+                            "output_hash": output_hash,
+                            "promotion_hash": entry.promotion_hash,
+                            "report": {
+                                "details_hash": entry.report_details_hash,
+                                "test_set_hash": entry.report_test_set_hash,
+                            },
+                        }
+                        if actual != expected_entry:
+                            raise IntegrityError(
+                                f"{artifact_id} function entry changed during projection"
+                            )
+                    validated = validate_function(
+                        document.value,
+                        expected_function_hash=(
+                            document.function_hash
+                            if expected_function_hash is None
+                            else expected_function_hash
+                        ),
+                    )
+                    if validated.text != document.text:
+                        raise IntegrityError(
+                            "function normalization changed during self-check"
+                        )
+                except (IntegrityError, ValidationError) as exc:
+                    hash_check = FunctionCheck(
+                        key="function-hash-matches-snapshot",
+                        passed=False,
+                        detail=str(exc),
+                    )
+                else:
+                    hash_check = FunctionCheck(
+                        key="function-hash-matches-snapshot",
+                        passed=True,
+                        detail=(
+                            f"{document.function_hash} binds "
+                            f"{entry_count} snapshot entry/entries"
+                        ),
+                    )
+
+            checks = (
+                duplicate_check,
+                abi_check,
+                report_check,
+                receipt_check,
+                hash_check,
+            )
+            passed = all(check.passed for check in checks)
+            return FunctionVerification(
+                passed=passed,
+                entries=entry_count,
+                document=document if passed else None,
+                function_hash=function_hash,
+                checks=checks,
+            )
 
     # -- replay verification + atomic promotion ----------------------------
 
