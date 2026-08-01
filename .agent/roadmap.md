@@ -84,9 +84,18 @@ Measured gaps driving the arc:
     Scout (`.scratch/agents/scout-m2u3.md`) sizes this at 170-210K (70-88%) for one implementing teammate,
     so plan it as two sequential units: u3a settles report/entry/set digest identities plus schema and
     extracts batch verification and failure semantics (~80-105K); u3b adds the prospective-union assembler,
-    the atomic set-promotion transaction, and race/receipt tests (~90-115K). Resolve first: a set receipt
-    binding the function hash is circular while each entry already carries `promotion_hash`
-    (`function.py:37-46`), so the identity invariant must be settled before any transaction integration.
+    the atomic set-promotion transaction, and race/receipt tests (~90-115K). Two blockers to resolve
+    during planning, both probe-confirmed by the scout:
+    (a) Identity/receipt timing cycle. u1's function hash includes each entry's `promotion_hash`
+    (`function.py:37-46`), but u3 asks the operator to repeat the function hash *before* promotion, while
+    per-entry promotion hashes are created only during promotion and bind promoter and time. The
+    pre-promotion repeat is therefore circular unless identity/receipt staging is revised or a distinct
+    candidate-set hash is defined for the explicit repeat. Settle this before any transaction integration.
+    (b) Stale-draft eligibility. A literal current-revision `status='draft'` enumeration is unusable:
+    `compile` keys reuse by `build_hash`, so added evidence produces a second draft for the same input
+    while the prior draft remains. The probe showed batch verification returning `stale=false`
+    (`evidence snapshot changed`) together with `current=true`, leaving the stale row draft forever.
+    "Every eligible draft" needs an explicit eligibility predicate, not a status filter.
     Splitting across simultaneous code-writing tracks collides in the verify/promote/receipt helpers and
     `test_system.py`; keep `function.py` unchanged unless the identity cycle forces revised entry semantics.
   - u4 OPEN - coverage and gap reporting plus the `function` CLI surface (`show`, `export`, `eval`,
