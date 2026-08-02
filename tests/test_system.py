@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import gc
 import hashlib
 import json
 import pathlib
+import shutil
 import sqlite3
 import tempfile
 import threading
 import unittest
+import warnings
 from contextlib import contextmanager
 from dataclasses import FrozenInstanceError, replace
 from unittest import mock
@@ -21,6 +24,9 @@ from cement_runtime import (
     FUNCTION_ENTRY_SEAL_ABI,
     FunctionCheck,
     FunctionEntry,
+    FunctionPromotionEntry,
+    FunctionPromotionManifest,
+    FunctionSetPromotion,
     FunctionVerification,
     InProgress,
     IntegrityError,
@@ -37,7 +43,17 @@ from cement_runtime import (
 )
 from cement_runtime.artifacts import ARTIFACT_ABI, ARTIFACT_MAX_BYTES, build_digest
 from cement_runtime.json_value import CANONICALIZER, canonicalize
-from cement_runtime.system import _digest_strings, _function_entry_seal
+from cement_runtime.store import SCHEMA_VERSION
+from cement_runtime.system import (
+    FUNCTION_MEMBERSHIP_ABI,
+    FUNCTION_PROMOTION_MANIFEST_ABI,
+    FUNCTION_PROMOTION_RECEIPT_ABI,
+    _digest_strings,
+    _function_entry_seal,
+    _function_receipt_hash,
+    _id_list_hash,
+    _membership_hash,
+)
 
 
 _FUNCTION_CHECK_KEYS = (
@@ -1179,8 +1195,15 @@ class SystemTests(unittest.TestCase):
     def test_corrupt_or_constraint_invalid_database_fails_at_open(self) -> None:
         corrupt = pathlib.Path(self.temporary.name) / "not-sqlite.db"
         corrupt.write_bytes(b"not a sqlite database")
-        with self.assertRaises(IntegrityError):
-            System(str(corrupt))
+        with warnings.catch_warnings(record=True) as observed:
+            warnings.simplefilter("always", ResourceWarning)
+            with self.assertRaises(IntegrityError):
+                System(str(corrupt))
+            gc.collect()
+        self.assertEqual(
+            [warning for warning in observed if warning.category is ResourceWarning],
+            [],
+        )
 
         self.register(confirmations=2, reviewers=1, span=0)
         connection = sqlite3.connect(self.database)
@@ -1392,6 +1415,67 @@ class SystemTests(unittest.TestCase):
         self.assertEqual(len(compiled.created), 3)
         self.assertEqual(compiled.blocked, ())
         return compiled.created
+
+
+    def _verify_three_function_candidates(self, prefix: str) -> DraftVerification:
+        self._compile_three_drafts(prefix)
+        result = self.system.verify_drafts(
+            "tenant-a",
+            "echo",
+            verified_by="batch-verifier",
+        )
+        self.assertTrue(result.passed)
+        self.assertEqual(len(result.entries), 3)
+        return result
+
+    def _promote_three_as_function(
+        self,
+        prefix: str,
+    ) -> tuple[FunctionPromotionManifest, FunctionSetPromotion]:
+        self._verify_three_function_candidates(prefix)
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        promotion = self.system.promote_function(
+            "tenant-a",
+            "echo",
+            expected_function_hash=manifest.function_hash,
+            promoted_by="release-manager",
+        )
+        return manifest, promotion
+
+    def _challenge_three_function_entries(self, prefix: str) -> DraftVerification:
+        for value in (1, 2, 3):
+            _, suspended = self.system.challenge(
+                "tenant-a",
+                "echo",
+                {"x": value},
+                {"echo": {"x": value}},
+                reviewer="alice",
+                note=f"{prefix}-{value}",
+            )
+            self.assertFalse(suspended)
+        compiled = self.system.compile("tenant-a", "echo")
+        self.assertEqual(len(compiled.created), 3)
+        result = self.system.verify_drafts(
+            "tenant-a",
+            "echo",
+            verified_by="batch-verifier",
+        )
+        self.assertTrue(result.passed)
+        self.assertEqual(len(result.entries), 3)
+        return result
+
+    def _function_member_evidence_id(self, artifact_id: str) -> str:
+        with self.system.store.transaction(write=False) as connection:
+            row = connection.execute(
+                """
+                SELECT example_id FROM artifact_evidence
+                WHERE artifact_id = ? ORDER BY example_id LIMIT 1
+                """,
+                (artifact_id,),
+            ).fetchone()
+        if row is None:
+            raise AssertionError("function member evidence disappeared")
+        return str(row["example_id"])
 
     def _clone_promoted_function_entry(
         self,
@@ -1792,7 +1876,7 @@ class SystemTests(unittest.TestCase):
             f"{document.function_hash} binds 1 snapshot entry/entries",
         )
         self.assertEqual(before, after)
-        self.assertNotIn("CREATE TABLE function", "\n".join(after))
+        self.assertNotIn("INSERT INTO function_receipts", "\n".join(after))
         transaction.assert_called_once_with(write=False)
         authority.assert_not_called()
         clock.assert_not_called()
@@ -4989,6 +5073,2219 @@ class SystemTests(unittest.TestCase):
                 for artifact_id, seal in pre_recomputed.items()
             },
         )
+
+
+    def test_function_promotion_schema_v2_is_reference_only_and_immutable(self) -> None:
+        self.assertEqual(SCHEMA_VERSION, 2)
+        self.register(confirmations=2, reviewers=1, span=0)
+        _, promotion = self._promote_three_as_function("function-schema")
+        with self.system.store.transaction(write=False) as connection:
+            receipt_columns = tuple(
+                str(row["name"])
+                for row in connection.execute(
+                    "PRAGMA table_info(function_receipts)"
+                )
+            )
+            membership_columns = tuple(
+                str(row["name"])
+                for row in connection.execute(
+                    "PRAGMA table_info(function_memberships)"
+                )
+            )
+            schema_rows = {
+                (str(row["type"]), str(row["name"])): str(row["sql"])
+                for row in connection.execute(
+                    """
+                    SELECT type, name, sql FROM sqlite_schema
+                    WHERE name LIKE 'function_%' AND sql IS NOT NULL
+                    """
+                )
+            }
+            membership = connection.execute(
+                """
+                SELECT * FROM function_memberships
+                WHERE receipt_id = ? ORDER BY ordinal LIMIT 1
+                """,
+                (promotion.receipt_id,),
+            ).fetchone()
+        self.assertEqual(
+            receipt_columns,
+            (
+                "sequence",
+                "id",
+                "partition",
+                "operation",
+                "operation_revision",
+                "policy_hash",
+                "function_hash",
+                "membership_hash",
+                "member_count",
+                "candidate_artifact_ids_hash",
+                "candidate_count",
+                "retired_artifact_ids_hash",
+                "retired_count",
+                "promoted_by",
+                "promoted_at_us",
+                "receipt_hash",
+            ),
+        )
+        self.assertEqual(
+            membership_columns,
+            (
+                "receipt_id",
+                "ordinal",
+                "function_hash",
+                "artifact_id",
+                "report_id",
+                "input_hash",
+                "entry_seal",
+            ),
+        )
+        self.assertIn(
+            ("index", "function_receipts_scope"),
+            schema_rows,
+        )
+        self.assertIn(
+            ("index", "function_receipts_hash"),
+            schema_rows,
+        )
+        self.assertIn("function_hash", schema_rows[("index", "function_receipts_hash")])
+        self.assertNotIn(
+            "UNIQUE",
+            schema_rows[("index", "function_receipts_hash")].upper(),
+        )
+        self.assertIn(
+            ("index", "function_memberships_artifact"),
+            schema_rows,
+        )
+        seal_sql = schema_rows[("trigger", "function_memberships_sealed_insert")]
+        self.assertIn(
+            "WHEN EXISTS (SELECT 1 FROM function_receipts WHERE id = NEW.receipt_id)",
+            seal_sql,
+        )
+        self.assertNotIn("COUNT", seal_sql.upper())
+        self.assertIn(
+            "DEFERRABLE INITIALLY DEFERRED",
+            schema_rows[("table", "function_memberships")],
+        )
+        if membership is None:
+            raise AssertionError("function membership fixture disappeared")
+
+        connection = sqlite3.connect(self.database)
+        try:
+            with self.assertRaisesRegex(sqlite3.IntegrityError, "memberships are immutable"):
+                connection.execute(
+                    """
+                    UPDATE function_memberships SET entry_seal = entry_seal
+                    WHERE receipt_id = ? AND ordinal = ?
+                    """,
+                    (promotion.receipt_id, membership["ordinal"]),
+                )
+            with self.assertRaisesRegex(sqlite3.IntegrityError, "memberships are immutable"):
+                connection.execute(
+                    """
+                    DELETE FROM function_memberships
+                    WHERE receipt_id = ? AND ordinal = ?
+                    """,
+                    (promotion.receipt_id, membership["ordinal"]),
+                )
+            with self.assertRaisesRegex(sqlite3.IntegrityError, "membership set is sealed"):
+                connection.execute(
+                    """
+                    INSERT INTO function_memberships(
+                        receipt_id, ordinal, function_hash, artifact_id, report_id,
+                        input_hash, entry_seal
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        promotion.receipt_id,
+                        99,
+                        membership["function_hash"],
+                        membership["artifact_id"],
+                        membership["report_id"],
+                        membership["input_hash"],
+                        membership["entry_seal"],
+                    ),
+                )
+            with self.assertRaisesRegex(sqlite3.IntegrityError, "receipts are immutable"):
+                connection.execute(
+                    """
+                    UPDATE function_receipts SET promoted_by = promoted_by
+                    WHERE id = ?
+                    """,
+                    (promotion.receipt_id,),
+                )
+            with self.assertRaisesRegex(sqlite3.IntegrityError, "receipts are immutable"):
+                connection.execute(
+                    "DELETE FROM function_receipts WHERE id = ?",
+                    (promotion.receipt_id,),
+                )
+        finally:
+            connection.rollback()
+            connection.close()
+
+    def test_function_promotion_schema_one_fails_closed_with_version_diagnostic(self) -> None:
+        legacy = str(pathlib.Path(self.temporary.name) / "schema-v1.db")
+        connection = sqlite3.connect(legacy)
+        try:
+            connection.execute("CREATE TABLE legacy_payload(value TEXT)")
+            connection.execute("INSERT INTO legacy_payload VALUES ('preserve-me')")
+            connection.execute("PRAGMA user_version = 1")
+            connection.commit()
+        finally:
+            connection.close()
+        connection = sqlite3.connect(legacy)
+        try:
+            before = tuple(connection.iterdump())
+        finally:
+            connection.close()
+        with self.assertRaisesRegex(
+            IntegrityError,
+            "database schema 1 is unsupported; expected 2",
+        ):
+            System(legacy)
+        connection = sqlite3.connect(legacy)
+        try:
+            after = tuple(connection.iterdump())
+            self.assertEqual(
+                connection.execute("SELECT value FROM legacy_payload").fetchone()[0],
+                "preserve-me",
+            )
+        finally:
+            connection.close()
+        self.assertEqual(after, before)
+
+    def test_function_promotion_manifest_is_deterministic_read_only_and_complete(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._verify_three_function_candidates("function-manifest")
+        authority = mock.Mock(side_effect=AssertionError("authority consulted"))
+        clock = mock.Mock(side_effect=AssertionError("clock consulted"))
+        reader = System(self.database, authority=authority, clock_us=clock)
+        independent = System(self.database)
+        before = self._database_dump()
+        with (
+            mock.patch.object(
+                reader.store,
+                "transaction",
+                wraps=reader.store.transaction,
+            ) as transaction,
+            mock.patch(
+                "cement_runtime.system.uuid.uuid4",
+                side_effect=AssertionError("ID allocated"),
+            ),
+        ):
+            manifest = reader.inspect_function_promotion("tenant-a", "echo")
+        repeated = independent.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(self._database_dump(), before)
+        transaction.assert_called_once_with(write=False)
+        authority.assert_not_called()
+        clock.assert_not_called()
+        self.assertIsInstance(manifest, FunctionPromotionManifest)
+        self.assertEqual(manifest.text, repeated.text)
+        self.assertEqual(manifest.operation_revision, 1)
+        self.assertEqual(manifest.function_hash, manifest.document.function_hash)
+        self.assertEqual(len(manifest.entries), 3)
+        self.assertTrue(
+            all(isinstance(entry, FunctionPromotionEntry) for entry in manifest.entries)
+        )
+        self.assertEqual(
+            tuple(entry.input_hash for entry in manifest.entries),
+            tuple(sorted(entry.input_hash for entry in manifest.entries)),
+        )
+        self.assertEqual(
+            tuple(entry.disposition for entry in manifest.entries),
+            ("candidate", "candidate", "candidate"),
+        )
+        self.assertTrue(
+            all(entry.replaces_artifact_id is None for entry in manifest.entries)
+        )
+        self.assertEqual(manifest.skipped, ())
+        raw = json.loads(manifest.text)
+        self.assertEqual(raw["abi"], "cement-function-promotion-manifest-v1")
+        self.assertEqual(FUNCTION_PROMOTION_MANIFEST_ABI, raw["abi"])
+        self.assertEqual(raw["function"], manifest.document.value)
+        self.assertEqual(raw["function_hash"], manifest.function_hash)
+        self.assertEqual(raw["skipped"], list(manifest.skipped))
+        self.assertEqual(
+            raw["entries"],
+            [
+                {
+                    "artifact_hash": entry.artifact_hash,
+                    "artifact_id": entry.artifact_id,
+                    "disposition": entry.disposition,
+                    "entry_seal": entry.entry_seal,
+                    "input_hash": entry.input_hash,
+                    "output_hash": entry.output_hash,
+                    "replaces_artifact_id": entry.replaces_artifact_id,
+                }
+                for entry in manifest.entries
+            ],
+        )
+        document_scope = manifest.document.value["scope"]
+        self.assertIsInstance(document_scope, dict)
+        assert type(document_scope) is dict
+        self.assertEqual(
+            raw["scope"],
+            {
+                "operation": "echo",
+                "operation_revision": 1,
+                "partition": "tenant-a",
+                "policy_hash": document_scope["policy_hash"],
+            },
+        )
+        with self.assertRaises(FrozenInstanceError):
+            manifest.function_hash = "0" * 64  # type: ignore[misc]
+        with self.assertRaises(FrozenInstanceError):
+            manifest.entries[1].disposition = "retained"  # type: ignore[misc]
+        self.assertFalse(hasattr(manifest, "__dict__"))
+        self.assertFalse(hasattr(manifest.entries[1], "__dict__"))
+
+    def test_promote_function_persists_receipt_memberships_and_projected_event(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        batch = self._verify_three_function_candidates("function-success")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        promotion = self.system.promote_function(
+            "tenant-a",
+            "echo",
+            expected_function_hash=manifest.function_hash,
+            promoted_by="release-manager",
+        )
+        self.assertIsInstance(promotion, FunctionSetPromotion)
+        self.assertEqual(promotion.function_hash, manifest.function_hash)
+        self.assertEqual(promotion.operation_revision, manifest.operation_revision)
+        self.assertEqual(promotion.promoted_at_us, self.clock.now_us)
+        self.assertEqual(
+            promotion.member_artifact_ids,
+            tuple(sorted(entry.artifact_id for entry in manifest.entries)),
+        )
+        self.assertEqual(
+            promotion.candidate_artifact_ids,
+            promotion.member_artifact_ids,
+        )
+        self.assertEqual(promotion.retired_artifact_ids, ())
+        self.assertFalse(hasattr(promotion, "__dict__"))
+
+        verified = self.system.verify_function("tenant-a", "echo")
+        self.assertTrue(verified.passed)
+        self.assertEqual(verified.function_hash, manifest.function_hash)
+        self.assertEqual(verified.document, manifest.document)
+        with self.system.store.transaction(write=False) as connection:
+            receipt = connection.execute(
+                "SELECT * FROM function_receipts WHERE id = ?",
+                (promotion.receipt_id,),
+            ).fetchone()
+            memberships = tuple(
+                connection.execute(
+                    """
+                    SELECT * FROM function_memberships
+                    WHERE receipt_id = ? ORDER BY ordinal
+                    """,
+                    (promotion.receipt_id,),
+                )
+            )
+            artifacts = tuple(
+                connection.execute(
+                    """
+                    SELECT * FROM artifacts WHERE id IN (?, ?, ?)
+                    ORDER BY input_hash, sequence, id
+                    """,
+                    promotion.member_artifact_ids,
+                )
+            )
+            event = connection.execute(
+                """
+                SELECT * FROM events
+                WHERE kind = 'function.promoted' AND subject_id = ?
+                """,
+                (promotion.receipt_id,),
+            ).fetchone()
+            reports = {
+                str(row["id"]): connection.execute(
+                    "SELECT * FROM test_reports WHERE id = ? AND artifact_id = ?",
+                    (row["verified_report_id"], row["id"]),
+                ).fetchone()
+                for row in artifacts
+            }
+        if receipt is None or event is None or any(report is None for report in reports.values()):
+            raise AssertionError("persisted function promotion fixture disappeared")
+        self.assertEqual(len(memberships), 3)
+        self.assertEqual(tuple(int(row["ordinal"]) for row in memberships), (0, 1, 2))
+        self.assertEqual(
+            tuple(str(row["input_hash"]) for row in memberships),
+            tuple(entry.input_hash for entry in manifest.entries),
+        )
+        self.assertEqual(
+            tuple(str(row["artifact_id"]) for row in memberships),
+            tuple(entry.artifact_id for entry in manifest.entries),
+        )
+        self.assertEqual(
+            tuple(str(row["entry_seal"]) for row in memberships),
+            tuple(entry.entry_seal for entry in manifest.entries),
+        )
+        self.assertTrue(
+            all(row["function_hash"] == manifest.function_hash for row in memberships)
+        )
+        self.assertEqual(receipt["membership_hash"], _membership_hash(memberships))
+        self.assertEqual(receipt["member_count"], 3)
+        self.assertEqual(
+            receipt["candidate_artifact_ids_hash"],
+            _id_list_hash(promotion.candidate_artifact_ids),
+        )
+        self.assertEqual(receipt["candidate_count"], 3)
+        self.assertEqual(receipt["retired_artifact_ids_hash"], _id_list_hash(()))
+        self.assertEqual(receipt["retired_count"], 0)
+        self.assertEqual(receipt["receipt_hash"], _function_receipt_hash(receipt))
+        self.assertEqual(receipt["receipt_hash"], promotion.receipt_hash)
+        self.assertEqual(receipt["promoted_by"], "release-manager")
+        self.assertEqual(receipt["promoted_at_us"], self.clock.now_us)
+        self.assertEqual(
+            tuple(str(row["status"]) for row in artifacts),
+            ("promoted", "promoted", "promoted"),
+        )
+        self.assertEqual(
+            {str(row["promoted_by"]) for row in artifacts},
+            {"release-manager"},
+        )
+        self.assertEqual(
+            {int(row["promoted_at_us"]) for row in artifacts},
+            {self.clock.now_us},
+        )
+        for row in artifacts:
+            report = reports[str(row["id"])]
+            assert report is not None
+            self.assertEqual(row["promotion_hash"], self._promotion_hash(row, report))
+        payload = json.loads(str(event["payload_json"]))
+        self.assertEqual(event["subject_type"], "function")
+        self.assertEqual(
+            payload,
+            {
+                "candidate_artifact_count": 3,
+                "candidate_artifact_ids": list(promotion.candidate_artifact_ids),
+                "candidate_artifact_ids_hash": _id_list_hash(
+                    promotion.candidate_artifact_ids
+                ),
+                "function_hash": manifest.function_hash,
+                "member_artifact_count": 3,
+                "member_artifact_ids": list(promotion.member_artifact_ids),
+                "member_artifact_ids_hash": _id_list_hash(
+                    promotion.member_artifact_ids
+                ),
+                "promoted_by": "release-manager",
+                "receipt_hash": promotion.receipt_hash,
+                "receipt_id": promotion.receipt_id,
+                "retired_artifact_count": 0,
+                "retired_artifact_ids": [],
+                "retired_artifact_ids_hash": _id_list_hash(()),
+            },
+        )
+        self.assertEqual(
+            {entry.artifact_id: entry.entry_seal for entry in batch.entries},
+            {
+                entry.artifact_id: entry.entry_seal
+                for entry in manifest.entries
+            },
+        )
+
+    def test_function_promotion_receipt_hash_binds_fourteen_fields_independently(self) -> None:
+        fields: dict[str, object] = {
+            "id": "fpr_receipt",
+            "partition": "tenant-a",
+            "operation": "echo",
+            "operation_revision": 7,
+            "policy_hash": "0" * 64,
+            "function_hash": "1" * 64,
+            "membership_hash": "2" * 64,
+            "member_count": 3,
+            "candidate_artifact_ids_hash": "3" * 64,
+            "candidate_count": 2,
+            "retired_artifact_ids_hash": "4" * 64,
+            "retired_count": 1,
+            "promoted_by": "release-manager",
+            "promoted_at_us": 1_234_567,
+        }
+        ordered_names = (
+            "id",
+            "partition",
+            "operation",
+            "operation_revision",
+            "policy_hash",
+            "function_hash",
+            "membership_hash",
+            "member_count",
+            "candidate_artifact_ids_hash",
+            "candidate_count",
+            "retired_artifact_ids_hash",
+            "retired_count",
+            "promoted_by",
+            "promoted_at_us",
+        )
+        mutations: dict[str, object] = {
+            "id": "fpr_changed",
+            "partition": "tenant-b",
+            "operation": "other",
+            "operation_revision": 8,
+            "policy_hash": "5" * 64,
+            "function_hash": "6" * 64,
+            "membership_hash": "7" * 64,
+            "member_count": 4,
+            "candidate_artifact_ids_hash": "8" * 64,
+            "candidate_count": 3,
+            "retired_artifact_ids_hash": "9" * 64,
+            "retired_count": 2,
+            "promoted_by": "other-manager",
+            "promoted_at_us": 1_234_568,
+        }
+        self.assertEqual(len(fields), 14)
+        self.assertEqual(set(mutations), set(fields))
+        baseline = _function_receipt_hash(fields)
+        for field, changed_value in mutations.items():
+            changed = dict(fields)
+            changed[field] = changed_value
+            differences = [name for name in fields if changed[name] != fields[name]]
+            with self.subTest(field=field):
+                self.assertEqual(differences, [field])
+                self.assertNotEqual(_function_receipt_hash(changed), baseline)
+
+        def framed_digest(label: str, values: tuple[str, ...]) -> str:
+            digest = hashlib.sha256()
+            for value in (label, *values):
+                encoded = value.encode("utf-8")
+                digest.update(len(encoded).to_bytes(8, "big"))
+                digest.update(encoded)
+            return digest.hexdigest()
+
+        self.assertEqual(
+            FUNCTION_PROMOTION_RECEIPT_ABI,
+            "cement-function-promotion-v1",
+        )
+        self.assertEqual(
+            baseline,
+            framed_digest(
+                "cement-function-promotion-v1",
+                tuple(str(fields[name]) for name in ordered_names),
+            ),
+        )
+
+    def test_function_membership_hash_binds_each_later_row_component(self) -> None:
+        rows = tuple(
+            {
+                "ordinal": ordinal,
+                "artifact_id": f"artifact-{ordinal}",
+                "report_id": f"report-{ordinal}",
+                "input_hash": str(ordinal + 1) * 64,
+                "entry_seal": str(ordinal + 4) * 64,
+            }
+            for ordinal in range(3)
+        )
+        baseline = _membership_hash(rows)
+        mutations: dict[str, int | str] = {
+            "ordinal": 9,
+            "artifact_id": "artifact-changed",
+            "report_id": "report-changed",
+            "input_hash": "8" * 64,
+            "entry_seal": "9" * 64,
+        }
+        for field, changed_value in mutations.items():
+            changed_rows = [dict(row) for row in rows]
+            changed_rows[1][field] = changed_value
+            differences = [
+                (index, key)
+                for index, row in enumerate(changed_rows)
+                for key in row
+                if row[key] != rows[index][key]
+            ]
+            with self.subTest(field=field):
+                self.assertEqual(differences, [(1, field)])
+                self.assertNotEqual(_membership_hash(changed_rows), baseline)
+
+        def framed_digest(label: str, values: tuple[str, ...]) -> str:
+            digest = hashlib.sha256()
+            for value in (label, *values):
+                encoded = value.encode("utf-8")
+                digest.update(len(encoded).to_bytes(8, "big"))
+                digest.update(encoded)
+            return digest.hexdigest()
+
+        ordered = tuple(
+            str(row[field])
+            for row in rows
+            for field in (
+                "ordinal",
+                "artifact_id",
+                "report_id",
+                "input_hash",
+                "entry_seal",
+            )
+        )
+        self.assertEqual(FUNCTION_MEMBERSHIP_ABI, "cement-function-membership-v1")
+        self.assertEqual(
+            baseline,
+            framed_digest("cement-function-membership-v1", ordered),
+        )
+        self.assertNotEqual(_membership_hash(tuple(reversed(rows))), baseline)
+        self.assertEqual(
+            _id_list_hash(("artifact-c", "artifact-a", "artifact-b")),
+            framed_digest(
+                "cement-id-list-v1",
+                ("artifact-a", "artifact-b", "artifact-c"),
+            ),
+        )
+
+
+    def test_promote_function_growth_retains_the_complete_existing_set(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        first_manifest, first = self._promote_three_as_function("function-growth-base")
+        for value in (4, 5, 6):
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                {"x": value},
+                f"function-growth-{value}-a",
+                reviewer="alice",
+            )
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                {"x": value},
+                f"function-growth-{value}-b",
+                reviewer="bob",
+            )
+        compiled = self.system.compile("tenant-a", "echo")
+        self.assertEqual(len(compiled.created), 3)
+        batch = self.system.verify_drafts(
+            "tenant-a",
+            "echo",
+            verified_by="batch-verifier",
+        )
+        self.assertTrue(batch.passed)
+        self.assertEqual(len(batch.entries), 3)
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        retained = tuple(
+            entry.artifact_id
+            for entry in manifest.entries
+            if entry.disposition == "retained"
+        )
+        candidates = tuple(
+            entry.artifact_id
+            for entry in manifest.entries
+            if entry.disposition == "candidate"
+        )
+        self.assertEqual(len(manifest.entries), 6)
+        self.assertEqual(
+            tuple(entry.input_hash for entry in manifest.entries),
+            tuple(sorted(entry.input_hash for entry in manifest.entries)),
+        )
+        self.assertEqual(set(retained), set(first.member_artifact_ids))
+        self.assertEqual(
+            set(candidates),
+            {entry.artifact_id for entry in batch.entries},
+        )
+        self.assertTrue(
+            all(entry.replaces_artifact_id is None for entry in manifest.entries)
+        )
+        promotion = self.system.promote_function(
+            "tenant-a",
+            "echo",
+            expected_function_hash=manifest.function_hash,
+            promoted_by="release-manager",
+        )
+        self.assertEqual(len(promotion.member_artifact_ids), 6)
+        self.assertEqual(set(promotion.candidate_artifact_ids), set(candidates))
+        self.assertEqual(promotion.retired_artifact_ids, ())
+        self.assertNotEqual(manifest.function_hash, first_manifest.function_hash)
+        verified = self.system.verify_function("tenant-a", "echo")
+        self.assertTrue(verified.passed)
+        self.assertEqual(verified.entries, 6)
+        self.assertEqual(verified.function_hash, manifest.function_hash)
+        with self.system.store.transaction(write=False) as connection:
+            retained_statuses = tuple(
+                str(row["status"])
+                for row in connection.execute(
+                    "SELECT status FROM artifacts WHERE id IN (?, ?, ?)",
+                    first.member_artifact_ids,
+                )
+            )
+        self.assertEqual(retained_statuses, ("promoted", "promoted", "promoted"))
+
+    def test_promote_function_retires_three_predecessors_before_activation(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        _, initial = self._promote_three_as_function("function-replace-base")
+        replacements = self._challenge_three_function_entries("function-replace")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(len(manifest.entries), 3)
+        self.assertEqual(
+            tuple(entry.disposition for entry in manifest.entries),
+            ("candidate", "candidate", "candidate"),
+        )
+        self.assertEqual(
+            {entry.replaces_artifact_id for entry in manifest.entries},
+            set(initial.member_artifact_ids),
+        )
+        self.assertEqual(
+            {entry.artifact_id for entry in manifest.entries},
+            {entry.artifact_id for entry in replacements.entries},
+        )
+        promotion = self.system.promote_function(
+            "tenant-a",
+            "echo",
+            expected_function_hash=manifest.function_hash,
+            promoted_by="release-manager",
+        )
+        self.assertEqual(
+            promotion.retired_artifact_ids,
+            tuple(sorted(initial.member_artifact_ids)),
+        )
+        self.assertEqual(
+            promotion.member_artifact_ids,
+            tuple(sorted(entry.artifact_id for entry in replacements.entries)),
+        )
+        with self.system.store.transaction(write=False) as connection:
+            retired = {
+                str(row["id"]): (
+                    str(row["status"]),
+                    row["promotion_hash"],
+                    str(row["status_reason"]),
+                )
+                for row in connection.execute(
+                    "SELECT * FROM artifacts WHERE id IN (?, ?, ?)",
+                    initial.member_artifact_ids,
+                )
+            }
+            active = {
+                str(row["id"]): str(row["status"])
+                for row in connection.execute(
+                    "SELECT * FROM artifacts WHERE id IN (?, ?, ?)",
+                    promotion.member_artifact_ids,
+                )
+            }
+        self.assertEqual(
+            retired,
+            {
+                artifact_id: (
+                    "retired",
+                    None,
+                    "replaced by function promotion",
+                )
+                for artifact_id in initial.member_artifact_ids
+            },
+        )
+        self.assertEqual(set(active.values()), {"promoted"})
+        verified = self.system.verify_function("tenant-a", "echo")
+        self.assertTrue(verified.passed)
+        self.assertEqual(verified.function_hash, manifest.function_hash)
+
+    def test_promote_function_zero_candidate_checkpoints_legacy_set(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        legacy_ids = self._promote_three_function_entries("function-checkpoint")
+        current = self.system.verify_function("tenant-a", "echo")
+        self.assertTrue(current.passed)
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(len(manifest.entries), 3)
+        self.assertEqual(
+            tuple(entry.disposition for entry in manifest.entries),
+            ("retained", "retained", "retained"),
+        )
+        self.assertEqual(
+            {entry.artifact_id for entry in manifest.entries},
+            set(legacy_ids),
+        )
+        first = self.system.promote_function(
+            "tenant-a",
+            "echo",
+            expected_function_hash=manifest.function_hash,
+            promoted_by="release-manager",
+        )
+        repeated_manifest = self.system.inspect_function_promotion(
+            "tenant-a",
+            "echo",
+        )
+        second = self.system.promote_function(
+            "tenant-a",
+            "echo",
+            expected_function_hash=repeated_manifest.function_hash,
+            promoted_by="release-manager",
+        )
+        self.assertEqual(manifest.function_hash, current.function_hash)
+        self.assertEqual(repeated_manifest.function_hash, manifest.function_hash)
+        self.assertEqual(first.function_hash, second.function_hash)
+        self.assertNotEqual(first.receipt_id, second.receipt_id)
+        self.assertNotEqual(first.receipt_hash, second.receipt_hash)
+        self.assertEqual(first.candidate_artifact_ids, ())
+        self.assertEqual(second.candidate_artifact_ids, ())
+        self.assertEqual(first.retired_artifact_ids, ())
+        self.assertEqual(second.retired_artifact_ids, ())
+        self.assertEqual(set(first.member_artifact_ids), set(legacy_ids))
+        with self.system.store.transaction(write=False) as connection:
+            receipts = tuple(
+                connection.execute(
+                    """
+                    SELECT candidate_count, member_count, function_hash
+                    FROM function_receipts ORDER BY sequence
+                    """
+                )
+            )
+            statuses = tuple(
+                str(row["status"])
+                for row in connection.execute(
+                    "SELECT status FROM artifacts WHERE id IN (?, ?, ?)",
+                    legacy_ids,
+                )
+            )
+        self.assertEqual(
+            tuple((row["candidate_count"], row["member_count"]) for row in receipts),
+            ((0, 3), (0, 3)),
+        )
+        self.assertEqual(
+            {str(row["function_hash"]) for row in receipts},
+            {manifest.function_hash},
+        )
+        self.assertEqual(statuses, ("promoted", "promoted", "promoted"))
+
+    def test_function_promotion_reports_three_superseded_verified_rows(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        old = self._verify_three_function_candidates("function-skipped-old")
+        for value in (1, 2, 3):
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                {"x": value},
+                f"function-skipped-new-{value}",
+                reviewer="alice",
+            )
+        compiled = self.system.compile("tenant-a", "echo")
+        self.assertEqual(len(compiled.created), 3)
+        current = self.system.verify_drafts(
+            "tenant-a",
+            "echo",
+            verified_by="batch-verifier",
+        )
+        self.assertTrue(current.passed)
+        self.assertEqual(len(current.entries), 3)
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(len(manifest.entries), 3)
+        self.assertEqual(len(manifest.skipped), 3)
+        self.assertEqual(
+            {entry.artifact_id for entry in manifest.entries},
+            {entry.artifact_id for entry in current.entries},
+        )
+        self.assertEqual(
+            {str(item["artifact_id"]) for item in manifest.skipped},
+            {entry.artifact_id for entry in old.entries},
+        )
+        self.assertEqual(
+            {str(item["reason"]) for item in manifest.skipped},
+            {"superseded-build"},
+        )
+        self.assertEqual(
+            json.loads(manifest.text)["skipped"],
+            list(manifest.skipped),
+        )
+        self.assertEqual(
+            tuple(
+                (str(item["input_hash"]), str(item["artifact_id"]))
+                for item in manifest.skipped
+            ),
+            tuple(
+                sorted(
+                    (
+                        str(item["input_hash"]),
+                        str(item["artifact_id"]),
+                    )
+                    for item in manifest.skipped
+                )
+            ),
+        )
+        promotion = self.system.promote_function(
+            "tenant-a",
+            "echo",
+            expected_function_hash=manifest.function_hash,
+            promoted_by="release-manager",
+        )
+        self.assertEqual(len(promotion.candidate_artifact_ids), 3)
+        with self.system.store.transaction(write=False) as connection:
+            old_statuses = tuple(
+                str(row["status"])
+                for row in connection.execute(
+                    "SELECT status FROM artifacts WHERE id IN (?, ?, ?)",
+                    tuple(entry.artifact_id for entry in old.entries),
+                )
+            )
+        self.assertEqual(old_statuses, ("verified", "verified", "verified"))
+
+    def test_function_promotion_rejects_duplicate_eligible_candidate(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._verify_three_function_candidates("function-duplicate-candidate")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        target = manifest.entries[1]
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute(
+                """
+                INSERT INTO artifacts(
+                    id, partition, operation, operation_revision, input_json, input_hash,
+                    output_json, output_hash, artifact_json, artifact_hash, scope_hash,
+                    build_hash, policy_json, policy_hash, evidence_snapshot_hash, status,
+                    support, reviewer_count, span_seconds, created_at_us,
+                    verified_report_id, promoted_by, promoted_at_us, promotion_hash,
+                    status_reason
+                )
+                SELECT 'artifact_duplicate_candidate', partition, operation,
+                    operation_revision, input_json, input_hash, output_json, output_hash,
+                    artifact_json, artifact_hash, scope_hash, build_hash, policy_json,
+                    policy_hash, evidence_snapshot_hash, status, support, reviewer_count,
+                    span_seconds, created_at_us, verified_report_id, promoted_by,
+                    promoted_at_us, promotion_hash, status_reason
+                FROM artifacts WHERE id = ?
+                """,
+                (target.artifact_id,),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        before = self._database_dump()
+        with self.assertRaisesRegex(
+            IntegrityError,
+            "multiple verified candidates claim current input",
+        ):
+            self.system.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(self._database_dump(), before)
+
+    def test_function_promotion_rejects_later_canonical_input_collision(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._verify_three_function_candidates("function-input-collision")
+        connection = sqlite3.connect(self.database)
+        connection.row_factory = sqlite3.Row
+        try:
+            groups = connection.execute(
+                """
+                SELECT input_hash, input_json FROM examples
+                WHERE partition = 'tenant-a' AND operation = 'echo'
+                GROUP BY input_hash, input_json ORDER BY input_hash, input_json
+                """
+            ).fetchall()
+            self.assertEqual(len(groups), 3)
+            target = groups[-1]
+            collision = groups[1]
+            example = connection.execute(
+                """
+                SELECT id FROM examples WHERE input_hash = ? AND input_json = ?
+                ORDER BY id LIMIT 1
+                """,
+                (target["input_hash"], target["input_json"]),
+            ).fetchone()
+            if example is None:
+                raise AssertionError("collision target disappeared")
+            connection.execute("DROP TRIGGER examples_no_update")
+            changed = connection.execute(
+                "UPDATE examples SET input_hash = ? WHERE id = ?",
+                (collision["input_hash"], example["id"]),
+            ).rowcount
+            self.assertEqual(changed, 1)
+            connection.commit()
+        finally:
+            connection.close()
+        before = self._database_dump()
+        with self.assertRaisesRegex(
+            IntegrityError,
+            "one input digest maps to multiple canonical inputs",
+        ):
+            self.system.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(self._database_dump(), before)
+
+
+    def test_promote_function_rejects_malformed_expected_hash_without_preflight(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._verify_three_function_candidates("function-malformed-hash")
+        authority = mock.Mock(side_effect=AssertionError("authority consulted"))
+        clock = mock.Mock(side_effect=AssertionError("clock consulted"))
+        reader = System(self.database, authority=authority, clock_us=clock)
+        before = self._database_dump()
+        with (
+            mock.patch.object(
+                reader.store,
+                "transaction",
+                wraps=reader.store.transaction,
+            ) as transaction,
+            mock.patch(
+                "cement_runtime.system.uuid.uuid4",
+                side_effect=AssertionError("ID allocated"),
+            ),
+        ):
+            with self.assertRaisesRegex(
+                ValidationError,
+                "expected_function_hash must be a SHA-256 hex digest",
+            ):
+                reader.promote_function(
+                    "tenant-a",
+                    "echo",
+                    expected_function_hash="not-a-digest",
+                    promoted_by="release-manager",
+                )
+        self.assertEqual(self._database_dump(), before)
+        transaction.assert_not_called()
+        authority.assert_not_called()
+        clock.assert_not_called()
+
+    def test_promote_function_rejects_well_formed_hash_mismatch_atomically(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._verify_three_function_candidates("function-hash-conflict")
+        before = self._database_dump()
+        with self.assertRaisesRegex(
+            ConflictError,
+            "expected_function_hash does not match the locked prospective function",
+        ):
+            self.system.promote_function(
+                "tenant-a",
+                "echo",
+                expected_function_hash="0" * 64,
+                promoted_by="release-manager",
+            )
+        self.assertEqual(self._database_dump(), before)
+
+    def test_promote_function_authorizes_every_member_before_clock_or_write(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._verify_three_function_candidates("function-authority")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        ordered_ids = tuple(entry.artifact_id for entry in manifest.entries)
+        denied = ordered_ids[-1]
+        calls: list[tuple[str, str, str, str]] = []
+
+        def authority(partition, actor, action, subject):
+            calls.append((partition, actor, action, subject))
+            return subject != denied
+
+        clock = mock.Mock(side_effect=AssertionError("clock consulted"))
+        reader = System(self.database, authority=authority, clock_us=clock)
+        before = self._database_dump()
+        with mock.patch.object(
+            reader.store,
+            "transaction",
+            wraps=reader.store.transaction,
+        ) as transaction:
+            with self.assertRaisesRegex(StateError, "not authorized"):
+                reader.promote_function(
+                    "tenant-a",
+                    "echo",
+                    expected_function_hash=manifest.function_hash,
+                    promoted_by="blocked-manager",
+                )
+        self.assertEqual(
+            calls,
+            [
+                ("tenant-a", "blocked-manager", "artifact.promote", artifact_id)
+                for artifact_id in ordered_ids
+            ],
+        )
+        self.assertEqual(transaction.call_args_list, [mock.call(write=False)])
+        clock.assert_not_called()
+        self.assertEqual(self._database_dump(), before)
+
+    def test_promote_function_old_manifest_rejects_middle_retained_revocation(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._promote_three_as_function("function-retained-revoked")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(len(manifest.entries), 3)
+        target = manifest.entries[1]
+        self.system.revoke_example(
+            "tenant-a",
+            self._function_member_evidence_id(target.artifact_id),
+            revoked_by="auditor",
+            reason="manifest-to-promotion retained-row probe",
+        )
+        before = self._database_dump()
+        with self.assertRaisesRegex(
+            ConflictError,
+            "expected_function_hash does not match",
+        ):
+            self.system.promote_function(
+                "tenant-a",
+                "echo",
+                expected_function_hash=manifest.function_hash,
+                promoted_by="release-manager",
+            )
+        self.assertEqual(self._database_dump(), before)
+        with self.system.store.transaction(write=False) as connection:
+            status = connection.execute(
+                "SELECT status FROM artifacts WHERE id = ?",
+                (target.artifact_id,),
+            ).fetchone()
+        self.assertIsNotNone(status)
+        assert status is not None
+        self.assertEqual(status["status"], "suspended")
+
+    def test_promote_function_rechecks_candidate_set_after_authorization(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._verify_three_function_candidates("function-candidate-race")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        target = manifest.entries[-1].artifact_id
+        mutator = System(self.database)
+        calls: list[str] = []
+        post_mutation: list[tuple[str, ...]] = []
+
+        def authority(partition, actor, action, subject):
+            calls.append(subject)
+            if subject == target:
+                mutator.suspend_artifact(
+                    "tenant-a",
+                    target,
+                    suspended_by="auditor",
+                    reason="authorization race probe",
+                )
+                post_mutation.append(self._database_dump())
+            return True
+
+        reader = System(self.database, authority=authority, clock_us=self.clock)
+        with self.assertRaisesRegex(
+            StateError,
+            "function promotion candidates changed during authorization",
+        ):
+            reader.promote_function(
+                "tenant-a",
+                "echo",
+                expected_function_hash=manifest.function_hash,
+                promoted_by="release-manager",
+            )
+        self.assertEqual(calls, [entry.artifact_id for entry in manifest.entries])
+        self.assertEqual(len(post_mutation), 1)
+        self.assertEqual(self._database_dump(), post_mutation[0])
+
+    def test_promote_function_late_event_failure_rolls_back_every_write(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        _, initial = self._promote_three_as_function("function-late-abort-base")
+        replacements = self._challenge_three_function_entries(
+            "function-late-abort-replace"
+        )
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(len(manifest.entries), 3)
+        self.assertTrue(
+            all(entry.replaces_artifact_id is not None for entry in manifest.entries)
+        )
+        before = self._database_dump()
+        observed = False
+
+        def fail_after_receipt(connection, **kwargs):
+            nonlocal observed
+            observed = True
+            receipt_count = connection.execute(
+                "SELECT COUNT(*) FROM function_receipts"
+            ).fetchone()[0]
+            member_count = connection.execute(
+                "SELECT COUNT(*) FROM function_memberships"
+            ).fetchone()[0]
+            retired = connection.execute(
+                "SELECT COUNT(*) FROM artifacts WHERE status = 'retired'"
+            ).fetchone()[0]
+            promoted = connection.execute(
+                "SELECT COUNT(*) FROM artifacts WHERE status = 'promoted'"
+            ).fetchone()[0]
+            self.assertEqual(receipt_count, 2)
+            self.assertEqual(member_count, 6)
+            self.assertEqual(retired, 3)
+            self.assertEqual(promoted, 3)
+            self.assertEqual(kwargs["kind"], "function.promoted")
+            raise StateError("injected failure after membership and receipt writes")
+
+        with mock.patch(
+            "cement_runtime.system._event",
+            side_effect=fail_after_receipt,
+        ):
+            with self.assertRaisesRegex(
+                StateError,
+                "injected failure after membership and receipt writes",
+            ):
+                self.system.promote_function(
+                    "tenant-a",
+                    "echo",
+                    expected_function_hash=manifest.function_hash,
+                    promoted_by="release-manager",
+                )
+        self.assertTrue(observed)
+        self.assertEqual(self._database_dump(), before)
+        self.assertEqual(
+            {entry.artifact_id for entry in replacements.entries},
+            {entry.artifact_id for entry in manifest.entries},
+        )
+        with self.system.store.transaction(write=False) as connection:
+            initial_statuses = tuple(
+                str(row["status"])
+                for row in connection.execute(
+                    "SELECT status FROM artifacts WHERE id IN (?, ?, ?)",
+                    initial.member_artifact_ids,
+                )
+            )
+        self.assertEqual(
+            initial_statuses,
+            ("promoted", "promoted", "promoted"),
+        )
+
+    def test_function_promotion_rejects_last_stale_revision_promoted_row(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._promote_three_as_function("function-stale-promoted")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        target = manifest.entries[-1]
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("DROP TRIGGER artifacts_build_fields_immutable")
+            changed = connection.execute(
+                "UPDATE artifacts SET operation_revision = 2 WHERE id = ?",
+                (target.artifact_id,),
+            ).rowcount
+            self.assertEqual(changed, 1)
+            connection.commit()
+        finally:
+            connection.close()
+        before = self._database_dump()
+        with self.assertRaisesRegex(
+            IntegrityError,
+            f"promoted artifact {target.artifact_id} has stale operation revision",
+        ):
+            self.system.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(self._database_dump(), before)
+
+    def test_function_promotion_replays_the_last_candidate(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._verify_three_function_candidates("function-candidate-replay")
+        baseline = self.system.inspect_function_promotion("tenant-a", "echo")
+        target = baseline.entries[-1].artifact_id
+        original = self.system._run_verification
+        calls: list[str] = []
+
+        def fail_last(connection, row, *, record_test=None):
+            calls.append(str(row["id"]))
+            if str(row["id"]) == target:
+                artifact = self.system._artifact_from_row(row)
+                return ["injected candidate replay failure"], 0, artifact
+            return original(connection, row, record_test=record_test)
+
+        before = self._database_dump()
+        with mock.patch.object(
+            self.system,
+            "_run_verification",
+            side_effect=fail_last,
+        ):
+            with self.assertRaisesRegex(
+                StateError,
+                "function candidate .* stopped qualifying: "
+                "injected candidate replay failure",
+            ):
+                self.system.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(calls, [entry.artifact_id for entry in baseline.entries])
+        self.assertEqual(self._database_dump(), before)
+
+
+    def test_function_promotion_rejects_middle_retained_policy_drift(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._promote_three_as_function("function-retained-policy")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        target = manifest.entries[1]
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("DROP TRIGGER artifacts_build_fields_immutable")
+            changed = connection.execute(
+                "UPDATE artifacts SET policy_hash = ? WHERE id = ?",
+                ("0" * 64, target.artifact_id),
+            ).rowcount
+            self.assertEqual(changed, 1)
+            connection.commit()
+        finally:
+            connection.close()
+        before = self._database_dump()
+        with self.assertRaisesRegex(
+            IntegrityError,
+            f"promoted artifact {target.artifact_id} has stale operation policy",
+        ):
+            self.system.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(self._database_dump(), before)
+
+    def test_function_promotion_rehashes_last_retained_report_child_set(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._promote_three_as_function("function-retained-report")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        target = manifest.entries[-1]
+        connection = sqlite3.connect(self.database)
+        try:
+            report_id = connection.execute(
+                "SELECT verified_report_id FROM artifacts WHERE id = ?",
+                (target.artifact_id,),
+            ).fetchone()[0]
+            test_key = connection.execute(
+                """
+                SELECT test_key FROM artifact_tests
+                WHERE report_id = ? ORDER BY test_key DESC LIMIT 1
+                """,
+                (report_id,),
+            ).fetchone()[0]
+            connection.execute("DROP TRIGGER artifact_tests_no_update")
+            changed = connection.execute(
+                """
+                UPDATE artifact_tests SET detail = detail || '-changed'
+                WHERE report_id = ? AND test_key = ?
+                """,
+                (report_id, test_key),
+            ).rowcount
+            self.assertEqual(changed, 1)
+            connection.commit()
+        finally:
+            connection.close()
+        before = self._database_dump()
+        with self.assertRaisesRegex(
+            IntegrityError,
+            "verification report test set mismatch",
+        ):
+            self.system.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(self._database_dump(), before)
+
+    def test_function_promotion_rejects_middle_retained_receipt_provenance(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._promote_three_as_function("function-retained-receipt")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        target = manifest.entries[1]
+        connection = sqlite3.connect(self.database)
+        try:
+            changed = connection.execute(
+                "UPDATE artifacts SET promoted_by = 'forged-manager' WHERE id = ?",
+                (target.artifact_id,),
+            ).rowcount
+            self.assertEqual(changed, 1)
+            connection.commit()
+        finally:
+            connection.close()
+        before = self._database_dump()
+        with self.assertRaisesRegex(IntegrityError, "promotion receipt"):
+            self.system.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(self._database_dump(), before)
+
+    def test_function_promotion_rejects_last_retained_artifact_document(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._promote_three_as_function("function-retained-artifact")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        target = manifest.entries[-1]
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("DROP TRIGGER artifacts_build_fields_immutable")
+            changed = connection.execute(
+                "UPDATE artifacts SET artifact_json = '{}' WHERE id = ?",
+                (target.artifact_id,),
+            ).rowcount
+            self.assertEqual(changed, 1)
+            connection.commit()
+        finally:
+            connection.close()
+        before = self._database_dump()
+        with self.assertRaisesRegex(IntegrityError, "artifact"):
+            self.system.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(self._database_dump(), before)
+
+    def test_function_promotion_rehashes_last_candidate_report_child_set(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._verify_three_function_candidates("function-candidate-report")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        target = manifest.entries[-1]
+        connection = sqlite3.connect(self.database)
+        try:
+            report_id = connection.execute(
+                "SELECT verified_report_id FROM artifacts WHERE id = ?",
+                (target.artifact_id,),
+            ).fetchone()[0]
+            test_key = connection.execute(
+                """
+                SELECT test_key FROM artifact_tests
+                WHERE report_id = ? ORDER BY test_key DESC LIMIT 1
+                """,
+                (report_id,),
+            ).fetchone()[0]
+            connection.execute("DROP TRIGGER artifact_tests_no_update")
+            changed = connection.execute(
+                """
+                UPDATE artifact_tests SET detail = detail || '-changed'
+                WHERE report_id = ? AND test_key = ?
+                """,
+                (report_id, test_key),
+            ).rowcount
+            self.assertEqual(changed, 1)
+            connection.commit()
+        finally:
+            connection.close()
+        before = self._database_dump()
+        with self.assertRaisesRegex(
+            IntegrityError,
+            "verification report test set mismatch",
+        ):
+            self.system.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(self._database_dump(), before)
+
+    def test_function_promotion_rejects_operation_policy_binding_mutation(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._verify_three_function_candidates("function-operation-policy")
+        connection = sqlite3.connect(self.database)
+        try:
+            changed = connection.execute(
+                """
+                UPDATE operations SET policy_json = ?
+                WHERE partition = 'tenant-a' AND name = 'echo'
+                """,
+                (json.dumps(CompilePolicy(2, 1, 0).as_json(), sort_keys=True),),
+            ).rowcount
+            self.assertEqual(changed, 1)
+            connection.commit()
+        finally:
+            connection.close()
+        before = self._database_dump()
+        with self.assertRaisesRegex(IntegrityError, "operation policy binding mismatch"):
+            self.system.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(self._database_dump(), before)
+
+    def test_function_promotion_rejects_duplicate_retained_input(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._promote_three_as_function("function-duplicate-retained")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        target = manifest.entries[1]
+        self._clone_promoted_function_entry(
+            target.artifact_id,
+            duplicate_id="artifact_duplicate_retained",
+            duplicate_report_id="report_duplicate_retained",
+        )
+        before = self._database_dump()
+        with self.assertRaisesRegex(
+            IntegrityError,
+            "multiple promoted artifacts claim input",
+        ):
+            self.system.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(self._database_dump(), before)
+
+    def test_function_promotion_uses_current_build_projection_for_all_candidates(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._verify_three_function_candidates("function-shared-projection")
+        original = self.system._project_current_build
+        calls: list[tuple[str, str]] = []
+
+        def projected(connection, operation_row, input_hash, input_json):
+            calls.append((input_hash, input_json))
+            return original(connection, operation_row, input_hash, input_json)
+
+        with mock.patch.object(
+            self.system,
+            "_project_current_build",
+            side_effect=projected,
+        ):
+            manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(len(manifest.entries), 3)
+        self.assertEqual(
+            tuple(input_hash for input_hash, _ in calls),
+            tuple(entry.input_hash for entry in manifest.entries),
+        )
+        self.assertEqual(len(set(calls)), 3)
+
+    def test_promote_function_predecessor_rowcount_guard_rolls_back(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._promote_three_as_function("function-retire-rowcount-base")
+        self._challenge_three_function_entries("function-retire-rowcount-new")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        before = self._database_dump()
+        original_transaction = self.system.store.transaction
+        injected = False
+
+        class ZeroRowcount:
+            rowcount = 0
+
+        class ConnectionProxy:
+            def __init__(self, connection):
+                self.connection = connection
+
+            def execute(self, sql, parameters=()):
+                nonlocal injected
+                cursor = self.connection.execute(sql, parameters)
+                normalized = " ".join(sql.split())
+                if (
+                    not injected
+                    and normalized.startswith("UPDATE artifacts SET status = 'retired'")
+                ):
+                    injected = True
+                    return ZeroRowcount()
+                return cursor
+
+            def __getattr__(self, name):
+                return getattr(self.connection, name)
+
+        @contextmanager
+        def transaction(*, write=False):
+            with original_transaction(write=write) as connection:
+                yield ConnectionProxy(connection) if write else connection
+
+        with mock.patch.object(
+            self.system.store,
+            "transaction",
+            side_effect=transaction,
+        ):
+            with self.assertRaisesRegex(
+                StateError,
+                "function predecessor changed before locked retirement",
+            ):
+                self.system.promote_function(
+                    "tenant-a",
+                    "echo",
+                    expected_function_hash=manifest.function_hash,
+                    promoted_by="release-manager",
+                )
+        self.assertTrue(injected)
+        self.assertEqual(self._database_dump(), before)
+
+    def test_promote_function_candidate_rowcount_guard_rolls_back_last_activation(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._verify_three_function_candidates("function-activate-rowcount")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        target = manifest.entries[-1].artifact_id
+        before = self._database_dump()
+        original_transaction = self.system.store.transaction
+        injected = False
+
+        class ZeroRowcount:
+            rowcount = 0
+
+        class ConnectionProxy:
+            def __init__(self, connection):
+                self.connection = connection
+
+            def execute(self, sql, parameters=()):
+                nonlocal injected
+                cursor = self.connection.execute(sql, parameters)
+                normalized = " ".join(sql.split())
+                if (
+                    not injected
+                    and normalized.startswith(
+                        "UPDATE artifacts SET status = 'promoted'"
+                    )
+                    and parameters[-1] == target
+                ):
+                    injected = True
+                    return ZeroRowcount()
+                return cursor
+
+            def __getattr__(self, name):
+                return getattr(self.connection, name)
+
+        @contextmanager
+        def transaction(*, write=False):
+            with original_transaction(write=write) as connection:
+                yield ConnectionProxy(connection) if write else connection
+
+        with mock.patch.object(
+            self.system.store,
+            "transaction",
+            side_effect=transaction,
+        ):
+            with self.assertRaisesRegex(
+                StateError,
+                "function candidate changed before locked activation",
+            ):
+                self.system.promote_function(
+                    "tenant-a",
+                    "echo",
+                    expected_function_hash=manifest.function_hash,
+                    promoted_by="release-manager",
+                )
+        self.assertTrue(injected)
+        self.assertEqual(self._database_dump(), before)
+
+
+    def test_promote_function_event_projects_first_hundred_of_complete_id_set(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        for value in range(101):
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                {"x": value},
+                f"function-event-bound-{value}-a",
+                reviewer="alice",
+            )
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                {"x": value},
+                f"function-event-bound-{value}-b",
+                reviewer="bob",
+            )
+        compiled = self.system.compile("tenant-a", "echo")
+        self.assertEqual(len(compiled.created), 101)
+        batch = self.system.verify_drafts(
+            "tenant-a",
+            "echo",
+            verified_by="batch-verifier",
+        )
+        self.assertTrue(batch.passed)
+        self.assertEqual(len(batch.entries), 101)
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        promotion = self.system.promote_function(
+            "tenant-a",
+            "echo",
+            expected_function_hash=manifest.function_hash,
+            promoted_by="release-manager",
+        )
+        with self.system.store.transaction(write=False) as connection:
+            event = connection.execute(
+                """
+                SELECT payload_json FROM events
+                WHERE kind = 'function.promoted' AND subject_id = ?
+                """,
+                (promotion.receipt_id,),
+            ).fetchone()
+        if event is None:
+            raise AssertionError("projected function event disappeared")
+        payload = json.loads(str(event["payload_json"]))
+        complete = tuple(sorted(promotion.member_artifact_ids))
+        self.assertEqual(len(complete), 101)
+        self.assertEqual(payload["member_artifact_count"], 101)
+        self.assertEqual(payload["candidate_artifact_count"], 101)
+        self.assertEqual(payload["member_artifact_ids"], list(complete[:100]))
+        self.assertEqual(payload["candidate_artifact_ids"], list(complete[:100]))
+        self.assertNotIn(complete[-1], payload["member_artifact_ids"])
+        self.assertNotIn(complete[-1], payload["candidate_artifact_ids"])
+        self.assertEqual(
+            payload["member_artifact_ids_hash"],
+            _id_list_hash(complete),
+        )
+        self.assertEqual(
+            payload["candidate_artifact_ids_hash"],
+            _id_list_hash(complete),
+        )
+
+
+    def test_function_promotion_unknown_operation_is_domain_not_found(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        with self.assertRaisesRegex(NotFoundError, "operation is not registered"):
+            self.system.inspect_function_promotion("tenant-a", "missing")
+
+    def test_function_promotion_rejects_invalid_operation_scalar_types(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._verify_three_function_candidates("function-operation-scalars")
+        corruptions = (
+            ("revision", b"1", "stored operation revision"),
+            ("policy_json", b"{}", "stored operation policy JSON"),
+            ("policy_hash", b"0" * 64, "stored operation policy hash"),
+        )
+
+        class OneRowCursor:
+            def __init__(self, row) -> None:
+                self.row = row
+
+            def fetchone(self):
+                return self.row
+
+        original_transaction = self.system.store.transaction
+        for field, value, detail in corruptions:
+            with self.subTest(field=field):
+
+                @contextmanager
+                def transaction(*, write=False):
+                    self.assertFalse(write)
+                    with original_transaction(write=False) as connection:
+
+                        class ConnectionProxy:
+                            def execute(self, sql, parameters=()):
+                                cursor = connection.execute(sql, parameters)
+                                if sql.startswith("SELECT * FROM operations WHERE"):
+                                    row = cursor.fetchone()
+                                    if row is None:
+                                        return OneRowCursor(None)
+                                    altered = dict(row)
+                                    altered[field] = value
+                                    return OneRowCursor(altered)
+                                return cursor
+
+                        yield ConnectionProxy()
+
+                with mock.patch.object(
+                    self.system.store,
+                    "transaction",
+                    side_effect=transaction,
+                ):
+                    with self.assertRaisesRegex(IntegrityError, detail):
+                        self.system.inspect_function_promotion("tenant-a", "echo")
+
+    def test_function_promotion_rejects_operation_policy_digest_mutation(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._verify_three_function_candidates("function-policy-digest")
+        connection = sqlite3.connect(self.database)
+        try:
+            changed = connection.execute(
+                """
+                UPDATE operations SET policy_hash = ?
+                WHERE partition = 'tenant-a' AND name = 'echo'
+                """,
+                ("0" * 64,),
+            ).rowcount
+            self.assertEqual(changed, 1)
+            connection.commit()
+        finally:
+            connection.close()
+        before = self._database_dump()
+        with self.assertRaisesRegex(IntegrityError, "operation policy binding mismatch"):
+            self.system.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(self._database_dump(), before)
+
+    def test_function_promotion_rejects_middle_retained_policy_json_drift(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._promote_three_as_function("function-retained-policy-json")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        target = manifest.entries[1]
+        changed_policy = canonicalize(CompilePolicy(3, 1, 0).as_json()).text
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("DROP TRIGGER artifacts_build_fields_immutable")
+            changed = connection.execute(
+                "UPDATE artifacts SET policy_json = ? WHERE id = ?",
+                (changed_policy, target.artifact_id),
+            ).rowcount
+            self.assertEqual(changed, 1)
+            connection.commit()
+        finally:
+            connection.close()
+        before = self._database_dump()
+        with self.assertRaisesRegex(
+            IntegrityError,
+            f"promoted artifact {target.artifact_id} has stale operation policy",
+        ):
+            self.system.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(self._database_dump(), before)
+
+    def test_function_promotion_skips_middle_candidate_with_nonexact_input(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._verify_three_function_candidates("function-candidate-input")
+        baseline = self.system.inspect_function_promotion("tenant-a", "echo")
+        target = baseline.entries[1]
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("DROP TRIGGER artifacts_build_fields_immutable")
+            changed = connection.execute(
+                "UPDATE artifacts SET input_json = 'null' WHERE id = ?",
+                (target.artifact_id,),
+            ).rowcount
+            self.assertEqual(changed, 1)
+            connection.commit()
+        finally:
+            connection.close()
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(len(manifest.entries), 2)
+        self.assertNotIn(
+            target.artifact_id,
+            {entry.artifact_id for entry in manifest.entries},
+        )
+        self.assertEqual(
+            manifest.skipped,
+            (
+                {
+                    "artifact_id": target.artifact_id,
+                    "input_hash": target.input_hash,
+                    "reason": "superseded-build",
+                },
+            ),
+        )
+
+    def test_function_promotion_candidate_report_binds_each_artifact_field(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._verify_three_function_candidates("function-report-bindings")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        target = manifest.entries[-1]
+        with self.system.store.transaction(write=False) as connection:
+            report_id = connection.execute(
+                "SELECT verified_report_id FROM artifacts WHERE id = ?",
+                (target.artifact_id,),
+            ).fetchone()[0]
+        mutations = (
+            ("artifact_hash", "0" * 64),
+            ("build_hash", "1" * 64),
+            ("policy_hash", "2" * 64),
+            ("evidence_snapshot_hash", "3" * 64),
+        )
+        for field, value in mutations:
+            with self.subTest(field=field):
+                database = pathlib.Path(self.temporary.name) / f"binding-{field}.db"
+                shutil.copy2(self.database, database)
+                system = System(database)
+                connection = sqlite3.connect(database)
+                try:
+                    connection.execute("DROP TRIGGER test_reports_no_update")
+                    changed = connection.execute(
+                        f"UPDATE test_reports SET {field} = ? WHERE id = ?",
+                        (value, report_id),
+                    ).rowcount
+                    self.assertEqual(changed, 1)
+                    connection.commit()
+                finally:
+                    connection.close()
+                before_connection = sqlite3.connect(database)
+                try:
+                    before = tuple(before_connection.iterdump())
+                finally:
+                    before_connection.close()
+                with self.assertRaisesRegex(
+                    IntegrityError,
+                    f"report {field} binding mismatch",
+                ):
+                    system.inspect_function_promotion("tenant-a", "echo")
+                connection = sqlite3.connect(database)
+                try:
+                    after = tuple(connection.iterdump())
+                finally:
+                    connection.close()
+                self.assertEqual(after, before)
+
+    def test_function_promotion_candidate_requires_present_passing_bound_report(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._verify_three_function_candidates("function-report-presence")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        target = manifest.entries[-1]
+        baseline = pathlib.Path(self.temporary.name) / "report-baseline.db"
+        shutil.copy2(self.database, baseline)
+        mutations = (
+            ("missing", "UPDATE artifacts SET verified_report_id = 'missing-report' WHERE id = ?"),
+            ("failed", None),
+        )
+        for label, sql in mutations:
+            with self.subTest(condition=label):
+                database = pathlib.Path(self.temporary.name) / f"report-{label}.db"
+                shutil.copy2(baseline, database)
+                system = System(database)
+                connection = sqlite3.connect(database)
+                try:
+                    if sql is not None:
+                        changed = connection.execute(
+                            sql,
+                            (target.artifact_id,),
+                        ).rowcount
+                    else:
+                        report_id = connection.execute(
+                            "SELECT verified_report_id FROM artifacts WHERE id = ?",
+                            (target.artifact_id,),
+                        ).fetchone()[0]
+                        connection.execute("DROP TRIGGER test_reports_no_update")
+                        changed = connection.execute(
+                            "UPDATE test_reports SET passed = 0 WHERE id = ?",
+                            (report_id,),
+                        ).rowcount
+                    self.assertEqual(changed, 1)
+                    connection.commit()
+                finally:
+                    connection.close()
+                before_connection = sqlite3.connect(database)
+                try:
+                    before = tuple(before_connection.iterdump())
+                finally:
+                    before_connection.close()
+                with self.assertRaisesRegex(
+                    IntegrityError,
+                    "has no passing bound report",
+                ):
+                    system.inspect_function_promotion("tenant-a", "echo")
+                after_connection = sqlite3.connect(database)
+                try:
+                    after = tuple(after_connection.iterdump())
+                finally:
+                    after_connection.close()
+                self.assertEqual(after, before)
+
+    def test_function_promotion_candidate_report_scope_binding_is_explicit(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._verify_three_function_candidates("function-report-scope")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        target = manifest.entries[-1]
+        with self.system.store.transaction(write=False) as connection:
+            report_id = str(
+                connection.execute(
+                    "SELECT verified_report_id FROM artifacts WHERE id = ?",
+                    (target.artifact_id,),
+                ).fetchone()[0]
+            )
+        original = self.system._validate_report
+
+        def wrong_scope(connection, row, *, verify_test_set=True):
+            details = original(
+                connection,
+                row,
+                verify_test_set=verify_test_set,
+            )
+            if str(row["id"]) != report_id:
+                return details
+            if type(details.value) is not dict:
+                raise AssertionError("report details fixture is not an object")
+            changed = dict(details.value)
+            changed["scope_hash"] = "0" * 64
+            return canonicalize(changed, max_bytes=262_144)
+
+        before = self._database_dump()
+        with mock.patch.object(
+            self.system,
+            "_validate_report",
+            side_effect=wrong_scope,
+        ):
+            with self.assertRaisesRegex(
+                IntegrityError,
+                f"{target.artifact_id} report scope binding mismatch",
+            ):
+                self.system.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(self._database_dump(), before)
+
+
+    def test_function_promotion_union_order_interleaves_retained_and_candidates(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        values = tuple(
+            sorted(
+                range(100, 106),
+                key=lambda value: canonicalize({"x": value}).digest,
+            )
+        )
+        retained_values = values[::2]
+        candidate_values = values[1::2]
+        self.assertEqual(len(retained_values), 3)
+        self.assertEqual(len(candidate_values), 3)
+        for value in retained_values:
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                {"x": value},
+                f"function-interleave-retained-{value}-a",
+                reviewer="alice",
+            )
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                {"x": value},
+                f"function-interleave-retained-{value}-b",
+                reviewer="bob",
+            )
+        self.assertEqual(len(self.system.compile("tenant-a", "echo").created), 3)
+        retained_batch = self.system.verify_drafts(
+            "tenant-a",
+            "echo",
+            verified_by="batch-verifier",
+        )
+        self.assertTrue(retained_batch.passed)
+        retained_manifest = self.system.inspect_function_promotion(
+            "tenant-a",
+            "echo",
+        )
+        self.system.promote_function(
+            "tenant-a",
+            "echo",
+            expected_function_hash=retained_manifest.function_hash,
+            promoted_by="release-manager",
+        )
+        for value in candidate_values:
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                {"x": value},
+                f"function-interleave-candidate-{value}-a",
+                reviewer="alice",
+            )
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                {"x": value},
+                f"function-interleave-candidate-{value}-b",
+                reviewer="bob",
+            )
+        self.assertEqual(len(self.system.compile("tenant-a", "echo").created), 3)
+        candidate_batch = self.system.verify_drafts(
+            "tenant-a",
+            "echo",
+            verified_by="batch-verifier",
+        )
+        self.assertTrue(candidate_batch.passed)
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        ordered_hashes = tuple(entry.input_hash for entry in manifest.entries)
+        self.assertEqual(ordered_hashes, tuple(sorted(ordered_hashes)))
+        self.assertEqual(
+            tuple(entry.disposition for entry in manifest.entries),
+            (
+                "retained",
+                "candidate",
+                "retained",
+                "candidate",
+                "retained",
+                "candidate",
+            ),
+        )
+
+
+    def test_function_promotion_rejects_candidate_retained_input_digest_collision(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._promote_three_as_function("function-member-collision-base")
+        self._challenge_three_function_entries("function-member-collision-new")
+        baseline = self.system.inspect_function_promotion("tenant-a", "echo")
+        target = baseline.entries[1]
+        self.assertIsNotNone(target.replaces_artifact_id)
+        collision_input = canonicalize({"synthetic_sha256_collision": True})
+        original_transaction = self.system.store.transaction
+        original_projection = self.system._project_current_build
+
+        class RowsCursor:
+            def __init__(self, rows) -> None:
+                self.rows = rows
+
+            def fetchall(self):
+                return self.rows
+
+        class ConnectionProxy:
+            def __init__(self, connection):
+                self.connection = connection
+
+            def execute(self, sql, parameters=()):
+                cursor = self.connection.execute(sql, parameters)
+                normalized = " ".join(sql.split())
+                if (
+                    normalized.startswith("SELECT * FROM artifacts")
+                    and "status = 'verified'" in normalized
+                ):
+                    rows = cursor.fetchall()
+                    altered = []
+                    for row in rows:
+                        if str(row["id"]) != target.artifact_id:
+                            altered.append(row)
+                            continue
+                        changed = dict(row)
+                        changed["input_json"] = collision_input.text
+                        altered.append(changed)
+                    return RowsCursor(altered)
+                return cursor
+
+            def __getattr__(self, name):
+                return getattr(self.connection, name)
+
+        @contextmanager
+        def transaction(*, write=False):
+            self.assertFalse(write)
+            with original_transaction(write=False) as connection:
+                yield ConnectionProxy(connection)
+
+        def collision_projection(
+            connection,
+            operation_row,
+            input_hash,
+            input_json,
+        ):
+            projection = original_projection(
+                connection,
+                operation_row,
+                input_hash,
+                input_json,
+            )
+            if input_hash != target.input_hash:
+                return projection
+            return replace(projection, input_json=collision_input)
+
+        before = self._database_dump()
+        with (
+            mock.patch.object(
+                self.system.store,
+                "transaction",
+                side_effect=transaction,
+            ),
+            mock.patch.object(
+                self.system,
+                "_project_current_build",
+                side_effect=collision_projection,
+            ),
+        ):
+            with self.assertRaisesRegex(
+                IntegrityError,
+                "equal input digest maps to unequal canonical inputs",
+            ):
+                self.system.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(self._database_dump(), before)
+
+
+    def test_function_promotion_rejects_last_candidate_without_canonical_input(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._verify_three_function_candidates("function-missing-input")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        target = manifest.entries[-1]
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("DROP TRIGGER artifacts_build_fields_immutable")
+            changed = connection.execute(
+                "UPDATE artifacts SET input_hash = ? WHERE id = ?",
+                ("f" * 64, target.artifact_id),
+            ).rowcount
+            self.assertEqual(changed, 1)
+            connection.commit()
+        finally:
+            connection.close()
+        before = self._database_dump()
+        with self.assertRaisesRegex(
+            IntegrityError,
+            f"current-revision verified artifact {target.artifact_id} "
+            "has no canonical input",
+        ):
+            self.system.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(self._database_dump(), before)
+
+    def test_function_promotion_requires_exact_current_build_projection_type(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._verify_three_function_candidates("function-projection-type")
+        baseline = self.system.inspect_function_promotion("tenant-a", "echo")
+        target = baseline.entries[1]
+        with self.system.store.transaction(write=False) as connection:
+            row = connection.execute(
+                "SELECT input_json, build_hash FROM artifacts WHERE id = ?",
+                (target.artifact_id,),
+            ).fetchone()
+        if row is None:
+            raise AssertionError("projection type target disappeared")
+
+        class LookalikeProjection:
+            input_json = canonicalize(json.loads(str(row["input_json"])))
+            build_hash = str(row["build_hash"])
+
+        original = self.system._project_current_build
+
+        def lookalike(connection, operation_row, input_hash, input_json):
+            if input_hash == target.input_hash:
+                return LookalikeProjection()
+            return original(connection, operation_row, input_hash, input_json)
+
+        with mock.patch.object(
+            self.system,
+            "_project_current_build",
+            side_effect=lookalike,
+        ):
+            manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        self.assertEqual(len(manifest.entries), 2)
+        self.assertEqual(
+            manifest.skipped,
+            (
+                {
+                    "artifact_id": target.artifact_id,
+                    "input_hash": target.input_hash,
+                    "reason": "superseded-build",
+                },
+            ),
+        )
+
+    def test_promote_function_plan_identity_binds_operation_revision(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._verify_three_function_candidates("function-plan-revision")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        original = self.system._function_promotion_plan
+        calls = 0
+
+        def changed_revision(connection, *, partition, operation):
+            nonlocal calls
+            calls += 1
+            plan = original(
+                connection,
+                partition=partition,
+                operation=operation,
+            )
+            if calls == 2:
+                return replace(
+                    plan,
+                    manifest=replace(
+                        plan.manifest,
+                        operation_revision=plan.manifest.operation_revision + 1,
+                    ),
+                )
+            return plan
+
+        before = self._database_dump()
+        with mock.patch.object(
+            self.system,
+            "_function_promotion_plan",
+            side_effect=changed_revision,
+        ):
+            with self.assertRaisesRegex(
+                StateError,
+                "function promotion candidates changed during authorization",
+            ):
+                self.system.promote_function(
+                    "tenant-a",
+                    "echo",
+                    expected_function_hash=manifest.function_hash,
+                    promoted_by="release-manager",
+                )
+        self.assertEqual(calls, 2)
+        self.assertEqual(self._database_dump(), before)
+
+    def test_promote_function_plan_identity_binds_candidate_ids_independently(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._verify_three_function_candidates("function-plan-candidates")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        original = self.system._function_promotion_plan
+        calls = 0
+
+        def changed_candidates(connection, *, partition, operation):
+            nonlocal calls
+            calls += 1
+            plan = original(
+                connection,
+                partition=partition,
+                operation=operation,
+            )
+            if calls != 2:
+                return plan
+            target = plan.entries[-1]
+            changed = replace(
+                target,
+                public=replace(target.public, disposition="retained"),
+            )
+            return replace(plan, entries=(*plan.entries[:-1], changed))
+
+        before = self._database_dump()
+        with mock.patch.object(
+            self.system,
+            "_function_promotion_plan",
+            side_effect=changed_candidates,
+        ):
+            with self.assertRaisesRegex(
+                StateError,
+                "function promotion candidates changed during authorization",
+            ):
+                self.system.promote_function(
+                    "tenant-a",
+                    "echo",
+                    expected_function_hash=manifest.function_hash,
+                    promoted_by="release-manager",
+                )
+        self.assertEqual(calls, 2)
+        self.assertEqual(self._database_dump(), before)
+
+    def test_promote_function_plan_identity_binds_member_ids_independently(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._promote_three_function_entries("function-plan-members")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        original = self.system._function_promotion_plan
+        calls = 0
+
+        def changed_members(connection, *, partition, operation):
+            nonlocal calls
+            calls += 1
+            plan = original(
+                connection,
+                partition=partition,
+                operation=operation,
+            )
+            if calls == 2:
+                return replace(plan, entries=plan.entries[:-1])
+            return plan
+
+        before = self._database_dump()
+        with mock.patch.object(
+            self.system,
+            "_function_promotion_plan",
+            side_effect=changed_members,
+        ):
+            with self.assertRaisesRegex(
+                StateError,
+                "function promotion candidates changed during authorization",
+            ):
+                self.system.promote_function(
+                    "tenant-a",
+                    "echo",
+                    expected_function_hash=manifest.function_hash,
+                    promoted_by="release-manager",
+                )
+        self.assertEqual(calls, 2)
+        self.assertEqual(self._database_dump(), before)
 
 
 if __name__ == "__main__":

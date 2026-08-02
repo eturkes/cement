@@ -33,7 +33,10 @@ from .errors import (
 from .function import (
     FUNCTION_ABI,
     FUNCTION_ENTRY_SEAL_ABI,
+    FUNCTION_MAX_BYTES,
+    FUNCTION_MAX_DEPTH,
     FUNCTION_MAX_ENTRIES,
+    FUNCTION_MAX_ITEMS,
     FunctionEntry,
     build_function,
     validate_function,
@@ -54,6 +57,9 @@ from .models import (
     DraftVerification,
     FallbackFailed,
     FunctionCheck,
+    FunctionPromotionEntry,
+    FunctionPromotionManifest,
+    FunctionSetPromotion,
     FunctionVerification,
     InProgress,
     Outcome,
@@ -73,6 +79,14 @@ _REQUEST_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}\Z")
 _UNSET = object()
 _RECEIPT_MAX_BYTES = 3 * DEFAULT_MAX_BYTES
 _MAX_SQLITE_INTEGER = 2**63 - 1
+
+FUNCTION_PROMOTION_MANIFEST_ABI = "cement-function-promotion-manifest-v1"
+FUNCTION_PROMOTION_RECEIPT_ABI = "cement-function-promotion-v1"
+FUNCTION_MEMBERSHIP_ABI = "cement-function-membership-v1"
+_FUNCTION_MANIFEST_MAX_BYTES = 2 * FUNCTION_MAX_BYTES
+_FUNCTION_MANIFEST_MAX_DEPTH = FUNCTION_MAX_DEPTH + 2
+_FUNCTION_MANIFEST_MAX_ITEMS = 2 * FUNCTION_MAX_ITEMS
+_ID_LIST_ABI = "cement-id-list-v1"
 
 AuthorityCheck = Callable[[str, str, str, str], bool]
 
@@ -96,6 +110,21 @@ class _CurrentBuild:
     reviewer_count: int
     span_seconds: int
     build_hash: str
+
+
+@dataclass(frozen=True, slots=True)
+class _FunctionPromotionPlanEntry:
+    row: sqlite3.Row
+    report: sqlite3.Row
+    function_entry: FunctionEntry
+    public: FunctionPromotionEntry
+
+
+@dataclass(frozen=True, slots=True)
+class _FunctionPromotionPlan:
+    manifest: FunctionPromotionManifest
+    policy_hash: str
+    entries: tuple[_FunctionPromotionPlanEntry, ...]
 
 
 def _name(value: str, label: str) -> str:
@@ -172,6 +201,60 @@ def _function_entry_seal(
             str(report["test_set_hash"]),
             str(report["test_count"]),
             str(report["passed"]),
+        ),
+    )
+
+
+def _digest(value: str, label: str) -> str:
+    if type(value) is not str or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+        raise ValidationError(f"{label} must be a SHA-256 hex digest")
+    return value
+
+
+def _id_list_hash(values: Sequence[str]) -> str:
+    return _digest_strings(_ID_LIST_ABI, tuple(sorted(values)))
+
+
+def _id_list_projection(
+    values: Sequence[str],
+) -> tuple[int, list[str], str]:
+    ordered = tuple(sorted(values))
+    return len(ordered), list(ordered[:100]), _id_list_hash(ordered)
+
+
+def _membership_hash(rows: Sequence[sqlite3.Row | Mapping[str, Any]]) -> str:
+    fields: list[str] = []
+    for row in rows:
+        fields.extend(
+            (
+                str(row["ordinal"]),
+                str(row["artifact_id"]),
+                str(row["report_id"]),
+                str(row["input_hash"]),
+                str(row["entry_seal"]),
+            )
+        )
+    return _digest_strings(FUNCTION_MEMBERSHIP_ABI, tuple(fields))
+
+
+def _function_receipt_hash(row: sqlite3.Row | Mapping[str, Any]) -> str:
+    return _digest_strings(
+        FUNCTION_PROMOTION_RECEIPT_ABI,
+        (
+            str(row["id"]),
+            str(row["partition"]),
+            str(row["operation"]),
+            str(row["operation_revision"]),
+            str(row["policy_hash"]),
+            str(row["function_hash"]),
+            str(row["membership_hash"]),
+            str(row["member_count"]),
+            str(row["candidate_artifact_ids_hash"]),
+            str(row["candidate_count"]),
+            str(row["retired_artifact_ids_hash"]),
+            str(row["retired_count"]),
+            str(row["promoted_by"]),
+            str(row["promoted_at_us"]),
         ),
     )
 
@@ -2710,6 +2793,555 @@ class System:
                 failures.append(f"{key} widened scope")
         return failures, test_count, artifact
 
+    def _function_promotion_entry(
+        self,
+        connection: sqlite3.Connection,
+        row: sqlite3.Row,
+        *,
+        promoted: bool,
+    ) -> tuple[sqlite3.Row, FunctionEntry]:
+        artifact_id = str(row["id"])
+        report = connection.execute(
+            "SELECT * FROM test_reports WHERE id = ? AND artifact_id = ?",
+            (row["verified_report_id"], artifact_id),
+        ).fetchone()
+        if report is None or report["passed"] != 1:
+            raise IntegrityError(f"{artifact_id} has no passing bound report")
+        details = self._validate_report(connection, report, verify_test_set=True)
+        if (
+            type(details.value) is not dict
+            or details.value.get("scope_hash") != row["scope_hash"]
+        ):
+            raise IntegrityError(f"{artifact_id} report scope binding mismatch")
+        for field in (
+            "artifact_hash",
+            "build_hash",
+            "policy_hash",
+            "evidence_snapshot_hash",
+        ):
+            if report[field] != row[field]:
+                raise IntegrityError(f"{artifact_id} report {field} binding mismatch")
+        if promoted:
+            artifact = self._artifact_from_row(row)
+            self._validate_promoted(connection, row)
+        else:
+            failures, _, artifact = self._run_verification(connection, row)
+            if failures:
+                raise StateError(
+                    f"function candidate {artifact_id} stopped qualifying: {failures[0]}"
+                )
+        return report, FunctionEntry(
+            input=artifact.input.value,
+            output=artifact.output.value,
+            artifact_hash=str(row["artifact_hash"]),
+            evidence_snapshot_hash=str(row["evidence_snapshot_hash"]),
+            entry_seal=_function_entry_seal(row, report),
+            report_details_hash=str(report["details_hash"]),
+            report_test_set_hash=str(report["test_set_hash"]),
+        )
+
+    def _function_promotion_plan(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        partition: str,
+        operation: str,
+    ) -> _FunctionPromotionPlan:
+        registered = connection.execute(
+            "SELECT * FROM operations WHERE partition = ? AND name = ?",
+            (partition, operation),
+        ).fetchone()
+        if registered is None:
+            raise NotFoundError("operation is not registered in this partition")
+        if type(registered["revision"]) is not int:
+            raise IntegrityError("stored operation revision is invalid")
+        if type(registered["policy_json"]) is not str:
+            raise IntegrityError("stored operation policy JSON is invalid")
+        if type(registered["policy_hash"]) is not str:
+            raise IntegrityError("stored operation policy hash is invalid")
+        revision = int(registered["revision"])
+        policy_json = str(registered["policy_json"])
+        policy_hash = str(registered["policy_hash"])
+        policy = _policy_from_text(policy_json)
+        canonical_policy = canonicalize(policy.as_json(), max_bytes=16_384)
+        if canonical_policy.text != policy_json or canonical_policy.digest != policy_hash:
+            raise IntegrityError("operation policy binding mismatch")
+
+        promoted_rows = connection.execute(
+            """
+            SELECT * FROM artifacts
+            WHERE partition = ? AND operation = ? AND status = 'promoted'
+            ORDER BY operation_revision, input_hash, sequence, id
+            """,
+            (partition, operation),
+        ).fetchall()
+        retained: dict[
+            str,
+            tuple[sqlite3.Row, sqlite3.Row, FunctionEntry],
+        ] = {}
+        for row in promoted_rows:
+            artifact_id = str(row["id"])
+            if row["operation_revision"] != revision:
+                raise IntegrityError(
+                    f"promoted artifact {artifact_id} has stale operation revision"
+                )
+            if row["policy_json"] != policy_json or row["policy_hash"] != policy_hash:
+                raise IntegrityError(
+                    f"promoted artifact {artifact_id} has stale operation policy"
+                )
+            input_hash = str(row["input_hash"])
+            if input_hash in retained:
+                raise IntegrityError(
+                    f"multiple promoted artifacts claim input {input_hash}"
+                )
+            report, function_entry = self._function_promotion_entry(
+                connection,
+                row,
+                promoted=True,
+            )
+            retained[input_hash] = (row, report, function_entry)
+
+        verified_rows = connection.execute(
+            """
+            SELECT * FROM artifacts
+            WHERE partition = ? AND operation = ? AND operation_revision = ?
+              AND status = 'verified'
+            ORDER BY operation_revision, input_hash, sequence, id
+            """,
+            (partition, operation, revision),
+        ).fetchall()
+        canonical_inputs: dict[str, str] = {}
+        for group in connection.execute(
+            """
+            SELECT e.input_hash, e.input_json
+            FROM examples AS e
+            LEFT JOIN example_revocations AS x ON x.example_id = e.id
+            WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
+              AND x.example_id IS NULL
+            GROUP BY e.input_hash, e.input_json
+            ORDER BY e.input_hash, e.input_json
+            """,
+            (partition, operation, revision),
+        ):
+            input_hash = str(group["input_hash"])
+            input_json = str(group["input_json"])
+            previous = canonical_inputs.get(input_hash)
+            if previous is not None and previous != input_json:
+                raise IntegrityError(
+                    "one input digest maps to multiple canonical inputs"
+                )
+            canonical_inputs[input_hash] = input_json
+
+        candidates: dict[
+            str,
+            tuple[sqlite3.Row, sqlite3.Row, FunctionEntry],
+        ] = {}
+        skipped: list[dict[str, JSONValue]] = []
+        projections: dict[str, _CurrentBuild | _BlockedBuild] = {}
+        for row in verified_rows:
+            artifact_id = str(row["id"])
+            input_hash = str(row["input_hash"])
+            input_json = canonical_inputs.get(input_hash)
+            if input_json is None:
+                raise IntegrityError(
+                    f"current-revision verified artifact {artifact_id} "
+                    "has no canonical input"
+                )
+            projection = projections.get(input_hash)
+            if projection is None:
+                projection = self._project_current_build(
+                    connection,
+                    registered,
+                    input_hash,
+                    input_json,
+                )
+                projections[input_hash] = projection
+            eligible = (
+                type(projection) is _CurrentBuild
+                and row["input_json"] == projection.input_json.text
+                and row["build_hash"] == projection.build_hash
+            )
+            if not eligible:
+                skipped.append(
+                    {
+                        "artifact_id": artifact_id,
+                        "input_hash": input_hash,
+                        "reason": "superseded-build",
+                    }
+                )
+                continue
+            if input_hash in candidates:
+                raise IntegrityError(
+                    f"multiple verified candidates claim current input {input_hash}"
+                )
+            predecessor = retained.get(input_hash)
+            if (
+                predecessor is not None
+                and row["input_json"] != predecessor[0]["input_json"]
+            ):
+                raise IntegrityError(
+                    "equal input digest maps to unequal canonical inputs"
+                )
+            report, function_entry = self._function_promotion_entry(
+                connection,
+                row,
+                promoted=False,
+            )
+            candidates[input_hash] = (row, report, function_entry)
+
+        final = dict(retained)
+        final.update(candidates)
+        planned: list[_FunctionPromotionPlanEntry] = []
+        for input_hash in sorted(final):
+            row, report, function_entry = final[input_hash]
+            candidate = input_hash in candidates
+            predecessor = retained.get(input_hash)
+            planned.append(
+                _FunctionPromotionPlanEntry(
+                    row=row,
+                    report=report,
+                    function_entry=function_entry,
+                    public=FunctionPromotionEntry(
+                        artifact_id=str(row["id"]),
+                        input_hash=input_hash,
+                        artifact_hash=str(row["artifact_hash"]),
+                        output_hash=str(row["output_hash"]),
+                        entry_seal=function_entry.entry_seal,
+                        disposition="candidate" if candidate else "retained",
+                        replaces_artifact_id=(
+                            str(predecessor[0]["id"])
+                            if candidate and predecessor is not None
+                            else None
+                        ),
+                    ),
+                )
+            )
+        planned_entries = tuple(planned)
+        document = build_function(
+            partition=partition,
+            operation=operation,
+            operation_revision=revision,
+            policy_hash=policy_hash,
+            entries=(entry.function_entry for entry in planned_entries),
+        )
+        public_entries = tuple(entry.public for entry in planned_entries)
+        skipped_entries = tuple(skipped)
+        encoded = canonicalize(
+            {
+                "abi": FUNCTION_PROMOTION_MANIFEST_ABI,
+                "entries": [
+                    {
+                        "artifact_hash": entry.artifact_hash,
+                        "artifact_id": entry.artifact_id,
+                        "disposition": entry.disposition,
+                        "entry_seal": entry.entry_seal,
+                        "input_hash": entry.input_hash,
+                        "output_hash": entry.output_hash,
+                        "replaces_artifact_id": entry.replaces_artifact_id,
+                    }
+                    for entry in public_entries
+                ],
+                "function": document.value,
+                "function_hash": document.function_hash,
+                "scope": {
+                    "operation": operation,
+                    "operation_revision": revision,
+                    "partition": partition,
+                    "policy_hash": policy_hash,
+                },
+                "skipped": list(skipped_entries),
+            },
+            max_bytes=_FUNCTION_MANIFEST_MAX_BYTES,
+            max_depth=_FUNCTION_MANIFEST_MAX_DEPTH,
+            max_items=_FUNCTION_MANIFEST_MAX_ITEMS,
+        )
+        return _FunctionPromotionPlan(
+            manifest=FunctionPromotionManifest(
+                operation_revision=revision,
+                function_hash=document.function_hash,
+                text=encoded.text,
+                document=document,
+                entries=public_entries,
+                skipped=skipped_entries,
+            ),
+            policy_hash=policy_hash,
+            entries=planned_entries,
+        )
+
+    def inspect_function_promotion(
+        self,
+        partition: str,
+        operation: str,
+    ) -> FunctionPromotionManifest:
+        """Build the deterministic prospective function without mutation."""
+
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        with self.store.transaction(write=False) as connection:
+            return self._function_promotion_plan(
+                connection,
+                partition=partition,
+                operation=operation,
+            ).manifest
+
+    def promote_function(
+        self,
+        partition: str,
+        operation: str,
+        *,
+        expected_function_hash: str,
+        promoted_by: str,
+    ) -> FunctionSetPromotion:
+        """Promote the authorized prospective union in one immediate transaction."""
+
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        expected_function_hash = _digest(
+            expected_function_hash,
+            "expected_function_hash",
+        )
+        promoted_by = _text(promoted_by, "promoted_by", maximum=256)
+        with self.store.transaction(write=False) as connection:
+            authorized = self._function_promotion_plan(
+                connection,
+                partition=partition,
+                operation=operation,
+            )
+        authorized_member_ids = tuple(
+            sorted(entry.public.artifact_id for entry in authorized.entries)
+        )
+        authorized_candidate_ids = tuple(
+            sorted(
+                entry.public.artifact_id
+                for entry in authorized.entries
+                if entry.public.disposition == "candidate"
+            )
+        )
+        for entry in authorized.entries:
+            self._authorize(
+                partition,
+                promoted_by,
+                "artifact.promote",
+                entry.public.artifact_id,
+            )
+        now = self._now()
+        receipt_id = _new_id("fpr")
+
+        with self.store.transaction(write=True) as connection:
+            locked = self._function_promotion_plan(
+                connection,
+                partition=partition,
+                operation=operation,
+            )
+            locked_member_ids = tuple(
+                sorted(entry.public.artifact_id for entry in locked.entries)
+            )
+            locked_candidate_ids = tuple(
+                sorted(
+                    entry.public.artifact_id
+                    for entry in locked.entries
+                    if entry.public.disposition == "candidate"
+                )
+            )
+            if (
+                locked.manifest.operation_revision
+                != authorized.manifest.operation_revision
+                or locked_candidate_ids != authorized_candidate_ids
+                or locked_member_ids != authorized_member_ids
+            ):
+                raise StateError(
+                    "function promotion candidates changed during authorization"
+                )
+            if locked.manifest.function_hash != expected_function_hash:
+                raise ConflictError(
+                    "expected_function_hash does not match the locked prospective function"
+                )
+
+            candidates = tuple(
+                entry
+                for entry in locked.entries
+                if entry.public.disposition == "candidate"
+            )
+            retired_ids = tuple(
+                sorted(
+                    entry.public.replaces_artifact_id
+                    for entry in candidates
+                    if entry.public.replaces_artifact_id is not None
+                )
+            )
+            for artifact_id in retired_ids:
+                changed = connection.execute(
+                    """
+                    UPDATE artifacts
+                    SET status = 'retired', promotion_hash = NULL,
+                        status_reason = 'replaced by function promotion'
+                    WHERE id = ? AND status = 'promoted'
+                    """,
+                    (artifact_id,),
+                ).rowcount
+                if changed != 1:
+                    raise StateError(
+                        "function predecessor changed before locked retirement"
+                    )
+
+            for entry in candidates:
+                row = entry.row
+                report = entry.report
+                promotion_hash = _digest_strings(
+                    "cement-promotion-v2",
+                    (
+                        str(row["id"]),
+                        str(row["artifact_hash"]),
+                        str(row["build_hash"]),
+                        str(row["policy_hash"]),
+                        str(row["evidence_snapshot_hash"]),
+                        str(row["support"]),
+                        str(row["reviewer_count"]),
+                        str(row["span_seconds"]),
+                        str(row["scope_hash"]),
+                        str(report["id"]),
+                        str(report["details_hash"]),
+                        str(report["test_set_hash"]),
+                        str(report["test_count"]),
+                        str(report["passed"]),
+                        promoted_by,
+                        str(now),
+                    ),
+                )
+                changed = connection.execute(
+                    """
+                    UPDATE artifacts
+                    SET status = 'promoted', promoted_by = ?, promoted_at_us = ?,
+                        promotion_hash = ?, status_reason = NULL
+                    WHERE id = ? AND status = 'verified'
+                    """,
+                    (promoted_by, now, promotion_hash, row["id"]),
+                ).rowcount
+                if changed != 1:
+                    raise StateError(
+                        "function candidate changed before locked activation"
+                    )
+
+            member_ids = locked_member_ids
+            candidate_ids = locked_candidate_ids
+            membership_rows = tuple(
+                {
+                    "receipt_id": receipt_id,
+                    "ordinal": ordinal,
+                    "function_hash": locked.manifest.function_hash,
+                    "artifact_id": entry.public.artifact_id,
+                    "report_id": str(entry.report["id"]),
+                    "input_hash": entry.public.input_hash,
+                    "entry_seal": entry.public.entry_seal,
+                }
+                for ordinal, entry in enumerate(locked.entries)
+            )
+            membership_hash = _membership_hash(membership_rows)
+            candidate_ids_hash = _id_list_hash(candidate_ids)
+            retired_ids_hash = _id_list_hash(retired_ids)
+            receipt_fields: dict[str, object] = {
+                "id": receipt_id,
+                "partition": partition,
+                "operation": operation,
+                "operation_revision": locked.manifest.operation_revision,
+                "policy_hash": locked.policy_hash,
+                "function_hash": locked.manifest.function_hash,
+                "membership_hash": membership_hash,
+                "member_count": len(membership_rows),
+                "candidate_artifact_ids_hash": candidate_ids_hash,
+                "candidate_count": len(candidate_ids),
+                "retired_artifact_ids_hash": retired_ids_hash,
+                "retired_count": len(retired_ids),
+                "promoted_by": promoted_by,
+                "promoted_at_us": now,
+            }
+            receipt_hash = _function_receipt_hash(receipt_fields)
+            connection.executemany(
+                """
+                INSERT INTO function_memberships(
+                    receipt_id, ordinal, function_hash, artifact_id, report_id,
+                    input_hash, entry_seal
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (
+                        row["receipt_id"],
+                        row["ordinal"],
+                        row["function_hash"],
+                        row["artifact_id"],
+                        row["report_id"],
+                        row["input_hash"],
+                        row["entry_seal"],
+                    )
+                    for row in membership_rows
+                ],
+            )
+            connection.execute(
+                """
+                INSERT INTO function_receipts(
+                    id, partition, operation, operation_revision, policy_hash,
+                    function_hash, membership_hash, member_count,
+                    candidate_artifact_ids_hash, candidate_count,
+                    retired_artifact_ids_hash, retired_count, promoted_by,
+                    promoted_at_us, receipt_hash
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    receipt_id,
+                    partition,
+                    operation,
+                    receipt_fields["operation_revision"],
+                    receipt_fields["policy_hash"],
+                    locked.manifest.function_hash,
+                    membership_hash,
+                    len(membership_rows),
+                    candidate_ids_hash,
+                    len(candidate_ids),
+                    retired_ids_hash,
+                    len(retired_ids),
+                    promoted_by,
+                    now,
+                    receipt_hash,
+                ),
+            )
+            member_projection = _id_list_projection(member_ids)
+            candidate_projection = _id_list_projection(candidate_ids)
+            retired_projection = _id_list_projection(retired_ids)
+            _event(
+                connection,
+                partition=partition,
+                kind="function.promoted",
+                subject_type="function",
+                subject_id=receipt_id,
+                payload={
+                    "candidate_artifact_count": candidate_projection[0],
+                    "candidate_artifact_ids": candidate_projection[1],
+                    "candidate_artifact_ids_hash": candidate_projection[2],
+                    "function_hash": locked.manifest.function_hash,
+                    "member_artifact_count": member_projection[0],
+                    "member_artifact_ids": member_projection[1],
+                    "member_artifact_ids_hash": member_projection[2],
+                    "promoted_by": promoted_by,
+                    "receipt_hash": receipt_hash,
+                    "receipt_id": receipt_id,
+                    "retired_artifact_count": retired_projection[0],
+                    "retired_artifact_ids": retired_projection[1],
+                    "retired_artifact_ids_hash": retired_projection[2],
+                },
+                now_us=now,
+            )
+
+        return FunctionSetPromotion(
+            receipt_id=receipt_id,
+            receipt_hash=receipt_hash,
+            function_hash=locked.manifest.function_hash,
+            operation_revision=locked.manifest.operation_revision,
+            member_artifact_ids=member_ids,
+            candidate_artifact_ids=candidate_ids,
+            retired_artifact_ids=retired_ids,
+            promoted_at_us=now,
+        )
+
     def promote(
         self,
         partition: str,
@@ -3067,9 +3699,7 @@ class System:
                     "revoked_by": revoked_by,
                     "suspended_artifact_count": len(suspended),
                     "suspended_artifact_ids": list(suspended[:100]),
-                    "suspended_artifact_ids_hash": _digest_strings(
-                        "cement-id-list-v1", suspended
-                    ),
+                    "suspended_artifact_ids_hash": _id_list_hash(suspended),
                 },
                 now_us=now,
             )

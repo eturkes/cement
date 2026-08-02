@@ -16,7 +16,7 @@ import sqlite3
 
 from .errors import CementError, IntegrityError, StateError, ValidationError
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 MIN_SQLITE = (3, 37, 0)  # STRICT tables
 
 SCHEMA = r"""
@@ -202,6 +202,41 @@ CREATE TABLE IF NOT EXISTS artifact_tests (
     PRIMARY KEY (report_id, test_key)
 ) STRICT;
 
+CREATE TABLE IF NOT EXISTS function_receipts (
+    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL UNIQUE,
+    partition TEXT NOT NULL,
+    operation TEXT NOT NULL,
+    operation_revision INTEGER NOT NULL CHECK (operation_revision >= 1),
+    policy_hash TEXT NOT NULL,
+    function_hash TEXT NOT NULL,
+    membership_hash TEXT NOT NULL,
+    member_count INTEGER NOT NULL CHECK (member_count >= 0),
+    candidate_artifact_ids_hash TEXT NOT NULL,
+    candidate_count INTEGER NOT NULL CHECK (candidate_count >= 0),
+    retired_artifact_ids_hash TEXT NOT NULL,
+    retired_count INTEGER NOT NULL CHECK (retired_count >= 0),
+    promoted_by TEXT NOT NULL,
+    promoted_at_us INTEGER NOT NULL,
+    receipt_hash TEXT NOT NULL UNIQUE,
+    UNIQUE (id, function_hash)
+) STRICT;
+
+CREATE TABLE IF NOT EXISTS function_memberships (
+    receipt_id TEXT NOT NULL,
+    ordinal INTEGER NOT NULL CHECK (ordinal >= 0),
+    function_hash TEXT NOT NULL,
+    artifact_id TEXT NOT NULL REFERENCES artifacts(id),
+    report_id TEXT NOT NULL REFERENCES test_reports(id),
+    input_hash TEXT NOT NULL,
+    entry_seal TEXT NOT NULL,
+    PRIMARY KEY (receipt_id, ordinal),
+    UNIQUE (receipt_id, artifact_id),
+    UNIQUE (receipt_id, input_hash),
+    FOREIGN KEY (receipt_id, function_hash)
+        REFERENCES function_receipts(id, function_hash) DEFERRABLE INITIALLY DEFERRED
+) STRICT;
+
 CREATE TABLE IF NOT EXISTS events (
     sequence INTEGER PRIMARY KEY AUTOINCREMENT,
     partition TEXT NOT NULL,
@@ -223,6 +258,12 @@ CREATE INDEX IF NOT EXISTS artifacts_build
 CREATE UNIQUE INDEX IF NOT EXISTS one_promoted_exact_scope
     ON artifacts(partition, operation, operation_revision, input_hash)
     WHERE status = 'promoted';
+CREATE INDEX IF NOT EXISTS function_receipts_scope
+    ON function_receipts(partition, operation, operation_revision, sequence);
+CREATE INDEX IF NOT EXISTS function_receipts_hash
+    ON function_receipts(function_hash, sequence);
+CREATE INDEX IF NOT EXISTS function_memberships_artifact
+    ON function_memberships(artifact_id, receipt_id);
 CREATE INDEX IF NOT EXISTS events_subject
     ON events(subject_type, subject_id, sequence);
 CREATE INDEX IF NOT EXISTS events_partition
@@ -300,6 +341,28 @@ END;
 CREATE TRIGGER IF NOT EXISTS artifact_tests_no_delete
 BEFORE DELETE ON artifact_tests BEGIN
     SELECT RAISE(ABORT, 'artifact tests are immutable');
+END;
+CREATE TRIGGER IF NOT EXISTS function_memberships_sealed_insert
+BEFORE INSERT ON function_memberships
+WHEN EXISTS (SELECT 1 FROM function_receipts WHERE id = NEW.receipt_id)
+BEGIN
+    SELECT RAISE(ABORT, 'function membership set is sealed');
+END;
+CREATE TRIGGER IF NOT EXISTS function_memberships_no_update
+BEFORE UPDATE ON function_memberships BEGIN
+    SELECT RAISE(ABORT, 'function memberships are immutable');
+END;
+CREATE TRIGGER IF NOT EXISTS function_memberships_no_delete
+BEFORE DELETE ON function_memberships BEGIN
+    SELECT RAISE(ABORT, 'function memberships are immutable');
+END;
+CREATE TRIGGER IF NOT EXISTS function_receipts_no_update
+BEFORE UPDATE ON function_receipts BEGIN
+    SELECT RAISE(ABORT, 'function receipts are immutable');
+END;
+CREATE TRIGGER IF NOT EXISTS function_receipts_no_delete
+BEFORE DELETE ON function_receipts BEGIN
+    SELECT RAISE(ABORT, 'function receipts are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS events_no_update
 BEFORE UPDATE ON events BEGIN
@@ -428,19 +491,23 @@ class Store:
             timeout=10.0,
             isolation_level=None,
         )
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        connection.execute("PRAGMA busy_timeout = 10000")
-        connection.execute("PRAGMA synchronous = EXTRA")
-        connection.execute("PRAGMA temp_store = MEMORY")
-        connection.execute("PRAGMA trusted_schema = OFF")
-        if hasattr(connection, "setconfig"):
-            defensive = getattr(sqlite3, "SQLITE_DBCONFIG_DEFENSIVE", None)
-            trusted = getattr(sqlite3, "SQLITE_DBCONFIG_TRUSTED_SCHEMA", None)
-            if defensive is not None:
-                connection.setconfig(defensive, True)
-            if trusted is not None:
-                connection.setconfig(trusted, False)
+        try:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON")
+            connection.execute("PRAGMA busy_timeout = 10000")
+            connection.execute("PRAGMA synchronous = EXTRA")
+            connection.execute("PRAGMA temp_store = MEMORY")
+            connection.execute("PRAGMA trusted_schema = OFF")
+            if hasattr(connection, "setconfig"):
+                defensive = getattr(sqlite3, "SQLITE_DBCONFIG_DEFENSIVE", None)
+                trusted = getattr(sqlite3, "SQLITE_DBCONFIG_TRUSTED_SCHEMA", None)
+                if defensive is not None:
+                    connection.setconfig(defensive, True)
+                if trusted is not None:
+                    connection.setconfig(trusted, False)
+        except Exception:
+            connection.close()
+            raise
         return connection
 
     def _initialize(self) -> None:

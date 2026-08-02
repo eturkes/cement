@@ -80,7 +80,7 @@ Measured gaps driving the arc:
     eligibility, and batch verification. `function.py` (+8/-7), `system.py` (+513/-223), `models.py`,
     `__init__.py`, `test_function.py`, `test_system.py`; suite 134 -> 162. Scope source: u3 was split
     here into u3a and u3b per the scout's sizing verdict, and both u3 blockers were settled by a
-    four-way spike wave arbitrated in `.scratch/m2u3a-design-record.md`.
+    four-way spike wave arbitrated in `.agent/decisions/m2u3a-design.md`.
     Identity. The blocker was circular: u1's function hash embeds each entry's `promotion_hash`, which
     `promote` creates only at commit time while binding promoter and clock. Resolution = raise the
     document to `cement-function-v2` and replace the entry's `promotion_hash` with `entry_seal`, a
@@ -118,24 +118,46 @@ Measured gaps driving the arc:
     stayed green, closed across two fix passes. Known limits: u3a is deliberately not operator-complete,
     since the operator-visible set hash needs u3b's union; the pre-existing `store.py` `ResourceWarning`
     remains, as `store.py` is outside u3a's write set.
-  - u3b OPEN - prospective union and atomic set promotion. Assemble the final set as retained current
-    promoted rows plus passing verified candidates, each candidate replacing the retained row of its own
-    input digest, so growth never silently drops established entries. Compute the prospective
-    `cement-function-v2` hash from that union - now possible before promotion because every entry seal
-    is - show it with an inspectable deterministic manifest, and require the operator to repeat it once
-    as `expected_function_hash`. Promote in one immediate transaction that revalidates under its own
-    write lock, bulk-retires predecessors, bulk-activates candidates, and writes a set receipt plus
-    immutable membership rows. This is the unit that carries the schema delta u3a avoided, so it must
-    choose explicitly between a pre-1.0 ledger reset and a versioned migration; `SCHEMA_FINGERPRINT`
-    changes either way. Keep the per-entry path working and demoted rather than removed - the roadmap
-    retires it as the *only* way to grow a function, and u4 owns the final CLI surface. Audit payloads
-    must project rather than enumerate: the event cap is 262,144 bytes against 50,000 admissible
-    entries, so mirror the revocation projection of count plus bounded IDs plus a digest, and let the
-    membership table stay authoritative. Depends on u3a.
+  - u3b1 OPEN - persisted set promotion core. Assemble the final set as retained current promoted rows
+    plus passing verified candidates, each candidate replacing the retained row of its own input digest,
+    so growth never silently drops established entries; a promoted row on a stale revision is corruption
+    and fails closed rather than being omitted. Compute the prospective `cement-function-v2` hash from
+    that union - now possible before promotion because every entry seal is - show it with an inspectable
+    deterministic manifest (`inspect_function_promotion`), and require the operator to repeat it once as
+    `expected_function_hash` (`promote_function`). Promote in one `BEGIN IMMEDIATE` that revalidates
+    under its own write lock, rechecks plan identity against what was authorized, bulk-retires
+    predecessors before bulk-activating candidates (the partial unique index forbids two promoted rows
+    for one scope even transiently), then writes immutable membership rows and the set receipt that
+    seals them. Carries the schema delta u3a avoided: `function_receipts` + `function_memberships`,
+    `SCHEMA_VERSION` 1 -> 2, and a pre-1.0 ledger reset with no migration runner. Membership is
+    reference-only - `artifact_id` + `report_id` + `input_hash` + `entry_seal` - so entry content keeps
+    exactly one authoritative home and foreign keys under `PRAGMA foreign_keys = ON` make retention
+    structural. Audit payloads project rather than enumerate: the event cap is 262,144 bytes against
+    50,000 admissible entries, so mirror the revocation projection of count plus bounded IDs plus a
+    digest, and let the membership table stay authoritative. Keep the per-entry path byte-identical -
+    its demotion is semantic and lands with u3b2's receipt check, u4 owns the final CLI surface.
+    Depends on u3a. Design record: `.agent/decisions/m2u3b-design.md`.
+    Status: implementation landed and gate-green (suite 162 -> 208; `store.py` +81/-14, `system.py`
+    +633/-3, `models.py` +33, `__init__.py` +6, `test_system.py` +2301/-4), two diff-blind reviews
+    complete, findings accepted and arbitrated in `.agent/decisions/m2u3b1-findings.md`. Unit stays OPEN
+    until those land: two production defects (empty-union promotion bypasses the authority callback;
+    plan identity omits the predecessor/retirement set) plus thirteen committed-pin batches. MAIN
+    reproduced both defects and four mutation survivors itself.
+  - u3b2 OPEN - function-receipt verification and historical reconstruction. Append `verify_function`
+    check P6 `persisted-function-receipt` without renumbering P1-P5: a nonempty promoted set with no
+    current-revision receipt fails, which is exactly how the legacy per-entry path is retired as a way
+    to grow a function, while an empty set with no receipt keeps u2's vacuous pass. Add historical
+    reconstruction that rebuilds a past `cement-function-v2` from `(receipt, memberships)` joined to the
+    artifact and report rows they pin, independent of current status - probed to survive supersession,
+    revision retirement, and full revocation of every member. Owns the cross-unit mutation sweep over the
+    joined u3b1 + u3b2 surface; u3b1 carries its own independent sweep at its own close. Depends on u3b1.
+    Split provenance: u3b's three independent design spikes each estimated full-unit implementation at
+    210-260K/240K and each proposed this same seam, so the scope is staged across two units rather than
+    narrowed.
   - u4 OPEN - coverage and gap reporting plus the `function` CLI surface (`show`, `export`, `eval`,
     `verify`, `promote`). Honest measures only: promoted entry count, per-entry support and reviewer
     counts, compile-blocked scopes with reasons, pending proposals, and suspended/retired entries. No
-    domain-coverage claim, since no domain schema exists. Depends on u1-u3b.
+    domain-coverage claim, since no domain schema exists. Depends on u1-u3b2.
   - u5 OPEN - surface realignment: `README.md` claim pass (guarantees, request outcomes, deployment
     boundary) against what the function object now proves, `docs/architecture.md` contract steps for the
     function layer, and the hospital example resolving from an exported bundle with no ledger, no adapter,

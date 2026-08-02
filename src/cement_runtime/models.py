@@ -170,6 +170,39 @@ class DraftVerification:
 
 
 @dataclass(frozen=True, slots=True)
+class FunctionPromotionEntry:
+    artifact_id: str
+    input_hash: str
+    artifact_hash: str
+    output_hash: str
+    entry_seal: str
+    disposition: Literal["retained", "candidate"]
+    replaces_artifact_id: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class FunctionPromotionManifest:
+    operation_revision: int
+    function_hash: str
+    text: str
+    document: FunctionDocument
+    entries: tuple[FunctionPromotionEntry, ...]
+    skipped: tuple[dict[str, JSONValue], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class FunctionSetPromotion:
+    receipt_id: str
+    receipt_hash: str
+    function_hash: str
+    operation_revision: int
+    member_artifact_ids: tuple[str, ...]
+    candidate_artifact_ids: tuple[str, ...]
+    retired_artifact_ids: tuple[str, ...]
+    promoted_at_us: int
+
+
+@dataclass(frozen=True, slots=True)
 class FunctionCheck:
     """One stable named decision in promoted-set verification."""
 
