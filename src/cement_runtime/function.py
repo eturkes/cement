@@ -21,7 +21,8 @@ from .json_value import (
     parse_json,
 )
 
-FUNCTION_ABI = "cement-function-v1"
+FUNCTION_ABI = "cement-function-v2"
+FUNCTION_ENTRY_SEAL_ABI = "cement-function-entry-seal-v1"
 FUNCTION_MAX_BYTES = 64 * DEFAULT_MAX_BYTES
 FUNCTION_MAX_ENTRIES = 50_000
 FUNCTION_MAX_ITEMS = 10 * DEFAULT_MAX_ITEMS
@@ -41,7 +42,7 @@ class FunctionEntry:
     output: JSONValue
     artifact_hash: str
     evidence_snapshot_hash: str
-    promotion_hash: str
+    entry_seal: str
     report_details_hash: str
     report_test_set_hash: str
 
@@ -152,7 +153,7 @@ def _normalize(value: Any) -> _NormalizedFunction:
                 "input_hash",
                 "output",
                 "output_hash",
-                "promotion_hash",
+                "entry_seal",
                 "report",
             },
             f"function entry {index}",
@@ -170,8 +171,8 @@ def _normalize(value: Any) -> _NormalizedFunction:
         output_hash = _digest(
             entry["output_hash"], f"function entry {index} output_hash"
         )
-        promotion_hash = _digest(
-            entry["promotion_hash"], f"function entry {index} promotion_hash"
+        entry_seal = _digest(
+            entry["entry_seal"], f"function entry {index} entry_seal"
         )
         report = _exact_keys(
             entry["report"],
@@ -201,7 +202,7 @@ def _normalize(value: Any) -> _NormalizedFunction:
             "input_hash": input_hash,
             "output": output_json.value,
             "output_hash": output_hash,
-            "promotion_hash": promotion_hash,
+            "entry_seal": entry_seal,
             "report": {
                 "details_hash": report_details_hash,
                 "test_set_hash": report_test_set_hash,
@@ -305,7 +306,7 @@ def build_function(
                 "input_hash": input_json.digest,
                 "output": output_json.value,
                 "output_hash": output_json.digest,
-                "promotion_hash": entry.promotion_hash,
+                "entry_seal": entry.entry_seal,
                 "report": {
                     "details_hash": entry.report_details_hash,
                     "test_set_hash": entry.report_test_set_hash,

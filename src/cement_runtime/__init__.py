@@ -11,6 +11,7 @@ from .errors import (
 )
 from .function import (
     FUNCTION_ABI,
+    FUNCTION_ENTRY_SEAL_ABI,
     FUNCTION_MAX_BYTES,
     FUNCTION_MAX_DEPTH,
     FUNCTION_MAX_ENTRIES,
@@ -28,6 +29,8 @@ from .models import (
     CandidateRequest,
     CompilePolicy,
     CompileResult,
+    DraftEntry,
+    DraftVerification,
     FallbackFailed,
     FunctionCheck,
     FunctionVerification,
@@ -53,8 +56,11 @@ __all__ = [
     "CompilePolicy",
     "CompileResult",
     "ConflictError",
+    "DraftEntry",
+    "DraftVerification",
     "FallbackFailed",
     "FUNCTION_ABI",
+    "FUNCTION_ENTRY_SEAL_ABI",
     "FUNCTION_MAX_BYTES",
     "FUNCTION_MAX_DEPTH",
     "FUNCTION_MAX_ENTRIES",

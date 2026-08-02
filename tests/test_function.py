@@ -14,6 +14,7 @@ from typing import Any
 import cement_runtime.function as function_module
 from cement_runtime import (
     FUNCTION_ABI,
+    FUNCTION_ENTRY_SEAL_ABI,
     FUNCTION_MAX_BYTES,
     FUNCTION_MAX_DEPTH,
     FUNCTION_MAX_ENTRIES,
@@ -52,7 +53,7 @@ def _entry(input_value: Any, output_value: Any, *, label: str) -> FunctionEntry:
         output=output_value,
         artifact_hash=_digest(f"{label}:artifact"),
         evidence_snapshot_hash=_digest(f"{label}:evidence"),
-        promotion_hash=_digest(f"{label}:promotion"),
+        entry_seal=_digest(f"{label}:entry-seal"),
         report_details_hash=_digest(f"{label}:report-details"),
         report_test_set_hash=_digest(f"{label}:report-tests"),
     )
@@ -144,13 +145,23 @@ class FunctionTests(unittest.TestCase):
         self.assertEqual(validated.function_hash, forward.function_hash)
         self.assertEqual(validated.text, forward.text)
 
+
+    def test_function_v1_document_is_explicitly_rejected(self) -> None:
+        document = deepcopy(
+            _build((_entry({"x": 1}, 1, label="legacy-abi"),)).value
+        )
+        document["abi"] = "cement-function-v1"
+        _rehash(document)
+        with self.assertRaisesRegex(ValidationError, "unsupported function ABI"):
+            validate_function(document)
+
     def test_every_document_field_fails_closed_with_typed_errors(self) -> None:
         bundle = _build((_entry({"x": 1}, {"answer": 1}, label="fields"),))
         mutations = (
             (
                 "root.abi",
                 ValidationError,
-                lambda doc: doc.__setitem__("abi", "cement-function-v2"),
+                lambda doc: doc.__setitem__("abi", "cement-function-v1"),
             ),
             (
                 "root.canonicalizer",
@@ -239,11 +250,11 @@ class FunctionTests(unittest.TestCase):
                 ),
             ),
             (
-                "entry.promotion_hash",
+                "entry.entry_seal",
                 IntegrityError,
                 lambda doc: doc["entries"][0].__setitem__(
-                    "promotion_hash",
-                    _flip_digest(doc["entries"][0]["promotion_hash"]),
+                    "entry_seal",
+                    _flip_digest(doc["entries"][0]["entry_seal"]),
                 ),
             ),
             (
@@ -423,7 +434,7 @@ class FunctionTests(unittest.TestCase):
             output=base.output,
             artifact_hash=base.artifact_hash,
             evidence_snapshot_hash=base.evidence_snapshot_hash,
-            promotion_hash=base.promotion_hash,
+            entry_seal=base.entry_seal,
             report_details_hash=base.report_details_hash,
             report_test_set_hash=base.report_test_set_hash,
         )
@@ -439,7 +450,7 @@ class FunctionTests(unittest.TestCase):
             output=1,
             artifact_hash=digest_64,
             evidence_snapshot_hash=digest_64,
-            promotion_hash=digest_64,
+            entry_seal=digest_64,
             report_details_hash=digest_64,
             report_test_set_hash=digest_64,
         )
@@ -460,7 +471,7 @@ class FunctionTests(unittest.TestCase):
             output=1,
             artifact_hash="a" * 65,
             evidence_snapshot_hash=digest_64,
-            promotion_hash=digest_64,
+            entry_seal=digest_64,
             report_details_hash=digest_64,
             report_test_set_hash=digest_64,
         )
@@ -561,7 +572,7 @@ entry = FunctionEntry(
     output={"answer": {"ok": True}},
     artifact_hash=digest("process:artifact"),
     evidence_snapshot_hash=digest("process:evidence"),
-    promotion_hash=digest("process:promotion"),
+    entry_seal=digest("process:entry-seal"),
     report_details_hash=digest("process:report-details"),
     report_test_set_hash=digest("process:report-tests"),
 )
@@ -586,6 +597,11 @@ print(json.dumps({"function_hash": bundle.function_hash, "text": bundle.text}, s
         self.assertEqual(observed["text"], bundle.text)
 
     def test_declared_limits_and_inclusive_document_boundaries(self) -> None:
+        self.assertEqual(FUNCTION_ABI, "cement-function-v2")
+        self.assertEqual(
+            FUNCTION_ENTRY_SEAL_ABI,
+            "cement-function-entry-seal-v1",
+        )
         self.assertEqual(FUNCTION_MAX_BYTES, 64 * DEFAULT_MAX_BYTES)
         self.assertEqual(FUNCTION_MAX_ENTRIES, 50_000)
         self.assertEqual(FUNCTION_MAX_ITEMS, 10 * DEFAULT_MAX_ITEMS)
@@ -648,7 +664,7 @@ print(json.dumps({"function_hash": bundle.function_hash, "text": bundle.text}, s
                     output=index,
                     artifact_hash=provenance_hash,
                     evidence_snapshot_hash=provenance_hash,
-                    promotion_hash=provenance_hash,
+                    entry_seal=provenance_hash,
                     report_details_hash=provenance_hash,
                     report_test_set_hash=provenance_hash,
                 )
@@ -669,7 +685,7 @@ print(json.dumps({"function_hash": bundle.function_hash, "text": bundle.text}, s
             output=0,
             artifact_hash=provenance_hash,
             evidence_snapshot_hash=provenance_hash,
-            promotion_hash=provenance_hash,
+            entry_seal=provenance_hash,
             report_details_hash=provenance_hash,
             report_test_set_hash=provenance_hash,
         )
@@ -689,7 +705,7 @@ print(json.dumps({"function_hash": bundle.function_hash, "text": bundle.text}, s
             output=artifact.output.value,
             artifact_hash=artifact.digest,
             evidence_snapshot_hash=_digest("artifact:evidence"),
-            promotion_hash=_digest("artifact:promotion"),
+            entry_seal=_digest("artifact:entry-seal"),
             report_details_hash=_digest("artifact:report-details"),
             report_test_set_hash=_digest("artifact:report-tests"),
         )

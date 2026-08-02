@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import pathlib
 import sqlite3
@@ -7,14 +8,17 @@ import tempfile
 import threading
 import unittest
 from contextlib import contextmanager
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, replace
 from unittest import mock
 
 from cement_runtime import (
     Candidate,
     CompilePolicy,
     ConflictError,
+    DraftEntry,
+    DraftVerification,
     FallbackFailed,
+    FUNCTION_ENTRY_SEAL_ABI,
     FunctionCheck,
     FunctionEntry,
     FunctionVerification,
@@ -27,12 +31,13 @@ from cement_runtime import (
     StateError,
     System,
     ValidationError,
+    VerificationReport,
     build_function,
     evaluate,
 )
 from cement_runtime.artifacts import ARTIFACT_ABI, ARTIFACT_MAX_BYTES, build_digest
 from cement_runtime.json_value import CANONICALIZER, canonicalize
-from cement_runtime.system import _digest_strings
+from cement_runtime.system import _digest_strings, _function_entry_seal
 
 
 _FUNCTION_CHECK_KEYS = (
@@ -89,6 +94,14 @@ class SystemTests(unittest.TestCase):
             candidate_source=self.source,
             clock_us=self.clock,
         )
+
+
+    def _database_dump(self) -> tuple[str, ...]:
+        connection = sqlite3.connect(self.database)
+        try:
+            return tuple(connection.iterdump())
+        finally:
+            connection.close()
 
     def register(self, *, confirmations=3, reviewers=2, span=10) -> None:
         self.system.register_operation(
@@ -1358,6 +1371,28 @@ class SystemTests(unittest.TestCase):
             for value in (1, 2, 3)
         )
 
+
+    def _compile_three_drafts(self, prefix: str) -> tuple[str, ...]:
+        for value in (1, 2, 3):
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                {"x": value},
+                f"{prefix}-{value}-a",
+                reviewer="alice",
+            )
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                {"x": value},
+                f"{prefix}-{value}-b",
+                reviewer="bob",
+            )
+        compiled = self.system.compile("tenant-a", "echo")
+        self.assertEqual(len(compiled.created), 3)
+        self.assertEqual(compiled.blocked, ())
+        return compiled.created
+
     def _clone_promoted_function_entry(
         self,
         artifact_id: str,
@@ -2263,7 +2298,7 @@ class SystemTests(unittest.TestCase):
             )
         )
         self.assertIsNotNone(result.function_hash)
-        self.assertNotEqual(result.function_hash, baseline.function_hash)
+        self.assertEqual(result.function_hash, baseline.function_hash)
         self.assertIsNone(result.document)
 
     def test_function_verification_rejects_stale_promoted_revision(self) -> None:
@@ -2514,7 +2549,7 @@ class SystemTests(unittest.TestCase):
                 output=entry.output,
                 artifact_hash="0" * 64,
                 evidence_snapshot_hash=entry.evidence_snapshot_hash,
-                promotion_hash=entry.promotion_hash,
+                entry_seal=entry.entry_seal,
                 report_details_hash=entry.report_details_hash,
                 report_test_set_hash=entry.report_test_set_hash,
             )
@@ -2667,7 +2702,7 @@ class SystemTests(unittest.TestCase):
                         output=json.loads(str(row["output_json"])),
                         artifact_hash=str(row["artifact_hash"]),
                         evidence_snapshot_hash=str(row["evidence_snapshot_hash"]),
-                        promotion_hash=str(row["promotion_hash"]),
+                        entry_seal=_function_entry_seal(row, report),
                         report_details_hash=str(report["details_hash"]),
                         report_test_set_hash=str(report["test_set_hash"]),
                     )
@@ -3237,6 +3272,1723 @@ class SystemTests(unittest.TestCase):
         self.assertIsInstance(new_scope, dict)
         assert type(new_scope) is dict
         self.assertEqual(new_scope["operation_revision"], 2)
+
+
+    def test_verify_drafts_empty_set_and_public_models(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        result = self.system.verify_drafts(
+            "tenant-a",
+            "echo",
+            verified_by="batch-verifier",
+        )
+        self.assertIsInstance(result, DraftVerification)
+        self.assertTrue(result.passed)
+        self.assertEqual(result.operation_revision, 1)
+        self.assertEqual(result.entries, ())
+        self.assertEqual(result.skipped, ())
+        self.assertEqual(
+            FUNCTION_ENTRY_SEAL_ABI,
+            "cement-function-entry-seal-v1",
+        )
+        self.assertFalse(hasattr(result, "__dict__"))
+        with self.assertRaises(FrozenInstanceError):
+            result.passed = False  # type: ignore[misc]
+        with self.assertRaises(TypeError):
+            self.system.verify_drafts("tenant-a", "echo")  # type: ignore[call-arg]
+
+    def test_verify_drafts_uses_shared_projection_and_one_locked_batch(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        project = self.system._project_current_build
+        with (
+            mock.patch.object(
+                self.system,
+                "_project_current_build",
+                wraps=project,
+            ) as projected,
+            mock.patch.object(
+                self.system.store,
+                "transaction",
+                wraps=self.system.store.transaction,
+            ) as transaction,
+        ):
+            created = self._compile_three_drafts("batch-pass")
+            result = self.system.verify_drafts(
+                "tenant-a",
+                "echo",
+                verified_by="batch-verifier",
+            )
+        self.assertTrue(result.passed)
+        self.assertEqual(len(result.entries), 3)
+        self.assertEqual(result.skipped, ())
+        self.assertEqual(projected.call_count, 9)
+        self.assertEqual(
+            transaction.call_args_list[-2:],
+            [mock.call(write=False), mock.call(write=True)],
+        )
+        self.assertTrue(all(isinstance(entry, DraftEntry) for entry in result.entries))
+        self.assertTrue(all(entry.report.passed for entry in result.entries))
+        self.assertTrue(all(entry.report.tests == 8 for entry in result.entries))
+        self.assertTrue(all(entry.entry_seal is not None for entry in result.entries))
+        self.assertTrue(
+            all(
+                len(entry.entry_seal or "") == 64
+                and int(entry.entry_seal or "0", 16) >= 0
+                for entry in result.entries
+            )
+        )
+        with self.system.store.transaction(write=False) as connection:
+            rows = connection.execute(
+                """
+                SELECT id, input_hash, status, verified_report_id FROM artifacts
+                WHERE id IN (?, ?, ?) ORDER BY input_hash, sequence, id
+                """,
+                created,
+            ).fetchall()
+            event_kinds = [
+                str(row["kind"])
+                for row in connection.execute(
+                    """
+                    SELECT kind FROM events
+                    WHERE subject_id IN (?, ?, ?)
+                      AND kind IN ('artifact.verified', 'artifact.verification_failed')
+                    ORDER BY sequence
+                    """,
+                    created,
+                )
+            ]
+        self.assertEqual(
+            [entry.artifact_id for entry in result.entries],
+            [str(row["id"]) for row in rows],
+        )
+        self.assertTrue(all(row["status"] == "verified" for row in rows))
+        self.assertTrue(all(row["verified_report_id"] is not None for row in rows))
+        self.assertEqual(event_kinds, ["artifact.verified"] * 3)
+
+
+    def test_verify_drafts_locked_recheck_excludes_revision_writer(self) -> None:
+        policy = CompilePolicy(2, 1, 0)
+        self.system.register_operation("tenant-a", "echo", policy=policy)
+        created = self._compile_three_drafts("batch-lock")
+        with self.system.store.transaction(write=False) as connection:
+            expected_ids = tuple(
+                str(row["id"])
+                for row in connection.execute(
+                    """
+                    SELECT id FROM artifacts WHERE id IN (?, ?, ?)
+                    ORDER BY input_hash, sequence, id
+                    """,
+                    created,
+                )
+            )
+
+        writer = System(self.database, clock_us=self.clock)
+        original_plan = self.system._draft_verification_plan
+        original_verify_row = self.system._verify_row
+        original_writer_connect = writer.store._connect
+        enumerated = threading.Event()
+        allow_plan_return = threading.Event()
+        batch_writing = threading.Event()
+        allow_batch_finish = threading.Event()
+        batch_finished = threading.Event()
+        writer_attempted = threading.Event()
+        writer_committed = threading.Event()
+        writer_finished = threading.Event()
+        batches: list[DraftVerification] = []
+        revisions: list[int] = []
+        errors: list[Exception] = []
+        plan_calls = 0
+
+        class CommitObserver:
+            def __init__(self, connection) -> None:
+                self.connection = connection
+
+            def __getattr__(self, name):
+                return getattr(self.connection, name)
+
+            def commit(self):
+                result = self.connection.commit()
+                writer_committed.set()
+                return result
+
+        def blocked_plan(connection, *, partition, operation):
+            nonlocal plan_calls
+            plan_calls += 1
+            plan = original_plan(
+                connection,
+                partition=partition,
+                operation=operation,
+            )
+            if plan_calls == 2:
+                enumerated.set()
+                if not allow_plan_return.wait(timeout=5):
+                    raise AssertionError("locked plan release timed out")
+            return plan
+
+        def blocked_verify_row(connection, row, *, verified_by, now_us):
+            batch_writing.set()
+            if not allow_batch_finish.wait(timeout=5):
+                raise AssertionError("batch completion release timed out")
+            return original_verify_row(
+                connection,
+                row,
+                verified_by=verified_by,
+                now_us=now_us,
+            )
+
+        def observed_writer_connect():
+            connection = original_writer_connect()
+
+            def trace(statement: str) -> None:
+                if statement.strip().upper() == "BEGIN IMMEDIATE":
+                    writer_attempted.set()
+
+            connection.set_trace_callback(trace)
+            return CommitObserver(connection)
+
+        def run_batch() -> None:
+            try:
+                batches.append(
+                    self.system.verify_drafts(
+                        "tenant-a", "echo", verified_by="batch-verifier"
+                    )
+                )
+            except Exception as exc:  # thread handoff
+                errors.append(exc)
+            finally:
+                batch_finished.set()
+
+        def run_writer() -> None:
+            try:
+                revisions.append(
+                    writer.revise_operation(
+                        "tenant-a",
+                        "echo",
+                        policy=policy,
+                        revised_by="owner",
+                    )
+                )
+            except Exception as exc:  # thread handoff
+                errors.append(exc)
+            finally:
+                writer_finished.set()
+
+        verifier = threading.Thread(target=run_batch)
+        revision_writer = threading.Thread(target=run_writer)
+        writer_started = False
+        with (
+            mock.patch.object(
+                self.system,
+                "_draft_verification_plan",
+                side_effect=blocked_plan,
+            ),
+            mock.patch.object(
+                self.system,
+                "_verify_row",
+                side_effect=blocked_verify_row,
+            ),
+            mock.patch.object(
+                writer.store,
+                "_connect",
+                side_effect=observed_writer_connect,
+            ),
+        ):
+            verifier.start()
+            try:
+                self.assertTrue(enumerated.wait(timeout=2))
+                revision_writer.start()
+                writer_started = True
+                self.assertTrue(writer_attempted.wait(timeout=2))
+                self.assertFalse(writer_committed.wait(timeout=0.1))
+                allow_plan_return.set()
+                self.assertTrue(batch_writing.wait(timeout=2))
+                self.assertFalse(batch_finished.is_set())
+                self.assertFalse(writer_committed.is_set())
+                inspection = sqlite3.connect(self.database)
+                try:
+                    current_revision = int(
+                        inspection.execute(
+                            """
+                            SELECT revision FROM operations
+                            WHERE partition = 'tenant-a' AND name = 'echo'
+                            """
+                        ).fetchone()[0]
+                    )
+                finally:
+                    inspection.close()
+                self.assertEqual(current_revision, 1)
+            finally:
+                allow_plan_return.set()
+                allow_batch_finish.set()
+                verifier.join(timeout=5)
+                if writer_started:
+                    revision_writer.join(timeout=5)
+
+        self.assertFalse(verifier.is_alive())
+        self.assertFalse(revision_writer.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual(plan_calls, 2)
+        self.assertTrue(batch_finished.is_set())
+        self.assertTrue(writer_finished.is_set())
+        self.assertTrue(writer_committed.is_set())
+        self.assertEqual(revisions, [2])
+        self.assertEqual(len(batches), 1)
+        self.assertTrue(batches[0].passed)
+        self.assertEqual(batches[0].operation_revision, 1)
+        self.assertEqual(
+            tuple(entry.artifact_id for entry in batches[0].entries),
+            expected_ids,
+        )
+        self.assertTrue(all(entry.report.passed for entry in batches[0].entries))
+
+    def test_verify_drafts_enumerates_page_tail_beyond_one_thousand(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        example_rows = []
+        for index in range(1_001):
+            input_json = canonicalize({"page": index})
+            output_json = canonicalize({"echo": {"page": index}})
+            for witness, reviewer in (("a", "alice"), ("b", "bob")):
+                example_id = f"ex_page_{index:04d}_{witness}"
+                confirmed_at_us = self.clock.now_us + (witness == "b")
+                receipt = canonicalize(
+                    {
+                        "confirmed_at_us": confirmed_at_us,
+                        "example_id": example_id,
+                        "format": "cement-confirmation-v1",
+                        "input": input_json.value,
+                        "note": "page-tail fixture",
+                        "operation": "echo",
+                        "operation_revision": 1,
+                        "output": output_json.value,
+                        "partition": "tenant-a",
+                        "resolution": "accepted",
+                        "reviewer": reviewer,
+                    }
+                )
+                example_rows.append(
+                    (
+                        example_id,
+                        "tenant-a",
+                        "echo",
+                        1,
+                        input_json.text,
+                        input_json.digest,
+                        output_json.text,
+                        output_json.digest,
+                        reviewer,
+                        "accepted",
+                        receipt.text,
+                        receipt.digest,
+                        confirmed_at_us,
+                    )
+                )
+        with self.system.store.transaction(write=True) as connection:
+            connection.executemany(
+                """
+                INSERT INTO examples(
+                    id, partition, operation, operation_revision, input_json, input_hash,
+                    output_json, output_hash, reviewer, origin, receipt_json,
+                    receipt_hash, confirmed_at_us
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                example_rows,
+            )
+        compiled = self.system.compile("tenant-a", "echo")
+        self.assertEqual(len(compiled.created), 1_001)
+        self.assertEqual(compiled.existing, ())
+        self.assertEqual(compiled.blocked, ())
+        with self.system.store.transaction(write=False) as connection:
+            expected = tuple(
+                (
+                    str(row["id"]),
+                    str(row["input_hash"]),
+                    str(row["scope_hash"]),
+                )
+                for row in connection.execute(
+                    """
+                    SELECT id, input_hash, scope_hash FROM artifacts
+                    WHERE partition = 'tenant-a' AND operation = 'echo'
+                      AND operation_revision = 1 AND status = 'draft'
+                    ORDER BY input_hash, sequence, id
+                    """
+                )
+            )
+        self.assertEqual(len(expected), 1_001)
+        sentinel = expected[-1][:2]
+
+        def selection_only(connection, row, *, verified_by, now_us):
+            return (
+                VerificationReport(
+                    id=f"report_selection_{row['sequence']}",
+                    artifact_id=str(row["id"]),
+                    scope_hash=str(row["scope_hash"]),
+                    passed=True,
+                    tests=1,
+                    failures=(),
+                    created_at_us=now_us,
+                ),
+                "0" * 64,
+            )
+
+        with mock.patch.object(
+            self.system,
+            "_verify_row",
+            side_effect=selection_only,
+        ) as selected:
+            result = self.system.verify_drafts(
+                "tenant-a", "echo", verified_by="page-tail-verifier"
+            )
+        actual = tuple(
+            (entry.artifact_id, entry.input_hash) for entry in result.entries
+        )
+        self.assertTrue(result.passed)
+        self.assertEqual(result.operation_revision, 1)
+        self.assertEqual(result.skipped, ())
+        self.assertEqual(
+            actual,
+            tuple((artifact_id, input_hash) for artifact_id, input_hash, _ in expected),
+        )
+        self.assertEqual(actual[-1], sentinel)
+        self.assertEqual(selected.call_count, 1_001)
+
+    def test_verify_drafts_selects_current_middle_build_and_reports_skipped(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        original_ids = self._compile_three_drafts("batch-middle")
+        with self.system.store.transaction(write=False) as connection:
+            original_rows = connection.execute(
+                """
+                SELECT id, input_hash, input_json FROM artifacts
+                WHERE id IN (?, ?, ?) ORDER BY input_hash, sequence, id
+                """,
+                original_ids,
+            ).fetchall()
+        middle = original_rows[1]
+        middle_input = json.loads(str(middle["input_json"]))
+        self._confirm_scope(
+            "tenant-a",
+            "echo",
+            middle_input,
+            "batch-middle-extra",
+            reviewer="alice",
+        )
+        newer = self.system.compile("tenant-a", "echo")
+        self.assertEqual(len(newer.created), 1)
+        newer_id = newer.created[0]
+        authority = mock.Mock(return_value=True)
+        self.system._authority = authority
+
+        result = self.system.verify_drafts(
+            "tenant-a",
+            "echo",
+            verified_by="batch-verifier",
+        )
+        selected = {entry.artifact_id for entry in result.entries}
+        expected_selected = (set(original_ids) - {str(middle["id"])}) | {newer_id}
+        self.assertTrue(result.passed)
+        self.assertEqual(selected, expected_selected)
+        self.assertEqual(
+            result.skipped,
+            (
+                {
+                    "artifact_id": str(middle["id"]),
+                    "input_hash": str(middle["input_hash"]),
+                    "reason": "superseded-build",
+                },
+            ),
+        )
+        self.assertEqual(
+            {call.args[3] for call in authority.call_args_list},
+            expected_selected,
+        )
+        self.assertNotIn(str(middle["id"]), {call.args[3] for call in authority.call_args_list})
+        with self.system.store.transaction(write=False) as connection:
+            statuses = dict(
+                connection.execute(
+                    "SELECT id, status FROM artifacts WHERE id IN (?, ?)",
+                    (middle["id"], newer_id),
+                ).fetchall()
+            )
+        self.assertEqual(statuses[str(middle["id"])], "draft")
+        self.assertEqual(statuses[newer_id], "verified")
+
+    def test_verify_drafts_requalifies_older_build_after_revocation(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._confirm_scope(
+            "tenant-a", "echo", {"x": 1}, "requalify-a", reviewer="alice"
+        )
+        self._confirm_scope(
+            "tenant-a", "echo", {"x": 1}, "requalify-b", reviewer="bob"
+        )
+        older = self.system.compile("tenant-a", "echo").created[0]
+        pending = self.system.handle(
+            "tenant-a", "echo", {"x": 1}, request_id="requalify-extra"
+        )
+        self.assertIsInstance(pending, ReviewRequired)
+        assert isinstance(pending, ReviewRequired)
+        resolved = self.system.review(
+            "tenant-a",
+            pending.proposal_id,
+            reviewer="alice",
+            decision="accept",
+        )
+        self.assertIsInstance(resolved, Resolved)
+        assert isinstance(resolved, Resolved)
+        added = resolved.example_id
+        self.assertIsNotNone(added)
+        newer = self.system.compile("tenant-a", "echo").created[0]
+        self.assertEqual(
+            self.system.revoke_example(
+                "tenant-a",
+                str(added),
+                revoked_by="auditor",
+                reason="withdraw extra evidence",
+            ),
+            (newer,),
+        )
+
+        result = self.system.verify_drafts(
+            "tenant-a", "echo", verified_by="batch-verifier"
+        )
+        self.assertTrue(result.passed)
+        self.assertEqual([entry.artifact_id for entry in result.entries], [older])
+        self.assertEqual(result.skipped, ())
+        self.assertEqual(self.system.artifact("tenant-a", newer)["status"], "suspended")
+
+    def test_verify_drafts_requires_exact_canonical_input_projection(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._confirm_scope(
+            "tenant-a", "echo", {"x": 1}, "input-projection-a", reviewer="alice"
+        )
+        self._confirm_scope(
+            "tenant-a", "echo", {"x": 1}, "input-projection-b", reviewer="bob"
+        )
+        artifact_id = self.system.compile("tenant-a", "echo").created[0]
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("DROP TRIGGER artifacts_build_fields_immutable")
+            connection.execute(
+                "UPDATE artifacts SET input_json = ? WHERE id = ?",
+                (canonicalize({"x": "forged"}).text, artifact_id),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        result = self.system.verify_drafts(
+            "tenant-a", "echo", verified_by="batch-verifier"
+        )
+        self.assertTrue(result.passed)
+        self.assertEqual(result.entries, ())
+        self.assertEqual(
+            result.skipped,
+            (
+                {
+                    "artifact_id": artifact_id,
+                    "input_hash": canonicalize({"x": 1}).digest,
+                    "reason": "superseded-build",
+                },
+            ),
+        )
+
+
+    def test_verify_drafts_eligibility_is_exactly_scoped_to_current_drafts(self) -> None:
+        policy = CompilePolicy(2, 1, 0)
+        self.system.register_operation("tenant-a", "echo", policy=policy)
+        self._confirm_scope(
+            "tenant-a", "echo", {"x": 1}, "scope-target-a", reviewer="alice"
+        )
+        self._confirm_scope(
+            "tenant-a", "echo", {"x": 1}, "scope-target-b", reviewer="bob"
+        )
+        target = self.system.compile("tenant-a", "echo").created[0]
+
+        self.system.register_operation("tenant-a", "other", policy=policy)
+        self._confirm_scope(
+            "tenant-a", "other", {"x": 1}, "scope-other-a", reviewer="alice"
+        )
+        self._confirm_scope(
+            "tenant-a", "other", {"x": 1}, "scope-other-b", reviewer="bob"
+        )
+        other_operation = self.system.compile("tenant-a", "other").created[0]
+
+        self.system.register_operation("tenant-b", "echo", policy=policy)
+        self._confirm_scope(
+            "tenant-b", "echo", {"x": 1}, "scope-partition-a", reviewer="alice"
+        )
+        self._confirm_scope(
+            "tenant-b", "echo", {"x": 1}, "scope-partition-b", reviewer="bob"
+        )
+        other_partition = self.system.compile("tenant-b", "echo").created[0]
+
+        with self.system.store.transaction(write=True) as connection:
+            for artifact_id, revision, status, reason in (
+                ("art_future_revision", 2, "draft", None),
+                ("art_suspended_decoy", 1, "suspended", "decoy"),
+            ):
+                connection.execute(
+                    """
+                    INSERT INTO artifacts(
+                        id, partition, operation, operation_revision, input_json, input_hash,
+                        output_json, output_hash, artifact_json, artifact_hash, scope_hash,
+                        build_hash, policy_json, policy_hash, evidence_snapshot_hash, status,
+                        support, reviewer_count, span_seconds, created_at_us,
+                        verified_report_id, promoted_by, promoted_at_us, promotion_hash,
+                        status_reason
+                    )
+                    SELECT ?, partition, operation, ?, input_json, input_hash,
+                           output_json, output_hash, artifact_json, artifact_hash, scope_hash,
+                           build_hash, policy_json, policy_hash, evidence_snapshot_hash, ?,
+                           support, reviewer_count, span_seconds, created_at_us,
+                           verified_report_id, promoted_by, promoted_at_us, promotion_hash, ?
+                    FROM artifacts WHERE id = ?
+                    """,
+                    (artifact_id, revision, status, reason, target),
+                )
+
+        result = self.system.verify_drafts(
+            "tenant-a", "echo", verified_by="batch-verifier"
+        )
+        self.assertTrue(result.passed)
+        self.assertEqual([entry.artifact_id for entry in result.entries], [target])
+        self.assertEqual(result.skipped, ())
+        with self.system.store.transaction(write=False) as connection:
+            statuses = dict(
+                connection.execute(
+                    """
+                    SELECT id, status FROM artifacts
+                    WHERE id IN (?, ?, ?, ?)
+                    """,
+                    (
+                        other_operation,
+                        other_partition,
+                        "art_future_revision",
+                        "art_suspended_decoy",
+                    ),
+                ).fetchall()
+            )
+        self.assertEqual(
+            statuses,
+            {
+                other_operation: "draft",
+                other_partition: "draft",
+                "art_future_revision": "draft",
+                "art_suspended_decoy": "suspended",
+            },
+        )
+
+    def test_verify_drafts_excludes_prior_revision_draft(self) -> None:
+        policy = CompilePolicy(2, 1, 0)
+        self.system.register_operation("tenant-a", "echo", policy=policy)
+        self._confirm_scope(
+            "tenant-a", "echo", {"x": 1}, "prior-revision-a", reviewer="alice"
+        )
+        self._confirm_scope(
+            "tenant-a", "echo", {"x": 1}, "prior-revision-b", reviewer="bob"
+        )
+        prior = self.system.compile("tenant-a", "echo").created[0]
+
+        revision = self.system.revise_operation(
+            "tenant-a", "echo", policy=policy, revised_by="owner"
+        )
+        self.assertEqual(revision, 2)
+        self._confirm_scope(
+            "tenant-a", "echo", {"x": 1}, "current-revision-a", reviewer="alice"
+        )
+        self._confirm_scope(
+            "tenant-a", "echo", {"x": 1}, "current-revision-b", reviewer="bob"
+        )
+        current = self.system.compile("tenant-a", "echo").created[0]
+        with self.system.store.transaction(write=True) as connection:
+            connection.execute("DROP TRIGGER artifacts_status_lifecycle")
+            connection.execute(
+                """
+                UPDATE artifacts SET status = 'draft', status_reason = NULL
+                WHERE id = ?
+                """,
+                (prior,),
+            )
+
+        authority = mock.Mock(return_value=True)
+        self.system._authority = authority
+        result = self.system.verify_drafts(
+            "tenant-a", "echo", verified_by="batch-verifier"
+        )
+        self.assertTrue(result.passed)
+        self.assertEqual(result.operation_revision, 2)
+        self.assertEqual(
+            tuple(entry.artifact_id for entry in result.entries),
+            (current,),
+        )
+        self.assertEqual(result.skipped, ())
+        self.assertEqual(
+            [call.args[3] for call in authority.call_args_list],
+            [current],
+        )
+        with self.system.store.transaction(write=False) as connection:
+            prior_diagnostics = connection.execute(
+                """
+                SELECT
+                    (SELECT COUNT(*) FROM test_reports WHERE artifact_id = ?),
+                    (SELECT COUNT(*) FROM events WHERE subject_id = ?
+                        AND kind IN ('artifact.verified', 'artifact.verification_failed'))
+                """,
+                (prior, prior),
+            ).fetchone()
+            prior_status = connection.execute(
+                "SELECT status FROM artifacts WHERE id = ?",
+                (prior,),
+            ).fetchone()
+        self.assertIsNotNone(prior_diagnostics)
+        self.assertEqual(tuple(prior_diagnostics), (0, 0))
+        self.assertIsNotNone(prior_status)
+        self.assertEqual(prior_status["status"], "draft")
+
+    def test_verify_drafts_excludes_each_non_draft_status(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        promoted, _, _ = self._promote_function_entry(
+            {"x": 1}, "non-draft-status"
+        )
+        status_ids = {
+            "promoted": promoted,
+            "verified": "art_non_draft_verified",
+            "building": "art_non_draft_building",
+            "retired": "art_non_draft_retired",
+        }
+        with self.system.store.transaction(write=True) as connection:
+            for status in ("verified", "building", "retired"):
+                connection.execute(
+                    """
+                    INSERT INTO artifacts(
+                        id, partition, operation, operation_revision,
+                        input_json, input_hash, output_json, output_hash,
+                        artifact_json, artifact_hash, scope_hash, build_hash,
+                        policy_json, policy_hash, evidence_snapshot_hash,
+                        status, support, reviewer_count, span_seconds,
+                        created_at_us, verified_report_id, promoted_by,
+                        promoted_at_us, promotion_hash, status_reason
+                    )
+                    SELECT ?, partition, operation, operation_revision,
+                           input_json, input_hash, output_json, output_hash,
+                           artifact_json, artifact_hash, scope_hash, build_hash,
+                           policy_json, policy_hash, evidence_snapshot_hash,
+                           ?, support, reviewer_count, span_seconds,
+                           created_at_us, NULL, NULL, NULL, NULL, ?
+                    FROM artifacts WHERE id = ?
+                    """,
+                    (
+                        status_ids[status],
+                        status,
+                        f"controlled {status} fixture",
+                        promoted,
+                    ),
+                )
+
+        authority = mock.Mock(return_value=True)
+        self.system._authority = authority
+        before = self._database_dump()
+        result = self.system.verify_drafts(
+            "tenant-a", "echo", verified_by="batch-verifier"
+        )
+        self.assertTrue(result.passed)
+        self.assertEqual(result.entries, ())
+        self.assertEqual(result.skipped, ())
+        self.assertEqual(authority.call_args_list, [])
+        self.assertEqual(self._database_dump(), before)
+
+    def test_verify_drafts_orders_entries_and_authority_by_input_hash(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        hash_value_pairs = sorted(
+            (canonicalize({"x": value}).digest, {"x": value})
+            for value in (1, 2, 3)
+        )
+        created_by_hash: dict[str, str] = {}
+        for index, (input_hash, value) in enumerate(
+            reversed(hash_value_pairs),
+            start=1,
+        ):
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                value,
+                f"batch-order-{index}-a",
+                reviewer="alice",
+            )
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                value,
+                f"batch-order-{index}-b",
+                reviewer="bob",
+            )
+            build = self.system.compile("tenant-a", "echo")
+            self.assertEqual(len(build.created), 1)
+            created_by_hash[input_hash] = build.created[0]
+
+        expected_hashes = tuple(input_hash for input_hash, _ in hash_value_pairs)
+        expected_ids = tuple(created_by_hash[input_hash] for input_hash in expected_hashes)
+        with self.system.store.transaction(write=False) as connection:
+            sequence_hashes = tuple(
+                str(row["input_hash"])
+                for row in connection.execute(
+                    """
+                    SELECT input_hash FROM artifacts WHERE id IN (?, ?, ?)
+                    ORDER BY sequence
+                    """,
+                    expected_ids,
+                )
+            )
+        self.assertEqual(sequence_hashes, tuple(reversed(expected_hashes)))
+
+        original_connect = self.system.store._connect
+
+        def reverse_unordered_connect():
+            connection = original_connect()
+            connection.execute("PRAGMA reverse_unordered_selects = ON")
+            return connection
+
+        authority = mock.Mock(return_value=True)
+        self.system._authority = authority
+        with mock.patch.object(
+            self.system.store,
+            "_connect",
+            side_effect=reverse_unordered_connect,
+        ):
+            result = self.system.verify_drafts(
+                "tenant-a", "echo", verified_by="batch-verifier"
+            )
+        self.assertTrue(result.passed)
+        self.assertEqual(
+            tuple(entry.input_hash for entry in result.entries),
+            expected_hashes,
+        )
+        self.assertEqual(
+            tuple(entry.artifact_id for entry in result.entries),
+            expected_ids,
+        )
+        self.assertEqual(
+            tuple(call.args[3] for call in authority.call_args_list),
+            expected_ids,
+        )
+
+    def test_verify_drafts_ignores_prior_revision_canonical_collisions(self) -> None:
+        policy = CompilePolicy(2, 1, 0)
+        self.system.register_operation("tenant-a", "echo", policy=policy)
+        self._confirm_scope(
+            "tenant-a", "echo", {"x": "stale"}, "stale-input-a", reviewer="alice"
+        )
+        self._confirm_scope(
+            "tenant-a", "echo", {"x": "stale"}, "stale-input-b", reviewer="bob"
+        )
+
+        revision = self.system.revise_operation(
+            "tenant-a", "echo", policy=policy, revised_by="owner"
+        )
+        self.assertEqual(revision, 2)
+        current_input = {"x": "current"}
+        self._confirm_scope(
+            "tenant-a", "echo", current_input, "current-input-a", reviewer="alice"
+        )
+        self._confirm_scope(
+            "tenant-a", "echo", current_input, "current-input-b", reviewer="bob"
+        )
+        current = self.system.compile("tenant-a", "echo").created[0]
+        current_hash = canonicalize(current_input).digest
+        with self.system.store.transaction(write=True) as connection:
+            connection.execute("DROP TRIGGER examples_no_update")
+            stale = connection.execute(
+                """
+                SELECT id FROM examples
+                WHERE partition = 'tenant-a' AND operation = 'echo'
+                  AND operation_revision = 1
+                ORDER BY id LIMIT 1
+                """
+            ).fetchone()
+            if stale is None:
+                raise AssertionError("prior-revision example disappeared")
+            connection.execute(
+                "UPDATE examples SET input_hash = ? WHERE id = ?",
+                (current_hash, stale["id"]),
+            )
+
+        result = self.system.verify_drafts(
+            "tenant-a", "echo", verified_by="batch-verifier"
+        )
+        self.assertTrue(result.passed)
+        self.assertEqual(
+            tuple(entry.artifact_id for entry in result.entries),
+            (current,),
+        )
+        self.assertEqual(result.skipped, ())
+
+    def test_verify_drafts_skips_policy_blocked_current_projection(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._confirm_scope(
+            "tenant-a", "echo", {"x": 1}, "blocked-current-a", reviewer="alice"
+        )
+        self._confirm_scope(
+            "tenant-a", "echo", {"x": 1}, "blocked-current-b", reviewer="bob"
+        )
+        artifact_id = self.system.compile("tenant-a", "echo").created[0]
+        with self.system.store.transaction(write=False) as connection:
+            example = connection.execute(
+                """
+                SELECT id FROM examples
+                WHERE partition = 'tenant-a' AND operation = 'echo'
+                  AND operation_revision = 1
+                ORDER BY id LIMIT 1
+                """
+            ).fetchone()
+        if example is None:
+            raise AssertionError("blocking evidence fixture disappeared")
+        self.system.revoke_example(
+            "tenant-a",
+            str(example["id"]),
+            revoked_by="auditor",
+            reason="force current projection below policy",
+        )
+        with self.system.store.transaction(write=True) as connection:
+            connection.execute("DROP TRIGGER artifacts_status_lifecycle")
+            connection.execute(
+                """
+                UPDATE artifacts SET status = 'draft', status_reason = NULL
+                WHERE id = ?
+                """,
+                (artifact_id,),
+            )
+
+        authority = mock.Mock(return_value=True)
+        self.system._authority = authority
+        result = self.system.verify_drafts(
+            "tenant-a", "echo", verified_by="batch-verifier"
+        )
+        self.assertTrue(result.passed)
+        self.assertEqual(result.entries, ())
+        self.assertEqual(
+            result.skipped,
+            (
+                {
+                    "artifact_id": artifact_id,
+                    "input_hash": canonicalize({"x": 1}).digest,
+                    "reason": "superseded-build",
+                },
+            ),
+        )
+        self.assertEqual(authority.call_args_list, [])
+
+    def test_verify_drafts_duplicate_eligible_rows_abort_full_ledger(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._confirm_scope(
+            "tenant-a", "echo", {"x": 1}, "duplicate-batch-a", reviewer="alice"
+        )
+        self._confirm_scope(
+            "tenant-a", "echo", {"x": 1}, "duplicate-batch-b", reviewer="bob"
+        )
+        current = self.system.compile("tenant-a", "echo").created[0]
+        with self.system.store.transaction(write=True) as connection:
+            connection.execute(
+                """
+                INSERT INTO artifacts(
+                    id, partition, operation, operation_revision, input_json, input_hash,
+                    output_json, output_hash, artifact_json, artifact_hash, scope_hash,
+                    build_hash, policy_json, policy_hash, evidence_snapshot_hash, status,
+                    support, reviewer_count, span_seconds, created_at_us,
+                    verified_report_id, promoted_by, promoted_at_us, promotion_hash,
+                    status_reason
+                )
+                SELECT 'art_duplicate_current', partition, operation, operation_revision,
+                       input_json, input_hash, output_json, output_hash, artifact_json,
+                       artifact_hash, scope_hash, build_hash, policy_json, policy_hash,
+                       evidence_snapshot_hash, status, support, reviewer_count, span_seconds,
+                       created_at_us, verified_report_id, promoted_by, promoted_at_us,
+                       promotion_hash, status_reason
+                FROM artifacts WHERE id = ?
+                """,
+                (current,),
+            )
+        before = self._database_dump()
+        with self.assertRaisesRegex(
+            IntegrityError,
+            "multiple drafts claim the current build",
+        ):
+            self.system.verify_drafts(
+                "tenant-a", "echo", verified_by="batch-verifier"
+            )
+        self.assertEqual(self._database_dump(), before)
+
+    def test_verify_drafts_missing_canonical_input_aborts_full_ledger(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._confirm_scope(
+            "tenant-a", "echo", {"x": 1}, "missing-input-a", reviewer="alice"
+        )
+        self._confirm_scope(
+            "tenant-a", "echo", {"x": 1}, "missing-input-b", reviewer="bob"
+        )
+        current = self.system.compile("tenant-a", "echo").created[0]
+        with self.system.store.transaction(write=True) as connection:
+            connection.execute(
+                """
+                INSERT INTO artifacts(
+                    id, partition, operation, operation_revision, input_json, input_hash,
+                    output_json, output_hash, artifact_json, artifact_hash, scope_hash,
+                    build_hash, policy_json, policy_hash, evidence_snapshot_hash, status,
+                    support, reviewer_count, span_seconds, created_at_us,
+                    verified_report_id, promoted_by, promoted_at_us, promotion_hash,
+                    status_reason
+                )
+                SELECT 'art_missing_input', partition, operation, operation_revision,
+                       input_json, ?, output_json, output_hash, artifact_json,
+                       artifact_hash, scope_hash, build_hash, policy_json, policy_hash,
+                       evidence_snapshot_hash, status, support, reviewer_count, span_seconds,
+                       created_at_us, verified_report_id, promoted_by, promoted_at_us,
+                       promotion_hash, status_reason
+                FROM artifacts WHERE id = ?
+                """,
+                ("0" * 64, current),
+            )
+        before = self._database_dump()
+        with self.assertRaisesRegex(IntegrityError, "has no canonical input"):
+            self.system.verify_drafts(
+                "tenant-a", "echo", verified_by="batch-verifier"
+            )
+        self.assertEqual(self._database_dump(), before)
+
+    def test_verify_drafts_duplicate_canonical_inputs_abort_full_ledger(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._compile_three_drafts("canonical-collision")
+        connection = sqlite3.connect(self.database)
+        try:
+            rows = connection.execute(
+                """
+                SELECT input_hash FROM artifacts
+                WHERE partition = 'tenant-a' AND operation = 'echo'
+                ORDER BY input_hash LIMIT 2
+                """
+            ).fetchall()
+            first_hash, second_hash = str(rows[0][0]), str(rows[1][0])
+            connection.execute("DROP TRIGGER examples_no_update")
+            connection.execute(
+                """
+                UPDATE examples SET input_hash = ?
+                WHERE partition = 'tenant-a' AND operation = 'echo'
+                  AND input_hash = ?
+                """,
+                (first_hash, second_hash),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        before = self._database_dump()
+        with self.assertRaisesRegex(
+            IntegrityError,
+            "one input digest maps to multiple canonical inputs",
+        ):
+            self.system.verify_drafts(
+                "tenant-a", "echo", verified_by="batch-verifier"
+            )
+        self.assertEqual(self._database_dump(), before)
+
+    def test_verify_drafts_authority_denial_precedes_write_transaction(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._compile_three_drafts("batch-authority")
+        with self.system.store.transaction(write=False) as connection:
+            selected_ids = tuple(
+                str(row["id"])
+                for row in connection.execute(
+                    """
+                    SELECT id FROM artifacts
+                    WHERE partition = 'tenant-a' AND operation = 'echo'
+                      AND status = 'draft'
+                    ORDER BY input_hash, sequence, id
+                    """
+                )
+            )
+        denied = selected_ids[-1]
+        calls: list[tuple[str, str, str, str]] = []
+
+        def authority(partition, actor, action, subject):
+            calls.append((partition, actor, action, subject))
+            return subject != denied
+
+        self.system._authority = authority
+        before = self._database_dump()
+        with mock.patch.object(
+            self.system.store,
+            "transaction",
+            wraps=self.system.store.transaction,
+        ) as transaction:
+            with self.assertRaisesRegex(StateError, "not authorized"):
+                self.system.verify_drafts(
+                    "tenant-a", "echo", verified_by="blocked-verifier"
+                )
+        self.assertEqual(
+            calls,
+            [
+                ("tenant-a", "blocked-verifier", "artifact.verify", artifact_id)
+                for artifact_id in selected_ids
+            ],
+        )
+        self.assertEqual(transaction.call_args_list, [mock.call(write=False)])
+        self.assertEqual(self._database_dump(), before)
+
+    def test_verify_drafts_contains_middle_integrity_failure_per_row(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        created = self._compile_three_drafts("batch-local-failure")
+        with self.system.store.transaction(write=False) as connection:
+            rows = connection.execute(
+                """
+                SELECT id FROM artifacts WHERE id IN (?, ?, ?)
+                ORDER BY input_hash, sequence, id
+                """,
+                created,
+            ).fetchall()
+        target = str(rows[1]["id"])
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("DROP TRIGGER artifacts_build_fields_immutable")
+            connection.execute(
+                "UPDATE artifacts SET artifact_json = '{}' WHERE id = ?",
+                (target,),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        result = self.system.verify_drafts(
+            "tenant-a", "echo", verified_by="batch-verifier"
+        )
+        self.assertFalse(result.passed)
+        self.assertEqual(len(result.entries), 3)
+        self.assertEqual(
+            [entry.report.passed for entry in result.entries],
+            [True, False, True],
+        )
+        self.assertIsNone(result.entries[1].entry_seal)
+        self.assertIsNotNone(result.entries[0].entry_seal)
+        self.assertIsNotNone(result.entries[2].entry_seal)
+        self.assertIn("integrity", result.entries[1].report.failures[0])
+        with self.system.store.transaction(write=False) as connection:
+            statuses = {
+                str(row["id"]): str(row["status"])
+                for row in connection.execute(
+                    "SELECT id, status FROM artifacts WHERE id IN (?, ?, ?)",
+                    created,
+                )
+            }
+            report_count = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM test_reports WHERE artifact_id IN (?, ?, ?)",
+                    created,
+                ).fetchone()[0]
+            )
+            event_count = int(
+                connection.execute(
+                    """
+                    SELECT COUNT(*) FROM events
+                    WHERE subject_id IN (?, ?, ?)
+                      AND kind IN ('artifact.verified', 'artifact.verification_failed')
+                    """,
+                    created,
+                ).fetchone()[0]
+            )
+        self.assertEqual(statuses[target], "draft")
+        self.assertEqual(
+            {status for artifact_id, status in statuses.items() if artifact_id != target},
+            {"verified"},
+        )
+        self.assertEqual(report_count, 3)
+        self.assertEqual(event_count, 3)
+
+    def test_verify_drafts_aggregate_includes_last_failed_row(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        created = self._compile_three_drafts("batch-last-failure")
+        with self.system.store.transaction(write=False) as connection:
+            ordered_ids = tuple(
+                str(row["id"])
+                for row in connection.execute(
+                    """
+                    SELECT id FROM artifacts WHERE id IN (?, ?, ?)
+                    ORDER BY input_hash, sequence, id
+                    """,
+                    created,
+                )
+            )
+        target = ordered_ids[-1]
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("DROP TRIGGER artifacts_build_fields_immutable")
+            connection.execute(
+                "UPDATE artifacts SET artifact_json = '{}' WHERE id = ?",
+                (target,),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        result = self.system.verify_drafts(
+            "tenant-a", "echo", verified_by="batch-verifier"
+        )
+        self.assertFalse(result.passed)
+        self.assertEqual(
+            tuple(entry.artifact_id for entry in result.entries),
+            ordered_ids,
+        )
+        self.assertEqual(
+            tuple(entry.report.passed for entry in result.entries),
+            (True, True, False),
+        )
+        self.assertEqual(
+            tuple(entry.entry_seal is not None for entry in result.entries),
+            (True, True, False),
+        )
+        self.assertEqual(
+            tuple(entry.report.tests for entry in result.entries),
+            (8, 8, 1),
+        )
+        with self.system.store.transaction(write=False) as connection:
+            statuses = dict(
+                connection.execute(
+                    "SELECT id, status FROM artifacts WHERE id IN (?, ?, ?)",
+                    ordered_ids,
+                ).fetchall()
+            )
+            report_count = int(
+                connection.execute(
+                    """
+                    SELECT COUNT(*) FROM test_reports
+                    WHERE artifact_id IN (?, ?, ?)
+                    """,
+                    ordered_ids,
+                ).fetchone()[0]
+            )
+            events = tuple(
+                (str(row["subject_id"]), str(row["kind"]))
+                for row in connection.execute(
+                    """
+                    SELECT subject_id, kind FROM events
+                    WHERE subject_id IN (?, ?, ?)
+                      AND kind IN ('artifact.verified', 'artifact.verification_failed')
+                    ORDER BY sequence
+                    """,
+                    ordered_ids,
+                )
+            )
+        self.assertEqual(
+            statuses,
+            {
+                ordered_ids[0]: "verified",
+                ordered_ids[1]: "verified",
+                ordered_ids[2]: "draft",
+            },
+        )
+        self.assertEqual(report_count, 3)
+        self.assertEqual(
+            events,
+            (
+                (ordered_ids[0], "artifact.verified"),
+                (ordered_ids[1], "artifact.verified"),
+                (ordered_ids[2], "artifact.verification_failed"),
+            ),
+        )
+
+
+    def test_verify_drafts_rolls_back_flushed_children_per_row(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        created = self._compile_three_drafts("batch-flush-rollback")
+        with self.system.store.transaction(write=False) as connection:
+            ordered_ids = tuple(
+                str(row["id"])
+                for row in connection.execute(
+                    """
+                    SELECT id FROM artifacts WHERE id IN (?, ?, ?)
+                    ORDER BY input_hash, sequence, id
+                    """,
+                    created,
+                )
+            )
+        target = ordered_ids[1]
+        original = self.system._run_verification
+
+        def fail_after_flush(connection, row, *, record_test=None):
+            if str(row["id"]) == target:
+                if record_test is None:
+                    raise AssertionError("batch row recorder was not provided")
+                for index in range(513):
+                    record_test(
+                        f"synthetic:{index:04d}",
+                        None,
+                        True,
+                        "pre-failure flushed child",
+                    )
+                raise IntegrityError("injected integrity failure after child flush")
+            return original(connection, row, record_test=record_test)
+
+        with mock.patch.object(
+            self.system,
+            "_run_verification",
+            side_effect=fail_after_flush,
+        ):
+            result = self.system.verify_drafts(
+                "tenant-a", "echo", verified_by="batch-verifier"
+            )
+
+        self.assertFalse(result.passed)
+        self.assertEqual(
+            tuple(entry.artifact_id for entry in result.entries),
+            ordered_ids,
+        )
+        self.assertEqual(
+            tuple(entry.report.passed for entry in result.entries),
+            (True, False, True),
+        )
+        self.assertEqual(
+            tuple(entry.report.tests for entry in result.entries),
+            (8, 1, 8),
+        )
+        self.assertEqual(result.entries[1].report.failures, (
+            "artifact integrity failure: "
+            "injected integrity failure after child flush",
+        ))
+        with self.system.store.transaction(write=False) as connection:
+            children = {
+                entry.artifact_id: tuple(
+                    (
+                        str(row["test_key"]),
+                        int(row["passed"]),
+                    )
+                    for row in connection.execute(
+                        """
+                        SELECT test_key, passed FROM artifact_tests
+                        WHERE report_id = ? ORDER BY test_key
+                        """,
+                        (entry.report.id,),
+                    )
+                )
+                for entry in result.entries
+            }
+            events = tuple(
+                (str(row["subject_id"]), str(row["kind"]))
+                for row in connection.execute(
+                    """
+                    SELECT subject_id, kind FROM events
+                    WHERE subject_id IN (?, ?, ?)
+                      AND kind IN ('artifact.verified', 'artifact.verification_failed')
+                    ORDER BY sequence
+                    """,
+                    ordered_ids,
+                )
+            )
+        self.assertEqual(len(children[ordered_ids[0]]), 8)
+        self.assertEqual(children[target], (("artifact-integrity", 0),))
+        self.assertEqual(len(children[ordered_ids[2]]), 8)
+        self.assertEqual(
+            events,
+            (
+                (ordered_ids[0], "artifact.verified"),
+                (target, "artifact.verification_failed"),
+                (ordered_ids[2], "artifact.verified"),
+            ),
+        )
+
+    def test_verify_drafts_test_count_mismatch_aborts_full_ledger(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._compile_three_drafts("batch-test-count")
+        before = self._database_dump()
+        original = self.system._test_snapshot
+
+        for delta in (1, -1):
+            with self.subTest(delta=delta):
+                calls = 0
+
+                def shifted_snapshot(connection, report_id):
+                    nonlocal calls
+                    calls += 1
+                    count, digest = original(connection, report_id)
+                    if calls == 2:
+                        return count + delta, digest
+                    return count, digest
+
+                with mock.patch.object(
+                    self.system,
+                    "_test_snapshot",
+                    side_effect=shifted_snapshot,
+                ):
+                    with self.assertRaisesRegex(
+                        IntegrityError,
+                        "verification test count changed while recording",
+                    ):
+                        self.system.verify_drafts(
+                            "tenant-a",
+                            "echo",
+                            verified_by="batch-verifier",
+                        )
+                self.assertEqual(calls, 2)
+                self.assertEqual(self._database_dump(), before)
+
+    def test_verify_drafts_missing_sealed_report_is_domain_error(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._compile_three_drafts("batch-missing-sealed-report")
+        before = self._database_dump()
+        seal_query = (
+            "SELECT * FROM test_reports WHERE id = ? AND artifact_id = ?"
+        )
+
+        class MissingSealCursor:
+            @staticmethod
+            def fetchone():
+                return None
+
+        class MissingSealConnection:
+            def __init__(self, connection):
+                self.connection = connection
+
+            def execute(self, sql, parameters=()):
+                cursor = self.connection.execute(sql, parameters)
+                if " ".join(sql.split()) == seal_query:
+                    return MissingSealCursor()
+                return cursor
+
+            def __getattr__(self, name):
+                return getattr(self.connection, name)
+
+        original_transaction = self.system.store.transaction
+
+        @contextmanager
+        def missing_seal_transaction(*, write=False):
+            with original_transaction(write=write) as connection:
+                if write:
+                    yield MissingSealConnection(connection)
+                else:
+                    yield connection
+
+        with mock.patch.object(
+            self.system.store,
+            "transaction",
+            side_effect=missing_seal_transaction,
+        ):
+            with self.assertRaisesRegex(
+                IntegrityError,
+                "verification report disappeared before sealing",
+            ):
+                self.system.verify_drafts(
+                    "tenant-a", "echo", verified_by="batch-verifier"
+                )
+        self.assertEqual(self._database_dump(), before)
+
+    def test_verify_drafts_unexpected_middle_failure_rolls_back_full_ledger(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._compile_three_drafts("batch-atomic")
+        before = self._database_dump()
+        original = self.system._run_verification
+        calls = 0
+
+        def fail_middle(connection, row, *, record_test=None):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise StateError("injected middle batch failure")
+            return original(connection, row, record_test=record_test)
+
+        with mock.patch.object(
+            self.system,
+            "_run_verification",
+            side_effect=fail_middle,
+        ):
+            with self.assertRaisesRegex(StateError, "injected middle batch failure"):
+                self.system.verify_drafts(
+                    "tenant-a", "echo", verified_by="batch-verifier"
+                )
+        self.assertEqual(calls, 2)
+        self.assertEqual(self._database_dump(), before)
+
+    def test_verify_drafts_rechecks_eligibility_after_authorization(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._compile_three_drafts("batch-recheck")
+        before = self._database_dump()
+        original = self.system._draft_verification_plan
+        calls = 0
+
+        def changed_plan(connection, *, partition, operation):
+            nonlocal calls
+            calls += 1
+            revision, rows, skipped = original(
+                connection,
+                partition=partition,
+                operation=operation,
+            )
+            if calls == 2:
+                return revision, rows[:-1], skipped
+            return revision, rows, skipped
+
+        with mock.patch.object(
+            self.system,
+            "_draft_verification_plan",
+            side_effect=changed_plan,
+        ):
+            with self.assertRaisesRegex(
+                StateError,
+                "eligibility changed during authorization",
+            ):
+                self.system.verify_drafts(
+                    "tenant-a", "echo", verified_by="batch-verifier"
+                )
+        self.assertEqual(calls, 2)
+        self.assertEqual(self._database_dump(), before)
+
+    def test_function_entry_seal_binds_each_of_fourteen_fields_independently(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._compile_three_drafts("seal-fields")
+        batch = self.system.verify_drafts(
+            "tenant-a", "echo", verified_by="seal-verifier"
+        )
+        self.assertTrue(batch.passed)
+        with self.system.store.transaction(write=False) as connection:
+            operation = connection.execute(
+                """
+                SELECT * FROM operations
+                WHERE partition = 'tenant-a' AND name = 'echo'
+                """
+            ).fetchone()
+            rows = connection.execute(
+                """
+                SELECT * FROM artifacts
+                WHERE partition = 'tenant-a' AND operation = 'echo'
+                  AND status = 'verified'
+                ORDER BY input_hash, sequence, id
+                """
+            ).fetchall()
+            self.assertEqual(len(rows), 3)
+            reports = [
+                connection.execute(
+                    "SELECT * FROM test_reports WHERE id = ? AND artifact_id = ?",
+                    (row["verified_report_id"], row["id"]),
+                ).fetchone()
+                for row in rows
+            ]
+        if operation is None or any(report is None for report in reports):
+            raise AssertionError("seal mutation fixture disappeared")
+        sealed_reports = [report for report in reports if report is not None]
+        entries = tuple(
+            FunctionEntry(
+                input=json.loads(str(row["input_json"])),
+                output=json.loads(str(row["output_json"])),
+                artifact_hash=str(row["artifact_hash"]),
+                evidence_snapshot_hash=str(row["evidence_snapshot_hash"]),
+                entry_seal=_function_entry_seal(row, report),
+                report_details_hash=str(report["details_hash"]),
+                report_test_set_hash=str(report["test_set_hash"]),
+            )
+            for row, report in zip(rows, sealed_reports, strict=True)
+        )
+        baseline_function = build_function(
+            partition="tenant-a",
+            operation="echo",
+            operation_revision=int(operation["revision"]),
+            policy_hash=str(operation["policy_hash"]),
+            entries=entries,
+        )
+        target = rows[1]
+        report = sealed_reports[1]
+        baseline_seal = entries[1].entry_seal
+        mutations = (
+            ("artifact", "id", f"{target['id']}-changed"),
+            ("artifact", "artifact_hash", "0" * 64),
+            ("artifact", "build_hash", "1" * 64),
+            ("artifact", "policy_hash", "2" * 64),
+            ("artifact", "evidence_snapshot_hash", "3" * 64),
+            ("artifact", "support", int(target["support"]) + 1),
+            ("artifact", "reviewer_count", int(target["reviewer_count"]) + 1),
+            ("artifact", "span_seconds", int(target["span_seconds"]) + 1),
+            ("artifact", "scope_hash", "4" * 64),
+            ("report", "id", f"{report['id']}-changed"),
+            ("report", "details_hash", "5" * 64),
+            ("report", "test_set_hash", "6" * 64),
+            ("report", "test_count", int(report["test_count"]) + 1),
+            ("report", "passed", 1 - int(report["passed"])),
+        )
+        self.assertEqual(len(mutations), 14)
+        for owner, field, changed_value in mutations:
+            artifact_changed = dict(target)
+            report_changed = dict(report)
+            changed = artifact_changed if owner == "artifact" else report_changed
+            changed[field] = changed_value
+            differences = [
+                f"artifact.{key}"
+                for key, value in artifact_changed.items()
+                if value != target[key]
+            ] + [
+                f"report.{key}"
+                for key, value in report_changed.items()
+                if value != report[key]
+            ]
+            changed_seal = _function_entry_seal(
+                artifact_changed,
+                report_changed,
+            )
+            changed_entries = list(entries)
+            changed_entries[1] = replace(entries[1], entry_seal=changed_seal)
+            changed_function = build_function(
+                partition="tenant-a",
+                operation="echo",
+                operation_revision=int(operation["revision"]),
+                policy_hash=str(operation["policy_hash"]),
+                entries=changed_entries,
+            )
+            with self.subTest(field=f"{owner}.{field}"):
+                self.assertEqual(differences, [f"{owner}.{field}"])
+                self.assertNotEqual(changed_seal, baseline_seal)
+                self.assertNotEqual(
+                    changed_function.function_hash,
+                    baseline_function.function_hash,
+                )
+
+
+    def test_function_entry_seal_matches_independent_framing_oracle(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._compile_three_drafts("seal-oracle")
+        batch = self.system.verify_drafts(
+            "tenant-a", "echo", verified_by="seal-verifier"
+        )
+        self.assertTrue(batch.passed)
+        with self.system.store.transaction(write=False) as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM artifacts
+                WHERE partition = 'tenant-a' AND operation = 'echo'
+                  AND status = 'verified'
+                ORDER BY input_hash, sequence, id
+                """
+            ).fetchall()
+            self.assertEqual(len(rows), 3)
+            target = rows[1]
+            report = connection.execute(
+                "SELECT * FROM test_reports WHERE id = ? AND artifact_id = ?",
+                (target["verified_report_id"], target["id"]),
+            ).fetchone()
+        if report is None:
+            raise AssertionError("middle entry report disappeared")
+
+        def framed_digest(label: str, values: tuple[str, ...]) -> str:
+            digest = hashlib.sha256()
+            for value in (label, *values):
+                encoded = value.encode("utf-8")
+                digest.update(len(encoded).to_bytes(8, "big"))
+                digest.update(encoded)
+            return digest.hexdigest()
+
+        ordered_fields = (
+            str(target["id"]),
+            str(target["artifact_hash"]),
+            str(target["build_hash"]),
+            str(target["policy_hash"]),
+            str(target["evidence_snapshot_hash"]),
+            str(target["support"]),
+            str(target["reviewer_count"]),
+            str(target["span_seconds"]),
+            str(target["scope_hash"]),
+            str(report["id"]),
+            str(report["details_hash"]),
+            str(report["test_set_hash"]),
+            str(report["test_count"]),
+            str(report["passed"]),
+        )
+        literal_label = "cement-function-entry-seal-v1"
+        self.assertEqual(FUNCTION_ENTRY_SEAL_ABI, literal_label)
+        expected = framed_digest(literal_label, ordered_fields)
+        self.assertNotEqual(target["build_hash"], target["policy_hash"])
+        self.assertEqual(batch.entries[1].artifact_id, target["id"])
+        self.assertEqual(batch.entries[1].entry_seal, expected)
+
+        left = ("ab", "c")
+        right = ("a", "bc")
+        self.assertEqual("".join(left), "".join(right))
+        left_digest = framed_digest(FUNCTION_ENTRY_SEAL_ABI, left)
+        right_digest = framed_digest(FUNCTION_ENTRY_SEAL_ABI, right)
+        self.assertNotEqual(left_digest, right_digest)
+        self.assertEqual(
+            _digest_strings(FUNCTION_ENTRY_SEAL_ABI, left),
+            left_digest,
+        )
+        self.assertEqual(
+            _digest_strings(FUNCTION_ENTRY_SEAL_ABI, right),
+            right_digest,
+        )
+
+    def test_entry_seal_timing_is_invariant_through_promotion_and_function_verify(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._compile_three_drafts("seal-timing")
+        batch = self.system.verify_drafts(
+            "tenant-a", "echo", verified_by="seal-verifier"
+        )
+        self.assertTrue(batch.passed)
+        pre_batch = {
+            entry.artifact_id: entry.entry_seal for entry in batch.entries
+        }
+        pre_recomputed: dict[str, str] = {}
+        input_hash_by_id: dict[str, str] = {}
+        with self.system.store.transaction(write=False) as connection:
+            for row in connection.execute(
+                """
+                SELECT * FROM artifacts
+                WHERE partition = 'tenant-a' AND operation = 'echo'
+                  AND status = 'verified'
+                ORDER BY input_hash, sequence, id
+                """
+            ):
+                report = connection.execute(
+                    "SELECT * FROM test_reports WHERE id = ? AND artifact_id = ?",
+                    (row["verified_report_id"], row["id"]),
+                ).fetchone()
+                if report is None:
+                    raise AssertionError("bound report disappeared before promotion")
+                artifact_id = str(row["id"])
+                pre_recomputed[artifact_id] = _function_entry_seal(row, report)
+                input_hash_by_id[artifact_id] = str(row["input_hash"])
+        self.assertEqual(pre_batch, pre_recomputed)
+        for entry in batch.entries:
+            self.system.promote(
+                "tenant-a",
+                entry.artifact_id,
+                scope_hash=entry.report.scope_hash,
+                promoted_by="release-manager",
+            )
+
+        post_recomputed: dict[str, str] = {}
+        with self.system.store.transaction(write=False) as connection:
+            for row in connection.execute(
+                """
+                SELECT * FROM artifacts
+                WHERE partition = 'tenant-a' AND operation = 'echo'
+                  AND status = 'promoted'
+                ORDER BY input_hash, sequence, id
+                """
+            ):
+                report = connection.execute(
+                    "SELECT * FROM test_reports WHERE id = ? AND artifact_id = ?",
+                    (row["verified_report_id"], row["id"]),
+                ).fetchone()
+                if report is None:
+                    raise AssertionError("bound report disappeared after promotion")
+                post_recomputed[str(row["id"])] = _function_entry_seal(row, report)
+        self.assertEqual(post_recomputed, pre_recomputed)
+
+        verified = self.system.verify_function("tenant-a", "echo")
+        self.assertTrue(verified.passed)
+        self.assertIsNotNone(verified.document)
+        assert verified.document is not None
+        raw_entries = verified.document.value["entries"]
+        self.assertIsInstance(raw_entries, list)
+        assert type(raw_entries) is list
+        function_seals = {
+            str(entry["input_hash"]): str(entry["entry_seal"])
+            for entry in raw_entries
+            if type(entry) is dict
+        }
+        self.assertEqual(
+            function_seals,
+            {
+                input_hash_by_id[artifact_id]: seal
+                for artifact_id, seal in pre_recomputed.items()
+            },
+        )
 
 
 if __name__ == "__main__":

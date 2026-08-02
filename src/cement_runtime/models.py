@@ -154,6 +154,22 @@ class VerificationReport:
 
 
 @dataclass(frozen=True, slots=True)
+class DraftEntry:
+    artifact_id: str
+    input_hash: str
+    report: VerificationReport
+    entry_seal: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class DraftVerification:
+    passed: bool
+    operation_revision: int
+    entries: tuple[DraftEntry, ...]
+    skipped: tuple[dict[str, JSONValue], ...]
+
+
+@dataclass(frozen=True, slots=True)
 class FunctionCheck:
     """One stable named decision in promoted-set verification."""
 

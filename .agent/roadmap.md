@@ -76,32 +76,66 @@ Measured gaps driving the arc:
     predecessor retirement make duplicates unreachable through the ordinary API. Known limits: sets within
     the 50,000-entry count guard are still materialized before the 64 MiB/item bounds apply (streaming
     deferred); the result binds one committed snapshot and is never a lease.
-  - u3 OPEN - atomic batch verify and set promotion under one explicitly repeated function hash,
-    retiring the O(N) per-entry `--scope-hash` path as the only way to grow a function. Verify every
-    eligible draft for an operation in one action; promote the resulting set in one immediate
-    transaction whose receipt binds the function hash, each entry's report digest, and the policy.
-    Explicit-repeat safety is preserved: the operator types the set hash once. Depends on u2.
-    Scout (`.scratch/agents/scout-m2u3.md`) sizes this at 170-210K (70-88%) for one implementing teammate,
-    so plan it as two sequential units: u3a settles report/entry/set digest identities plus schema and
-    extracts batch verification and failure semantics (~80-105K); u3b adds the prospective-union assembler,
-    the atomic set-promotion transaction, and race/receipt tests (~90-115K). Two blockers to resolve
-    during planning, both probe-confirmed by the scout:
-    (a) Identity/receipt timing cycle. u1's function hash includes each entry's `promotion_hash`
-    (`function.py:37-46`), but u3 asks the operator to repeat the function hash *before* promotion, while
-    per-entry promotion hashes are created only during promotion and bind promoter and time. The
-    pre-promotion repeat is therefore circular unless identity/receipt staging is revised or a distinct
-    candidate-set hash is defined for the explicit repeat. Settle this before any transaction integration.
-    (b) Stale-draft eligibility. A literal current-revision `status='draft'` enumeration is unusable:
-    `compile` keys reuse by `build_hash`, so added evidence produces a second draft for the same input
-    while the prior draft remains. The probe showed batch verification returning `stale=false`
-    (`evidence snapshot changed`) together with `current=true`, leaving the stale row draft forever.
-    "Every eligible draft" needs an explicit eligibility predicate, not a status filter.
-    Splitting across simultaneous code-writing tracks collides in the verify/promote/receipt helpers and
-    `test_system.py`; keep `function.py` unchanged unless the identity cycle forces revised entry semantics.
+  - u3a DONE (main=91% 218K/240K, impl=72% 173K/240K) - pre-promotion entry identity, draft
+    eligibility, and batch verification. `function.py` (+8/-7), `system.py` (+513/-223), `models.py`,
+    `__init__.py`, `test_function.py`, `test_system.py`; suite 134 -> 162. Scope source: u3 was split
+    here into u3a and u3b per the scout's sizing verdict, and both u3 blockers were settled by a
+    four-way spike wave arbitrated in `.scratch/m2u3a-design-record.md`.
+    Identity. The blocker was circular: u1's function hash embeds each entry's `promotion_hash`, which
+    `promote` creates only at commit time while binding promoter and clock. Resolution = raise the
+    document to `cement-function-v2` and replace the entry's `promotion_hash` with `entry_seal`, a
+    `cement-function-entry-seal-v1` digest over 14 ordered fields - exactly `cement-promotion-v2` minus
+    `promoted_by` and `promoted_at_us`. The seal is recomputed on demand, never stored, so u3a carries no
+    schema delta, and `cement-promotion-v2` stays byte-identical with its dispatch fast path untouched.
+    Consequence, accepted: function identity is now verified-content identity, so re-promoting identical
+    content yields one hash, and activation provenance stays in the ledger receipt.
+    Rejected with probe evidence: making the ledger receipt itself pre-promotion computable (dropping
+    promoter/time to `cement-promotion-v3`) - its own probe recorded a successful undetected actor/time
+    substitution on an active row, since `_validate_promoted` recomputes from `row["promoted_by"]` and
+    `row["promoted_at_us"]` (`system.py:3198-3215`); and a distinct candidate-set hash - conceded by its
+    own author to be strictly weaker, because one candidate digest can lead to multiple valid function
+    hashes, so the operator can never pre-authorize the final identity.
+    Eligibility. A literal `status='draft'` filter stays permanently poisoned, so selection now
+    reconstructs the expected current build: `_project_current_build` is shared by `compile` and the
+    batch enumerator, and an eligible row must match current revision, `draft`, exact canonical input,
+    and the projected `build_hash`. Duplicate qualifying rows, duplicate canonical inputs, and missing
+    canonical input each fail closed; non-qualifying current drafts are returned as `superseded-build`
+    rather than silently omitted. Compile-side supersession was rejected on a probed liveness failure: a
+    stale verified row demoted back to `draft` re-poisons the literal batch. Selection-side additionally
+    lets revocation requalify an older correct build with no recompilation.
+    Batch verification. `System.verify_drafts(partition, operation, *, verified_by)` returns
+    `DraftVerification`/`DraftEntry`, sequenced as read preflight, per-artifact authority under the
+    existing `artifact.verify` subject, then one `BEGIN IMMEDIATE` whose locked recheck raises
+    `StateError` if eligibility moved, then one savepoint, report, and event per row. `verify` and
+    `verify_drafts` share `_verify_row`, so per-row semantics stay identical. Savepoint containment
+    covers only artifact-local `IntegrityError`/`ValidationError`; authority denial, duplicate rows, and
+    any unexpected failure abort the whole batch with no partial writes.
+    Verification. Two diff-blind reviewers plus MAIN. Every landed check is pinned by the mutation
+    criterion: MAIN replayed all 25 independent-sweep survivors against the fixed tree and killed 22,
+    leaving exactly 3 mutants with accepted equivalence proofs (two orderings on a query whose rows only
+    key a map, and the private 512-row flush threshold). Review found no defect in the landed code -
+    all ten findings were committed-test gaps where a mutant broke a required guarantee while the suite
+    stayed green, closed across two fix passes. Known limits: u3a is deliberately not operator-complete,
+    since the operator-visible set hash needs u3b's union; the pre-existing `store.py` `ResourceWarning`
+    remains, as `store.py` is outside u3a's write set.
+  - u3b OPEN - prospective union and atomic set promotion. Assemble the final set as retained current
+    promoted rows plus passing verified candidates, each candidate replacing the retained row of its own
+    input digest, so growth never silently drops established entries. Compute the prospective
+    `cement-function-v2` hash from that union - now possible before promotion because every entry seal
+    is - show it with an inspectable deterministic manifest, and require the operator to repeat it once
+    as `expected_function_hash`. Promote in one immediate transaction that revalidates under its own
+    write lock, bulk-retires predecessors, bulk-activates candidates, and writes a set receipt plus
+    immutable membership rows. This is the unit that carries the schema delta u3a avoided, so it must
+    choose explicitly between a pre-1.0 ledger reset and a versioned migration; `SCHEMA_FINGERPRINT`
+    changes either way. Keep the per-entry path working and demoted rather than removed - the roadmap
+    retires it as the *only* way to grow a function, and u4 owns the final CLI surface. Audit payloads
+    must project rather than enumerate: the event cap is 262,144 bytes against 50,000 admissible
+    entries, so mirror the revocation projection of count plus bounded IDs plus a digest, and let the
+    membership table stay authoritative. Depends on u3a.
   - u4 OPEN - coverage and gap reporting plus the `function` CLI surface (`show`, `export`, `eval`,
     `verify`, `promote`). Honest measures only: promoted entry count, per-entry support and reviewer
     counts, compile-blocked scopes with reasons, pending proposals, and suspended/retired entries. No
-    domain-coverage claim, since no domain schema exists. Depends on u1-u3.
+    domain-coverage claim, since no domain schema exists. Depends on u1-u3b.
   - u5 OPEN - surface realignment: `README.md` claim pass (guarantees, request outcomes, deployment
     boundary) against what the function object now proves, `docs/architecture.md` contract steps for the
     function layer, and the hospital example resolving from an exported bundle with no ledger, no adapter,
