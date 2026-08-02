@@ -3107,6 +3107,8 @@ class System:
                 partition=partition,
                 operation=operation,
             )
+        if not authorized.entries:
+            raise StateError("function promotion requires at least one member")
         authorized_member_ids = tuple(
             sorted(entry.public.artifact_id for entry in authorized.entries)
         )
@@ -3115,6 +3117,15 @@ class System:
                 entry.public.artifact_id
                 for entry in authorized.entries
                 if entry.public.disposition == "candidate"
+            )
+        )
+        authorized_retired_ids = tuple(
+            sorted(
+                {
+                    entry.public.replaces_artifact_id
+                    for entry in authorized.entries
+                    if entry.public.replaces_artifact_id is not None
+                }
             )
         )
         for entry in authorized.entries:
@@ -3143,11 +3154,21 @@ class System:
                     if entry.public.disposition == "candidate"
                 )
             )
+            locked_retired_ids = tuple(
+                sorted(
+                    {
+                        entry.public.replaces_artifact_id
+                        for entry in locked.entries
+                        if entry.public.replaces_artifact_id is not None
+                    }
+                )
+            )
             if (
                 locked.manifest.operation_revision
                 != authorized.manifest.operation_revision
                 or locked_candidate_ids != authorized_candidate_ids
                 or locked_member_ids != authorized_member_ids
+                or locked_retired_ids != authorized_retired_ids
             ):
                 raise StateError(
                     "function promotion candidates changed during authorization"
@@ -3162,13 +3183,7 @@ class System:
                 for entry in locked.entries
                 if entry.public.disposition == "candidate"
             )
-            retired_ids = tuple(
-                sorted(
-                    entry.public.replaces_artifact_id
-                    for entry in candidates
-                    if entry.public.replaces_artifact_id is not None
-                )
-            )
+            retired_ids = locked_retired_ids
             for artifact_id in retired_ids:
                 changed = connection.execute(
                     """

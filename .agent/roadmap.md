@@ -118,7 +118,8 @@ Measured gaps driving the arc:
     stayed green, closed across two fix passes. Known limits: u3a is deliberately not operator-complete,
     since the operator-visible set hash needs u3b's union; the pre-existing `store.py` `ResourceWarning`
     remains, as `store.py` is outside u3a's write set.
-  - u3b1 OPEN - persisted set promotion core. Assemble the final set as retained current promoted rows
+  - u3b1 DONE (main=92% 222K/240K then 71% 170K/240K across two sessions, impl=78% 186K/240K) -
+    persisted set promotion core. Assemble the final set as retained current promoted rows
     plus passing verified candidates, each candidate replacing the retained row of its own input digest,
     so growth never silently drops established entries; a promoted row on a stale revision is corruption
     and fails closed rather than being omitted. Compute the prospective `cement-function-v2` hash from
@@ -137,12 +138,29 @@ Measured gaps driving the arc:
     digest, and let the membership table stay authoritative. Keep the per-entry path byte-identical -
     its demotion is semantic and lands with u3b2's receipt check, u4 owns the final CLI surface.
     Depends on u3a. Design record: `.agent/decisions/m2u3b-design.md`.
-    Status: implementation landed and gate-green (suite 162 -> 208; `store.py` +81/-14, `system.py`
-    +633/-3, `models.py` +33, `__init__.py` +6, `test_system.py` +2301/-4), two diff-blind reviews
-    complete, findings accepted and arbitrated in `.agent/decisions/m2u3b1-findings.md`. Unit stays OPEN
-    until those land: two production defects (empty-union promotion bypasses the authority callback;
-    plan identity omits the predecessor/retirement set) plus thirteen committed-pin batches. MAIN
-    reproduced both defects and four mutation survivors itself.
+    Landed across one implementation pass plus three fix passes; suite 162 -> 230. Files: `store.py`
+    +81/-14, `system.py` +655/-10, `models.py` +33, `__init__.py` +6, `test_system.py` +4462/-51.
+    Review. Two diff-blind reviewers - correctness/spec plus an independent 146-mutant catalogue -
+    produced findings arbitrated in `.agent/decisions/m2u3b1-findings.md`. Two were production defects in
+    `promote_function`, both reproduced by MAIN before dispatch. An empty prospective union performed
+    zero authority calls yet still allocated a receipt ID, read the clock, and wrote a durable receipt
+    plus event, because authorization was a loop over prospective members; it now raises `StateError`
+    ahead of any clock read, ID allocation, or write, and a zero-candidate checkpoint over a nonempty
+    retained set stays legal and still authorizes every retained member. The authorized-vs-locked plan
+    identity omitted the retirement set, so suspending a displayed predecessor inside the authority
+    callback left revision, candidate IDs, member IDs, and the function hash all unchanged while
+    committing a different retirement plan than was inspected; the identity tuple now carries the sorted
+    non-null `replaces_artifact_id` set, which is also the sole source of the executed `retired_ids`.
+    Pins. The other thirteen batches were committed pins over already-correct code: enumeration
+    quantification against the 50,000-entry contract (`LIMIT 1000` on either query had left all 208 tests
+    green), partition/operation/revision isolation, the expected-hash gate, retained-member
+    authorization, bound-report ownership, the surviving semantic scope digest, event transition sets,
+    skipped ordering under reverse scans, retire-all-before-activate-any, schema-v2 structure, receipt
+    ABI integer framing, manifest byte/item caps, and active-only canonical inputs. MAIN replayed 37
+    mutants itself across the three passes, all killed, and audited the widened retirement derivation as
+    set-identical (`system.py:3011-3014` sets `replaces_artifact_id` non-null only for candidates).
+    Known limit: `verify_function` still exposes P1-P5 only, so a promoted set carries no receipt check
+    until u3b2 appends P6.
   - u3b2 OPEN - function-receipt verification and historical reconstruction. Append `verify_function`
     check P6 `persisted-function-receipt` without renumbering P1-P5: a nonempty promoted set with no
     current-revision receipt fails, which is exactly how the legacy per-entry path is retired as a way
