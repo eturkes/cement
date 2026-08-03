@@ -11,7 +11,7 @@ import sqlite3
 import time
 import unicodedata
 import uuid
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from .artifacts import (
     ARTIFACT_ABI,
@@ -37,6 +37,7 @@ from .function import (
     FUNCTION_MAX_DEPTH,
     FUNCTION_MAX_ENTRIES,
     FUNCTION_MAX_ITEMS,
+    FunctionDocument,
     FunctionEntry,
     build_function,
     validate_function,
@@ -59,6 +60,8 @@ from .models import (
     FunctionCheck,
     FunctionPromotionEntry,
     FunctionPromotionManifest,
+    FunctionReceipt,
+    FunctionReconstruction,
     FunctionSetPromotion,
     FunctionVerification,
     InProgress,
@@ -256,6 +259,87 @@ def _function_receipt_hash(row: sqlite3.Row | Mapping[str, Any]) -> str:
             str(row["promoted_by"]),
             str(row["promoted_at_us"]),
         ),
+    )
+
+
+def _function_receipt_from_row(
+    row: sqlite3.Row | Mapping[str, Any],
+) -> FunctionReceipt:
+    try:
+        receipt_id = _request_id(row["id"])
+        partition = _name(row["partition"], "stored function receipt partition")
+        operation = _name(row["operation"], "stored function receipt operation")
+        promoted_by = _text(
+            row["promoted_by"],
+            "stored function receipt promoted_by",
+            maximum=256,
+        )
+        policy_hash = _digest(
+            row["policy_hash"], "stored function receipt policy_hash"
+        )
+        function_hash = _digest(
+            row["function_hash"], "stored function receipt function_hash"
+        )
+        membership_hash = _digest(
+            row["membership_hash"], "stored function receipt membership_hash"
+        )
+        candidate_artifact_ids_hash = _digest(
+            row["candidate_artifact_ids_hash"],
+            "stored function receipt candidate_artifact_ids_hash",
+        )
+        retired_artifact_ids_hash = _digest(
+            row["retired_artifact_ids_hash"],
+            "stored function receipt retired_artifact_ids_hash",
+        )
+        receipt_hash = _digest(
+            row["receipt_hash"], "stored function receipt receipt_hash"
+        )
+    except (IndexError, KeyError, TypeError, ValidationError) as exc:
+        raise IntegrityError("stored function receipt has invalid scalar fields") from exc
+
+    integers = {
+        "sequence": row["sequence"],
+        "operation_revision": row["operation_revision"],
+        "member_count": row["member_count"],
+        "candidate_count": row["candidate_count"],
+        "retired_count": row["retired_count"],
+        "promoted_at_us": row["promoted_at_us"],
+    }
+    sequence = int(integers["sequence"])
+    operation_revision = int(integers["operation_revision"])
+    member_count = int(integers["member_count"])
+    candidate_count = int(integers["candidate_count"])
+    retired_count = int(integers["retired_count"])
+    promoted_at_us = int(integers["promoted_at_us"])
+    if not 1 <= sequence <= _MAX_SQLITE_INTEGER:
+        raise IntegrityError("stored function receipt sequence is invalid")
+    if not 1 <= operation_revision <= _MAX_SQLITE_INTEGER:
+        raise IntegrityError("stored function receipt operation revision is invalid")
+    if not 1 <= member_count <= FUNCTION_MAX_ENTRIES:
+        raise IntegrityError("stored function receipt member count is invalid")
+    if not 0 <= retired_count <= candidate_count <= member_count:
+        raise IntegrityError("stored function receipt transition counts are invalid")
+    if not 0 <= promoted_at_us <= _MAX_SQLITE_INTEGER:
+        raise IntegrityError("stored function receipt timestamp is invalid")
+    if _function_receipt_hash(row) != receipt_hash:
+        raise IntegrityError("function receipt hash mismatch")
+    return FunctionReceipt(
+        id=receipt_id,
+        sequence=sequence,
+        partition=partition,
+        operation=operation,
+        operation_revision=operation_revision,
+        policy_hash=policy_hash,
+        function_hash=function_hash,
+        membership_hash=membership_hash,
+        member_count=member_count,
+        candidate_artifact_ids_hash=candidate_artifact_ids_hash,
+        candidate_count=candidate_count,
+        retired_artifact_ids_hash=retired_artifact_ids_hash,
+        retired_count=retired_count,
+        promoted_by=promoted_by,
+        promoted_at_us=promoted_at_us,
+        receipt_hash=receipt_hash,
     )
 
 
@@ -1843,6 +1927,272 @@ class System:
             (partition, operation),
         ).fetchall()
 
+    @staticmethod
+    def _latest_function_receipt_row(
+        connection: sqlite3.Connection,
+        *,
+        partition: str,
+        operation: str,
+        operation_revision: int,
+    ) -> sqlite3.Row | None:
+        return connection.execute(
+            """
+            SELECT * FROM function_receipts
+            WHERE partition = ? AND operation = ? AND operation_revision = ?
+            ORDER BY sequence DESC LIMIT 1
+            """,
+            (partition, operation, operation_revision),
+        ).fetchone()
+
+    def _reconstruct_function_receipt(
+        self,
+        connection: sqlite3.Connection,
+        receipt_row: sqlite3.Row,
+    ) -> FunctionReconstruction:
+        """Validate and rebuild one status-independent historical receipt."""
+
+        receipt = _function_receipt_from_row(receipt_row)
+        memberships = tuple(
+            connection.execute(
+                """
+                SELECT * FROM function_memberships
+                WHERE receipt_id = ? ORDER BY ordinal
+                """,
+                (receipt.id,),
+            )
+        )
+        if len(memberships) != receipt.member_count:
+            raise IntegrityError("function receipt membership count mismatch")
+
+        input_hashes: list[str] = []
+        for ordinal, membership in enumerate(memberships):
+            if membership["ordinal"] != ordinal:
+                raise IntegrityError("function receipt membership ordinals are not contiguous")
+            try:
+                _request_id(membership["artifact_id"])
+                _request_id(membership["report_id"])
+                membership_function_hash = _digest(
+                    membership["function_hash"],
+                    "stored membership function_hash",
+                )
+                input_hash = _digest(
+                    membership["input_hash"], "stored membership input_hash"
+                )
+                _digest(membership["entry_seal"], "stored membership entry_seal")
+            except (TypeError, ValidationError) as exc:
+                raise IntegrityError(
+                    f"function receipt membership {ordinal} has invalid scalar fields"
+                ) from exc
+            if membership_function_hash != receipt.function_hash:
+                raise IntegrityError("function receipt membership function hash mismatch")
+            input_hashes.append(input_hash)
+        if input_hashes != sorted(input_hashes):
+            raise IntegrityError("function receipt membership order is not canonical")
+        if _membership_hash(memberships) != receipt.membership_hash:
+            raise IntegrityError("function receipt membership digest mismatch")
+
+        artifacts = tuple(
+            connection.execute(
+                """
+                SELECT a.* FROM function_memberships AS m
+                JOIN artifacts AS a ON a.id = m.artifact_id
+                WHERE m.receipt_id = ? ORDER BY m.ordinal
+                """,
+                (receipt.id,),
+            )
+        )
+        reports = tuple(
+            connection.execute(
+                """
+                SELECT r.* FROM function_memberships AS m
+                JOIN test_reports AS r
+                  ON r.id = m.report_id AND r.artifact_id = m.artifact_id
+                WHERE m.receipt_id = ? ORDER BY m.ordinal
+                """,
+                (receipt.id,),
+            )
+        )
+        if len(artifacts) != receipt.member_count:
+            raise IntegrityError("function receipt references a missing artifact")
+        if len(reports) != receipt.member_count:
+            raise IntegrityError(
+                "function receipt references a missing or foreign report"
+            )
+
+        artifacts_by_id = {str(row["id"]): row for row in artifacts}
+        reports_by_id = {str(row["id"]): row for row in reports}
+        entries: list[FunctionEntry] = []
+        for ordinal, membership in enumerate(memberships):
+            artifact_id = str(membership["artifact_id"])
+            report_id = str(membership["report_id"])
+            artifact_row = artifacts_by_id[artifact_id]
+            report_row = reports_by_id[report_id]
+            if (
+                artifact_row["partition"] != receipt.partition
+                or artifact_row["operation"] != receipt.operation
+                or artifact_row["operation_revision"] != receipt.operation_revision
+                or artifact_row["policy_hash"] != receipt.policy_hash
+            ):
+                raise IntegrityError(
+                    f"function receipt member {ordinal} scope binding mismatch"
+                )
+            try:
+                artifact = self._artifact_from_row(artifact_row)
+            except (IntegrityError, ValidationError) as exc:
+                raise IntegrityError(
+                    f"function receipt member {ordinal} artifact is invalid: {exc}"
+                ) from exc
+            try:
+                if report_row["passed"] != 1:
+                    raise IntegrityError("bound report is not passing")
+                details = self._validate_report(
+                    connection,
+                    report_row,
+                    verify_test_set=True,
+                )
+                if type(details.value) is not dict:
+                    raise IntegrityError("bound report details are not an object")
+                details_value = cast(dict[str, JSONValue], details.value)
+                if details_value.get("scope_hash") != artifact_row["scope_hash"]:
+                    raise IntegrityError("bound report scope mismatch")
+                for field in (
+                    "artifact_hash",
+                    "build_hash",
+                    "policy_hash",
+                    "evidence_snapshot_hash",
+                ):
+                    if report_row[field] != artifact_row[field]:
+                        raise IntegrityError(f"bound report {field} mismatch")
+            except (IntegrityError, ValidationError) as exc:
+                raise IntegrityError(
+                    f"function receipt member {ordinal} report is invalid: {exc}"
+                ) from exc
+            if membership["input_hash"] != artifact_row["input_hash"]:
+                raise IntegrityError(
+                    f"function receipt member {ordinal} input digest mismatch"
+                )
+            entry_seal = _function_entry_seal(artifact_row, report_row)
+            if membership["entry_seal"] != entry_seal:
+                raise IntegrityError(
+                    f"function receipt member {ordinal} entry seal mismatch"
+                )
+            entries.append(
+                FunctionEntry(
+                    input=artifact.input.value,
+                    output=artifact.output.value,
+                    artifact_hash=str(artifact_row["artifact_hash"]),
+                    evidence_snapshot_hash=str(
+                        artifact_row["evidence_snapshot_hash"]
+                    ),
+                    entry_seal=entry_seal,
+                    report_details_hash=str(report_row["details_hash"]),
+                    report_test_set_hash=str(report_row["test_set_hash"]),
+                )
+            )
+
+        try:
+            document = build_function(
+                partition=receipt.partition,
+                operation=receipt.operation,
+                operation_revision=receipt.operation_revision,
+                policy_hash=receipt.policy_hash,
+                entries=entries,
+            )
+            if document.function_hash != receipt.function_hash:
+                raise IntegrityError("rebuilt function hash does not match receipt")
+            validated = validate_function(
+                document.value,
+                expected_function_hash=receipt.function_hash,
+            )
+            if validated.text != document.text:
+                raise IntegrityError("rebuilt function normalization changed")
+        except ValidationError as exc:
+            raise IntegrityError("function receipt rebuilt an invalid document") from exc
+        return FunctionReconstruction(receipt=receipt, document=document)
+
+    def _persisted_function_receipt_check(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        partition: str,
+        operation: str,
+        operation_revision: int,
+        entry_count: int,
+        document: FunctionDocument | None,
+    ) -> FunctionCheck:
+        receipt_row = self._latest_function_receipt_row(
+            connection,
+            partition=partition,
+            operation=operation,
+            operation_revision=operation_revision,
+        )
+        if receipt_row is None:
+            if entry_count == 0:
+                return FunctionCheck(
+                    key="persisted-function-receipt",
+                    passed=True,
+                    detail="empty promoted set vacuously requires no persisted receipt",
+                )
+            return FunctionCheck(
+                key="persisted-function-receipt",
+                passed=False,
+                detail="nonempty promoted set has no current-revision function receipt",
+            )
+        try:
+            reconstructed = self._reconstruct_function_receipt(
+                connection,
+                receipt_row,
+            )
+        except IntegrityError as exc:
+            return FunctionCheck(
+                key="persisted-function-receipt",
+                passed=False,
+                detail=f"latest current-revision receipt is invalid: {exc}",
+            )
+        if document is None:
+            return FunctionCheck(
+                key="persisted-function-receipt",
+                passed=False,
+                detail="latest receipt reconstructs but the promoted snapshot does not",
+            )
+        if reconstructed.text != document.text:
+            return FunctionCheck(
+                key="persisted-function-receipt",
+                passed=False,
+                detail="latest receipt does not bind the promoted snapshot",
+            )
+        return FunctionCheck(
+            key="persisted-function-receipt",
+            passed=True,
+            detail=(
+                f"receipt {reconstructed.receipt.id} at sequence "
+                f"{reconstructed.receipt.sequence} binds the promoted snapshot"
+            ),
+        )
+
+    def reconstruct_function_receipt(
+        self,
+        partition: str,
+        receipt_id: str,
+    ) -> FunctionReconstruction:
+        """Validate and rebuild one historical function by immutable receipt ID."""
+
+        partition = _name(partition, "partition")
+        receipt_id = _request_id(receipt_id)
+        with self.store.transaction(write=False) as connection:
+            receipt_row = connection.execute(
+                """
+                SELECT * FROM function_receipts
+                WHERE partition = ? AND id = ?
+                """,
+                (partition, receipt_id),
+            ).fetchone()
+            if receipt_row is None:
+                raise NotFoundError(
+                    "function receipt does not exist in this partition"
+                )
+            return self._reconstruct_function_receipt(connection, receipt_row)
+
     def verify_function(
         self,
         partition: str,
@@ -1963,6 +2313,11 @@ class System:
                             f"promoted set has {entry_count} entries and exceeds "
                             f"FUNCTION_MAX_ENTRIES={FUNCTION_MAX_ENTRIES}"
                         ),
+                    ),
+                    FunctionCheck(
+                        key="persisted-function-receipt",
+                        passed=False,
+                        detail=skipped,
                     ),
                 )
                 return FunctionVerification(
@@ -2266,12 +2621,21 @@ class System:
                         ),
                     )
 
+            persisted_receipt_check = self._persisted_function_receipt_check(
+                connection,
+                partition=partition,
+                operation=operation,
+                operation_revision=revision,
+                entry_count=entry_count,
+                document=document,
+            )
             checks = (
                 duplicate_check,
                 abi_check,
                 report_check,
                 receipt_check,
                 hash_check,
+                persisted_receipt_check,
             )
             passed = all(check.passed for check in checks)
             return FunctionVerification(

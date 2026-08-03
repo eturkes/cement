@@ -161,17 +161,49 @@ Measured gaps driving the arc:
     set-identical (`system.py:3011-3014` sets `replaces_artifact_id` non-null only for candidates).
     Known limit: `verify_function` still exposes P1-P5 only, so a promoted set carries no receipt check
     until u3b2 appends P6.
-  - u3b2 OPEN - function-receipt verification and historical reconstruction. Append `verify_function`
-    check P6 `persisted-function-receipt` without renumbering P1-P5: a nonempty promoted set with no
-    current-revision receipt fails, which is exactly how the legacy per-entry path is retired as a way
-    to grow a function, while an empty set with no receipt keeps u2's vacuous pass. Add historical
-    reconstruction that rebuilds a past `cement-function-v2` from `(receipt, memberships)` joined to the
-    artifact and report rows they pin, independent of current status - probed to survive supersession,
-    revision retirement, and full revocation of every member. Owns the cross-unit mutation sweep over the
-    joined u3b1 + u3b2 surface; u3b1 carries its own independent sweep at its own close. Depends on u3b1.
-    Split provenance: u3b's three independent design spikes each estimated full-unit implementation at
-    210-260K/240K and each proposed this same seam, so the scope is staged across two units rather than
-    narrowed.
+  - u3b2 DONE (main=93% 222K/240K, impl=90% 216K/240K) - function-receipt verification and historical
+    reconstruction. `system.py` +377/-2, `models.py` +34, `__init__.py` +5/-1, `test_system.py` +3225/-65;
+    suite 230 -> 293. Design record `.agent/decisions/m2u3b2-design.md`, findings
+    `.agent/decisions/m2u3b2-findings.md`.
+    Surface. `verify_function` gains ordered check P6 `persisted-function-receipt` after an unchanged
+    P1-P5, emitted in every vector including the aggregate-limit path: a nonempty promoted set with no
+    current-revision receipt fails, an empty set with no receipt keeps u2's vacuous pass, and the latest
+    receipt for the current revision is selected by descending `sequence`. Because P6 compares the
+    persisted document against P5's live snapshot, a set that drifted from its last receipt through
+    legacy per-entry promotion, revocation, or suspension fails until the operator re-checkpoints with a
+    zero-candidate `promote_function` - the legacy path's demotion is now enforced, not just described.
+    `System.reconstruct_function_receipt(partition, receipt_id) -> FunctionReconstruction(receipt,
+    document)` rebuilds a past `cement-function-v2` from `(receipt, memberships)` joined to the artifact
+    and report rows they pin, status-independently: probed byte-identical after supersession, after
+    operation-revision retirement, and after revoking every member's evidence. One shared private
+    validating core serves both surfaces; it revalidates the 14-field receipt ABI, membership count,
+    ordinal contiguity, ascending `input_hash`, the membership digest, the joined rows, scope binding,
+    full report child sets, recomputed entry seals, the rebuilt hash, and the normalized self-check.
+    Design fork, arbitrated from two staged spikes: scope from `min` (receipt enumeration/discovery stays
+    out, since u4 owns the CLI and would freeze ordering/cursor/filter vocabulary a unit early), return
+    shape from `record` (the receipt's 16 fields are already recomputed inside the core and mirror an ABI
+    Decision 7 already froze, so binding them costs one frozen dataclass while a bare document would cost
+    a return-type change across ~45 committed tests). No schema delta: `store.py` stays byte-identical
+    because `function_receipts_scope` and the `(receipt_id, ordinal)` primary key already index both
+    lookups.
+    Review. Two diff-blind reviewers plus a fresh successor sweep, arbitrated in the findings record.
+    No production defect in the unmutated landed code. One production resource regression: the aggregate
+    fast-fail path reconstructed and fully validated the latest receipt before testing `document is None`,
+    so an oversized invalid set still materialized up to 50,000 memberships and their test rows; it now
+    emits the failed P6 directly. Everything else - 34 findings across three fix batches - was a committed
+    test gap where a live mutant broke a required guarantee while the suite stayed green: enumeration
+    tails beyond `LIMIT 1000` on three separate queries plus authorization quantification, read-only proof
+    breadth across the failure branches, entry-seal integer framing above nine, inclusive maxima, revision
+    and status predicates, schema-index/FK/fingerprint pins, and one dominant family - set checks pinned
+    only in the middle of three members, leaving every last-row quantifier alive. MAIN replayed 17 mutants
+    itself across batches 1-2 (all killed) and then re-ran the reviewer's entire 108-mutant catalogue
+    against the fixed tree: 83 killed, 25 survivors, and every one of those 25 lies inside the reviewer's
+    own 26 explicitly-proved-equivalent set.
+    Known limits: the >1000-member tail sentinel is one shared fixture carrying four distinct enumeration
+    pins, so weakening that single test would unpin all four; reconstruction stays O(members + joined
+    reports/tests) and depends on u3b's structural retention invariant; the receipt's candidate and
+    retired ID sets are recoverable only as counts plus digests, so u4's previews need the projected
+    event.
   - u4 OPEN - coverage and gap reporting plus the `function` CLI surface (`show`, `export`, `eval`,
     `verify`, `promote`). Honest measures only: promoted entry count, per-entry support and reviewer
     counts, compile-blocked scopes with reasons, pending proposals, and suspended/retired entries. No

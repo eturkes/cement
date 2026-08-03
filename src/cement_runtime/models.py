@@ -191,6 +191,40 @@ class FunctionPromotionManifest:
 
 
 @dataclass(frozen=True, slots=True)
+class FunctionReceipt:
+    id: str
+    sequence: int
+    partition: str
+    operation: str
+    operation_revision: int
+    policy_hash: str
+    function_hash: str
+    membership_hash: str
+    member_count: int
+    candidate_artifact_ids_hash: str
+    candidate_count: int
+    retired_artifact_ids_hash: str
+    retired_count: int
+    promoted_by: str
+    promoted_at_us: int
+    receipt_hash: str
+
+
+@dataclass(frozen=True, slots=True)
+class FunctionReconstruction:
+    receipt: FunctionReceipt
+    document: FunctionDocument
+
+    @property
+    def text(self) -> str:
+        return self.document.text
+
+    @property
+    def function_hash(self) -> str:
+        return self.document.function_hash
+
+
+@dataclass(frozen=True, slots=True)
 class FunctionSetPromotion:
     receipt_id: str
     receipt_hash: str
