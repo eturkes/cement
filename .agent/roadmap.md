@@ -204,15 +204,79 @@ Measured gaps driving the arc:
     reports/tests) and depends on u3b's structural retention invariant; the receipt's candidate and
     retired ID sets are recoverable only as counts plus digests, so u4's previews need the projected
     event.
-  - u4 OPEN - coverage and gap reporting plus the `function` CLI surface (`show`, `export`, `eval`,
-    `verify`, `promote`). Honest measures only: promoted entry count, per-entry support and reviewer
-    counts, compile-blocked scopes with reasons, pending proposals, and suspended/retired entries. No
-    domain-coverage claim, since no domain schema exists. Depends on u1-u3b2.
+  - u4 split three ways per `.agent/decisions/m2u4-design.md`, arbitrated from a surface map plus three
+    prototyped design spikes. Scope as actually inherited exceeds one window: u3b2's design record
+    deferred receipt discovery/enumeration to u4, and u4 also owns an offline ledger-free `eval`, so the
+    map sized the whole at 560-770 production + 4,600-6,400 test lines against u3b2's landed 411 + 3,225
+    at impl=90%. The `anchored` spike reached the same verdict independently from its own 881-line
+    prototype. Two framing decisions bind all three sub-units. (1) A library-level read-only report method
+    is required, because the CLI-only baseline self-rejected on measurement: compile-blocked state is
+    persisted nowhere and public `compile()` is a write, and a two-ledger probe showed all 13 existing
+    read methods returning byte-identical projections while the compiler diverged healthy-vs-`IntegrityError`
+    on hidden `receipt_json`. (2) Coverage splits into two separately-anchored surfaces that never share a
+    number space - function-anchored identity (membership, frozen build-time support/reviewer counts,
+    receipt provenance) and operation-centric now (blocked/ready scopes, pending proposals, artifact
+    statuses, stale-revision anomalies) - because both surviving spikes self-rejected as the sole model on
+    the same defect: a receipt's membership is immutable while its "complement" moves, so a three-promotion
+    probe held `member_count=2` fixed while the same report's promoted count went to 4.
+  - u4a DONE (main=93% 223K/240K, impl=59% 142K/240K) - receipt discovery/enumeration.
+    `system.py` +91, `models.py` +6, `__init__.py` +2, `test_system.py` +1163/-1; suite 293 -> 314
+    across one implementation pass plus one fix pass. `store.py`, `cli.py`, `function.py`, `README.md`,
+    `docs/` byte-identical, verified by MAIN at every gate rerun.
+    Review. Two diff-blind reviewers, one correctness/spec/claim-soundness and one independent
+    138-mutant catalogue plus determinism probes. The mutation sweep killed 126 and left 12 survivors
+    with an EMPTY proved-equivalent set, so every survivor became a finding. Cross-lens result: three
+    findings confirmed by both, six unique but probe-proved, one rejected. The lenses again found
+    disjoint defects - the mutation catalogue never reached the `=` -> `LIKE` family, and the
+    correctness reviewer never reached snapshot lifetime.
+    One production defect, found only because the reviewer probed past the intact-schema boundary:
+    `int(registered["revision"])` had no stored-scalar guard, so a live ledger whose operations schema
+    was altered after `System` construction leaked a raw `ValueError` instead of `IntegrityError`. The
+    revision is now type- and range-checked before conversion and before the helper call. Everything
+    else - the 10,001-row continuation boundary, exact `=` scoping against `_`/case `LIKE` collisions,
+    one-snapshot lifetime of the latest lookup, exact bounded `limit + 1` materialization,
+    validate-only-returned-rows placement, `before_sequence=False`, inclusive `limit=1`, and the frozen
+    public signature/model shape - was a committed-test gap on already-correct code.
+    Rejected with reasoning recorded in the design record: a finding wanting the
+    current-revision-without-receipt branch to reuse the shared unknown-operation message. The two
+    conditions differ and merging the strings would discard diagnostic information and make a
+    wrong-scope lookup fail indistinguishably from an unregistered one; the ambiguity was MAIN's
+    reviewer brief, not the implementation.
+    MAIN replayed all 12 survivors itself against the fixed tree: 12 killed, 0 surviving.
+    Known limits: discovery proves row-level receipt self-binding only, never that a listed receipt's
+    memberships/artifacts/reports/tests reconstruct - `reconstruct_function_receipt` stays the sole
+    reconstruction surface. The 10,001-receipt census is one expensive fixture carrying four pins
+    (inclusive `limit=10_000`, maximum-page ordering, the `limit + 1` continuation fetch, and tail
+    traversal), so weakening that single test unpins all four; the exact bounded-materialization pin
+    deliberately sits on a separate five-row proxy fixture so it does not depend on that census. The
+    public-surface introspection test likewise carries all seven exact-shape pins as one frozen ABI.
+    Original scope line: `latest_function_receipt(partition, operation) ->
+    FunctionReceipt` (resolves the current revision, promotes the private `_latest_function_receipt_row`)
+    plus `function_receipts(partition, operation, *, operation_revision=None, before_sequence=None,
+    limit=100) -> FunctionReceiptPage(receipts, next_before_sequence)`: `sequence DESC`, exclusive cursor,
+    `limit + 1` fetch to decide continuation, every row validated through `_function_receipt_from_row`, a
+    malformed row in the page raising `IntegrityError` rather than being skipped. Row-level self-binding
+    only - membership reconstruction stays `reconstruct_function_receipt`. Convention corrections against
+    both spikes: `limit` bound is the repository-wide `1..10_000`, and enumeration returns an empty page
+    for an unknown operation while only the current-revision lookup raises `NotFoundError`. No schema
+    delta - `function_receipts_scope` already covers a backward range scan. Write set `system.py`,
+    `models.py`, `__init__.py`, `test_system.py`. Depends on u1-u3b2.
+  - u4b OPEN - coverage + gap report core, both anchors, one read transaction. Honest measures only:
+    promoted entry count, per-entry support and reviewer counts from the sealed `artifacts` columns,
+    compile-blocked scopes with reasons, pending proposals, suspended/retired entries, and explicit
+    stale-revision anomalies. No domain-coverage claim, since no domain schema exists. Blocked reporting
+    factors the compiler's canonical-input enumeration plus `_project_current_build` into a read-callable
+    helper. Depends on u4a.
+  - u4c OPEN - the five `function` CLI commands (`show`, `export`, `eval`, `verify`, `promote`), owning
+    `cli.py` + `test_cli.py` only. Offline `eval --bundle` special-cased ahead of the `--db`/`--partition`
+    gate so `System` is never constructed; `export` writing `FunctionDocument.text` bytes exactly rather
+    than through `_emit`; `verify` making an explicit exit-code choice, since generic `main` returns 0 for
+    any returned dataclass. Depends on u4a + u4b.
   - u5 OPEN - surface realignment: `README.md` claim pass (guarantees, request outcomes, deployment
     boundary) against what the function object now proves, `docs/architecture.md` contract steps for the
     function layer, and the hospital example resolving from an exported bundle with no ledger, no adapter,
     and no LLM, covered by `tests/test_hospital_ocr_example.py`. Owns every documentation edit for M2 so
-    u1-u4 stay code-and-test only. Depends on u1-u4.
+    u1-u4c stay code-and-test only. Depends on u1-u4c.
 
 - M3 - Trim to paragraph scope - UNPLANNED. Removes behavior outside `turns repeatedly supervised LLM
   answers into narrowly scoped deterministic behavior`, sequenced after M2 so the pure resolver is

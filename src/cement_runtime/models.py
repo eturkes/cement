@@ -211,6 +211,12 @@ class FunctionReceipt:
 
 
 @dataclass(frozen=True, slots=True)
+class FunctionReceiptPage:
+    receipts: tuple[FunctionReceipt, ...]
+    next_before_sequence: int | None
+
+
+@dataclass(frozen=True, slots=True)
 class FunctionReconstruction:
     receipt: FunctionReceipt
     document: FunctionDocument

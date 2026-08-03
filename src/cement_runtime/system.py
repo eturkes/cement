@@ -61,6 +61,7 @@ from .models import (
     FunctionPromotionEntry,
     FunctionPromotionManifest,
     FunctionReceipt,
+    FunctionReceiptPage,
     FunctionReconstruction,
     FunctionSetPromotion,
     FunctionVerification,
@@ -2169,6 +2170,96 @@ class System:
                 f"{reconstructed.receipt.sequence} binds the promoted snapshot"
             ),
         )
+
+    def latest_function_receipt(
+        self,
+        partition: str,
+        operation: str,
+    ) -> FunctionReceipt:
+        """Return the newest self-bound receipt for the current revision."""
+
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        with self.store.transaction(write=False) as connection:
+            registered = connection.execute(
+                "SELECT revision FROM operations WHERE partition = ? AND name = ?",
+                (partition, operation),
+            ).fetchone()
+            if registered is None:
+                raise NotFoundError("operation is not registered in this partition")
+            stored_revision = registered["revision"]
+            if (
+                type(stored_revision) is not int
+                or not 1 <= stored_revision <= _MAX_SQLITE_INTEGER
+            ):
+                raise IntegrityError("stored operation revision is invalid")
+            revision = int(stored_revision)
+            receipt_row = self._latest_function_receipt_row(
+                connection,
+                partition=partition,
+                operation=operation,
+                operation_revision=revision,
+            )
+            if receipt_row is None:
+                raise NotFoundError("current operation revision has no function receipt")
+            return _function_receipt_from_row(receipt_row)
+
+    def function_receipts(
+        self,
+        partition: str,
+        operation: str,
+        *,
+        operation_revision: int | None = None,
+        before_sequence: int | None = None,
+        limit: int = 100,
+    ) -> FunctionReceiptPage:
+        """Enumerate self-bound receipt rows without reconstructing memberships."""
+
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        if operation_revision is not None:
+            _bounded_int(
+                operation_revision,
+                "operation_revision",
+                minimum=1,
+                maximum=2**63 - 1,
+            )
+        if before_sequence is not None:
+            _bounded_int(
+                before_sequence,
+                "before_sequence",
+                minimum=0,
+                maximum=2**63 - 1,
+            )
+        _bounded_int(limit, "limit", minimum=1, maximum=10_000)
+
+        predicates = ["partition = ?", "operation = ?"]
+        parameters: list[object] = [partition, operation]
+        if operation_revision is not None:
+            predicates.append("operation_revision = ?")
+            parameters.append(operation_revision)
+        if before_sequence is not None:
+            predicates.append("sequence < ?")
+            parameters.append(before_sequence)
+        parameters.append(limit + 1)
+
+        with self.store.transaction(write=False) as connection:
+            rows = connection.execute(
+                f"""
+                SELECT * FROM function_receipts
+                WHERE {' AND '.join(predicates)}
+                ORDER BY sequence DESC LIMIT ?
+                """,
+                parameters,
+            ).fetchall()
+            page_rows = rows[:limit]
+            receipts = tuple(_function_receipt_from_row(row) for row in page_rows)
+            return FunctionReceiptPage(
+                receipts=receipts,
+                next_before_sequence=(
+                    receipts[-1].sequence if len(rows) > limit else None
+                ),
+            )
 
     def reconstruct_function_receipt(
         self,

@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import gc
 import hashlib
+import inspect
 import json
 import pathlib
 import shutil
 import sqlite3
 import tempfile
 import threading
+import typing
 import unittest
 import warnings
 from contextlib import contextmanager
-from dataclasses import FrozenInstanceError, replace
+from dataclasses import MISSING, FrozenInstanceError, fields, replace
 from unittest import mock
 
 import cement_runtime
@@ -31,6 +33,7 @@ from cement_runtime import (
     FunctionPromotionEntry,
     FunctionPromotionManifest,
     FunctionReceipt,
+    FunctionReceiptPage,
     FunctionReconstruction,
     FunctionSetPromotion,
     FunctionVerification,
@@ -1473,6 +1476,55 @@ class SystemTests(unittest.TestCase):
                 receipt_hash if receipt_hash is not None else f"{receipt_id}-hash",
             ),
         )
+
+    @staticmethod
+    def _insert_valid_function_receipt(
+        connection: sqlite3.Connection,
+        *,
+        receipt_id: str,
+        partition: str = "tenant-a",
+        operation: str = "echo",
+        operation_revision: int = 1,
+        promoted_at_us: int = 1_000_000,
+        member_count: int = 13,
+        candidate_count: int = 11,
+        retired_count: int = 3,
+    ) -> int:
+        def bound_digest(field: str) -> str:
+            return hashlib.sha256(f"{receipt_id}:{field}".encode()).hexdigest()
+
+        fields: dict[str, object] = {
+            "id": receipt_id,
+            "partition": partition,
+            "operation": operation,
+            "operation_revision": operation_revision,
+            "policy_hash": bound_digest("policy"),
+            "function_hash": bound_digest("function"),
+            "membership_hash": bound_digest("membership"),
+            "member_count": member_count,
+            "candidate_artifact_ids_hash": bound_digest("candidates"),
+            "candidate_count": candidate_count,
+            "retired_artifact_ids_hash": bound_digest("retired"),
+            "retired_count": retired_count,
+            "promoted_by": f"promoter-{receipt_id}",
+            "promoted_at_us": promoted_at_us,
+        }
+        fields["receipt_hash"] = _function_receipt_hash(fields)
+        cursor = connection.execute(
+            """
+            INSERT INTO function_receipts(
+                id, partition, operation, operation_revision, policy_hash,
+                function_hash, membership_hash, member_count,
+                candidate_artifact_ids_hash, candidate_count,
+                retired_artifact_ids_hash, retired_count, promoted_by,
+                promoted_at_us, receipt_hash
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            tuple(fields.values()),
+        )
+        if cursor.lastrowid is None:
+            raise AssertionError("function receipt fixture received no sequence")
+        return int(cursor.lastrowid)
 
     def _promote_function_entry(
         self,
@@ -9823,21 +9875,33 @@ class SystemTests(unittest.TestCase):
         )
         self.assertIsInstance(rebuilt, FunctionReconstruction)
         self.assertIsInstance(rebuilt.receipt, FunctionReceipt)
-        for name in ("FunctionReceipt", "FunctionReconstruction"):
+        page = self.system.function_receipts("tenant-a", "echo")
+        self.assertIsInstance(page, FunctionReceiptPage)
+        self.assertEqual(page.receipts, (rebuilt.receipt,))
+        self.assertIsNone(page.next_before_sequence)
+        for name in (
+            "FunctionReceipt",
+            "FunctionReceiptPage",
+            "FunctionReconstruction",
+        ):
             self.assertIn(name, cement_runtime.__all__)
         exported: dict[str, object] = {}
         exec("from cement_runtime import *", exported)
         self.assertIs(exported["FunctionReceipt"], FunctionReceipt)
+        self.assertIs(exported["FunctionReceiptPage"], FunctionReceiptPage)
         self.assertIs(exported["FunctionReconstruction"], FunctionReconstruction)
         self.assertEqual(rebuilt.document, manifest.document)
         self.assertEqual(rebuilt.text, rebuilt.document.text)
         self.assertEqual(rebuilt.function_hash, rebuilt.document.function_hash)
         self.assertFalse(hasattr(rebuilt, "__dict__"))
         self.assertFalse(hasattr(rebuilt.receipt, "__dict__"))
+        self.assertFalse(hasattr(page, "__dict__"))
         with self.assertRaises(FrozenInstanceError):
             rebuilt.document = manifest.document  # type: ignore[misc]
         with self.assertRaises(FrozenInstanceError):
             rebuilt.receipt.promoted_by = "other"  # type: ignore[misc]
+        with self.assertRaises(FrozenInstanceError):
+            page.next_before_sequence = 1  # type: ignore[misc]
         with self.system.store.transaction(write=False) as connection:
             row = connection.execute(
                 "SELECT * FROM function_receipts WHERE id = ?",
@@ -9847,6 +9911,1101 @@ class SystemTests(unittest.TestCase):
             raise AssertionError("function receipt model fixture disappeared")
         for field in FunctionReceipt.__dataclass_fields__:
             self.assertEqual(getattr(rebuilt.receipt, field), row[field])
+
+    def test_function_receipt_discovery_public_signatures_are_exact(self) -> None:
+        page_fields = fields(FunctionReceiptPage)
+        self.assertEqual(
+            tuple(field.name for field in page_fields),
+            ("receipts", "next_before_sequence"),
+        )
+        self.assertTrue(
+            all(
+                field.default is MISSING and field.default_factory is MISSING
+                for field in page_fields
+            )
+        )
+        with self.assertRaises(TypeError):
+            FunctionReceiptPage(())  # type: ignore[call-arg]
+
+        self.assertEqual(
+            typing.get_type_hints(FunctionReceiptPage),
+            {
+                "receipts": tuple[FunctionReceipt, ...],
+                "next_before_sequence": int | None,
+            },
+        )
+        signature = inspect.signature(System.function_receipts)
+        for name in ("operation_revision", "before_sequence", "limit"):
+            self.assertIs(
+                signature.parameters[name].kind,
+                inspect.Parameter.KEYWORD_ONLY,
+            )
+        self.assertIs(
+            typing.get_type_hints(System.function_receipts)["return"],
+            FunctionReceiptPage,
+        )
+        self.assertIs(
+            typing.get_type_hints(System.latest_function_receipt)["return"],
+            FunctionReceipt,
+        )
+
+    def test_latest_function_receipt_resolves_only_current_revision_and_latest_sequence(self) -> None:
+        policy = CompilePolicy(2, 1, 0)
+        self.system.register_operation("tenant-a", "echo", policy=policy)
+        with self.system.store.transaction(write=True) as connection:
+            old_sequence = self._insert_valid_function_receipt(
+                connection,
+                receipt_id="fpr_latest_revision_one",
+                operation_revision=1,
+                promoted_at_us=90_000_000,
+                member_count=16,
+                candidate_count=12,
+                retired_count=4,
+            )
+        self.assertEqual(old_sequence, 1)
+        self.assertEqual(
+            self.system.revise_operation(
+                "tenant-a",
+                "echo",
+                policy=policy,
+                revised_by="release-manager",
+            ),
+            2,
+        )
+        with self.assertRaisesRegex(
+            NotFoundError,
+            "^current operation revision has no function receipt$",
+        ):
+            self.system.latest_function_receipt("tenant-a", "echo")
+
+        with self.system.store.transaction(write=True) as connection:
+            current_first = self._insert_valid_function_receipt(
+                connection,
+                receipt_id="fpr_latest_current_first",
+                operation_revision=2,
+                promoted_at_us=80_000_000,
+                member_count=17,
+                candidate_count=13,
+                retired_count=5,
+            )
+            later_old_revision = self._insert_valid_function_receipt(
+                connection,
+                receipt_id="fpr_latest_old_revision_late",
+                operation_revision=1,
+                promoted_at_us=200_000_000,
+                member_count=18,
+                candidate_count=14,
+                retired_count=6,
+            )
+            current_latest = self._insert_valid_function_receipt(
+                connection,
+                receipt_id="fpr_latest_current_last",
+                operation_revision=2,
+                promoted_at_us=10_000_000,
+                member_count=19,
+                candidate_count=15,
+                retired_count=7,
+            )
+        self.assertLess(current_first, later_old_revision)
+        self.assertLess(later_old_revision, current_latest)
+
+        receipt = self.system.latest_function_receipt("tenant-a", "echo")
+        self.assertIsInstance(receipt, FunctionReceipt)
+        self.assertEqual(receipt.id, "fpr_latest_current_last")
+        self.assertEqual(receipt.sequence, current_latest)
+        self.assertEqual(receipt.operation_revision, 2)
+        self.assertEqual(receipt.promoted_at_us, 10_000_000)
+        self.assertEqual(
+            (receipt.member_count, receipt.candidate_count, receipt.retired_count),
+            (19, 15, 7),
+        )
+
+    def test_latest_function_receipt_unknown_operation_raises_exact_not_found(self) -> None:
+        self.system.register_operation(
+            "tenant-a",
+            "echo",
+            policy=CompilePolicy(2, 1, 0),
+        )
+        for partition, operation in (
+            ("tenant-a", "missing"),
+            ("tenant-b", "echo"),
+        ):
+            with self.subTest(partition=partition, operation=operation):
+                with self.assertRaisesRegex(
+                    NotFoundError,
+                    "^operation is not registered in this partition$",
+                ):
+                    self.system.latest_function_receipt(partition, operation)
+
+    def test_latest_function_receipt_rejects_malformed_stored_revision_before_receipt_lookup(self) -> None:
+        self.system.register_operation(
+            "tenant-a",
+            "echo",
+            policy=CompilePolicy(2, 1, 0),
+        )
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("PRAGMA foreign_keys = OFF")
+            connection.execute("ALTER TABLE operations RENAME TO operations_strict")
+            connection.execute(
+                """
+                CREATE TABLE operations (
+                    partition TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    revision TEXT NOT NULL,
+                    policy_json TEXT NOT NULL,
+                    policy_hash TEXT NOT NULL,
+                    created_at_us INTEGER NOT NULL,
+                    updated_at_us INTEGER NOT NULL,
+                    PRIMARY KEY (partition, name)
+                )
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO operations(
+                    partition, name, revision, policy_json, policy_hash,
+                    created_at_us, updated_at_us
+                )
+                SELECT partition, name, 'not-an-int', policy_json, policy_hash,
+                       created_at_us, updated_at_us
+                FROM operations_strict
+                """
+            )
+            connection.execute("DROP TABLE operations_strict")
+            connection.commit()
+        finally:
+            connection.close()
+
+        with mock.patch.object(
+            self.system,
+            "_latest_function_receipt_row",
+        ) as receipt_lookup:
+            with self.assertRaisesRegex(
+                IntegrityError,
+                "^stored operation revision is invalid$",
+            ):
+                self.system.latest_function_receipt("tenant-a", "echo")
+        receipt_lookup.assert_not_called()
+
+    def test_latest_function_receipt_rejects_malformed_current_receipt(self) -> None:
+        self.system.register_operation(
+            "tenant-a",
+            "echo",
+            policy=CompilePolicy(2, 1, 0),
+        )
+        with self.system.store.transaction(write=True) as connection:
+            self._insert_valid_function_receipt(
+                connection,
+                receipt_id="fpr_latest_corrupt",
+                promoted_at_us=12_000_000,
+            )
+            connection.execute("DROP TRIGGER function_receipts_no_update")
+            changed = connection.execute(
+                "UPDATE function_receipts SET receipt_hash = ? WHERE id = ?",
+                ("0" * 64, "fpr_latest_corrupt"),
+            ).rowcount
+        self.assertEqual(changed, 1)
+        with self.assertRaisesRegex(IntegrityError, "function receipt hash mismatch"):
+            self.system.latest_function_receipt("tenant-a", "echo")
+
+    def test_function_receipts_enumerates_all_revisions_by_sequence_not_timestamp(self) -> None:
+        policy = CompilePolicy(2, 1, 0)
+        self.system.register_operation("tenant-a", "echo", policy=policy)
+        self.system.revise_operation(
+            "tenant-a",
+            "echo",
+            policy=policy,
+            revised_by="release-manager",
+        )
+        specifications = (
+            ("fpr_enumerate_r1_first", 1, 90_000_000, 15, 10, 2),
+            ("fpr_enumerate_r2_first", 2, 80_000_000, 16, 11, 3),
+            ("fpr_enumerate_r1_middle", 1, 100_000_000, 17, 12, 4),
+            ("fpr_enumerate_r2_last", 2, 10_000_000, 18, 13, 5),
+            ("fpr_enumerate_r1_last", 1, 70_000_000, 19, 14, 6),
+        )
+        sequences: dict[str, int] = {}
+        with self.system.store.transaction(write=True) as connection:
+            for (
+                receipt_id,
+                revision,
+                promoted_at_us,
+                member_count,
+                candidate_count,
+                retired_count,
+            ) in specifications:
+                sequences[receipt_id] = self._insert_valid_function_receipt(
+                    connection,
+                    receipt_id=receipt_id,
+                    operation_revision=revision,
+                    promoted_at_us=promoted_at_us,
+                    member_count=member_count,
+                    candidate_count=candidate_count,
+                    retired_count=retired_count,
+                )
+
+        page = self.system.function_receipts("tenant-a", "echo")
+        self.assertEqual(
+            tuple(receipt.id for receipt in page.receipts),
+            tuple(specification[0] for specification in reversed(specifications)),
+        )
+        self.assertEqual(
+            tuple(receipt.sequence for receipt in page.receipts),
+            tuple(sorted(sequences.values(), reverse=True)),
+        )
+        self.assertEqual(
+            tuple(receipt.promoted_at_us for receipt in page.receipts),
+            (70_000_000, 10_000_000, 100_000_000, 80_000_000, 90_000_000),
+        )
+        self.assertNotEqual(
+            tuple(receipt.promoted_at_us for receipt in page.receipts),
+            tuple(
+                sorted(
+                    (specification[2] for specification in specifications),
+                    reverse=True,
+                )
+            ),
+        )
+        self.assertIsNone(page.next_before_sequence)
+
+        revision_one = self.system.function_receipts(
+            "tenant-a",
+            "echo",
+            operation_revision=1,
+        )
+        self.assertEqual(
+            tuple(receipt.id for receipt in revision_one.receipts),
+            (
+                "fpr_enumerate_r1_last",
+                "fpr_enumerate_r1_middle",
+                "fpr_enumerate_r1_first",
+            ),
+        )
+        self.assertEqual(
+            tuple(receipt.operation_revision for receipt in revision_one.receipts),
+            (1, 1, 1),
+        )
+        self.assertEqual(
+            (
+                revision_one.receipts[0].member_count,
+                revision_one.receipts[1].candidate_count,
+                revision_one.receipts[2].retired_count,
+            ),
+            (19, 12, 2),
+        )
+
+        revision_two = self.system.function_receipts(
+            "tenant-a",
+            "echo",
+            operation_revision=2,
+        )
+        self.assertEqual(
+            tuple(receipt.id for receipt in revision_two.receipts),
+            ("fpr_enumerate_r2_last", "fpr_enumerate_r2_first"),
+        )
+        self.assertEqual(
+            tuple(receipt.operation_revision for receipt in revision_two.receipts),
+            (2, 2),
+        )
+
+    def test_function_receipts_cursor_is_exclusive_across_first_middle_and_last_pages(self) -> None:
+        with self.system.store.transaction(write=True) as connection:
+            sequences = tuple(
+                self._insert_valid_function_receipt(
+                    connection,
+                    receipt_id=f"fpr_cursor_{index}",
+                    promoted_at_us=50_000_000 - index * 1_000_000,
+                    member_count=14 + index,
+                    candidate_count=10 + index,
+                    retired_count=2 + index,
+                )
+                for index in range(5)
+            )
+
+        first = self.system.function_receipts("tenant-a", "echo", limit=2)
+        self.assertEqual(
+            tuple(receipt.id for receipt in first.receipts),
+            ("fpr_cursor_4", "fpr_cursor_3"),
+        )
+        self.assertEqual(
+            tuple(receipt.sequence for receipt in first.receipts),
+            (sequences[4], sequences[3]),
+        )
+        self.assertEqual(first.next_before_sequence, sequences[3])
+
+        middle = self.system.function_receipts(
+            "tenant-a",
+            "echo",
+            before_sequence=first.next_before_sequence,
+            limit=2,
+        )
+        self.assertEqual(
+            tuple(receipt.id for receipt in middle.receipts),
+            ("fpr_cursor_2", "fpr_cursor_1"),
+        )
+        self.assertEqual(
+            tuple(receipt.sequence for receipt in middle.receipts),
+            (sequences[2], sequences[1]),
+        )
+        self.assertEqual(middle.next_before_sequence, sequences[1])
+
+        last = self.system.function_receipts(
+            "tenant-a",
+            "echo",
+            before_sequence=middle.next_before_sequence,
+            limit=2,
+        )
+        self.assertEqual(
+            tuple(receipt.id for receipt in last.receipts),
+            ("fpr_cursor_0",),
+        )
+        self.assertEqual(
+            tuple(receipt.sequence for receipt in last.receipts),
+            (sequences[0],),
+        )
+        self.assertIsNone(last.next_before_sequence)
+        self.assertEqual(
+            tuple(
+                receipt.id
+                for page in (first, middle, last)
+                for receipt in page.receipts
+            ),
+            tuple(f"fpr_cursor_{index}" for index in reversed(range(5))),
+        )
+
+    def test_function_receipts_accepts_limit_one_and_continues(self) -> None:
+        with self.system.store.transaction(write=True) as connection:
+            sequences = tuple(
+                self._insert_valid_function_receipt(
+                    connection,
+                    receipt_id=f"fpr_limit_one_{index}",
+                    promoted_at_us=9_000_000 + index,
+                )
+                for index in range(2)
+            )
+
+        first = self.system.function_receipts("tenant-a", "echo", limit=1)
+        self.assertEqual(
+            tuple(receipt.id for receipt in first.receipts),
+            ("fpr_limit_one_1",),
+        )
+        self.assertEqual(first.next_before_sequence, sequences[1])
+
+        last = self.system.function_receipts(
+            "tenant-a",
+            "echo",
+            before_sequence=first.next_before_sequence,
+            limit=1,
+        )
+        self.assertEqual(
+            tuple(receipt.id for receipt in last.receipts),
+            ("fpr_limit_one_0",),
+        )
+        self.assertIsNone(last.next_before_sequence)
+
+    def test_function_receipts_continuation_distinguishes_limit_from_limit_plus_one(self) -> None:
+        with self.system.store.transaction(write=True) as connection:
+            sequences = tuple(
+                self._insert_valid_function_receipt(
+                    connection,
+                    receipt_id=f"fpr_continuation_{index}",
+                    promoted_at_us=10_000_000 + index,
+                    member_count=15 + index,
+                    candidate_count=11 + index,
+                    retired_count=3 + index,
+                )
+                for index in range(3)
+            )
+
+        exact = self.system.function_receipts("tenant-a", "echo", limit=3)
+        self.assertEqual(
+            tuple(receipt.id for receipt in exact.receipts),
+            (
+                "fpr_continuation_2",
+                "fpr_continuation_1",
+                "fpr_continuation_0",
+            ),
+        )
+        self.assertIsNone(exact.next_before_sequence)
+
+        with_more = self.system.function_receipts("tenant-a", "echo", limit=2)
+        self.assertEqual(
+            tuple(receipt.id for receipt in with_more.receipts),
+            ("fpr_continuation_2", "fpr_continuation_1"),
+        )
+        self.assertEqual(with_more.next_before_sequence, sequences[1])
+
+    def test_function_receipts_fetches_exact_bounded_lookahead(self) -> None:
+        with self.system.store.transaction(write=True) as connection:
+            for index in range(5):
+                self._insert_valid_function_receipt(
+                    connection,
+                    receipt_id=f"fpr_bounded_lookahead_{index}",
+                    promoted_at_us=11_000_000 + index,
+                )
+
+        bound_limits: list[int] = []
+        materialized_counts: list[int] = []
+        original_transaction = self.system.store.transaction
+
+        class CursorProxy:
+            def __init__(self, cursor: sqlite3.Cursor) -> None:
+                self.cursor = cursor
+
+            def fetchall(self):
+                rows = self.cursor.fetchall()
+                materialized_counts.append(len(rows))
+                return rows
+
+            def __getattr__(self, name: str):
+                return getattr(self.cursor, name)
+
+        class ConnectionProxy:
+            def __init__(self, connection: sqlite3.Connection) -> None:
+                self.connection = connection
+
+            def execute(self, sql: str, parameters=()):
+                cursor = self.connection.execute(sql, parameters)
+                if (
+                    "SELECT * FROM function_receipts" in sql
+                    and "ORDER BY sequence DESC" in sql
+                ):
+                    bound_limits.append(int(parameters[-1]))
+                    return CursorProxy(cursor)
+                return cursor
+
+            def __getattr__(self, name: str):
+                return getattr(self.connection, name)
+
+        @contextmanager
+        def tracked_transaction(*, write: bool):
+            with original_transaction(write=write) as connection:
+                yield ConnectionProxy(connection)
+
+        with mock.patch.object(
+            self.system.store,
+            "transaction",
+            side_effect=tracked_transaction,
+        ):
+            page = self.system.function_receipts("tenant-a", "echo", limit=2)
+        self.assertEqual(
+            tuple(receipt.id for receipt in page.receipts),
+            ("fpr_bounded_lookahead_4", "fpr_bounded_lookahead_3"),
+        )
+        self.assertEqual(bound_limits, [3])
+        self.assertEqual(materialized_counts, [3])
+
+    def test_function_receipts_default_limit_is_one_hundred_and_continues(self) -> None:
+        with self.system.store.transaction(write=True) as connection:
+            sequences = tuple(
+                self._insert_valid_function_receipt(
+                    connection,
+                    receipt_id=f"fpr_default_limit_{index:03d}",
+                    promoted_at_us=60_000_000 - index,
+                    member_count=15 + index % 3,
+                    candidate_count=10 + index % 2,
+                    retired_count=2 + index % 3,
+                )
+                for index in range(101)
+            )
+
+        first = self.system.function_receipts("tenant-a", "echo")
+        self.assertEqual(len(first.receipts), 100)
+        self.assertEqual(first.receipts[0].id, "fpr_default_limit_100")
+        self.assertEqual(first.receipts[-1].id, "fpr_default_limit_001")
+        self.assertEqual(first.next_before_sequence, sequences[1])
+
+        last = self.system.function_receipts(
+            "tenant-a",
+            "echo",
+            before_sequence=first.next_before_sequence,
+        )
+        self.assertEqual(
+            tuple(receipt.id for receipt in last.receipts),
+            ("fpr_default_limit_000",),
+        )
+        self.assertEqual(
+            tuple(receipt.sequence for receipt in last.receipts),
+            (sequences[0],),
+        )
+        self.assertIsNone(last.next_before_sequence)
+
+    def test_function_receipts_unknown_operation_is_empty_without_operations_lookup(self) -> None:
+        self.system.register_operation(
+            "tenant-a",
+            "registered",
+            policy=CompilePolicy(2, 1, 0),
+        )
+        reader = System(self.database)
+        original_transaction = reader.store.transaction
+        operations_reads: list[str] = []
+
+        @contextmanager
+        def deny_operations_read(*, write: bool):
+            self.assertFalse(write)
+            with original_transaction(write=write) as connection:
+                def authorize(action, table, _column, _database, _trigger):
+                    if action == sqlite3.SQLITE_READ and table == "operations":
+                        operations_reads.append(str(table))
+                        return sqlite3.SQLITE_DENY
+                    return sqlite3.SQLITE_OK
+
+                connection.set_authorizer(authorize)
+                try:
+                    yield connection
+                finally:
+                    connection.set_authorizer(None)
+
+        with mock.patch.object(
+            reader.store,
+            "transaction",
+            side_effect=deny_operations_read,
+        ) as transaction:
+            page = reader.function_receipts("tenant-a", "missing")
+        self.assertEqual(page, FunctionReceiptPage((), None))
+        self.assertEqual(operations_reads, [])
+        transaction.assert_called_once_with(write=False)
+
+    def test_function_receipts_isolates_partition_and_operation(self) -> None:
+        with self.system.store.transaction(write=True) as connection:
+            target_first = self._insert_valid_function_receipt(
+                connection,
+                receipt_id="fpr_isolation_target_first",
+                partition="tenant-a",
+                operation="echo",
+                promoted_at_us=10_000_000,
+            )
+            self._insert_valid_function_receipt(
+                connection,
+                receipt_id="fpr_isolation_other_operation",
+                partition="tenant-a",
+                operation="other",
+                promoted_at_us=40_000_000,
+                member_count=16,
+                candidate_count=12,
+                retired_count=4,
+            )
+            target_last = self._insert_valid_function_receipt(
+                connection,
+                receipt_id="fpr_isolation_target_last",
+                partition="tenant-a",
+                operation="echo",
+                promoted_at_us=20_000_000,
+                member_count=17,
+                candidate_count=13,
+                retired_count=5,
+            )
+            self._insert_valid_function_receipt(
+                connection,
+                receipt_id="fpr_isolation_other_partition",
+                partition="tenant-b",
+                operation="echo",
+                promoted_at_us=50_000_000,
+                member_count=18,
+                candidate_count=14,
+                retired_count=6,
+            )
+
+        page = self.system.function_receipts("tenant-a", "echo")
+        self.assertEqual(
+            tuple(receipt.id for receipt in page.receipts),
+            ("fpr_isolation_target_last", "fpr_isolation_target_first"),
+        )
+        self.assertEqual(
+            tuple(receipt.sequence for receipt in page.receipts),
+            (target_last, target_first),
+        )
+        self.assertEqual(
+            tuple((receipt.partition, receipt.operation) for receipt in page.receipts),
+            (("tenant-a", "echo"), ("tenant-a", "echo")),
+        )
+
+    def test_function_receipts_scope_is_exact_across_like_and_case_collisions(self) -> None:
+        specifications = (
+            ("fpr_exact_scope", "tenant_a", "echo_1"),
+            ("fpr_partition_wildcard", "tenantXa", "echo_1"),
+            ("fpr_partition_case", "TENANT_A", "echo_1"),
+            ("fpr_operation_wildcard", "tenant_a", "echoX1"),
+            ("fpr_operation_case", "tenant_a", "ECHO_1"),
+        )
+        with self.system.store.transaction(write=True) as connection:
+            for index, (receipt_id, partition, operation) in enumerate(specifications):
+                self._insert_valid_function_receipt(
+                    connection,
+                    receipt_id=receipt_id,
+                    partition=partition,
+                    operation=operation,
+                    promoted_at_us=40_000_000 + index,
+                    member_count=15 + index,
+                    candidate_count=10 + index,
+                    retired_count=2 + index,
+                )
+
+        page = self.system.function_receipts("tenant_a", "echo_1")
+        self.assertEqual(
+            tuple(receipt.id for receipt in page.receipts),
+            ("fpr_exact_scope",),
+        )
+        self.assertEqual(
+            tuple((receipt.partition, receipt.operation) for receipt in page.receipts),
+            (("tenant_a", "echo_1"),),
+        )
+
+    def test_latest_function_receipt_operation_lookup_is_exact_across_like_collisions(self) -> None:
+        policy = CompilePolicy(2, 1, 0)
+        self.system.register_operation("tenantXa", "echo_1", policy=policy)
+        self.system.register_operation("tenant_a", "echoX1", policy=policy)
+        self.system.revise_operation(
+            "tenant_a",
+            "echoX1",
+            policy=policy,
+            revised_by="operation-collision-reviser",
+        )
+        self.system.register_operation("tenant_a", "echo_1", policy=policy)
+        for revision in (2, 3):
+            self.assertEqual(
+                self.system.revise_operation(
+                    "tenant_a",
+                    "echo_1",
+                    policy=policy,
+                    revised_by=f"exact-scope-reviser-{revision}",
+                ),
+                revision,
+            )
+
+        with self.system.store.transaction(write=True) as connection:
+            for receipt_id, partition, operation, revision in (
+                ("fpr_latest_partition_collision", "tenantXa", "echo_1", 1),
+                ("fpr_latest_operation_collision", "tenant_a", "echoX1", 2),
+                ("fpr_latest_target_wrong_revision_one", "tenant_a", "echo_1", 1),
+                ("fpr_latest_target_wrong_revision_two", "tenant_a", "echo_1", 2),
+                ("fpr_latest_target_current", "tenant_a", "echo_1", 3),
+            ):
+                self._insert_valid_function_receipt(
+                    connection,
+                    receipt_id=receipt_id,
+                    partition=partition,
+                    operation=operation,
+                    operation_revision=revision,
+                    promoted_at_us=50_000_000 + revision,
+                )
+
+        receipt = self.system.latest_function_receipt("tenant_a", "echo_1")
+        self.assertEqual(receipt.id, "fpr_latest_target_current")
+        self.assertEqual(receipt.operation_revision, 3)
+        self.assertEqual((receipt.partition, receipt.operation), ("tenant_a", "echo_1"))
+
+    def test_function_receipt_discovery_validates_names_and_integer_bounds(self) -> None:
+        with self.system.store.transaction(write=True) as connection:
+            self._insert_valid_function_receipt(
+                connection,
+                receipt_id="fpr_bounds",
+                promoted_at_us=12_000_000,
+            )
+
+        accepted_limit = self.system.function_receipts(
+            "tenant-a",
+            "echo",
+            limit=10_000,
+        )
+        self.assertEqual(
+            tuple(receipt.id for receipt in accepted_limit.receipts),
+            ("fpr_bounds",),
+        )
+        self.assertEqual(
+            self.system.function_receipts(
+                "tenant-a",
+                "echo",
+                operation_revision=1,
+            ).receipts,
+            accepted_limit.receipts,
+        )
+        self.assertEqual(
+            self.system.function_receipts(
+                "tenant-a",
+                "echo",
+                operation_revision=2**63 - 1,
+            ),
+            FunctionReceiptPage((), None),
+        )
+        self.assertEqual(
+            self.system.function_receipts(
+                "tenant-a",
+                "echo",
+                before_sequence=0,
+            ),
+            FunctionReceiptPage((), None),
+        )
+        self.assertEqual(
+            self.system.function_receipts(
+                "tenant-a",
+                "echo",
+                before_sequence=2**63 - 1,
+            ).receipts,
+            accepted_limit.receipts,
+        )
+
+        for value in (0, -1, 2**63, "1", 1.0, True):
+            with self.subTest(field="operation_revision", value=value):
+                with self.assertRaises(ValidationError):
+                    self.system.function_receipts(
+                        "tenant-a",
+                        "echo",
+                        operation_revision=value,  # type: ignore[arg-type]
+                    )
+        with self.assertRaises(ValidationError):
+            self.system.function_receipts(
+                "tenant-a",
+                "echo",
+                before_sequence=False,  # type: ignore[arg-type]
+            )
+        for value in (-1, 2**63, "1", 1.0, True):
+            with self.subTest(field="before_sequence", value=value):
+                with self.assertRaises(ValidationError):
+                    self.system.function_receipts(
+                        "tenant-a",
+                        "echo",
+                        before_sequence=value,  # type: ignore[arg-type]
+                    )
+        for value in (0, -1, 10_001, "100", 100.0, True, None):
+            with self.subTest(field="limit", value=value):
+                with self.assertRaises(ValidationError):
+                    self.system.function_receipts(
+                        "tenant-a",
+                        "echo",
+                        limit=value,  # type: ignore[arg-type]
+                    )
+
+        invalid_names = ("", "bad name", b"tenant-a", None)
+        for value in invalid_names:
+            with self.subTest(method="function_receipts", field="partition", value=value):
+                with self.assertRaises(ValidationError):
+                    self.system.function_receipts(
+                        value,  # type: ignore[arg-type]
+                        "echo",
+                    )
+            with self.subTest(method="function_receipts", field="operation", value=value):
+                with self.assertRaises(ValidationError):
+                    self.system.function_receipts(
+                        "tenant-a",
+                        value,  # type: ignore[arg-type]
+                    )
+            with self.subTest(method="latest", field="partition", value=value):
+                with self.assertRaises(ValidationError):
+                    self.system.latest_function_receipt(
+                        value,  # type: ignore[arg-type]
+                        "echo",
+                    )
+            with self.subTest(method="latest", field="operation", value=value):
+                with self.assertRaises(ValidationError):
+                    self.system.latest_function_receipt(
+                        "tenant-a",
+                        value,  # type: ignore[arg-type]
+                    )
+
+    def test_function_receipts_rejects_corrupt_middle_selected_receipt(self) -> None:
+        with self.system.store.transaction(write=True) as connection:
+            for index in range(3):
+                self._insert_valid_function_receipt(
+                    connection,
+                    receipt_id=f"fpr_corrupt_middle_{index}",
+                    promoted_at_us=20_000_000 + index,
+                    member_count=15 + index,
+                    candidate_count=11 + index,
+                    retired_count=3 + index,
+                )
+            connection.execute("DROP TRIGGER function_receipts_no_update")
+            changed = connection.execute(
+                "UPDATE function_receipts SET receipt_hash = ? WHERE id = ?",
+                ("0" * 64, "fpr_corrupt_middle_1"),
+            ).rowcount
+        self.assertEqual(changed, 1)
+        with self.assertRaisesRegex(IntegrityError, "function receipt hash mismatch"):
+            self.system.function_receipts("tenant-a", "echo", limit=3)
+
+    def test_function_receipts_rejects_corrupt_last_selected_receipt(self) -> None:
+        with self.system.store.transaction(write=True) as connection:
+            for index in range(3):
+                self._insert_valid_function_receipt(
+                    connection,
+                    receipt_id=f"fpr_corrupt_last_{index}",
+                    promoted_at_us=30_000_000 + index,
+                    member_count=16 + index,
+                    candidate_count=12 + index,
+                    retired_count=4 + index,
+                )
+            connection.execute("DROP TRIGGER function_receipts_no_update")
+            changed = connection.execute(
+                "UPDATE function_receipts SET receipt_hash = ? WHERE id = ?",
+                ("0" * 64, "fpr_corrupt_last_0"),
+            ).rowcount
+        self.assertEqual(changed, 1)
+        with self.assertRaisesRegex(IntegrityError, "function receipt hash mismatch"):
+            self.system.function_receipts("tenant-a", "echo", limit=3)
+
+    def test_function_receipts_validates_only_returned_rows_before_lookahead(self) -> None:
+        with self.system.store.transaction(write=True) as connection:
+            sequences = tuple(
+                self._insert_valid_function_receipt(
+                    connection,
+                    receipt_id=f"fpr_lookahead_validation_{index}",
+                    promoted_at_us=35_000_000 + index,
+                )
+                for index in range(3)
+            )
+            connection.execute("DROP TRIGGER function_receipts_no_update")
+            changed = connection.execute(
+                "UPDATE function_receipts SET receipt_hash = ? WHERE id = ?",
+                ("0" * 64, "fpr_lookahead_validation_0"),
+            ).rowcount
+        self.assertEqual(changed, 1)
+
+        current = self.system.function_receipts("tenant-a", "echo", limit=2)
+        self.assertEqual(
+            tuple(receipt.id for receipt in current.receipts),
+            ("fpr_lookahead_validation_2", "fpr_lookahead_validation_1"),
+        )
+        self.assertEqual(current.next_before_sequence, sequences[1])
+
+        with self.assertRaisesRegex(IntegrityError, "function receipt hash mismatch"):
+            self.system.function_receipts(
+                "tenant-a",
+                "echo",
+                before_sequence=current.next_before_sequence,
+                limit=2,
+            )
+
+    def test_function_receipts_enumerates_maximum_page_and_tail_sentinel(self) -> None:
+        receipt_count = 10_001
+        with self.system.store.transaction(write=True) as connection:
+            for index in range(receipt_count):
+                self._insert_valid_function_receipt(
+                    connection,
+                    receipt_id=f"fpr_tail_{index:05d}",
+                    promoted_at_us=5_000_000 + index,
+                    member_count=15 + index % 3,
+                    candidate_count=10 + index % 2,
+                    retired_count=2 + index % 3,
+                )
+
+        page = self.system.function_receipts(
+            "tenant-a",
+            "echo",
+            limit=10_000,
+        )
+        self.assertEqual(len(page.receipts), 10_000)
+        self.assertEqual(page.receipts[0].id, "fpr_tail_10000")
+        self.assertEqual(page.receipts[5_000].id, "fpr_tail_05000")
+        self.assertEqual(page.receipts[-1].id, "fpr_tail_00001")
+        self.assertEqual(page.receipts[0].sequence, receipt_count)
+        self.assertEqual(page.receipts[-1].sequence, 2)
+        self.assertEqual(page.next_before_sequence, 2)
+
+        tail = self.system.function_receipts(
+            "tenant-a",
+            "echo",
+            before_sequence=page.next_before_sequence,
+            limit=10_000,
+        )
+        self.assertEqual(
+            tuple((receipt.id, receipt.sequence) for receipt in tail.receipts),
+            (("fpr_tail_00000", 1),),
+        )
+        self.assertIsNone(tail.next_before_sequence)
+
+    def test_function_receipt_discovery_is_read_only_on_success_and_failures(self) -> None:
+        policy = CompilePolicy(2, 1, 0)
+        self.system.register_operation("tenant-a", "echo", policy=policy)
+        self.system.register_operation("tenant-a", "empty", policy=policy)
+        with self.system.store.transaction(write=True) as connection:
+            first_sequence = self._insert_valid_function_receipt(
+                connection,
+                receipt_id="fpr_read_only_first",
+                promoted_at_us=30_000_000,
+                member_count=15,
+                candidate_count=11,
+                retired_count=3,
+            )
+            latest_sequence = self._insert_valid_function_receipt(
+                connection,
+                receipt_id="fpr_read_only_latest",
+                promoted_at_us=10_000_000,
+                member_count=16,
+                candidate_count=12,
+                retired_count=4,
+            )
+
+        authority = mock.Mock(side_effect=AssertionError("authority consulted"))
+        clock = mock.Mock(side_effect=AssertionError("clock consulted"))
+        reader = System(self.database, authority=authority, clock_us=clock)
+        original_transaction = reader.store.transaction
+        write_actions = {
+            getattr(sqlite3, name)
+            for name in (
+                "SQLITE_INSERT",
+                "SQLITE_DELETE",
+                "SQLITE_UPDATE",
+                "SQLITE_CREATE_INDEX",
+                "SQLITE_CREATE_TABLE",
+                "SQLITE_CREATE_TEMP_INDEX",
+                "SQLITE_CREATE_TEMP_TABLE",
+                "SQLITE_CREATE_TEMP_TRIGGER",
+                "SQLITE_CREATE_TEMP_VIEW",
+                "SQLITE_CREATE_TRIGGER",
+                "SQLITE_CREATE_VIEW",
+                "SQLITE_DROP_INDEX",
+                "SQLITE_DROP_TABLE",
+                "SQLITE_DROP_TEMP_INDEX",
+                "SQLITE_DROP_TEMP_TABLE",
+                "SQLITE_DROP_TEMP_TRIGGER",
+                "SQLITE_DROP_TEMP_VIEW",
+                "SQLITE_DROP_TRIGGER",
+                "SQLITE_DROP_VIEW",
+                "SQLITE_ALTER_TABLE",
+                "SQLITE_REINDEX",
+                "SQLITE_ANALYZE",
+                "SQLITE_CREATE_VTABLE",
+                "SQLITE_DROP_VTABLE",
+            )
+            if hasattr(sqlite3, name)
+        }
+        denied: list[int] = []
+
+        @contextmanager
+        def guarded_transaction(*, write: bool):
+            self.assertFalse(write)
+            with original_transaction(write=write) as connection:
+                def authorize(action, _one, _two, _database, _trigger):
+                    if action in write_actions:
+                        denied.append(action)
+                        return sqlite3.SQLITE_DENY
+                    return sqlite3.SQLITE_OK
+
+                connection.set_authorizer(authorize)
+                try:
+                    yield connection
+                finally:
+                    connection.set_authorizer(None)
+
+        original_latest_row = reader._latest_function_receipt_row
+        latest_snapshot_states: list[bool] = []
+
+        def latest_row_in_snapshot(
+            connection: sqlite3.Connection,
+            *,
+            partition: str,
+            operation: str,
+            operation_revision: int,
+        ):
+            latest_snapshot_states.append(connection.in_transaction)
+            return original_latest_row(
+                connection,
+                partition=partition,
+                operation=operation,
+                operation_revision=operation_revision,
+            )
+
+        with mock.patch.object(
+            reader.store,
+            "transaction",
+            side_effect=guarded_transaction,
+        ) as transaction, mock.patch.object(
+            reader,
+            "_latest_function_receipt_row",
+            side_effect=latest_row_in_snapshot,
+        ), mock.patch.object(
+            reader,
+            "_reconstruct_function_receipt",
+            side_effect=AssertionError("receipt discovery reconstructed memberships"),
+        ) as reconstruct:
+            def prove_read_only(label, call):
+                denied.clear()
+                before = self._database_dump()
+                call_count = transaction.call_count
+                result = call()
+                self.assertEqual(self._database_dump(), before, label)
+                self.assertEqual(denied, [], label)
+                self.assertEqual(
+                    transaction.call_args_list[call_count:],
+                    [mock.call(write=False)],
+                    label,
+                )
+                return result
+
+            page = prove_read_only(
+                "enumeration-success",
+                lambda: reader.function_receipts("tenant-a", "echo"),
+            )
+            self.assertEqual(
+                tuple(receipt.sequence for receipt in page.receipts),
+                (latest_sequence, first_sequence),
+            )
+            latest = prove_read_only(
+                "latest-success",
+                lambda: reader.latest_function_receipt("tenant-a", "echo"),
+            )
+            self.assertEqual(latest.id, "fpr_read_only_latest")
+            self.assertIsInstance(latest, FunctionReceipt)
+
+            unknown_page = prove_read_only(
+                "enumeration-unknown-operation",
+                lambda: reader.function_receipts("tenant-a", "missing"),
+            )
+            self.assertEqual(unknown_page, FunctionReceiptPage((), None))
+
+            def latest_unknown():
+                with self.assertRaisesRegex(
+                    NotFoundError,
+                    "^operation is not registered in this partition$",
+                ):
+                    reader.latest_function_receipt("tenant-a", "missing")
+
+            prove_read_only("latest-unknown-operation", latest_unknown)
+
+            def latest_without_receipt():
+                with self.assertRaisesRegex(
+                    NotFoundError,
+                    "^current operation revision has no function receipt$",
+                ):
+                    reader.latest_function_receipt("tenant-a", "empty")
+
+            prove_read_only("latest-current-revision-empty", latest_without_receipt)
+
+            connection = sqlite3.connect(self.database)
+            try:
+                connection.execute("DROP TRIGGER function_receipts_no_update")
+                changed = connection.execute(
+                    "UPDATE function_receipts SET receipt_hash = ? WHERE id = ?",
+                    ("0" * 64, "fpr_read_only_latest"),
+                ).rowcount
+                self.assertEqual(changed, 1)
+                connection.commit()
+            finally:
+                connection.close()
+
+            def corrupt_enumeration():
+                with self.assertRaisesRegex(
+                    IntegrityError,
+                    "function receipt hash mismatch",
+                ):
+                    reader.function_receipts("tenant-a", "echo")
+
+            prove_read_only("enumeration-corrupt-row", corrupt_enumeration)
+
+            def corrupt_latest():
+                with self.assertRaisesRegex(
+                    IntegrityError,
+                    "function receipt hash mismatch",
+                ):
+                    reader.latest_function_receipt("tenant-a", "echo")
+
+            prove_read_only("latest-corrupt-row", corrupt_latest)
+            reconstruct.assert_not_called()
+
+        self.assertEqual(latest_snapshot_states, [True, True, True])
+        authority.assert_not_called()
+        clock.assert_not_called()
 
     def test_reconstruct_function_receipt_matches_promoted_manifest_bytes_hash_order_and_exclusion(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
