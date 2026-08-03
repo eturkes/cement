@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 import hashlib
 import os
@@ -54,25 +54,34 @@ from .models import (
     CandidateRequest,
     CompilePolicy,
     CompileResult,
+    CompileScope,
     DraftEntry,
     DraftVerification,
     FallbackFailed,
+    FunctionAnchorReport,
     FunctionCheck,
+    FunctionMember,
     FunctionPromotionEntry,
     FunctionPromotionManifest,
     FunctionReceipt,
     FunctionReceiptPage,
     FunctionReconstruction,
+    FunctionReport,
     FunctionSetPromotion,
     FunctionVerification,
     InProgress,
+    OperationArtifact,
+    OperationArtifactStatus,
+    OperationNowReport,
     Outcome,
+    PendingProposalGap,
     Promotion,
     ProposalView,
     ReconciliationRequired,
     Rejected,
     Resolved,
     ReviewRequired,
+    StaleRevisionAnomaly,
     VerificationReport,
 )
 from .source import CandidateSource
@@ -100,6 +109,8 @@ AuthorityCheck = Callable[[str, str, str, str], bool]
 class _BlockedBuild:
     reasons: tuple[str, ...]
     support: int
+    reviewer_count: int
+    span_seconds: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -342,6 +353,18 @@ def _function_receipt_from_row(
         promoted_at_us=promoted_at_us,
         receipt_hash=receipt_hash,
     )
+
+
+def _stored_int(
+    value: object,
+    label: str,
+    *,
+    minimum: int = 0,
+    maximum: int = _MAX_SQLITE_INTEGER,
+) -> int:
+    if type(value) is not int or not minimum <= value <= maximum:
+        raise IntegrityError(f"{label} is invalid")
+    return value
 
 
 def _event(
@@ -1469,8 +1492,15 @@ class System:
             raise IntegrityError(str(assessment["integrity_failures"][0]))
         reasons = tuple(str(reason) for reason in assessment["policy_failures"])
         support = int(assessment["support"])
+        reviewer_count = int(assessment["reviewer_count"])
+        span_seconds = int(assessment["span_seconds"])
         if reasons:
-            return _BlockedBuild(reasons=reasons, support=support)
+            return _BlockedBuild(
+                reasons=reasons,
+                support=support,
+                reviewer_count=reviewer_count,
+                span_seconds=span_seconds,
+            )
 
         output_json = parse_json(str(assessment["output_text"]))
         try:
@@ -1485,6 +1515,8 @@ class System:
             return _BlockedBuild(
                 reasons=(f"artifact constraint: {exc}",),
                 support=support,
+                reviewer_count=reviewer_count,
+                span_seconds=span_seconds,
             )
         snapshot = self._evidence_snapshot(
             self._active_evidence(
@@ -1501,8 +1533,6 @@ class System:
             revision=revision,
             input_text=input_json,
         )
-        reviewer_count = int(assessment["reviewer_count"])
-        span_seconds = int(assessment["span_seconds"])
         return _CurrentBuild(
             input_json=canonical_input,
             output_json=output_json,
@@ -1522,6 +1552,47 @@ class System:
                 span_seconds=span_seconds,
             ),
         )
+
+    def _current_build_projections(
+        self,
+        connection: sqlite3.Connection,
+        operation_row: sqlite3.Row,
+    ) -> Iterator[tuple[str, str, _CurrentBuild | _BlockedBuild]]:
+        """Enumerate compile's exact current scopes without writing."""
+
+        partition = str(operation_row["partition"])
+        operation = str(operation_row["name"])
+        revision = int(operation_row["revision"])
+        groups = connection.execute(
+            """
+            SELECT e.input_hash, e.input_json
+            FROM examples AS e
+            LEFT JOIN example_revocations AS x ON x.example_id = e.id
+            WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
+              AND x.example_id IS NULL
+            GROUP BY e.input_hash, e.input_json
+            ORDER BY e.input_hash, e.input_json
+            """,
+            (partition, operation, revision),
+        )
+        canonical_inputs: dict[str, str] = {}
+        for group in groups:
+            input_hash = str(group["input_hash"])
+            input_text = str(group["input_json"])
+            previous = canonical_inputs.get(input_hash)
+            if previous is not None and previous != input_text:
+                raise IntegrityError("one input digest maps to multiple canonical inputs")
+            canonical_inputs[input_hash] = input_text
+            yield (
+                input_hash,
+                input_text,
+                self._project_current_build(
+                    connection,
+                    operation_row,
+                    input_hash,
+                    input_text,
+                ),
+            )
 
     def compile(
         self,
@@ -1553,34 +1624,10 @@ class System:
             if registered is None:
                 raise NotFoundError("operation is not registered in this partition")
             revision = int(registered["revision"])
-            groups = connection.execute(
-                """
-                SELECT e.input_hash, e.input_json
-                FROM examples AS e
-                LEFT JOIN example_revocations AS x ON x.example_id = e.id
-                WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
-                  AND x.example_id IS NULL
-                GROUP BY e.input_hash, e.input_json
-                ORDER BY e.input_hash, e.input_json
-                """,
-                (partition, operation, revision),
-            )
-            canonical_inputs: dict[str, str] = {}
-            for group in groups:
-                input_hash = str(group["input_hash"])
-                input_text = str(group["input_json"])
-                previous = canonical_inputs.get(input_hash)
-                if previous is not None and previous != input_text:
-                    raise IntegrityError(
-                        "one input digest maps to multiple canonical inputs"
-                    )
-                canonical_inputs[input_hash] = input_text
-                projection = self._project_current_build(
-                    connection,
-                    registered,
-                    input_hash,
-                    input_text,
-                )
+            for input_hash, input_text, projection in self._current_build_projections(
+                connection,
+                registered,
+            ):
                 if isinstance(projection, _BlockedBuild):
                     blocked.append(
                         {
@@ -2258,6 +2305,601 @@ class System:
                 receipts=receipts,
                 next_before_sequence=(
                     receipts[-1].sequence if len(rows) > limit else None
+                ),
+            )
+
+    def _function_report_member(
+        self,
+        connection: sqlite3.Connection,
+        row: sqlite3.Row,
+        *,
+        receipt: FunctionReceipt,
+        expected_ordinal: int,
+    ) -> FunctionMember:
+        try:
+            ordinal = _stored_int(
+                row["membership_ordinal"],
+                "function report member ordinal",
+                maximum=receipt.member_count - 1,
+            )
+            artifact_id = _request_id(row["membership_artifact_id"])
+            report_id = _request_id(row["membership_report_id"])
+            function_hash = _digest(
+                row["membership_function_hash"],
+                "function report member function_hash",
+            )
+            input_hash = _digest(
+                row["membership_input_hash"],
+                "function report member input_hash",
+            )
+            entry_seal = _digest(
+                row["membership_entry_seal"],
+                "function report member entry_seal",
+            )
+            support = _stored_int(
+                row["support"],
+                "function report member support",
+                minimum=2,
+            )
+            reviewer_count = _stored_int(
+                row["reviewer_count"],
+                "function report member reviewer count",
+                minimum=1,
+                maximum=support,
+            )
+        except (IndexError, KeyError, TypeError, ValidationError) as exc:
+            raise IntegrityError(
+                f"function report member {expected_ordinal} has invalid scalar fields"
+            ) from exc
+        if ordinal != expected_ordinal:
+            raise IntegrityError("function report member ordinals are not contiguous")
+        if function_hash != receipt.function_hash:
+            raise IntegrityError("function report member function hash mismatch")
+        if row["id"] != artifact_id:
+            raise IntegrityError("function report member artifact binding mismatch")
+        if (
+            row["partition"] != receipt.partition
+            or row["operation"] != receipt.operation
+            or row["operation_revision"] != receipt.operation_revision
+            or row["policy_hash"] != receipt.policy_hash
+        ):
+            raise IntegrityError("function report member scope binding mismatch")
+        if row["input_hash"] != input_hash:
+            raise IntegrityError("function report member input digest mismatch")
+        try:
+            self._artifact_from_row(row)
+        except ValidationError as exc:
+            raise IntegrityError(
+                f"function report member {expected_ordinal} artifact is invalid: {exc}"
+            ) from exc
+
+        report_row: dict[str, Any] = {
+            "id": row["bound_report_id"],
+            "artifact_id": row["bound_report_artifact_id"],
+            "artifact_hash": row["bound_report_artifact_hash"],
+            "build_hash": row["bound_report_build_hash"],
+            "policy_hash": row["bound_report_policy_hash"],
+            "evidence_snapshot_hash": row[
+                "bound_report_evidence_snapshot_hash"
+            ],
+            "passed": row["bound_report_passed"],
+            "details_json": row["bound_report_details_json"],
+            "details_hash": row["bound_report_details_hash"],
+            "test_count": row["bound_report_test_count"],
+            "test_set_hash": row["bound_report_test_set_hash"],
+        }
+        try:
+            if _request_id(report_row["id"]) != report_id:
+                raise IntegrityError("bound report identity mismatch")
+            if _request_id(report_row["artifact_id"]) != artifact_id:
+                raise IntegrityError("bound report artifact mismatch")
+            if report_row["passed"] != 1:
+                raise IntegrityError("bound report is not passing")
+            details = self._validate_report(
+                connection,
+                report_row,
+                verify_test_set=False,
+            )
+            details_value = cast(dict[str, JSONValue], details.value)
+            if details_value.get("scope_hash") != row["scope_hash"]:
+                raise IntegrityError("bound report scope mismatch")
+            for field in (
+                "artifact_hash",
+                "build_hash",
+                "policy_hash",
+                "evidence_snapshot_hash",
+            ):
+                if report_row[field] != row[field]:
+                    raise IntegrityError(f"bound report {field} mismatch")
+        except (
+            IndexError,
+            KeyError,
+            TypeError,
+            ValidationError,
+            ValueError,
+            OverflowError,
+            IntegrityError,
+        ) as exc:
+            raise IntegrityError(
+                f"function report member {expected_ordinal} report is invalid: {exc}"
+            ) from exc
+        if _function_entry_seal(row, report_row) != entry_seal:
+            raise IntegrityError(
+                f"function report member {expected_ordinal} entry seal mismatch"
+            )
+        return FunctionMember(
+            ordinal=ordinal,
+            artifact_id=artifact_id,
+            input_hash=input_hash,
+            build_support=support,
+            build_reviewer_count=reviewer_count,
+        )
+
+    def _pending_proposal_gap_from_row(
+        self,
+        row: sqlite3.Row,
+        *,
+        partition: str,
+        operation: str,
+    ) -> PendingProposalGap:
+        try:
+            proposal_id = _request_id(row["id"])
+            request_id = _request_id(row["bound_request_id"])
+            operation_revision = _stored_int(
+                row["operation_revision"],
+                "pending proposal operation revision",
+                minimum=1,
+            )
+            input_hash = _digest(
+                row["input_hash"],
+                "pending proposal input_hash",
+            )
+        except (IndexError, KeyError, TypeError, ValidationError) as exc:
+            raise IntegrityError("pending proposal row has invalid scalar fields") from exc
+        if (
+            row["partition"] != partition
+            or row["bound_request_partition"] != partition
+            or row["operation"] != operation
+            or row["request_id"] != request_id
+            or row["status"] != "pending"
+            or row["bound_request_status"] != "pending"
+            or row["bound_proposal_id"] != proposal_id
+        ):
+            raise IntegrityError("pending proposal scope or request binding mismatch")
+        try:
+            self._validate_proposal_shape(row)
+            self._proposal_content(row)
+        except ValidationError as exc:
+            raise IntegrityError(f"pending proposal row is invalid: {exc}") from exc
+        return PendingProposalGap(
+            proposal_id=proposal_id,
+            request_id=request_id,
+            operation_revision=operation_revision,
+            input_hash=input_hash,
+        )
+
+    def _operation_report_artifact(
+        self,
+        connection: sqlite3.Connection,
+        row: sqlite3.Row,
+        *,
+        partition: str,
+        operation: str,
+        expected_status: str,
+    ) -> OperationArtifact:
+        try:
+            sequence = _stored_int(
+                row["sequence"],
+                "operation artifact sequence",
+                minimum=1,
+            )
+            artifact_id = _request_id(row["id"])
+            operation_revision = _stored_int(
+                row["operation_revision"],
+                "operation artifact revision",
+                minimum=1,
+            )
+            input_hash = _digest(row["input_hash"], "operation artifact input_hash")
+            support = _stored_int(
+                row["support"],
+                "operation artifact support",
+                minimum=2,
+            )
+            _stored_int(
+                row["reviewer_count"],
+                "operation artifact reviewer count",
+                minimum=1,
+                maximum=support,
+            )
+            _stored_int(
+                row["span_seconds"],
+                "operation artifact span",
+            )
+            status_reason = (
+                _text(
+                    row["status_reason"],
+                    "operation artifact status_reason",
+                    maximum=2_048,
+                )
+                if row["status_reason"] is not None
+                else None
+            )
+        except (IndexError, KeyError, TypeError, ValidationError) as exc:
+            raise IntegrityError("operation artifact row has invalid scalar fields") from exc
+        if (
+            row["partition"] != partition
+            or row["operation"] != operation
+            or row["status"] != expected_status
+        ):
+            raise IntegrityError("operation artifact scope or status binding mismatch")
+        try:
+            self._artifact_from_row(row)
+            if expected_status == "promoted":
+                self._validate_promoted(connection, row)
+        except (TypeError, ValidationError, ValueError, OverflowError) as exc:
+            raise IntegrityError(f"operation artifact row is invalid: {exc}") from exc
+        return OperationArtifact(
+            sequence=sequence,
+            artifact_id=artifact_id,
+            operation_revision=operation_revision,
+            input_hash=input_hash,
+            status_reason=status_reason,
+        )
+
+    def function_report(
+        self,
+        partition: str,
+        operation: str,
+        *,
+        receipt_id: str | None = None,
+        projection_limit: int = 100,
+    ) -> FunctionReport:
+        """Report immutable function membership beside current operation state."""
+
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        if receipt_id is not None:
+            receipt_id = _request_id(receipt_id)
+        _bounded_int(
+            projection_limit,
+            "projection_limit",
+            minimum=1,
+            maximum=10_000,
+        )
+
+        with self.store.transaction(write=False) as connection:
+            operation_row = connection.execute(
+                "SELECT * FROM operations WHERE partition = ? AND name = ?",
+                (partition, operation),
+            ).fetchone()
+            if operation_row is None:
+                raise NotFoundError("operation is not registered in this partition")
+            if (
+                operation_row["partition"] != partition
+                or operation_row["name"] != operation
+            ):
+                raise IntegrityError("stored operation scope is invalid")
+            revision = _stored_int(
+                operation_row["revision"],
+                "stored operation revision",
+                minimum=1,
+            )
+            policy_json = operation_row["policy_json"]
+            try:
+                if type(policy_json) is not str:
+                    raise TypeError("policy text is not a string")
+                policy_hash = _digest(
+                    operation_row["policy_hash"],
+                    "stored operation policy_hash",
+                )
+                policy = _policy_from_text(policy_json)
+                normalized_policy = canonicalize(policy.as_json(), max_bytes=16_384)
+            except (TypeError, ValidationError) as exc:
+                raise IntegrityError("stored operation policy is invalid") from exc
+            if normalized_policy.text != policy_json:
+                raise IntegrityError("stored operation policy is not canonical")
+            if normalized_policy.digest != policy_hash:
+                raise IntegrityError("operation policy digest mismatch")
+
+            if receipt_id is None:
+                receipt_row = self._latest_function_receipt_row(
+                    connection,
+                    partition=partition,
+                    operation=operation,
+                    operation_revision=revision,
+                )
+            else:
+                receipt_row = connection.execute(
+                    """
+                    SELECT * FROM function_receipts
+                    WHERE partition = ? AND operation = ? AND id = ?
+                    """,
+                    (partition, operation, receipt_id),
+                ).fetchone()
+                if receipt_row is None:
+                    raise NotFoundError(
+                        "function receipt does not exist for this operation"
+                    )
+
+            function_anchor: FunctionAnchorReport | None = None
+            if receipt_row is not None:
+                receipt = _function_receipt_from_row(receipt_row)
+                member_rows = connection.execute(
+                    """
+                    SELECT a.*,
+                           m.ordinal AS membership_ordinal,
+                           m.function_hash AS membership_function_hash,
+                           m.artifact_id AS membership_artifact_id,
+                           m.report_id AS membership_report_id,
+                           m.input_hash AS membership_input_hash,
+                           m.entry_seal AS membership_entry_seal,
+                           r.id AS bound_report_id,
+                           r.artifact_id AS bound_report_artifact_id,
+                           r.artifact_hash AS bound_report_artifact_hash,
+                           r.build_hash AS bound_report_build_hash,
+                           r.policy_hash AS bound_report_policy_hash,
+                           r.evidence_snapshot_hash
+                               AS bound_report_evidence_snapshot_hash,
+                           r.passed AS bound_report_passed,
+                           r.details_json AS bound_report_details_json,
+                           r.details_hash AS bound_report_details_hash,
+                           r.test_count AS bound_report_test_count,
+                           r.test_set_hash AS bound_report_test_set_hash
+                    FROM function_memberships AS m
+                    JOIN artifacts AS a ON a.id = m.artifact_id
+                    JOIN test_reports AS r
+                      ON r.id = m.report_id AND r.artifact_id = m.artifact_id
+                    WHERE m.receipt_id = ?
+                    ORDER BY m.ordinal LIMIT ?
+                    """,
+                    (receipt.id, projection_limit),
+                ).fetchall()
+                expected_members = min(receipt.member_count, projection_limit)
+                if len(member_rows) != expected_members:
+                    raise IntegrityError(
+                        "function receipt projected membership count mismatch"
+                    )
+                members = tuple(
+                    self._function_report_member(
+                        connection,
+                        row,
+                        receipt=receipt,
+                        expected_ordinal=ordinal,
+                    )
+                    for ordinal, row in enumerate(member_rows)
+                )
+                member_input_hashes = [member.input_hash for member in members]
+                if member_input_hashes != sorted(member_input_hashes):
+                    raise IntegrityError(
+                        "function report member order is not canonical"
+                    )
+                function_anchor = FunctionAnchorReport(
+                    receipt=receipt,
+                    member_count=receipt.member_count,
+                    members=members,
+                )
+
+            ready_scopes: list[CompileScope] = []
+            blocked_scopes: list[CompileScope] = []
+            ready_count = 0
+            blocked_count = 0
+            try:
+                projections = self._current_build_projections(
+                    connection,
+                    operation_row,
+                )
+                for input_hash, _input_text, projection in projections:
+                    scope = CompileScope(
+                        input_hash=input_hash,
+                        active_support=projection.support,
+                        active_reviewer_count=projection.reviewer_count,
+                        active_span_seconds=projection.span_seconds,
+                        reasons=(
+                            projection.reasons
+                            if isinstance(projection, _BlockedBuild)
+                            else ()
+                        ),
+                    )
+                    if isinstance(projection, _BlockedBuild):
+                        blocked_count += 1
+                        if len(blocked_scopes) < projection_limit:
+                            blocked_scopes.append(scope)
+                    else:
+                        ready_count += 1
+                        if len(ready_scopes) < projection_limit:
+                            ready_scopes.append(scope)
+            except (TypeError, ValidationError, ValueError, OverflowError) as exc:
+                raise IntegrityError(f"current build projection is invalid: {exc}") from exc
+
+            pending_count_row = connection.execute(
+                """
+                SELECT COUNT(*) AS item_count
+                FROM proposals AS p
+                JOIN requests AS r
+                  ON r.partition = p.partition AND r.id = p.request_id
+                WHERE p.partition = ? AND r.operation = ? AND p.status = 'pending'
+                """,
+                (partition, operation),
+            ).fetchone()
+            if pending_count_row is None:
+                raise IntegrityError("pending proposal count is missing")
+            pending_count = _stored_int(
+                pending_count_row["item_count"],
+                "pending proposal count",
+            )
+            pending_rows = connection.execute(
+                """
+                SELECT p.*, r.partition AS bound_request_partition,
+                       r.operation, r.operation_revision, r.input_json, r.input_hash,
+                       r.id AS bound_request_id,
+                       r.status AS bound_request_status,
+                       r.proposal_id AS bound_proposal_id
+                FROM proposals AS p
+                JOIN requests AS r
+                  ON r.partition = p.partition AND r.id = p.request_id
+                WHERE p.partition = ? AND r.operation = ? AND p.status = 'pending'
+                ORDER BY p.id LIMIT ?
+                """,
+                (partition, operation, projection_limit),
+            ).fetchall()
+            if len(pending_rows) != min(pending_count, projection_limit):
+                raise IntegrityError("pending proposal projection count mismatch")
+            pending_proposals = tuple(
+                self._pending_proposal_gap_from_row(
+                    row,
+                    partition=partition,
+                    operation=operation,
+                )
+                for row in pending_rows
+            )
+
+            artifact_status_order = (
+                "draft",
+                "verified",
+                "promoted",
+                "suspended",
+                "retired",
+            )
+            artifact_counts = {status: 0 for status in artifact_status_order}
+            for count_row in connection.execute(
+                """
+                SELECT status, COUNT(*) AS item_count
+                FROM artifacts
+                WHERE partition = ? AND operation = ?
+                GROUP BY status
+                """,
+                (partition, operation),
+            ).fetchall():
+                status = count_row["status"]
+                if status == "building":
+                    raise IntegrityError(
+                        "operation contains a persisted building artifact"
+                    )
+                if type(status) is not str or status not in artifact_counts:
+                    raise IntegrityError(
+                        "operation contains an unknown artifact status"
+                    )
+                artifact_counts[status] = _stored_int(
+                    count_row["item_count"],
+                    f"{status} artifact count",
+                )
+
+            artifact_statuses: list[OperationArtifactStatus] = []
+            for status in artifact_status_order:
+                artifact_rows = connection.execute(
+                    """
+                    SELECT * FROM artifacts
+                    WHERE partition = ? AND operation = ? AND status = ?
+                    ORDER BY sequence DESC LIMIT ?
+                    """,
+                    (partition, operation, status, projection_limit),
+                ).fetchall()
+                if len(artifact_rows) != min(
+                    artifact_counts[status],
+                    projection_limit,
+                ):
+                    raise IntegrityError(
+                        f"{status} artifact projection count mismatch"
+                    )
+                artifacts = tuple(
+                    self._operation_report_artifact(
+                        connection,
+                        row,
+                        partition=partition,
+                        operation=operation,
+                        expected_status=status,
+                    )
+                    for row in artifact_rows
+                )
+                artifact_statuses.append(
+                    OperationArtifactStatus(
+                        status=cast(
+                            Literal[
+                                "draft",
+                                "verified",
+                                "promoted",
+                                "suspended",
+                                "retired",
+                            ],
+                            status,
+                        ),
+                        count=artifact_counts[status],
+                        artifacts=artifacts,
+                    )
+                )
+
+            stale_count_row = connection.execute(
+                """
+                SELECT COUNT(*) AS item_count FROM artifacts
+                WHERE partition = ? AND operation = ?
+                  AND status IN ('draft', 'verified', 'promoted')
+                  AND operation_revision <> ?
+                """,
+                (partition, operation, revision),
+            ).fetchone()
+            if stale_count_row is None:
+                raise IntegrityError("stale revision anomaly count is missing")
+            stale_count = _stored_int(
+                stale_count_row["item_count"],
+                "stale revision anomaly count",
+            )
+            stale_rows = connection.execute(
+                """
+                SELECT * FROM artifacts
+                WHERE partition = ? AND operation = ?
+                  AND status IN ('draft', 'verified', 'promoted')
+                  AND operation_revision <> ?
+                ORDER BY id LIMIT ?
+                """,
+                (partition, operation, revision, projection_limit),
+            ).fetchall()
+            if len(stale_rows) != min(stale_count, projection_limit):
+                raise IntegrityError("stale revision anomaly projection count mismatch")
+            stale_anomalies: list[StaleRevisionAnomaly] = []
+            for row in stale_rows:
+                status = str(row["status"])
+                artifact = self._operation_report_artifact(
+                    connection,
+                    row,
+                    partition=partition,
+                    operation=operation,
+                    expected_status=status,
+                )
+                artifact_revision = artifact.operation_revision
+                stale_anomalies.append(
+                    StaleRevisionAnomaly(
+                        artifact_id=artifact.artifact_id,
+                        status=cast(
+                            Literal["draft", "verified", "promoted"],
+                            status,
+                        ),
+                        artifact_revision=artifact_revision,
+                        current_revision=revision,
+                        reason=(
+                            f"{status} artifact belongs to stale operation revision "
+                            f"{artifact_revision}; current revision is {revision}"
+                        ),
+                    )
+                )
+
+            return FunctionReport(
+                partition=partition,
+                operation=operation,
+                function_anchor=function_anchor,
+                operation_now=OperationNowReport(
+                    operation_revision=revision,
+                    policy_hash=policy_hash,
+                    projection_limit=projection_limit,
+                    promoted_entry_count=artifact_counts["promoted"],
+                    compile_ready_scope_count=ready_count,
+                    compile_ready_scopes=tuple(ready_scopes),
+                    compile_blocked_scope_count=blocked_count,
+                    compile_blocked_scopes=tuple(blocked_scopes),
+                    pending_proposal_count=pending_count,
+                    pending_proposals=pending_proposals,
+                    artifact_statuses=tuple(artifact_statuses),
+                    stale_revision_anomaly_count=stale_count,
+                    stale_revision_anomalies=tuple(stale_anomalies),
                 ),
             )
 
@@ -4532,7 +5174,7 @@ class System:
     @staticmethod
     def _validate_report(
         connection: sqlite3.Connection,
-        row: sqlite3.Row,
+        row: sqlite3.Row | Mapping[str, Any],
         *,
         verify_test_set: bool = True,
     ) -> CanonicalJSON:

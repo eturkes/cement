@@ -261,12 +261,84 @@ Measured gaps driving the arc:
     for an unknown operation while only the current-revision lookup raises `NotFoundError`. No schema
     delta - `function_receipts_scope` already covers a backward range scan. Write set `system.py`,
     `models.py`, `__init__.py`, `test_system.py`. Depends on u1-u3b2.
-  - u4b OPEN - coverage + gap report core, both anchors, one read transaction. Honest measures only:
-    promoted entry count, per-entry support and reviewer counts from the sealed `artifacts` columns,
-    compile-blocked scopes with reasons, pending proposals, suspended/retired entries, and explicit
-    stale-revision anomalies. No domain-coverage claim, since no domain schema exists. Blocked reporting
-    factors the compiler's canonical-input enumeration plus `_project_current_build` into a read-callable
-    helper. Depends on u4a.
+  - u4b DONE (main=81% 194K/240K, impl=92% 220K/240K) - coverage + gap report core, both anchors, one
+    read transaction. `system.py` +675/-33, `models.py` +83, `__init__.py` +18, `test_system.py` +3725;
+    suite 314 -> 353 across one implementation pass plus two fix batches. `store.py`, `cli.py`,
+    `function.py`, `README.md`, `docs/`, `examples/` byte-identical, verified by MAIN at every gate rerun.
+    Design record `.agent/decisions/m2u4b-design.md`, arbitrated from three prototyped full-design spikes
+    that each reached green gates in their own staging tree, so all three costed shapes were buildable.
+    `split` (two per-anchor methods plus a shared-snapshot lease) self-rejected on its own measurements:
+    atomicity degrades to caller discipline, and its deliberately unclosed public snapshot blocked a
+    writer 10,017.791 ms before failing it with `StateError`, because `journal_mode=DELETE` lets a writer
+    stage but not commit behind a live reader. `minimal` self-rejected on reachability - its hard-coded
+    limit of 100 left 9,900 of 10,000 pending IDs and 49,900 of 50,000 member annotations unreachable
+    through any public read. `composite` named its own strongest counterargument: calling full receipt
+    reconstruction from the report makes the healthy operation-now anchor unavailable whenever the
+    selected receipt is corrupt or 50,000 members wide.
+    Accepted shape: one composite read-only call
+    `function_report(partition, operation, *, receipt_id=None, projection_limit=100) -> FunctionReport`
+    over 9 frozen/slotted models, every field required. The function anchor does NOT reconstruct - it
+    validates the receipt row plus only the member rows it returns, keeping
+    `reconstruct_function_receipt` the sole reconstruction surface (u3b2's freeze) and matching u4a's
+    validate-only-returned-rows convention. Exact `COUNT(*)` everywhere plus `LIMIT ?` detail projections;
+    truncation is visible as `count > len(items)` with no redundant `has_more`. Rejected with reasons
+    recorded: per-category digests (the u3b1 pattern exists because that projection is sealed into an
+    immutable event; this report is ephemeral, and the honest full digest is unavoidably O(n)), an event
+    watermark (a snapshot-identity reading it cannot support), and typed reason codes (the compiler's
+    ordered strings are the authoritative vocabulary). Naming is structurally separated - frozen fields
+    are `build_*`, current fields `active_*` - and no field subtracts, ratios or complements one anchor
+    against the other. `projection_limit` is the repository-wide validated `1..10_000`, never clamped.
+    Compiler factoring: `_current_build_projections` is a lazy read-callable generator shared with
+    `compile()`, raising `IntegrityError` when one input digest carries two canonical texts; `_BlockedBuild`
+    gains `reviewer_count`/`span_seconds` while `compile()`'s serialized blocked shape stays frozen at
+    exactly `{input_hash, reasons, support}` - now a committed pin, not just scratch before/after evidence.
+    All five block reasons are reached through real public-API probes, the fifth via a depth-63 input that
+    `handle`/`review` accept while the artifact wrapper crosses canonical depth 64.
+    Review. Two diff-blind reviewers: correctness/spec/claim-soundness, and an independent 254-mutant
+    catalogue plus determinism/snapshot probes. The mutation reviewer died at 77% (184K) with an
+    all-`planned` catalogue and was replaced by a successor seeded from its on-disk catalogue and runner.
+    Two production defects, both from the correctness lens, both reproduced by MAIN before dispatch.
+    (1) Returned membership rows were syntax-checked only: `_function_report_member` passed
+    `membership_report_id` through `_request_id` and `membership_entry_seal` through `_digest` and
+    discarded both results, so retargeting a selected member's `entry_seal` to another valid 64-hex digest
+    let the report succeed while `reconstruct_function_receipt` rejected the same ledger. The bounded
+    member query now joins `test_reports` on both report and artifact identity, checks passing/scope and
+    the four hash bindings, and recomputes `_function_entry_seal`; validation stays bounded to each
+    returned member's own artifact row plus its single bound report row, with
+    `_validate_report(verify_test_set=False)` issuing no query at all. The new inner join can only drop a
+    member row, and the pre-existing projected-count check turns any drop into `IntegrityError`.
+    (2) Persisted corruption escaped as a raw `TypeError` - selected active evidence with
+    `confirmed_at_us=NULL` and a selected promoted report with `passed=NULL` both leaked
+    `int() argument ... NoneType` past catches written for `(ValidationError, ValueError)`. Both sites now
+    translate `TypeError`/`ValueError`/`OverflowError`. Same defect class u4a already paid for once.
+    Everything else - 5 correctness-lens test gaps and 59 mutation findings - was a committed-test gap on
+    already-correct code: the two anchors were never behaviorally distinguished (every asserted member had
+    `build_support == build_reviewer_count == 2` and every revision reused one policy, so both a
+    build-field swap and sourcing `operation_now.policy_hash` from the historical receipt passed all 337
+    tests); public field mappings were unpinned against authoritative rows; blocked and stale counts were
+    unpinned under truncation; the 10,000 bound was proved only on an empty ledger, leaving a 1,000 clamp
+    alive; and nine separate queries had `=` -> `LIKE` mutants alive for want of `_`/case colliders
+    reaching each one.
+    MAIN's own verification, driven from the reviewer's catalogue rather than any fixer's account, with a
+    purpose-built replay driver (`.scratch/main-replay/replay.py`): 8 isolated clones,
+    `PYTHONDONTWRITEBYTECODE=1`, a per-mutant proof that the interpreter loaded the mutated module, and
+    byte-exact restore, preceded by a pristine control run in all 8 clones under full parallel load so no
+    kill could be a flaky-timing artifact. Pre-fix: all 61 catalogue survivors reproduced as survivors.
+    Post-batch-1: 10 closed. Final: 58 killed, 1 superseded (the mutated code no longer exists after the
+    A1 fix), and exactly the 2 mutants carrying the reviewer's own equivalence proofs still alive. Line
+    shifts from the production fix were re-anchored exactly by a `difflib` line map from the catalogue's
+    own baseline copy, never by guessing.
+    Accepted invariant rather than code change: both pending queries inner-join `requests`, so a pending
+    proposal whose request was deleted through a connection with foreign keys disabled undercounts instead
+    of failing closed. `PRAGMA foreign_keys = ON` makes that state unreachable through any ordinary API -
+    the same posture u3b1 took for membership retention.
+    Known limits: the function anchor proves row-level receipt self-binding plus the validity of the
+    members it returns, never that the whole membership reconstructs. Unselected rows beyond
+    `projection_limit` are counted but not validated, so the report never claims validated history.
+    Compile-ready and compile-blocked are the only categories whose counts cost a full pass, since
+    ready-vs-blocked is not readable from stored status. The 166 Pyright `reportAttributeAccessIssue`
+    errors in `tests/test_system.py` lines 221-1192 are pre-existing at `d0b7e93` - unnarrowed union
+    member access in baseline outcome assertions, in a region this unit left byte-identical.
   - u4c OPEN - the five `function` CLI commands (`show`, `export`, `eval`, `verify`, `promote`), owning
     `cli.py` + `test_cli.py` only. Offline `eval --bundle` special-cased ahead of the `--db`/`--partition`
     gate so `System` is never constructed; `export` writing `FunctionDocument.text` bytes exactly rather

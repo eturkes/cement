@@ -217,6 +217,89 @@ class FunctionReceiptPage:
 
 
 @dataclass(frozen=True, slots=True)
+class FunctionMember:
+    ordinal: int
+    artifact_id: str
+    input_hash: str
+    build_support: int
+    build_reviewer_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class FunctionAnchorReport:
+    receipt: FunctionReceipt
+    member_count: int
+    members: tuple[FunctionMember, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class CompileScope:
+    input_hash: str
+    active_support: int
+    active_reviewer_count: int
+    active_span_seconds: int
+    reasons: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class PendingProposalGap:
+    proposal_id: str
+    request_id: str
+    operation_revision: int
+    input_hash: str
+
+
+@dataclass(frozen=True, slots=True)
+class OperationArtifact:
+    sequence: int
+    artifact_id: str
+    operation_revision: int
+    input_hash: str
+    status_reason: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class OperationArtifactStatus:
+    status: Literal["draft", "verified", "promoted", "suspended", "retired"]
+    count: int
+    artifacts: tuple[OperationArtifact, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class StaleRevisionAnomaly:
+    artifact_id: str
+    status: Literal["draft", "verified", "promoted"]
+    artifact_revision: int
+    current_revision: int
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class OperationNowReport:
+    operation_revision: int
+    policy_hash: str
+    projection_limit: int
+    promoted_entry_count: int
+    compile_ready_scope_count: int
+    compile_ready_scopes: tuple[CompileScope, ...]
+    compile_blocked_scope_count: int
+    compile_blocked_scopes: tuple[CompileScope, ...]
+    pending_proposal_count: int
+    pending_proposals: tuple[PendingProposalGap, ...]
+    artifact_statuses: tuple[OperationArtifactStatus, ...]
+    stale_revision_anomaly_count: int
+    stale_revision_anomalies: tuple[StaleRevisionAnomaly, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class FunctionReport:
+    partition: str
+    operation: str
+    function_anchor: FunctionAnchorReport | None
+    operation_now: OperationNowReport
+
+
+@dataclass(frozen=True, slots=True)
 class FunctionReconstruction:
     receipt: FunctionReceipt
     document: FunctionDocument

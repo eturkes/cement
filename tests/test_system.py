@@ -10,6 +10,7 @@ import sqlite3
 import tempfile
 import threading
 import typing
+from typing import Literal
 import unittest
 import warnings
 from contextlib import contextmanager
@@ -23,26 +24,35 @@ import cement_runtime.system as system_module
 from cement_runtime import (
     Candidate,
     CompilePolicy,
+    CompileScope,
     ConflictError,
     DraftEntry,
     DraftVerification,
     FallbackFailed,
     FUNCTION_ENTRY_SEAL_ABI,
+    FunctionAnchorReport,
     FunctionCheck,
     FunctionEntry,
+    FunctionMember,
     FunctionPromotionEntry,
     FunctionPromotionManifest,
     FunctionReceipt,
     FunctionReceiptPage,
     FunctionReconstruction,
+    FunctionReport,
     FunctionSetPromotion,
     FunctionVerification,
     InProgress,
     IntegrityError,
     NotFoundError,
+    OperationArtifact,
+    OperationArtifactStatus,
+    OperationNowReport,
+    PendingProposalGap,
     ReconciliationRequired,
     Resolved,
     ReviewRequired,
+    StaleRevisionAnomaly,
     StateError,
     System,
     ValidationError,
@@ -62,6 +72,7 @@ from cement_runtime.system import (
     FUNCTION_MEMBERSHIP_ABI,
     FUNCTION_PROMOTION_MANIFEST_ABI,
     FUNCTION_PROMOTION_RECEIPT_ABI,
+    _BlockedBuild,
     _CurrentBuild,
     _digest_strings,
     _function_entry_seal,
@@ -112,6 +123,59 @@ class BlockingSource:
         self.entered.set()
         self.release.wait(timeout=2)
         return Candidate(output="done", provenance={})
+
+
+class _CoercibleStoredScalar:
+    def __init__(self, value: str | int) -> None:
+        self.value = value
+
+    def __str__(self) -> str:
+        return str(self.value)
+
+    def __int__(self) -> int:
+        return int(self.value)
+
+    def __eq__(self, other: object) -> bool:
+        return self.value == other
+
+    def __ne__(self, other: object) -> bool:
+        return self.value != other
+
+
+class _LeftMismatchText(str):
+    foreign: str
+
+    def __new__(cls, value: str, foreign: str):
+        instance = super().__new__(cls, value)
+        instance.foreign = foreign
+        return instance
+
+    def __ne__(self, other: object) -> bool:
+        return self.foreign != other
+
+
+class _LeftMismatchInteger(int):
+    foreign: int
+
+    def __new__(cls, value: int, foreign: int):
+        instance = super().__new__(cls, value)
+        instance.foreign = foreign
+        return instance
+
+    def __ne__(self, other: object) -> bool:
+        return self.foreign != other
+
+
+class _OverlayRow:
+    def __init__(self, row: sqlite3.Row, values: dict[str, object]) -> None:
+        self.row = row
+        self.values = values
+
+    def __getitem__(self, key: str):
+        return self.values[key] if key in self.values else self.row[key]
+
+    def keys(self):
+        return self.row.keys()
 
 
 class SystemTests(unittest.TestCase):
@@ -13687,6 +13751,3667 @@ class SystemTests(unittest.TestCase):
             manual.function_hash,
             manual.receipt.function_hash,
         )
+
+    def test_function_report_public_shape_is_exact_frozen_slotted_and_exported(self) -> None:
+        model_shapes = {
+            FunctionMember: (
+                ("ordinal", "artifact_id", "input_hash", "build_support", "build_reviewer_count"),
+                {
+                    "ordinal": int,
+                    "artifact_id": str,
+                    "input_hash": str,
+                    "build_support": int,
+                    "build_reviewer_count": int,
+                },
+            ),
+            FunctionAnchorReport: (
+                ("receipt", "member_count", "members"),
+                {
+                    "receipt": FunctionReceipt,
+                    "member_count": int,
+                    "members": tuple[FunctionMember, ...],
+                },
+            ),
+            CompileScope: (
+                (
+                    "input_hash",
+                    "active_support",
+                    "active_reviewer_count",
+                    "active_span_seconds",
+                    "reasons",
+                ),
+                {
+                    "input_hash": str,
+                    "active_support": int,
+                    "active_reviewer_count": int,
+                    "active_span_seconds": int,
+                    "reasons": tuple[str, ...],
+                },
+            ),
+            PendingProposalGap: (
+                ("proposal_id", "request_id", "operation_revision", "input_hash"),
+                {
+                    "proposal_id": str,
+                    "request_id": str,
+                    "operation_revision": int,
+                    "input_hash": str,
+                },
+            ),
+            OperationArtifact: (
+                (
+                    "sequence",
+                    "artifact_id",
+                    "operation_revision",
+                    "input_hash",
+                    "status_reason",
+                ),
+                {
+                    "sequence": int,
+                    "artifact_id": str,
+                    "operation_revision": int,
+                    "input_hash": str,
+                    "status_reason": str | None,
+                },
+            ),
+            OperationArtifactStatus: (
+                ("status", "count", "artifacts"),
+                {
+                    "status": Literal[
+                        "draft", "verified", "promoted", "suspended", "retired"
+                    ],
+                    "count": int,
+                    "artifacts": tuple[OperationArtifact, ...],
+                },
+            ),
+            StaleRevisionAnomaly: (
+                (
+                    "artifact_id",
+                    "status",
+                    "artifact_revision",
+                    "current_revision",
+                    "reason",
+                ),
+                {
+                    "artifact_id": str,
+                    "status": Literal["draft", "verified", "promoted"],
+                    "artifact_revision": int,
+                    "current_revision": int,
+                    "reason": str,
+                },
+            ),
+            OperationNowReport: (
+                (
+                    "operation_revision",
+                    "policy_hash",
+                    "projection_limit",
+                    "promoted_entry_count",
+                    "compile_ready_scope_count",
+                    "compile_ready_scopes",
+                    "compile_blocked_scope_count",
+                    "compile_blocked_scopes",
+                    "pending_proposal_count",
+                    "pending_proposals",
+                    "artifact_statuses",
+                    "stale_revision_anomaly_count",
+                    "stale_revision_anomalies",
+                ),
+                {
+                    "operation_revision": int,
+                    "policy_hash": str,
+                    "projection_limit": int,
+                    "promoted_entry_count": int,
+                    "compile_ready_scope_count": int,
+                    "compile_ready_scopes": tuple[CompileScope, ...],
+                    "compile_blocked_scope_count": int,
+                    "compile_blocked_scopes": tuple[CompileScope, ...],
+                    "pending_proposal_count": int,
+                    "pending_proposals": tuple[PendingProposalGap, ...],
+                    "artifact_statuses": tuple[OperationArtifactStatus, ...],
+                    "stale_revision_anomaly_count": int,
+                    "stale_revision_anomalies": tuple[StaleRevisionAnomaly, ...],
+                },
+            ),
+            FunctionReport: (
+                ("partition", "operation", "function_anchor", "operation_now"),
+                {
+                    "partition": str,
+                    "operation": str,
+                    "function_anchor": FunctionAnchorReport | None,
+                    "operation_now": OperationNowReport,
+                },
+            ),
+        }
+        for model, (field_names, hints) in model_shapes.items():
+            with self.subTest(model=model.__name__):
+                model_fields = fields(model)
+                self.assertEqual(tuple(field.name for field in model_fields), field_names)
+                self.assertTrue(
+                    all(
+                        field.default is MISSING and field.default_factory is MISSING
+                        for field in model_fields
+                    )
+                )
+                self.assertEqual(typing.get_type_hints(model), hints)
+                self.assertTrue(model.__dataclass_params__.frozen)
+                self.assertIn("__slots__", model.__dict__)
+                self.assertIn(model.__name__, cement_runtime.__all__)
+                exported: dict[str, object] = {}
+                exec("from cement_runtime import *", exported)
+                self.assertIs(exported[model.__name__], model)
+
+        signature = inspect.signature(System.function_report)
+        self.assertEqual(
+            tuple(signature.parameters),
+            ("self", "partition", "operation", "receipt_id", "projection_limit"),
+        )
+        self.assertIs(
+            signature.parameters["receipt_id"].kind,
+            inspect.Parameter.KEYWORD_ONLY,
+        )
+        self.assertIsNone(signature.parameters["receipt_id"].default)
+        self.assertIs(
+            signature.parameters["projection_limit"].kind,
+            inspect.Parameter.KEYWORD_ONLY,
+        )
+        self.assertEqual(signature.parameters["projection_limit"].default, 100)
+        self.assertEqual(
+            typing.get_type_hints(System.function_report),
+            {
+                "partition": str,
+                "operation": str,
+                "receipt_id": str | None,
+                "projection_limit": int,
+                "return": FunctionReport,
+            },
+        )
+
+    def test_function_report_validates_arguments_and_registered_empty_resolution(self) -> None:
+        policy = CompilePolicy(2, 1, 0)
+        self.system.register_operation("tenant-a", "echo", policy=policy)
+        for projection_limit in (1, 10_000):
+            with self.subTest(projection_limit=projection_limit):
+                report = self.system.function_report(
+                    "tenant-a",
+                    "echo",
+                    projection_limit=projection_limit,
+                )
+                self.assertEqual(report.partition, "tenant-a")
+                self.assertEqual(report.operation, "echo")
+                self.assertIsNone(report.function_anchor)
+                self.assertEqual(report.operation_now.operation_revision, 1)
+                self.assertEqual(report.operation_now.projection_limit, projection_limit)
+                self.assertEqual(report.operation_now.promoted_entry_count, 0)
+                self.assertEqual(report.operation_now.compile_ready_scope_count, 0)
+                self.assertEqual(report.operation_now.compile_ready_scopes, ())
+                self.assertEqual(report.operation_now.compile_blocked_scope_count, 0)
+                self.assertEqual(report.operation_now.compile_blocked_scopes, ())
+                self.assertEqual(report.operation_now.pending_proposal_count, 0)
+                self.assertEqual(report.operation_now.pending_proposals, ())
+                self.assertEqual(report.operation_now.stale_revision_anomaly_count, 0)
+                self.assertEqual(report.operation_now.stale_revision_anomalies, ())
+                self.assertEqual(
+                    tuple(
+                        (status.status, status.count, status.artifacts)
+                        for status in report.operation_now.artifact_statuses
+                    ),
+                    (
+                        ("draft", 0, ()),
+                        ("verified", 0, ()),
+                        ("promoted", 0, ()),
+                        ("suspended", 0, ()),
+                        ("retired", 0, ()),
+                    ),
+                )
+
+        for value in (0, 10_001, True, 1.0, "100"):
+            with self.subTest(projection_limit=value):
+                with self.assertRaises(ValidationError):
+                    self.system.function_report(
+                        "tenant-a",
+                        "echo",
+                        projection_limit=value,  # type: ignore[arg-type]
+                    )
+        for receipt_id in ("", "bad id", True, "r" * 193):
+            with self.subTest(receipt_id=receipt_id):
+                with self.assertRaises(ValidationError):
+                    self.system.function_report(
+                        "tenant-a",
+                        "echo",
+                        receipt_id=receipt_id,  # type: ignore[arg-type]
+                    )
+        for partition, operation in (
+            ("tenant-a", "missing"),
+            ("tenant-b", "echo"),
+        ):
+            with self.subTest(partition=partition, operation=operation):
+                with self.assertRaisesRegex(
+                    NotFoundError,
+                    "^operation is not registered in this partition$",
+                ):
+                    self.system.function_report(partition, operation)
+        with self.assertRaisesRegex(
+            NotFoundError,
+            "^function receipt does not exist for this operation$",
+        ):
+            self.system.function_report(
+                "tenant-a",
+                "echo",
+                receipt_id="fpr_absent_report_receipt",
+            )
+
+    def test_function_report_projects_both_anchors_with_exact_counts_and_ordering(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        manifest, promotion = self._promote_three_as_function("function-report-positive")
+        pending = self.system.handle(
+            "tenant-a",
+            "echo",
+            {"x": 40},
+            request_id="function-report-pending",
+        )
+        self.assertIsInstance(pending, ReviewRequired)
+        assert isinstance(pending, ReviewRequired)
+        for value in (50, 60, 70):
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                {"x": value},
+                f"function-report-blocked-{value}",
+                reviewer="alice",
+            )
+
+        report = self.system.function_report(
+            "tenant-a",
+            "echo",
+            projection_limit=2,
+        )
+        self.assertIsInstance(report, FunctionReport)
+        anchor = report.function_anchor
+        self.assertIsNotNone(anchor)
+        assert anchor is not None
+        self.assertEqual(anchor.receipt.id, promotion.receipt_id)
+        self.assertEqual(anchor.receipt.function_hash, manifest.function_hash)
+        self.assertEqual(anchor.member_count, 3)
+        self.assertEqual(len(anchor.members), 2)
+        self.assertEqual(
+            tuple(member.ordinal for member in anchor.members),
+            (0, 1),
+        )
+        self.assertEqual(
+            tuple(member.input_hash for member in anchor.members),
+            tuple(sorted(member.input_hash for member in anchor.members)),
+        )
+        self.assertEqual(
+            tuple(
+                (member.build_support, member.build_reviewer_count)
+                for member in anchor.members
+            ),
+            ((2, 2), (2, 2)),
+        )
+
+        now = report.operation_now
+        ready_hashes = tuple(sorted(canonicalize({"x": value}).digest for value in (1, 2, 3)))
+        self.assertEqual(now.compile_ready_scope_count, 3)
+        self.assertEqual(
+            tuple(scope.input_hash for scope in now.compile_ready_scopes),
+            ready_hashes[:2],
+        )
+        self.assertTrue(all(scope.reasons == () for scope in now.compile_ready_scopes))
+        self.assertEqual(
+            tuple(
+                (
+                    scope.active_support,
+                    scope.active_reviewer_count,
+                    scope.active_span_seconds,
+                )
+                for scope in now.compile_ready_scopes
+            ),
+            ((2, 2, 0), (2, 2, 0)),
+        )
+        blocked_hashes = tuple(
+            sorted(canonicalize({"x": value}).digest for value in (50, 60, 70))
+        )
+        self.assertEqual(now.compile_blocked_scope_count, 3)
+        self.assertEqual(len(now.compile_blocked_scopes), 2)
+        self.assertGreater(
+            now.compile_blocked_scope_count,
+            len(now.compile_blocked_scopes),
+        )
+        self.assertEqual(
+            tuple(scope.input_hash for scope in now.compile_blocked_scopes),
+            blocked_hashes[:2],
+        )
+        for blocked in now.compile_blocked_scopes:
+            self.assertEqual(blocked.active_support, 1)
+            self.assertEqual(blocked.active_reviewer_count, 1)
+            self.assertEqual(blocked.active_span_seconds, 0)
+            self.assertEqual(blocked.reasons, ("support 1 is below required 2",))
+        self.assertEqual(now.pending_proposal_count, 1)
+        self.assertEqual(
+            now.pending_proposals,
+            (
+                PendingProposalGap(
+                    proposal_id=pending.proposal_id,
+                    request_id="function-report-pending",
+                    operation_revision=1,
+                    input_hash=canonicalize({"x": 40}).digest,
+                ),
+            ),
+        )
+        self.assertEqual(
+            tuple(status.status for status in now.artifact_statuses),
+            ("draft", "verified", "promoted", "suspended", "retired"),
+        )
+        status_counts = {status.status: status.count for status in now.artifact_statuses}
+        self.assertEqual(
+            status_counts,
+            {"draft": 0, "verified": 0, "promoted": 3, "suspended": 0, "retired": 0},
+        )
+        promoted = now.artifact_statuses[2]
+        self.assertEqual(len(promoted.artifacts), 2)
+        self.assertEqual(
+            tuple(item.sequence for item in promoted.artifacts),
+            tuple(sorted((item.sequence for item in promoted.artifacts), reverse=True)),
+        )
+        self.assertEqual(now.promoted_entry_count, 3)
+        self.assertEqual(now.stale_revision_anomaly_count, 0)
+
+    def test_function_report_selects_latest_current_receipt_and_explicit_history(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        manifest, first = self._promote_three_as_function("function-report-history")
+        checkpoint = self.system.inspect_function_promotion("tenant-a", "echo")
+        second = self.system.promote_function(
+            "tenant-a",
+            "echo",
+            expected_function_hash=checkpoint.function_hash,
+            promoted_by="second-report-promoter",
+        )
+        self.assertEqual(first.function_hash, second.function_hash)
+        self.assertNotEqual(first.receipt_id, second.receipt_id)
+        latest = self.system.function_report("tenant-a", "echo")
+        self.assertIsNotNone(latest.function_anchor)
+        assert latest.function_anchor is not None
+        self.assertEqual(latest.function_anchor.receipt.id, second.receipt_id)
+        self.assertEqual(latest.function_anchor.receipt.function_hash, manifest.function_hash)
+
+        for expected_revision in range(2, 11):
+            revision = self.system.revise_operation(
+                "tenant-a",
+                "echo",
+                policy=CompilePolicy(2, 1, 0),
+                revised_by=f"revision-{expected_revision}",
+            )
+            self.assertEqual(revision, expected_revision)
+        current = self.system.function_report("tenant-a", "echo")
+        self.assertIsNone(current.function_anchor)
+        self.assertEqual(current.operation_now.operation_revision, 10)
+        self.assertEqual(current.operation_now.compile_ready_scope_count, 0)
+        self.assertEqual(current.operation_now.compile_ready_scopes, ())
+        self.assertEqual(current.operation_now.compile_blocked_scope_count, 0)
+        self.assertEqual(current.operation_now.compile_blocked_scopes, ())
+        historical = self.system.function_report(
+            "tenant-a",
+            "echo",
+            receipt_id=first.receipt_id,
+            projection_limit=2,
+        )
+        self.assertIsNotNone(historical.function_anchor)
+        assert historical.function_anchor is not None
+        self.assertEqual(historical.function_anchor.receipt.id, first.receipt_id)
+        self.assertEqual(historical.function_anchor.receipt.operation_revision, 1)
+        self.assertEqual(historical.operation_now.operation_revision, 10)
+        self.assertEqual(historical.operation_now.compile_ready_scope_count, 0)
+        self.assertEqual(historical.operation_now.compile_ready_scopes, ())
+        self.assertEqual(historical.operation_now.compile_blocked_scope_count, 0)
+        self.assertEqual(historical.operation_now.compile_blocked_scopes, ())
+        self.assertEqual(historical.function_anchor.member_count, 3)
+        self.assertEqual(len(historical.function_anchor.members), 2)
+
+        self.system.register_operation(
+            "tenant-a",
+            "other",
+            policy=CompilePolicy(2, 1, 0),
+        )
+        with self.assertRaisesRegex(
+            NotFoundError,
+            "^function receipt does not exist for this operation$",
+        ):
+            self.system.function_report(
+                "tenant-a",
+                "other",
+                receipt_id=first.receipt_id,
+            )
+
+    def test_function_report_keeps_historical_build_and_current_evidence_anchors_distinct(self) -> None:
+        build_policy = CompilePolicy(3, 2, 0)
+        self.system.register_operation("tenant-a", "echo", policy=build_policy)
+        value = {"temporal-anchor": 10}
+        for index, reviewer in enumerate(("alice", "bob", "alice")):
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                value,
+                f"function-report-anchor-build-{index}",
+                reviewer=reviewer,
+            )
+        build = self.system.compile("tenant-a", "echo")
+        self.assertEqual(len(build.created), 1)
+        verification = self.system.verify("tenant-a", build.created[0])
+        self.assertTrue(verification.passed)
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        promotion = self.system.promote_function(
+            "tenant-a",
+            "echo",
+            expected_function_hash=manifest.function_hash,
+            promoted_by="anchor-promoter",
+        )
+
+        current_policy = CompilePolicy(4, 3, 10)
+        self.assertEqual(
+            self.system.revise_operation(
+                "tenant-a",
+                "echo",
+                policy=current_policy,
+                revised_by="anchor-reviser",
+            ),
+            2,
+        )
+        for index, reviewer in enumerate(("alice", "bob", "carol", "alice")):
+            if index == 1:
+                self.clock.advance(11)
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                value,
+                f"function-report-anchor-current-{index}",
+                reviewer=reviewer,
+            )
+
+        with self.system.store.transaction(write=False) as connection:
+            artifact_row = connection.execute(
+                """
+                SELECT a.id, a.input_hash, a.support, a.reviewer_count,
+                       a.policy_hash
+                FROM function_memberships AS m
+                JOIN artifacts AS a ON a.id = m.artifact_id
+                WHERE m.receipt_id = ?
+                """,
+                (promotion.receipt_id,),
+            ).fetchone()
+            operation_row = connection.execute(
+                """
+                SELECT revision, policy_hash FROM operations
+                WHERE partition = ? AND name = ?
+                """,
+                ("tenant-a", "echo"),
+            ).fetchone()
+        self.assertIsNotNone(artifact_row)
+        self.assertIsNotNone(operation_row)
+        assert artifact_row is not None and operation_row is not None
+        self.assertEqual(
+            (artifact_row["support"], artifact_row["reviewer_count"]),
+            (3, 2),
+        )
+        self.assertEqual(operation_row["revision"], 2)
+        self.assertNotEqual(artifact_row["policy_hash"], operation_row["policy_hash"])
+
+        report = self.system.function_report(
+            "tenant-a",
+            "echo",
+            receipt_id=promotion.receipt_id,
+        )
+        anchor = report.function_anchor
+        self.assertIsNotNone(anchor)
+        assert anchor is not None
+        self.assertEqual(anchor.receipt.policy_hash, artifact_row["policy_hash"])
+        self.assertEqual(anchor.receipt.policy_hash, canonicalize(build_policy.as_json()).digest)
+        self.assertEqual(len(anchor.members), 1)
+        member = anchor.members[0]
+        self.assertEqual(member.artifact_id, artifact_row["id"])
+        self.assertEqual(member.input_hash, artifact_row["input_hash"])
+        self.assertEqual(member.build_support, artifact_row["support"])
+        self.assertEqual(member.build_reviewer_count, artifact_row["reviewer_count"])
+
+        now = report.operation_now
+        self.assertEqual(now.operation_revision, operation_row["revision"])
+        self.assertEqual(now.policy_hash, operation_row["policy_hash"])
+        self.assertEqual(now.policy_hash, canonicalize(current_policy.as_json()).digest)
+        self.assertEqual(now.compile_ready_scope_count, 1)
+        self.assertEqual(len(now.compile_ready_scopes), 1)
+        current = now.compile_ready_scopes[0]
+        self.assertEqual(current.input_hash, artifact_row["input_hash"])
+        self.assertEqual(current.active_support, 4)
+        self.assertEqual(current.active_reviewer_count, 3)
+        self.assertEqual(current.active_span_seconds, 11)
+        self.assertNotEqual(
+            (member.build_support, member.build_reviewer_count),
+            (current.active_support, current.active_reviewer_count),
+        )
+
+    def test_function_report_public_rows_match_first_middle_and_last_authoritative_sources(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        _, promotion = self._promote_three_as_function("function-report-row-sources")
+        for revision in range(2, 11):
+            self.assertEqual(
+                self.system.revise_operation(
+                    "tenant-a",
+                    "echo",
+                    policy=CompilePolicy(2, 1, 0),
+                    revised_by=f"row-source-revision-{revision}",
+                ),
+                revision,
+            )
+        for value in (10, 20, 30):
+            for suffix, reviewer in (("a", "alice"), ("b", "bob")):
+                self._confirm_scope(
+                    "tenant-a",
+                    "echo",
+                    {"row-source": value},
+                    f"function-report-row-source-{value}-{suffix}",
+                    reviewer=reviewer,
+                )
+        draft_ids = self.system.compile("tenant-a", "echo").created
+        self.assertEqual(len(draft_ids), 3)
+
+        with self.system.store.transaction(write=False) as connection:
+            member_rows = connection.execute(
+                """
+                SELECT m.ordinal, a.id AS artifact_id, a.input_hash,
+                       a.support, a.reviewer_count
+                FROM function_memberships AS m
+                JOIN artifacts AS a ON a.id = m.artifact_id
+                WHERE m.receipt_id = ? ORDER BY m.ordinal
+                """,
+                (promotion.receipt_id,),
+            ).fetchall()
+            artifact_rows = connection.execute(
+                """
+                SELECT sequence, id, operation_revision, input_hash, status_reason
+                FROM artifacts
+                WHERE id IN (?, ?, ?)
+                ORDER BY sequence DESC
+                """,
+                draft_ids,
+            ).fetchall()
+        self.assertEqual(len(member_rows), 3)
+        self.assertEqual(tuple(row["ordinal"] for row in member_rows), (0, 1, 2))
+        self.assertEqual(len({row["artifact_id"] for row in member_rows}), 3)
+        self.assertEqual(len({row["input_hash"] for row in member_rows}), 3)
+        self.assertEqual(len(artifact_rows), 3)
+        self.assertEqual(len({row["sequence"] for row in artifact_rows}), 3)
+        self.assertEqual(len({row["id"] for row in artifact_rows}), 3)
+        self.assertEqual(len({row["input_hash"] for row in artifact_rows}), 3)
+        self.assertEqual(
+            tuple(row["operation_revision"] for row in artifact_rows),
+            (10, 10, 10),
+        )
+
+        report = self.system.function_report(
+            "tenant-a",
+            "echo",
+            receipt_id=promotion.receipt_id,
+            projection_limit=3,
+        )
+        anchor = report.function_anchor
+        self.assertIsNotNone(anchor)
+        assert anchor is not None
+        self.assertEqual(
+            tuple(
+                (
+                    member.ordinal,
+                    member.artifact_id,
+                    member.input_hash,
+                    member.build_support,
+                    member.build_reviewer_count,
+                )
+                for member in anchor.members
+            ),
+            tuple(
+                (
+                    row["ordinal"],
+                    row["artifact_id"],
+                    row["input_hash"],
+                    row["support"],
+                    row["reviewer_count"],
+                )
+                for row in member_rows
+            ),
+        )
+        draft_status = report.operation_now.artifact_statuses[0]
+        self.assertEqual(draft_status.status, "draft")
+        self.assertEqual(draft_status.count, 3)
+        self.assertEqual(
+            tuple(
+                (
+                    artifact.sequence,
+                    artifact.artifact_id,
+                    artifact.operation_revision,
+                    artifact.input_hash,
+                    artifact.status_reason,
+                )
+                for artifact in draft_status.artifacts
+            ),
+            tuple(
+                (
+                    row["sequence"],
+                    row["id"],
+                    row["operation_revision"],
+                    row["input_hash"],
+                    row["status_reason"],
+                )
+                for row in artifact_rows
+            ),
+        )
+
+    def test_function_report_member_projection_is_sql_bounded_and_validates_middle_and_last(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        _, promotion = self._promote_three_as_function("function-report-members")
+        bound_limits: list[int] = []
+        materialized_counts: list[int] = []
+        original_transaction = self.system.store.transaction
+
+        class CursorProxy:
+            def __init__(self, cursor: sqlite3.Cursor) -> None:
+                self.cursor = cursor
+
+            def fetchall(self):
+                rows = self.cursor.fetchall()
+                materialized_counts.append(len(rows))
+                return rows
+
+            def __getattr__(self, name: str):
+                return getattr(self.cursor, name)
+
+        class ConnectionProxy:
+            def __init__(self, connection: sqlite3.Connection) -> None:
+                self.connection = connection
+
+            def execute(self, sql: str, parameters=()):
+                cursor = self.connection.execute(sql, parameters)
+                if "FROM function_memberships AS m" in sql and "LIMIT ?" in sql:
+                    bound_limits.append(int(parameters[-1]))
+                    return CursorProxy(cursor)
+                return cursor
+
+            def __getattr__(self, name: str):
+                return getattr(self.connection, name)
+
+        @contextmanager
+        def tracked_transaction(*, write: bool):
+            self.assertFalse(write)
+            with original_transaction(write=write) as connection:
+                yield ConnectionProxy(connection)
+
+        with mock.patch.object(
+            self.system.store,
+            "transaction",
+            side_effect=tracked_transaction,
+        ), mock.patch.object(
+            self.system,
+            "_reconstruct_function_receipt",
+            side_effect=AssertionError("function report reconstructed memberships"),
+        ) as reconstruct:
+            report = self.system.function_report(
+                "tenant-a",
+                "echo",
+                projection_limit=2,
+            )
+        self.assertIsNotNone(report.function_anchor)
+        assert report.function_anchor is not None
+        self.assertEqual(len(report.function_anchor.members), 2)
+        self.assertEqual(bound_limits, [2])
+        self.assertEqual(materialized_counts, [2])
+        reconstruct.assert_not_called()
+
+        with self.system.store.transaction(write=False) as connection:
+            membership_rows = connection.execute(
+                """
+                SELECT m.ordinal, m.artifact_id, m.report_id, m.entry_seal,
+                       a.sequence AS artifact_sequence, a.artifact_json
+                FROM function_memberships AS m
+                JOIN artifacts AS a ON a.id = m.artifact_id
+                WHERE m.receipt_id = ? ORDER BY m.ordinal
+                """,
+                (promotion.receipt_id,),
+            ).fetchall()
+        self.assertEqual(len(membership_rows), 3)
+
+        connection = sqlite3.connect(self.database)
+        connection.row_factory = sqlite3.Row
+        try:
+            connection.execute("DROP TRIGGER artifacts_build_fields_immutable")
+            connection.execute("DROP TRIGGER function_memberships_no_update")
+            connection.execute("DROP TRIGGER test_reports_no_update")
+            for ordinal in (1, 2):
+                with self.subTest(kind="artifact", ordinal=ordinal):
+                    row = membership_rows[ordinal]
+                    connection.execute(
+                        "UPDATE artifacts SET artifact_json = '{}' WHERE id = ?",
+                        (row["artifact_id"],),
+                    )
+                    connection.commit()
+                    with self.assertRaisesRegex(
+                        IntegrityError,
+                        "artifact document digest mismatch",
+                    ):
+                        self.system.function_report(
+                            "tenant-a",
+                            "echo",
+                            projection_limit=3,
+                        )
+                    connection.execute(
+                        "UPDATE artifacts SET artifact_json = ? WHERE id = ?",
+                        (row["artifact_json"], row["artifact_id"]),
+                    )
+                    connection.commit()
+
+                with self.subTest(kind="entry_seal", ordinal=ordinal):
+                    row = membership_rows[ordinal]
+                    connection.execute(
+                        """
+                        UPDATE function_memberships SET entry_seal = ?
+                        WHERE receipt_id = ? AND ordinal = ?
+                        """,
+                        (
+                            self._flip_final_nibble(str(row["entry_seal"])),
+                            promotion.receipt_id,
+                            ordinal,
+                        ),
+                    )
+                    connection.commit()
+                    with self.assertRaisesRegex(
+                        IntegrityError,
+                        f"function report member {ordinal} entry seal mismatch",
+                    ):
+                        self.system.function_report(
+                            "tenant-a",
+                            "echo",
+                            projection_limit=3,
+                        )
+                    connection.execute(
+                        """
+                        UPDATE function_memberships SET entry_seal = ?
+                        WHERE receipt_id = ? AND ordinal = ?
+                        """,
+                        (row["entry_seal"], promotion.receipt_id, ordinal),
+                    )
+                    connection.commit()
+
+                with self.subTest(kind="foreign_report", ordinal=ordinal):
+                    row = membership_rows[ordinal]
+                    connection.execute(
+                        """
+                        UPDATE function_memberships SET report_id = ?
+                        WHERE receipt_id = ? AND ordinal = ?
+                        """,
+                        (
+                            membership_rows[0]["report_id"],
+                            promotion.receipt_id,
+                            ordinal,
+                        ),
+                    )
+                    connection.commit()
+                    with self.assertRaisesRegex(
+                        IntegrityError,
+                        "function receipt projected membership count mismatch",
+                    ):
+                        self.system.function_report(
+                            "tenant-a",
+                            "echo",
+                            projection_limit=3,
+                        )
+                    connection.execute(
+                        """
+                        UPDATE function_memberships SET report_id = ?
+                        WHERE receipt_id = ? AND ordinal = ?
+                        """,
+                        (row["report_id"], promotion.receipt_id, ordinal),
+                    )
+                    connection.commit()
+
+                artifact_row = connection.execute(
+                    "SELECT * FROM artifacts WHERE id = ?",
+                    (row["artifact_id"],),
+                ).fetchone()
+                report_row = connection.execute(
+                    "SELECT * FROM test_reports WHERE id = ?",
+                    (row["report_id"],),
+                ).fetchone()
+                self.assertIsNotNone(artifact_row)
+                self.assertIsNotNone(report_row)
+                assert artifact_row is not None and report_row is not None
+                details_value = json.loads(str(report_row["details_json"]))
+                self.assertIs(type(details_value), dict)
+                passing_details = dict(details_value)
+                passing_details["failures"] = ["forced report failure"]
+                passing_document = canonicalize(passing_details)
+                scope_details = dict(details_value)
+                scope_details["scope_hash"] = "0" * 64
+                scope_document = canonicalize(scope_details)
+                report_mutations = (
+                    (
+                        "passing",
+                        {
+                            "passed": 0,
+                            "details_json": passing_document.text,
+                            "details_hash": passing_document.digest,
+                        },
+                        "bound report is not passing",
+                    ),
+                    (
+                        "scope",
+                        {
+                            "details_json": scope_document.text,
+                            "details_hash": scope_document.digest,
+                        },
+                        "bound report scope mismatch",
+                    ),
+                    (
+                        "artifact_hash",
+                        {"artifact_hash": "0" * 64},
+                        "bound report artifact_hash mismatch",
+                    ),
+                    (
+                        "build_hash",
+                        {"build_hash": "0" * 64},
+                        "bound report build_hash mismatch",
+                    ),
+                    (
+                        "policy_hash",
+                        {"policy_hash": "0" * 64},
+                        "bound report policy_hash mismatch",
+                    ),
+                    (
+                        "evidence_snapshot_hash",
+                        {"evidence_snapshot_hash": "0" * 64},
+                        "bound report evidence_snapshot_hash mismatch",
+                    ),
+                )
+                for label, updates, expected in report_mutations:
+                    with self.subTest(kind=label, ordinal=ordinal):
+                        assignments = ", ".join(
+                            f"{field} = ?" for field in updates
+                        )
+                        connection.execute(
+                            f"UPDATE test_reports SET {assignments} WHERE id = ?",
+                            (*updates.values(), row["report_id"]),
+                        )
+                        mutated_report = connection.execute(
+                            "SELECT * FROM test_reports WHERE id = ?",
+                            (row["report_id"],),
+                        ).fetchone()
+                        self.assertIsNotNone(mutated_report)
+                        assert mutated_report is not None
+                        connection.execute(
+                            """
+                            UPDATE function_memberships SET entry_seal = ?
+                            WHERE receipt_id = ? AND ordinal = ?
+                            """,
+                            (
+                                _function_entry_seal(artifact_row, mutated_report),
+                                promotion.receipt_id,
+                                ordinal,
+                            ),
+                        )
+                        connection.commit()
+                        with self.assertRaisesRegex(
+                            IntegrityError,
+                            f"^function report member {ordinal} report is invalid: {expected}$",
+                        ):
+                            self.system.function_report(
+                                "tenant-a",
+                                "echo",
+                                projection_limit=3,
+                            )
+                        connection.execute(
+                            """
+                            UPDATE test_reports
+                            SET artifact_hash = ?, build_hash = ?, policy_hash = ?,
+                                evidence_snapshot_hash = ?, passed = ?,
+                                details_json = ?, details_hash = ?
+                            WHERE id = ?
+                            """,
+                            (
+                                report_row["artifact_hash"],
+                                report_row["build_hash"],
+                                report_row["policy_hash"],
+                                report_row["evidence_snapshot_hash"],
+                                report_row["passed"],
+                                report_row["details_json"],
+                                report_row["details_hash"],
+                                row["report_id"],
+                            ),
+                        )
+                        connection.execute(
+                            """
+                            UPDATE function_memberships SET entry_seal = ?
+                            WHERE receipt_id = ? AND ordinal = ?
+                            """,
+                            (row["entry_seal"], promotion.receipt_id, ordinal),
+                        )
+                        connection.commit()
+
+            last = membership_rows[2]
+            connection.execute(
+                """
+                UPDATE function_memberships SET entry_seal = ?
+                WHERE receipt_id = ? AND ordinal = ?
+                """,
+                (
+                    self._flip_final_nibble(str(last["entry_seal"])),
+                    promotion.receipt_id,
+                    2,
+                ),
+            )
+            connection.commit()
+            projected = self.system.function_report(
+                "tenant-a",
+                "echo",
+                projection_limit=2,
+            )
+            self.assertIsNotNone(projected.function_anchor)
+            assert projected.function_anchor is not None
+            self.assertEqual(len(projected.function_anchor.members), 2)
+            with self.assertRaisesRegex(
+                IntegrityError,
+                "function report member 2 entry seal mismatch",
+            ):
+                self.system.function_report(
+                    "tenant-a",
+                    "echo",
+                    projection_limit=3,
+                )
+            connection.execute(
+                """
+                UPDATE function_memberships SET entry_seal = ?
+                WHERE receipt_id = ? AND ordinal = ?
+                """,
+                (last["entry_seal"], promotion.receipt_id, 2),
+            )
+            connection.execute(
+                """
+                UPDATE function_memberships SET report_id = ?
+                WHERE receipt_id = ? AND ordinal = ?
+                """,
+                (membership_rows[0]["report_id"], promotion.receipt_id, 2),
+            )
+            connection.commit()
+            projected = self.system.function_report(
+                "tenant-a",
+                "echo",
+                projection_limit=2,
+            )
+            self.assertIsNotNone(projected.function_anchor)
+            assert projected.function_anchor is not None
+            self.assertEqual(len(projected.function_anchor.members), 2)
+            with self.assertRaisesRegex(
+                IntegrityError,
+                "function receipt projected membership count mismatch",
+            ):
+                self.system.function_report(
+                    "tenant-a",
+                    "echo",
+                    projection_limit=3,
+                )
+            connection.execute(
+                """
+                UPDATE function_memberships SET report_id = ?
+                WHERE receipt_id = ? AND ordinal = ?
+                """,
+                (last["report_id"], promotion.receipt_id, 2),
+            )
+            connection.commit()
+
+            status_selected_sequences = {
+                row["artifact_sequence"]
+                for row in sorted(
+                    membership_rows,
+                    key=lambda item: item["artifact_sequence"],
+                    reverse=True,
+                )[:2]
+            }
+            isolated = [
+                row
+                for row in membership_rows[:2]
+                if row["artifact_sequence"] not in status_selected_sequences
+            ]
+            self.assertEqual(len(isolated), 1)
+            member_only = isolated[0]
+            connection.execute(
+                "UPDATE artifacts SET artifact_json = '{}' WHERE id = ?",
+                (member_only["artifact_id"],),
+            )
+            connection.commit()
+            with self.assertRaisesRegex(
+                IntegrityError,
+                "artifact document digest mismatch",
+            ):
+                self.system.function_report(
+                    "tenant-a",
+                    "echo",
+                    projection_limit=2,
+                )
+            connection.execute(
+                "UPDATE artifacts SET artifact_json = ? WHERE id = ?",
+                (member_only["artifact_json"], member_only["artifact_id"]),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+    def test_function_report_reaches_every_compiler_block_reason_through_public_apis(self) -> None:
+        class ConstantSource:
+            def propose(self, request):
+                return Candidate(output="ok", provenance={"probe": "artifact-depth"})
+
+        def new_system(label: str, policy: CompilePolicy, *, source=None) -> System:
+            return System(
+                str(pathlib.Path(self.temporary.name) / f"{label}.db"),
+                candidate_source=source if source is not None else FakeSource(),
+                clock_us=Clock(),
+            )
+
+        def confirm(
+            system: System,
+            request_id: str,
+            *,
+            input_value: object = None,
+            reviewer: str = "alice",
+            corrected: object = None,
+        ) -> None:
+            value = {"x": 1} if input_value is None else input_value
+            pending = system.handle(
+                "tenant-a",
+                "echo",
+                value,
+                request_id=request_id,
+            )
+            self.assertIsInstance(pending, ReviewRequired)
+            assert isinstance(pending, ReviewRequired)
+            if corrected is None:
+                system.review(
+                    "tenant-a",
+                    pending.proposal_id,
+                    reviewer=reviewer,
+                    decision="accept",
+                )
+            else:
+                system.review(
+                    "tenant-a",
+                    pending.proposal_id,
+                    reviewer=reviewer,
+                    decision="correct",
+                    corrected_output=corrected,
+                )
+
+        probes: list[tuple[str, System, tuple[str, ...], int, int, int]] = []
+
+        support = new_system("report-reason-support", CompilePolicy(2, 1, 0))
+        support.register_operation(
+            "tenant-a", "echo", policy=CompilePolicy(2, 1, 0)
+        )
+        confirm(support, "support-one")
+        probes.append(
+            (
+                "support",
+                support,
+                ("support 1 is below required 2",),
+                1,
+                1,
+                0,
+            )
+        )
+
+        reviewers = new_system("report-reason-reviewers", CompilePolicy(2, 2, 0))
+        reviewers.register_operation(
+            "tenant-a", "echo", policy=CompilePolicy(2, 2, 0)
+        )
+        confirm(reviewers, "reviewers-one", reviewer="alice")
+        confirm(reviewers, "reviewers-two", reviewer="alice")
+        probes.append(
+            (
+                "reviewers",
+                reviewers,
+                ("reviewers 1 is below required 2",),
+                2,
+                1,
+                0,
+            )
+        )
+
+        span = new_system("report-reason-span", CompilePolicy(2, 1, 10))
+        span.register_operation(
+            "tenant-a", "echo", policy=CompilePolicy(2, 1, 10)
+        )
+        confirm(span, "span-one", reviewer="alice")
+        confirm(span, "span-two", reviewer="bob")
+        probes.append(
+            (
+                "span",
+                span,
+                ("span 0s is below required 10s",),
+                2,
+                2,
+                0,
+            )
+        )
+
+        conflict = new_system("report-reason-conflict", CompilePolicy(2, 1, 0))
+        conflict.register_operation(
+            "tenant-a", "echo", policy=CompilePolicy(2, 1, 0)
+        )
+        confirm(conflict, "conflict-one", reviewer="alice")
+        confirm(
+            conflict,
+            "conflict-two",
+            reviewer="bob",
+            corrected={"different": True},
+        )
+        probes.append(
+            (
+                "conflict",
+                conflict,
+                ("confirmed outputs conflict",),
+                2,
+                2,
+                0,
+            )
+        )
+
+        nested: object = 0
+        for _ in range(63):
+            nested = [nested]
+        artifact = new_system(
+            "report-reason-artifact",
+            CompilePolicy(2, 1, 0),
+            source=ConstantSource(),
+        )
+        artifact.register_operation(
+            "tenant-a", "echo", policy=CompilePolicy(2, 1, 0)
+        )
+        confirm(artifact, "artifact-one", input_value=nested, reviewer="alice")
+        confirm(artifact, "artifact-two", input_value=nested, reviewer="alice")
+        probes.append(
+            (
+                "artifact",
+                artifact,
+                ("artifact constraint: JSON exceeds maximum depth 64",),
+                2,
+                1,
+                0,
+            )
+        )
+
+        for label, system, reasons, active_support, reviewer_count, span_seconds in probes:
+            with self.subTest(reason=label):
+                report = system.function_report("tenant-a", "echo")
+                self.assertEqual(report.operation_now.compile_ready_scope_count, 0)
+                self.assertEqual(report.operation_now.compile_ready_scopes, ())
+                self.assertEqual(report.operation_now.compile_blocked_scope_count, 1)
+                self.assertEqual(len(report.operation_now.compile_blocked_scopes), 1)
+                scope = report.operation_now.compile_blocked_scopes[0]
+                self.assertEqual(scope.reasons, reasons)
+                self.assertEqual(scope.active_support, active_support)
+                self.assertEqual(scope.active_reviewer_count, reviewer_count)
+                self.assertEqual(scope.active_span_seconds, span_seconds)
+
+        ordered = new_system("report-reason-order", CompilePolicy(3, 3, 10))
+        ordered.register_operation(
+            "tenant-a", "echo", policy=CompilePolicy(3, 3, 10)
+        )
+        confirm(ordered, "ordered-one", reviewer="alice")
+        confirm(
+            ordered,
+            "ordered-two",
+            reviewer="alice",
+            corrected={"different": True},
+        )
+        ordered_scope = ordered.function_report(
+            "tenant-a", "echo"
+        ).operation_now.compile_blocked_scopes[0]
+        self.assertEqual(
+            ordered_scope.reasons,
+            (
+                "confirmed outputs conflict",
+                "support 2 is below required 3",
+                "reviewers 1 is below required 3",
+                "span 0s is below required 10s",
+            ),
+        )
+        self.assertEqual(ordered_scope.active_support, 2)
+        self.assertEqual(ordered_scope.active_reviewer_count, 1)
+        self.assertEqual(ordered_scope.active_span_seconds, 0)
+
+        compiled = ordered.compile("tenant-a", "echo")
+        self.assertEqual(compiled.created, ())
+        self.assertEqual(compiled.existing, ())
+        self.assertEqual(
+            compiled.blocked,
+            (
+                {
+                    "input_hash": ordered_scope.input_hash,
+                    "reasons": list(ordered_scope.reasons),
+                    "support": 2,
+                },
+            ),
+        )
+        self.assertEqual(
+            set(compiled.blocked[0]),
+            {"input_hash", "reasons", "support"},
+        )
+
+    def test_function_report_compile_integrity_failure_is_never_a_gap_reason(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self.confirm("function-report-corrupt-example", reviewer="alice")
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("DROP TRIGGER examples_no_update")
+            changed = connection.execute(
+                "UPDATE examples SET receipt_json = '{}' WHERE id = (SELECT id FROM examples LIMIT 1)"
+            ).rowcount
+            self.assertEqual(changed, 1)
+            connection.commit()
+        finally:
+            connection.close()
+        with self.assertRaisesRegex(
+            IntegrityError,
+            "receipt digest mismatch",
+        ):
+            self.system.function_report("tenant-a", "echo")
+
+    def test_function_report_translates_null_persisted_projection_scalars(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._promote_three_as_function("function-report-null-scalars")
+        for suffix, reviewer in (("a", "alice"), ("b", "bob")):
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                {"null-report-passed": 1},
+                f"function-report-null-passed-{suffix}",
+                reviewer=reviewer,
+            )
+        extra_build = self.system.compile("tenant-a", "echo")
+        self.assertEqual(len(extra_build.created), 1)
+        extra_id = extra_build.created[0]
+        extra_report = self.system.verify("tenant-a", extra_id)
+        self.assertTrue(extra_report.passed)
+        self.system.promote(
+            "tenant-a",
+            extra_id,
+            scope_hash=extra_report.scope_hash,
+            promoted_by="null-scalar-promoter",
+        )
+
+        authority = mock.Mock(side_effect=AssertionError("authority consulted"))
+        clock = mock.Mock(side_effect=AssertionError("clock consulted"))
+        reader = System(self.database, authority=authority, clock_us=clock)
+        connection = sqlite3.connect(self.database)
+        try:
+            replacements = {
+                "examples": (
+                    "confirmed_at_us INTEGER NOT NULL",
+                    "confirmed_at_us INTEGER",
+                ),
+                "test_reports": (
+                    "passed INTEGER NOT NULL CHECK (passed IN (0, 1))",
+                    "passed INTEGER CHECK (passed IN (0, 1))",
+                ),
+            }
+            connection.execute("PRAGMA writable_schema = ON")
+            for table, (stored, nullable) in replacements.items():
+                schema_row = connection.execute(
+                    "SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = ?",
+                    (table,),
+                ).fetchone()
+                self.assertIsNotNone(schema_row)
+                assert schema_row is not None
+                schema = str(schema_row[0])
+                self.assertIn(stored, schema)
+                connection.execute(
+                    "UPDATE sqlite_schema SET sql = ? WHERE type = 'table' AND name = ?",
+                    (schema.replace(stored, nullable, 1), table),
+                )
+            schema_version = int(
+                connection.execute("PRAGMA schema_version").fetchone()[0]
+            )
+            connection.execute(f"PRAGMA schema_version = {schema_version + 1}")
+            connection.execute("PRAGMA writable_schema = OFF")
+            connection.execute("DROP TRIGGER examples_no_update")
+            connection.execute("DROP TRIGGER test_reports_no_update")
+            connection.commit()
+        finally:
+            connection.close()
+
+        connection = sqlite3.connect(self.database)
+        try:
+            report_id = connection.execute(
+                "SELECT verified_report_id FROM artifacts WHERE id = ?",
+                (extra_id,),
+            ).fetchone()[0]
+            changed = connection.execute(
+                "UPDATE test_reports SET passed = NULL WHERE id = ?",
+                (report_id,),
+            ).rowcount
+            self.assertEqual(changed, 1)
+            connection.commit()
+            self.assertIsNone(
+                connection.execute(
+                    "SELECT passed FROM test_reports WHERE id = ?",
+                    (report_id,),
+                ).fetchone()[0]
+            )
+        finally:
+            connection.close()
+        before = self._database_dump()
+        with self.assertRaisesRegex(
+            IntegrityError,
+            "^operation artifact row is invalid:",
+        ):
+            reader.function_report("tenant-a", "echo")
+        self.assertEqual(self._database_dump(), before)
+        authority.assert_not_called()
+        clock.assert_not_called()
+
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute(
+                "UPDATE test_reports SET passed = 1 WHERE id = ?",
+                (report_id,),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        self.assertEqual(
+            self.system.revise_operation(
+                "tenant-a",
+                "echo",
+                policy=CompilePolicy(2, 1, 0),
+                revised_by="null-scalar-reviser",
+            ),
+            2,
+        )
+        for suffix, reviewer in (("a", "alice"), ("b", "bob")):
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                {"null-confirmed-at": 1},
+                f"function-report-null-confirmed-at-{suffix}",
+                reviewer=reviewer,
+            )
+        connection = sqlite3.connect(self.database)
+        try:
+            example_id = connection.execute(
+                """
+                SELECT id FROM examples
+                WHERE partition = ? AND operation = ? AND operation_revision = ?
+                ORDER BY id LIMIT 1
+                """,
+                ("tenant-a", "echo", 2),
+            ).fetchone()[0]
+            changed = connection.execute(
+                "UPDATE examples SET confirmed_at_us = NULL WHERE id = ?",
+                (example_id,),
+            ).rowcount
+            self.assertEqual(changed, 1)
+            connection.commit()
+            self.assertIsNone(
+                connection.execute(
+                    "SELECT confirmed_at_us FROM examples WHERE id = ?",
+                    (example_id,),
+                ).fetchone()[0]
+            )
+        finally:
+            connection.close()
+        before = self._database_dump()
+        with self.assertRaisesRegex(
+            IntegrityError,
+            "^current build projection is invalid:",
+        ):
+            reader.function_report("tenant-a", "echo")
+        self.assertEqual(self._database_dump(), before)
+        authority.assert_not_called()
+        clock.assert_not_called()
+
+    def test_current_build_projection_helper_is_lazy_ordered_and_shared_by_compile(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        for value in (3, 1, 2):
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                {"x": value},
+                f"function-report-helper-{value}-a",
+                reviewer="alice",
+            )
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                {"x": value},
+                f"function-report-helper-{value}-b",
+                reviewer="bob",
+            )
+        with self.system.store.transaction(write=False) as connection:
+            operation_row = connection.execute(
+                "SELECT * FROM operations WHERE partition = ? AND name = ?",
+                ("tenant-a", "echo"),
+            ).fetchone()
+            self.assertIsNotNone(operation_row)
+            assert operation_row is not None
+            projections = self.system._current_build_projections(
+                connection,
+                operation_row,
+            )
+            self.assertIs(iter(projections), projections)
+            projected = tuple(projections)
+            self.assertTrue(connection.in_transaction)
+        expected_hashes = tuple(
+            sorted(canonicalize({"x": value}).digest for value in (1, 2, 3))
+        )
+        self.assertEqual(tuple(item[0] for item in projected), expected_hashes)
+        self.assertEqual(tuple(item[1] for item in projected), tuple(
+            canonicalize({"x": value}).text
+            for value in sorted((1, 2, 3), key=lambda value: canonicalize({"x": value}).digest)
+        ))
+        self.assertTrue(all(isinstance(item[2], _CurrentBuild) for item in projected))
+
+        with mock.patch.object(
+            self.system,
+            "_current_build_projections",
+            wraps=self.system._current_build_projections,
+        ) as shared:
+            result = self.system.compile("tenant-a", "echo")
+        self.assertEqual(len(result.created), 3)
+        self.assertEqual(result.existing, ())
+        self.assertEqual(result.blocked, ())
+        shared.assert_called_once()
+
+    def test_current_build_projection_helper_rejects_a_second_canonical_text_for_one_digest(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        for value in (1, 2):
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                {"collision": value},
+                f"function-report-collision-{value}",
+                reviewer="alice",
+            )
+        first = canonicalize({"collision": 1})
+        second = canonicalize({"collision": 2})
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("DROP TRIGGER examples_no_update")
+            changed = connection.execute(
+                "UPDATE examples SET input_hash = ? WHERE input_json = ?",
+                (first.digest, second.text),
+            ).rowcount
+            self.assertEqual(changed, 1)
+            connection.commit()
+        finally:
+            connection.close()
+
+        sentinel = _BlockedBuild(
+            reasons=("sentinel",),
+            support=1,
+            reviewer_count=1,
+            span_seconds=0,
+        )
+        with self.system.store.transaction(write=False) as connection:
+            operation_row = connection.execute(
+                "SELECT * FROM operations WHERE partition = ? AND name = ?",
+                ("tenant-a", "echo"),
+            ).fetchone()
+            self.assertIsNotNone(operation_row)
+            assert operation_row is not None
+            with mock.patch.object(
+                self.system,
+                "_project_current_build",
+                return_value=sentinel,
+            ) as project:
+                with self.assertRaisesRegex(
+                    IntegrityError,
+                    "^one input digest maps to multiple canonical inputs$",
+                ):
+                    tuple(
+                        self.system._current_build_projections(
+                            connection,
+                            operation_row,
+                        )
+                    )
+        project.assert_called_once()
+
+    def test_function_report_pending_proposals_bind_partition_operation_request_and_revision(self) -> None:
+        policy = CompilePolicy(2, 1, 0)
+        scopes = (
+            ("tenant_a", "echo_1"),
+            ("tenant_a", "echoX1"),
+            ("tenant_a", "ECHO_1"),
+            ("tenantXa", "echo_1"),
+            ("TENANT_A", "echo_1"),
+        )
+        for partition, operation in scopes:
+            self.system.register_operation(partition, operation, policy=policy)
+
+        target: list[ReviewRequired] = []
+        for request_id, value in (
+            ("shared_request", {"target": 3}),
+            ("target_middle", {"target": 2}),
+            ("target_last", {"target": 1}),
+        ):
+            pending = self.system.handle(
+                "tenant_a",
+                "echo_1",
+                value,
+                request_id=request_id,
+            )
+            self.assertIsInstance(pending, ReviewRequired)
+            assert isinstance(pending, ReviewRequired)
+            target.append(pending)
+        self.assertEqual(
+            self.system.revise_operation(
+                "tenant_a",
+                "echo_1",
+                policy=policy,
+                revised_by="pending-revision-two",
+            ),
+            2,
+        )
+        current = self.system.handle(
+            "tenant_a",
+            "echo_1",
+            {"target": 4},
+            request_id="target_current",
+        )
+        self.assertIsInstance(current, ReviewRequired)
+        assert isinstance(current, ReviewRequired)
+        target.append(current)
+
+        colliders: list[ReviewRequired] = []
+        for partition, operation, request_id in (
+            ("tenantXa", "echo_1", "shared_request"),
+            ("tenant_a", "echoX1", "other-operation"),
+            ("tenant_a", "ECHO_1", "case-operation"),
+            ("TENANT_A", "echo_1", "case-partition"),
+        ):
+            pending = self.system.handle(
+                partition,
+                operation,
+                {"collider": request_id},
+                request_id=request_id,
+            )
+            self.assertIsInstance(pending, ReviewRequired)
+            assert isinstance(pending, ReviewRequired)
+            colliders.append(pending)
+
+        report = self.system.function_report(
+            "tenant_a",
+            "echo_1",
+            projection_limit=10,
+        )
+        gaps = report.operation_now.pending_proposals
+        target_ids = tuple(sorted(item.proposal_id for item in target))
+        self.assertEqual(report.operation_now.pending_proposal_count, 4)
+        self.assertEqual(tuple(item.proposal_id for item in gaps), target_ids)
+        self.assertEqual(
+            {item.proposal_id: item.request_id for item in gaps},
+            {item.proposal_id: request_id for item, request_id in zip(
+                target,
+                ("shared_request", "target_middle", "target_last", "target_current"),
+                strict=True,
+            )},
+        )
+        self.assertEqual(
+            sorted(item.operation_revision for item in gaps),
+            [1, 1, 1, 2],
+        )
+        self.assertTrue(
+            {item.proposal_id for item in gaps}.isdisjoint(
+                {item.proposal_id for item in colliders}
+            )
+        )
+
+    def test_function_report_pending_count_reaches_the_10001_tail_with_bounded_detail(self) -> None:
+        self.system.register_operation(
+            "tenant-a",
+            "echo",
+            policy=CompilePolicy(2, 1, 0),
+        )
+        provenance = canonicalize({"source": "tail"})
+        request_rows: list[tuple[object, ...]] = []
+        proposal_rows: list[tuple[object, ...]] = []
+        input_hashes: list[str] = []
+        for index in range(10_001):
+            request_id = f"req_tail_{index:05d}"
+            proposal_id = f"prop_tail_{index:05d}"
+            input_json = canonicalize({"tail": index})
+            proposed = canonicalize({"output": index})
+            input_hashes.append(input_json.digest)
+            request_rows.append(
+                (
+                    request_id,
+                    "tenant-a",
+                    "echo",
+                    1,
+                    input_json.text,
+                    input_json.digest,
+                    proposal_id,
+                    20_000 + index,
+                    20_000 + index,
+                )
+            )
+            proposal_rows.append(
+                (
+                    proposal_id,
+                    "tenant-a",
+                    request_id,
+                    proposed.text,
+                    proposed.digest,
+                    provenance.text,
+                    provenance.digest,
+                    20_000 + index,
+                    index + 2,
+                )
+            )
+        with self.system.store.transaction(write=True) as connection:
+            connection.executemany(
+                """
+                INSERT INTO requests(
+                    id, partition, operation, operation_revision,
+                    input_json, input_hash, status, proposal_id,
+                    created_at_us, updated_at_us
+                ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+                """,
+                request_rows,
+            )
+            connection.executemany(
+                """
+                INSERT INTO proposals(
+                    id, partition, request_id,
+                    proposed_output_json, proposed_output_hash,
+                    provenance_json, provenance_hash,
+                    status, created_at_us, status_sequence
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+                """,
+                proposal_rows,
+            )
+
+        report = self.system.function_report(
+            "tenant-a",
+            "echo",
+            projection_limit=1,
+        )
+        self.assertEqual(report.operation_now.pending_proposal_count, 10_001)
+        self.assertEqual(
+            report.operation_now.pending_proposals,
+            (
+                PendingProposalGap(
+                    proposal_id="prop_tail_00000",
+                    request_id="req_tail_00000",
+                    operation_revision=1,
+                    input_hash=input_hashes[0],
+                ),
+            ),
+        )
+        self.assertGreater(
+            report.operation_now.pending_proposal_count,
+            len(report.operation_now.pending_proposals),
+        )
+
+        maximum = self.system.function_report(
+            "tenant-a",
+            "echo",
+            projection_limit=10_000,
+        )
+        maximum_pending = maximum.operation_now.pending_proposals
+        self.assertEqual(maximum.operation_now.pending_proposal_count, 10_001)
+        self.assertEqual(len(maximum_pending), 10_000)
+        self.assertEqual(
+            maximum_pending[0],
+            PendingProposalGap(
+                proposal_id="prop_tail_00000",
+                request_id="req_tail_00000",
+                operation_revision=1,
+                input_hash=input_hashes[0],
+            ),
+        )
+        self.assertEqual(
+            maximum_pending[-1],
+            PendingProposalGap(
+                proposal_id="prop_tail_09999",
+                request_id="req_tail_09999",
+                operation_revision=1,
+                input_hash=input_hashes[9_999],
+            ),
+        )
+        self.assertGreater(
+            maximum.operation_now.pending_proposal_count,
+            len(maximum_pending),
+        )
+
+    def test_function_report_artifact_statuses_are_fixed_exact_newest_first_and_bounded(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        for value in range(1, 8):
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                {"status": value},
+                f"function-report-status-{value}-a",
+                reviewer="alice",
+            )
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                {"status": value},
+                f"function-report-status-{value}-b",
+                reviewer="bob",
+            )
+        artifacts = self.system.compile("tenant-a", "echo").created
+        self.assertEqual(len(artifacts), 7)
+        draft_ids = artifacts[:3]
+        verified_id = artifacts[3]
+        promoted_id = artifacts[4]
+        suspended_id = artifacts[5]
+        retired_id = artifacts[6]
+
+        verified_report = self.system.verify("tenant-a", verified_id)
+        self.assertTrue(verified_report.passed)
+        promoted_report = self.system.verify("tenant-a", promoted_id)
+        self.assertTrue(promoted_report.passed)
+        self.system.promote(
+            "tenant-a",
+            promoted_id,
+            scope_hash=promoted_report.scope_hash,
+            promoted_by="status-promoter",
+        )
+        self.system.suspend_artifact(
+            "tenant-a",
+            suspended_id,
+            suspended_by="status-suspender",
+            reason="status suspension reason",
+        )
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("DROP TRIGGER artifacts_status_lifecycle")
+            connection.execute("DROP TRIGGER artifacts_build_fields_immutable")
+            changed = connection.execute(
+                """
+                UPDATE artifacts SET status = 'retired', status_reason = ?
+                WHERE id = ?
+                """,
+                ("status retirement reason", retired_id),
+            ).rowcount
+            self.assertEqual(changed, 1)
+            connection.commit()
+        finally:
+            connection.close()
+
+        report = self.system.function_report(
+            "tenant-a",
+            "echo",
+            projection_limit=2,
+        )
+        statuses = report.operation_now.artifact_statuses
+        self.assertEqual(
+            tuple(status.status for status in statuses),
+            ("draft", "verified", "promoted", "suspended", "retired"),
+        )
+        self.assertEqual(
+            tuple(status.count for status in statuses),
+            (3, 1, 1, 1, 1),
+        )
+        self.assertEqual(report.operation_now.promoted_entry_count, 1)
+        self.assertEqual(len(statuses[0].artifacts), 2)
+        self.assertEqual(
+            tuple(item.sequence for item in statuses[0].artifacts),
+            tuple(sorted((item.sequence for item in statuses[0].artifacts), reverse=True)),
+        )
+        self.assertEqual(statuses[1].artifacts[0].artifact_id, verified_id)
+        self.assertEqual(statuses[2].artifacts[0].artifact_id, promoted_id)
+        self.assertEqual(statuses[3].artifacts[0].artifact_id, suspended_id)
+        self.assertEqual(
+            statuses[3].artifacts[0].status_reason,
+            "status suspension reason",
+        )
+        self.assertEqual(statuses[4].artifacts[0].artifact_id, retired_id)
+        self.assertEqual(
+            statuses[4].artifacts[0].status_reason,
+            "status retirement reason",
+        )
+        self.assertEqual(
+            {item.artifact_id for item in statuses[0].artifacts},
+            set(
+                sorted(
+                    draft_ids,
+                    key=lambda artifact_id: typing.cast(
+                        int,
+                        self.system.artifact("tenant-a", artifact_id)["sequence"],
+                    ),
+                    reverse=True,
+                )[:2]
+            ),
+        )
+
+        connection = sqlite3.connect(self.database)
+        try:
+            draft_rows = connection.execute(
+                """
+                SELECT id, artifact_json FROM artifacts
+                WHERE id IN (?, ?, ?) ORDER BY sequence DESC
+                """,
+                draft_ids,
+            ).fetchall()
+            self.assertEqual(len(draft_rows), 3)
+            for position in (1, 2):
+                with self.subTest(position=position):
+                    artifact_id, artifact_json = draft_rows[position]
+                    connection.execute(
+                        "UPDATE artifacts SET artifact_json = '{}' WHERE id = ?",
+                        (artifact_id,),
+                    )
+                    connection.commit()
+                    with self.assertRaisesRegex(
+                        IntegrityError,
+                        "artifact document digest mismatch",
+                    ):
+                        self.system.function_report(
+                            "tenant-a",
+                            "echo",
+                            projection_limit=3,
+                        )
+                    connection.execute(
+                        "UPDATE artifacts SET artifact_json = ? WHERE id = ?",
+                        (artifact_json, artifact_id),
+                    )
+                    connection.commit()
+
+            oldest_id, oldest_json = draft_rows[2]
+            connection.execute(
+                "UPDATE artifacts SET artifact_json = '{}' WHERE id = ?",
+                (oldest_id,),
+            )
+            connection.commit()
+            bounded = self.system.function_report(
+                "tenant-a",
+                "echo",
+                projection_limit=2,
+            )
+            self.assertEqual(bounded.operation_now.artifact_statuses[0].count, 3)
+            self.assertEqual(len(bounded.operation_now.artifact_statuses[0].artifacts), 2)
+            with self.assertRaisesRegex(
+                IntegrityError,
+                "artifact document digest mismatch",
+            ):
+                self.system.function_report(
+                    "tenant-a",
+                    "echo",
+                    projection_limit=3,
+                )
+            connection.execute(
+                "UPDATE artifacts SET artifact_json = ? WHERE id = ?",
+                (oldest_json, oldest_id),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+    def test_function_report_stale_anomalies_cover_three_active_statuses_at_revision_ten(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        for value in range(1, 6):
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                {"stale": value},
+                f"function-report-stale-{value}-a",
+                reviewer="alice",
+            )
+            self._confirm_scope(
+                "tenant-a",
+                "echo",
+                {"stale": value},
+                f"function-report-stale-{value}-b",
+                reviewer="bob",
+            )
+        artifacts = self.system.compile("tenant-a", "echo").created
+        self.assertEqual(len(artifacts), 5)
+        draft_id, verified_id, promoted_id, suspended_id, retired_id = artifacts
+        verified_report = self.system.verify("tenant-a", verified_id)
+        self.assertTrue(verified_report.passed)
+        promoted_report = self.system.verify("tenant-a", promoted_id)
+        self.assertTrue(promoted_report.passed)
+        self.system.promote(
+            "tenant-a",
+            promoted_id,
+            scope_hash=promoted_report.scope_hash,
+            promoted_by="stale-promoter",
+        )
+        self.system.suspend_artifact(
+            "tenant-a",
+            suspended_id,
+            suspended_by="stale-suspender",
+            reason="expected stale history",
+        )
+        with self.system.store.transaction(write=False) as connection:
+            promoted_row = connection.execute(
+                "SELECT promotion_hash FROM artifacts WHERE id = ?",
+                (promoted_id,),
+            ).fetchone()
+        self.assertIsNotNone(promoted_row)
+        assert promoted_row is not None
+        original_promotion_hash = str(promoted_row["promotion_hash"])
+
+        connection = sqlite3.connect(self.database)
+        try:
+            changed = connection.execute(
+                """
+                UPDATE artifacts SET status = 'retired', status_reason = ?
+                WHERE id = ?
+                """,
+                ("expected retired history", retired_id),
+            ).rowcount
+            self.assertEqual(changed, 1)
+            connection.commit()
+        finally:
+            connection.close()
+
+        for expected_revision in range(2, 11):
+            self.assertEqual(
+                self.system.revise_operation(
+                    "tenant-a",
+                    "echo",
+                    policy=CompilePolicy(2, 1, 0),
+                    revised_by=f"stale-revision-{expected_revision}",
+                ),
+                expected_revision,
+            )
+
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("DROP TRIGGER artifacts_status_lifecycle")
+            connection.execute(
+                "UPDATE artifacts SET status = 'draft', status_reason = NULL WHERE id = ?",
+                (draft_id,),
+            )
+            connection.execute(
+                "UPDATE artifacts SET status = 'verified', status_reason = NULL WHERE id = ?",
+                (verified_id,),
+            )
+            connection.execute(
+                """
+                UPDATE artifacts
+                SET status = 'promoted', promotion_hash = ?, status_reason = NULL
+                WHERE id = ?
+                """,
+                (original_promotion_hash, promoted_id),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        report = self.system.function_report(
+            "tenant-a",
+            "echo",
+            projection_limit=2,
+        )
+        now = report.operation_now
+        self.assertEqual(now.operation_revision, 10)
+        self.assertEqual(now.promoted_entry_count, 1)
+        self.assertEqual(
+            tuple((status.status, status.count) for status in now.artifact_statuses),
+            (
+                ("draft", 1),
+                ("verified", 1),
+                ("promoted", 1),
+                ("suspended", 1),
+                ("retired", 1),
+            ),
+        )
+        expected = {
+            draft_id: "draft",
+            verified_id: "verified",
+            promoted_id: "promoted",
+        }
+        projected_ids = tuple(sorted(expected))[:2]
+        self.assertEqual(now.stale_revision_anomaly_count, 3)
+        self.assertEqual(len(now.stale_revision_anomalies), 2)
+        self.assertGreater(
+            now.stale_revision_anomaly_count,
+            len(now.stale_revision_anomalies),
+        )
+        self.assertEqual(
+            tuple(item.artifact_id for item in now.stale_revision_anomalies),
+            projected_ids,
+        )
+        self.assertEqual(
+            {item.artifact_id: item.status for item in now.stale_revision_anomalies},
+            {artifact_id: expected[artifact_id] for artifact_id in projected_ids},
+        )
+        for anomaly in now.stale_revision_anomalies:
+            self.assertEqual(anomaly.artifact_revision, 1)
+            self.assertEqual(anomaly.current_revision, 10)
+            self.assertEqual(
+                anomaly.reason,
+                f"{anomaly.status} artifact belongs to stale operation revision 1; current revision is 10",
+            )
+        self.assertNotIn(
+            suspended_id,
+            {item.artifact_id for item in now.stale_revision_anomalies},
+        )
+        self.assertNotIn(
+            retired_id,
+            {item.artifact_id for item in now.stale_revision_anomalies},
+        )
+
+    def test_function_report_rejects_persisted_building_and_unknown_artifact_statuses(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self.confirm("function-report-status-integrity-a", reviewer="alice")
+        self.confirm("function-report-status-integrity-b", reviewer="bob")
+        artifact_id = self.system.compile("tenant-a", "echo").created[0]
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("DROP TRIGGER artifacts_status_lifecycle")
+            connection.execute(
+                "UPDATE artifacts SET status = 'building' WHERE id = ?",
+                (artifact_id,),
+            )
+            connection.commit()
+            with self.assertRaisesRegex(
+                IntegrityError,
+                "^operation contains a persisted building artifact$",
+            ):
+                self.system.function_report("tenant-a", "echo")
+
+            connection.execute("PRAGMA ignore_check_constraints = ON")
+            connection.execute(
+                "UPDATE artifacts SET status = 'unknown' WHERE id = ?",
+                (artifact_id,),
+            )
+            connection.commit()
+            with self.assertRaisesRegex(
+                IntegrityError,
+                "^operation contains an unknown artifact status$",
+            ):
+                self.system.function_report("tenant-a", "echo")
+            connection.execute(
+                "UPDATE artifacts SET status = 'draft' WHERE id = ?",
+                (artifact_id,),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+    def test_function_report_is_one_read_only_snapshot_with_exact_limit_materialization(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._promote_three_as_function("function-report-read-only")
+        for index in range(3):
+            pending = self.system.handle(
+                "tenant-a",
+                "echo",
+                {"pending": index},
+                request_id=f"function-report-read-only-pending-{index}",
+            )
+            self.assertIsInstance(pending, ReviewRequired)
+
+        authority = mock.Mock(side_effect=AssertionError("authority consulted"))
+        clock = mock.Mock(side_effect=AssertionError("clock consulted"))
+        reader = System(self.database, authority=authority, clock_us=clock)
+        original_transaction = reader.store.transaction
+        write_actions = {
+            getattr(sqlite3, name)
+            for name in (
+                "SQLITE_INSERT",
+                "SQLITE_DELETE",
+                "SQLITE_UPDATE",
+                "SQLITE_CREATE_INDEX",
+                "SQLITE_CREATE_TABLE",
+                "SQLITE_CREATE_TEMP_INDEX",
+                "SQLITE_CREATE_TEMP_TABLE",
+                "SQLITE_CREATE_TEMP_TRIGGER",
+                "SQLITE_CREATE_TEMP_VIEW",
+                "SQLITE_CREATE_TRIGGER",
+                "SQLITE_CREATE_VIEW",
+                "SQLITE_DROP_INDEX",
+                "SQLITE_DROP_TABLE",
+                "SQLITE_DROP_TEMP_INDEX",
+                "SQLITE_DROP_TEMP_TABLE",
+                "SQLITE_DROP_TEMP_TRIGGER",
+                "SQLITE_DROP_TEMP_VIEW",
+                "SQLITE_DROP_TRIGGER",
+                "SQLITE_DROP_VIEW",
+                "SQLITE_ALTER_TABLE",
+                "SQLITE_REINDEX",
+                "SQLITE_ANALYZE",
+                "SQLITE_CREATE_VTABLE",
+                "SQLITE_DROP_VTABLE",
+            )
+            if hasattr(sqlite3, name)
+        }
+        denied: list[int] = []
+        execute_snapshot_states: list[bool] = []
+        limited_fetches: list[tuple[str, int, int, bool]] = []
+
+        class CursorProxy:
+            def __init__(
+                self,
+                cursor: sqlite3.Cursor,
+                *,
+                label: str,
+                bound_limit: int,
+                in_transaction: bool,
+            ) -> None:
+                self.cursor = cursor
+                self.label = label
+                self.bound_limit = bound_limit
+                self.in_transaction = in_transaction
+
+            def fetchall(self):
+                rows = self.cursor.fetchall()
+                limited_fetches.append(
+                    (
+                        self.label,
+                        self.bound_limit,
+                        len(rows),
+                        self.in_transaction,
+                    )
+                )
+                return rows
+
+            def __getattr__(self, name: str):
+                return getattr(self.cursor, name)
+
+        class ConnectionProxy:
+            def __init__(self, connection: sqlite3.Connection) -> None:
+                self.connection = connection
+
+            def execute(self, sql: str, parameters=()):
+                execute_snapshot_states.append(self.connection.in_transaction)
+                cursor = self.connection.execute(sql, parameters)
+                label: str | None = None
+                if "FROM function_memberships AS m" in sql and "LIMIT ?" in sql:
+                    label = "members"
+                elif "ORDER BY p.id LIMIT ?" in sql:
+                    label = "pending"
+                elif (
+                    "FROM artifacts" in sql
+                    and "ORDER BY sequence DESC LIMIT ?" in sql
+                ):
+                    label = f"status:{parameters[-2]}"
+                elif "ORDER BY id LIMIT ?" in sql and "operation_revision <> ?" in sql:
+                    label = "stale"
+                if label is not None:
+                    return CursorProxy(
+                        cursor,
+                        label=label,
+                        bound_limit=int(parameters[-1]),
+                        in_transaction=self.connection.in_transaction,
+                    )
+                return cursor
+
+            def __getattr__(self, name: str):
+                return getattr(self.connection, name)
+
+        @contextmanager
+        def guarded_transaction(*, write: bool):
+            self.assertFalse(write)
+            with original_transaction(write=write) as connection:
+                def authorize(action, _one, _two, _database, _trigger):
+                    if action in write_actions:
+                        denied.append(action)
+                        return sqlite3.SQLITE_DENY
+                    return sqlite3.SQLITE_OK
+
+                connection.set_authorizer(authorize)
+                try:
+                    yield ConnectionProxy(connection)
+                finally:
+                    connection.set_authorizer(None)
+
+        before = self._database_dump()
+        with mock.patch.object(
+            reader.store,
+            "transaction",
+            side_effect=guarded_transaction,
+        ) as transaction, mock.patch.object(
+            reader,
+            "_reconstruct_function_receipt",
+            side_effect=AssertionError("function report reconstructed receipt"),
+        ) as reconstruct, mock.patch.object(
+            system_module,
+            "_new_id",
+            side_effect=AssertionError("function report allocated an ID"),
+        ), mock.patch.object(
+            system_module,
+            "_event",
+            side_effect=AssertionError("function report emitted an event"),
+        ):
+            small_report = reader.function_report(
+                "tenant-a",
+                "echo",
+                projection_limit=2,
+            )
+            small_fetches = tuple(limited_fetches)
+            limited_fetches.clear()
+            maximum_report = reader.function_report(
+                "tenant-a",
+                "echo",
+                projection_limit=10_000,
+            )
+            maximum_fetches = tuple(limited_fetches)
+
+        self.assertEqual(self._database_dump(), before)
+        self.assertEqual(denied, [])
+        self.assertEqual(transaction.call_count, 2)
+        transaction.assert_has_calls(
+            [mock.call(write=False), mock.call(write=False)]
+        )
+        reconstruct.assert_not_called()
+        authority.assert_not_called()
+        clock.assert_not_called()
+        self.assertTrue(execute_snapshot_states)
+        self.assertTrue(all(execute_snapshot_states))
+        self.assertEqual(
+            small_fetches,
+            (
+                ("members", 2, 2, True),
+                ("pending", 2, 2, True),
+                ("status:draft", 2, 0, True),
+                ("status:verified", 2, 0, True),
+                ("status:promoted", 2, 2, True),
+                ("status:suspended", 2, 0, True),
+                ("status:retired", 2, 0, True),
+                ("stale", 2, 0, True),
+            ),
+        )
+        self.assertEqual(
+            maximum_fetches,
+            (
+                ("members", 10_000, 3, True),
+                ("pending", 10_000, 3, True),
+                ("status:draft", 10_000, 0, True),
+                ("status:verified", 10_000, 0, True),
+                ("status:promoted", 10_000, 3, True),
+                ("status:suspended", 10_000, 0, True),
+                ("status:retired", 10_000, 0, True),
+                ("stale", 10_000, 0, True),
+            ),
+        )
+        self.assertTrue(all(fetch[1] == 10_000 for fetch in maximum_fetches))
+        self.assertEqual(maximum_fetches[-1], ("stale", 10_000, 0, True))
+        self.assertEqual(small_report.operation_now.pending_proposal_count, 3)
+        self.assertEqual(small_report.operation_now.promoted_entry_count, 3)
+        self.assertEqual(maximum_report.operation_now.pending_proposal_count, 3)
+        self.assertEqual(maximum_report.operation_now.promoted_entry_count, 3)
+
+    def test_function_report_pending_projection_validates_middle_and_last_but_not_tail(self) -> None:
+        self.system.register_operation(
+            "tenant-a",
+            "echo",
+            policy=CompilePolicy(2, 1, 0),
+        )
+        for index in range(3):
+            pending = self.system.handle(
+                "tenant-a",
+                "echo",
+                {"pending-validation": index},
+                request_id=f"pending-validation-{index}",
+            )
+            self.assertIsInstance(pending, ReviewRequired)
+        connection = sqlite3.connect(self.database)
+        try:
+            rows = connection.execute(
+                "SELECT id, provenance_hash FROM proposals ORDER BY id"
+            ).fetchall()
+            self.assertEqual(len(rows), 3)
+            for position in (1, 2):
+                with self.subTest(position=position):
+                    proposal_id, provenance_hash = rows[position]
+                    connection.execute(
+                        "UPDATE proposals SET provenance_hash = ? WHERE id = ?",
+                        ("0" * 64, proposal_id),
+                    )
+                    connection.commit()
+                    with self.assertRaisesRegex(
+                        IntegrityError,
+                        "proposal provenance digest mismatch",
+                    ):
+                        self.system.function_report(
+                            "tenant-a",
+                            "echo",
+                            projection_limit=3,
+                        )
+                    connection.execute(
+                        "UPDATE proposals SET provenance_hash = ? WHERE id = ?",
+                        (provenance_hash, proposal_id),
+                    )
+                    connection.commit()
+
+            proposal_id, provenance_hash = rows[2]
+            connection.execute(
+                "UPDATE proposals SET provenance_hash = ? WHERE id = ?",
+                ("0" * 64, proposal_id),
+            )
+            connection.commit()
+            bounded = self.system.function_report(
+                "tenant-a",
+                "echo",
+                projection_limit=2,
+            )
+            self.assertEqual(bounded.operation_now.pending_proposal_count, 3)
+            self.assertEqual(len(bounded.operation_now.pending_proposals), 2)
+            with self.assertRaisesRegex(
+                IntegrityError,
+                "proposal provenance digest mismatch",
+            ):
+                self.system.function_report(
+                    "tenant-a",
+                    "echo",
+                    projection_limit=3,
+                )
+            connection.execute(
+                "UPDATE proposals SET provenance_hash = ? WHERE id = ?",
+                (provenance_hash, proposal_id),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+    def test_function_report_rejects_invalid_operation_revision_and_policy_rows(self) -> None:
+        for label, stored_revision in (
+            ("text", "1"),
+            ("zero", 0),
+            ("overflow-real", float(2**63)),
+        ):
+            with self.subTest(revision=label):
+                database = str(pathlib.Path(self.temporary.name) / f"report-revision-{label}.db")
+                system = System(database)
+                system.register_operation(
+                    "tenant-a",
+                    "echo",
+                    policy=CompilePolicy(2, 1, 0),
+                )
+                connection = sqlite3.connect(database)
+                try:
+                    connection.execute("PRAGMA foreign_keys = OFF")
+                    connection.execute("ALTER TABLE operations RENAME TO operations_strict")
+                    connection.execute(
+                        """
+                        CREATE TABLE operations (
+                            partition TEXT NOT NULL,
+                            name TEXT NOT NULL,
+                            revision,
+                            policy_json TEXT NOT NULL,
+                            policy_hash TEXT NOT NULL,
+                            created_at_us INTEGER NOT NULL,
+                            updated_at_us INTEGER NOT NULL,
+                            PRIMARY KEY (partition, name)
+                        )
+                        """
+                    )
+                    connection.execute(
+                        """
+                        INSERT INTO operations(
+                            partition, name, revision, policy_json, policy_hash,
+                            created_at_us, updated_at_us
+                        )
+                        SELECT partition, name, ?, policy_json, policy_hash,
+                               created_at_us, updated_at_us
+                        FROM operations_strict
+                        """,
+                        (stored_revision,),
+                    )
+                    connection.execute("DROP TABLE operations_strict")
+                    connection.commit()
+                finally:
+                    connection.close()
+                with mock.patch.object(
+                    system,
+                    "_latest_function_receipt_row",
+                ) as receipt_lookup, mock.patch.object(
+                    system,
+                    "_current_build_projections",
+                ) as projections:
+                    with self.assertRaisesRegex(
+                        IntegrityError,
+                        "^stored operation revision is invalid$",
+                    ):
+                        system.function_report("tenant-a", "echo")
+                receipt_lookup.assert_not_called()
+                projections.assert_not_called()
+
+        self.system.register_operation(
+            "tenant-a",
+            "echo",
+            policy=CompilePolicy(2, 1, 0),
+        )
+        canonical_policy = canonicalize(CompilePolicy(2, 1, 0).as_json(), max_bytes=16_384)
+        connection = sqlite3.connect(self.database)
+        try:
+            mutations = (
+                (
+                    "noncanonical",
+                    '{ "min_confirmations": 2, "min_reviewers": 1, "min_span_seconds": 0 }',
+                    canonical_policy.digest,
+                    "stored operation policy is not canonical",
+                ),
+                (
+                    "wrong-digest",
+                    canonical_policy.text,
+                    "0" * 64,
+                    "operation policy digest mismatch",
+                ),
+                (
+                    "invalid-json",
+                    "{",
+                    canonical_policy.digest,
+                    "stored operation policy is invalid",
+                ),
+                (
+                    "invalid-hash",
+                    canonical_policy.text,
+                    "G" * 64,
+                    "stored operation policy is invalid",
+                ),
+            )
+            for label, policy_json, policy_hash, message in mutations:
+                with self.subTest(policy=label):
+                    connection.execute(
+                        """
+                        UPDATE operations SET policy_json = ?, policy_hash = ?
+                        WHERE partition = ? AND name = ?
+                        """,
+                        (policy_json, policy_hash, "tenant-a", "echo"),
+                    )
+                    connection.commit()
+                    with self.assertRaisesRegex(IntegrityError, message):
+                        self.system.function_report("tenant-a", "echo")
+            connection.execute(
+                """
+                UPDATE operations SET policy_json = ?, policy_hash = ?
+                WHERE partition = ? AND name = ?
+                """,
+                (
+                    canonical_policy.text,
+                    canonical_policy.digest,
+                    "tenant-a",
+                    "echo",
+                ),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+    def test_function_report_validates_only_the_selected_receipt_row(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        _, first = self._promote_three_as_function("function-report-receipt-selection")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        second = self.system.promote_function(
+            "tenant-a",
+            "echo",
+            expected_function_hash=manifest.function_hash,
+            promoted_by="receipt-selection-second",
+        )
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("DROP TRIGGER function_receipts_no_update")
+            changed = connection.execute(
+                "UPDATE function_receipts SET receipt_hash = ? WHERE id = ?",
+                ("0" * 64, first.receipt_id),
+            ).rowcount
+            self.assertEqual(changed, 1)
+            connection.commit()
+        finally:
+            connection.close()
+
+        latest = self.system.function_report("tenant-a", "echo")
+        self.assertIsNotNone(latest.function_anchor)
+        assert latest.function_anchor is not None
+        self.assertEqual(latest.function_anchor.receipt.id, second.receipt_id)
+        with self.assertRaisesRegex(
+            IntegrityError,
+            "function receipt hash mismatch",
+        ):
+            self.system.function_report(
+                "tenant-a",
+                "echo",
+                receipt_id=first.receipt_id,
+            )
+
+    def test_function_report_explicit_receipt_scope_is_case_and_like_exact(self) -> None:
+        policy = CompilePolicy(2, 1, 0)
+        for partition, operation in (
+            ("tenant_a", "echo_1"),
+            ("tenant_a", "echoX1"),
+            ("tenantXa", "echo_1"),
+            ("TENANT_A", "echo_1"),
+        ):
+            self.system.register_operation(partition, operation, policy=policy)
+        fixtures = (
+            ("fpr_report_like_operation", "tenant_a", "echoX1"),
+            ("fpr_report_like_partition", "tenantXa", "echo_1"),
+            ("fpr_report_case_partition", "TENANT_A", "echo_1"),
+        )
+        with self.system.store.transaction(write=True) as connection:
+            for receipt_id, partition, operation in fixtures:
+                self._insert_valid_function_receipt(
+                    connection,
+                    receipt_id=receipt_id,
+                    partition=partition,
+                    operation=operation,
+                )
+        for receipt_id, _partition, _operation in fixtures:
+            with self.subTest(receipt_id=receipt_id):
+                with self.assertRaisesRegex(
+                    NotFoundError,
+                    "^function receipt does not exist for this operation$",
+                ):
+                    self.system.function_report(
+                        "tenant_a",
+                        "echo_1",
+                        receipt_id=receipt_id,
+                    )
+
+    def test_function_report_operation_queries_are_case_and_like_exact(self) -> None:
+        policy = CompilePolicy(2, 1, 0)
+        scopes = (
+            ("tenant_a", "echo_1", {"scope": "target"}),
+            ("tenant_a", "echoX1", {"scope": "operation-like"}),
+            ("tenant_a", "ECHO_1", {"scope": "operation-case"}),
+            ("tenantXa", "echo_1", {"scope": "partition-like"}),
+            ("TENANT_A", "echo_1", {"scope": "partition-case"}),
+        )
+        compiled: dict[tuple[str, str], str] = {}
+        for partition, operation, value in scopes:
+            self.system.register_operation(partition, operation, policy=policy)
+            for suffix, reviewer in (("a", "alice"), ("b", "bob")):
+                self._confirm_scope(
+                    partition,
+                    operation,
+                    value,
+                    f"report-scope-{partition}-{operation}-{suffix}",
+                    reviewer=reviewer,
+                )
+            result = self.system.compile(partition, operation)
+            self.assertEqual(len(result.created), 1)
+            compiled[(partition, operation)] = result.created[0]
+
+        report = self.system.function_report(
+            "tenant_a",
+            "echo_1",
+            projection_limit=10,
+        )
+        self.assertEqual(report.operation_now.compile_ready_scope_count, 1)
+        self.assertEqual(report.operation_now.compile_blocked_scope_count, 0)
+        self.assertEqual(report.operation_now.compile_blocked_scopes, ())
+        self.assertEqual(
+            tuple(scope.input_hash for scope in report.operation_now.compile_ready_scopes),
+            (canonicalize({"scope": "target"}).digest,),
+        )
+        self.assertEqual(
+            tuple((status.status, status.count) for status in report.operation_now.artifact_statuses),
+            (
+                ("draft", 1),
+                ("verified", 0),
+                ("promoted", 0),
+                ("suspended", 0),
+                ("retired", 0),
+            ),
+        )
+        self.assertEqual(
+            report.operation_now.artifact_statuses[0].artifacts[0].artifact_id,
+            compiled[("tenant_a", "echo_1")],
+        )
+        self.assertTrue(
+            {
+                report.operation_now.artifact_statuses[0].artifacts[0].artifact_id
+            }.isdisjoint(
+                {
+                    artifact_id
+                    for scope, artifact_id in compiled.items()
+                    if scope != ("tenant_a", "echo_1")
+                }
+            )
+        )
+
+    def test_function_report_member_bindings_quantify_over_middle_and_last(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        _, promotion = self._promote_three_as_function("function-report-member-bindings")
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("DROP TRIGGER function_memberships_no_update")
+            rows = connection.execute(
+                """
+                SELECT ordinal, function_hash, input_hash
+                FROM function_memberships
+                WHERE receipt_id = ? ORDER BY ordinal
+                """,
+                (promotion.receipt_id,),
+            ).fetchall()
+            self.assertEqual(len(rows), 3)
+            for position in (1, 2):
+                ordinal, function_hash, input_hash = rows[position]
+                with self.subTest(field="function_hash", position=position):
+                    connection.execute(
+                        """
+                        UPDATE function_memberships SET function_hash = ?
+                        WHERE receipt_id = ? AND ordinal = ?
+                        """,
+                        ("0" * 64, promotion.receipt_id, ordinal),
+                    )
+                    connection.commit()
+                    with self.assertRaisesRegex(
+                        IntegrityError,
+                        "function report member function hash mismatch",
+                    ):
+                        self.system.function_report(
+                            "tenant-a", "echo", projection_limit=3
+                        )
+                    connection.execute(
+                        """
+                        UPDATE function_memberships SET function_hash = ?
+                        WHERE receipt_id = ? AND ordinal = ?
+                        """,
+                        (function_hash, promotion.receipt_id, ordinal),
+                    )
+                    connection.commit()
+
+                with self.subTest(field="input_hash", position=position):
+                    connection.execute(
+                        """
+                        UPDATE function_memberships SET input_hash = ?
+                        WHERE receipt_id = ? AND ordinal = ?
+                        """,
+                        ("0" * 64, promotion.receipt_id, ordinal),
+                    )
+                    connection.commit()
+                    with self.assertRaisesRegex(
+                        IntegrityError,
+                        "function report member input digest mismatch",
+                    ):
+                        self.system.function_report(
+                            "tenant-a", "echo", projection_limit=3
+                        )
+                    connection.execute(
+                        """
+                        UPDATE function_memberships SET input_hash = ?
+                        WHERE receipt_id = ? AND ordinal = ?
+                        """,
+                        (input_hash, promotion.receipt_id, ordinal),
+                    )
+                    connection.commit()
+
+                with self.subTest(field="ordinal", position=position):
+                    mutated_ordinal = 10 + position
+                    connection.execute(
+                        """
+                        UPDATE function_memberships SET ordinal = ?
+                        WHERE receipt_id = ? AND ordinal = ?
+                        """,
+                        (mutated_ordinal, promotion.receipt_id, ordinal),
+                    )
+                    connection.commit()
+                    with self.assertRaisesRegex(
+                        IntegrityError,
+                        "function report member ordinal(?:s are not contiguous| is invalid)",
+                    ):
+                        self.system.function_report(
+                            "tenant-a", "echo", projection_limit=3
+                        )
+                    connection.execute(
+                        """
+                        UPDATE function_memberships SET ordinal = ?
+                        WHERE receipt_id = ? AND ordinal = ?
+                        """,
+                        (ordinal, promotion.receipt_id, mutated_ordinal),
+                    )
+                    connection.commit()
+        finally:
+            connection.close()
+
+    def test_function_report_member_validator_pins_expected_ordinal_directly(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        _, promotion = self._promote_three_as_function("function-report-member-ordinal")
+        report = self.system.function_report(
+            "tenant-a",
+            "echo",
+            projection_limit=3,
+        )
+        self.assertIsNotNone(report.function_anchor)
+        assert report.function_anchor is not None
+        with self.system.store.transaction(write=False) as connection:
+            row = connection.execute(
+                """
+                SELECT a.*,
+                       m.ordinal AS membership_ordinal,
+                       m.function_hash AS membership_function_hash,
+                       m.artifact_id AS membership_artifact_id,
+                       m.report_id AS membership_report_id,
+                       m.input_hash AS membership_input_hash,
+                       m.entry_seal AS membership_entry_seal,
+                       r.id AS bound_report_id,
+                       r.artifact_id AS bound_report_artifact_id,
+                       r.artifact_hash AS bound_report_artifact_hash,
+                       r.build_hash AS bound_report_build_hash,
+                       r.policy_hash AS bound_report_policy_hash,
+                       r.evidence_snapshot_hash
+                           AS bound_report_evidence_snapshot_hash,
+                       r.passed AS bound_report_passed,
+                       r.details_json AS bound_report_details_json,
+                       r.details_hash AS bound_report_details_hash,
+                       r.test_count AS bound_report_test_count,
+                       r.test_set_hash AS bound_report_test_set_hash
+                FROM function_memberships AS m
+                JOIN artifacts AS a ON a.id = m.artifact_id
+                JOIN test_reports AS r
+                  ON r.id = m.report_id AND r.artifact_id = m.artifact_id
+                WHERE m.receipt_id = ? AND m.ordinal = 1
+                """,
+                (promotion.receipt_id,),
+            ).fetchone()
+            self.assertIsNotNone(row)
+            assert row is not None
+            with self.assertRaisesRegex(
+                IntegrityError,
+                "^function report member ordinals are not contiguous$",
+            ):
+                self.system._function_report_member(
+                    connection,
+                    row,
+                    receipt=report.function_anchor.receipt,
+                    expected_ordinal=0,
+                )
+
+    def test_function_report_validates_middle_and_last_promoted_activation_receipts(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        _, promotion = self._promote_three_as_function("function-report-promoted-bindings")
+        connection = sqlite3.connect(self.database)
+        try:
+            rows = connection.execute(
+                """
+                SELECT a.id, a.promotion_hash
+                FROM function_memberships AS m
+                JOIN artifacts AS a ON a.id = m.artifact_id
+                WHERE m.receipt_id = ?
+                ORDER BY a.sequence DESC
+                """,
+                (promotion.receipt_id,),
+            ).fetchall()
+            self.assertEqual(len(rows), 3)
+            for position in (1, 2):
+                artifact_id, promotion_hash = rows[position]
+                with self.subTest(position=position):
+                    connection.execute(
+                        "UPDATE artifacts SET promotion_hash = ? WHERE id = ?",
+                        ("0" * 64, artifact_id),
+                    )
+                    connection.commit()
+                    with self.assertRaisesRegex(
+                        IntegrityError,
+                        "artifact promotion receipt mismatch",
+                    ):
+                        self.system.function_report(
+                            "tenant-a", "echo", projection_limit=3
+                        )
+                    connection.execute(
+                        "UPDATE artifacts SET promotion_hash = ? WHERE id = ?",
+                        (promotion_hash, artifact_id),
+                    )
+                    connection.commit()
+        finally:
+            connection.close()
+
+    def test_function_report_validates_names_before_opening_a_transaction(self) -> None:
+        invalid_scopes = (
+            ("bad partition", "echo"),
+            ("tenant-a", "bad operation"),
+            (True, "echo"),
+            ("tenant-a", True),
+        )
+        with mock.patch.object(
+            self.system.store,
+            "transaction",
+            side_effect=AssertionError("invalid name opened a transaction"),
+        ) as transaction:
+            for partition, operation in invalid_scopes:
+                with self.subTest(partition=partition, operation=operation):
+                    with self.assertRaises(ValidationError):
+                        self.system.function_report(
+                            partition,  # type: ignore[arg-type]
+                            operation,  # type: ignore[arg-type]
+                        )
+        transaction.assert_not_called()
+
+    def test_function_report_rebinds_operation_rows_and_rejects_noninteger_revisions(self) -> None:
+        target_policy = CompilePolicy(2, 1, 0)
+        collider_policy = CompilePolicy(3, 2, 10)
+        self.system.register_operation("tenantXa", "echo_1", policy=target_policy)
+        self.assertEqual(
+            self.system.revise_operation(
+                "tenantXa",
+                "echo_1",
+                policy=collider_policy,
+                revised_by="operation-row-collider",
+            ),
+            2,
+        )
+        self.system.register_operation("tenant_a", "echoX1", policy=collider_policy)
+        self.system.register_operation("tenant_a", "echo_1", policy=target_policy)
+
+        with self.system.store.transaction(write=False) as connection:
+            like_row = connection.execute(
+                "SELECT * FROM operations WHERE partition LIKE ? AND name = ?",
+                ("tenant_a", "echo_1"),
+            ).fetchone()
+        self.assertIsNotNone(like_row)
+        assert like_row is not None
+        self.assertEqual(like_row["partition"], "tenantXa")
+        exact = self.system.function_report("tenant_a", "echo_1")
+        self.assertEqual(exact.operation_now.operation_revision, 1)
+        self.assertEqual(
+            exact.operation_now.policy_hash,
+            canonicalize(target_policy.as_json(), max_bytes=16_384).digest,
+        )
+
+        original_transaction = self.system.store.transaction
+        replacement_scope: tuple[str, str] | None = None
+        replacement_revision: object | None = None
+
+        class OperationRow:
+            def __init__(self, row: sqlite3.Row, revision: object | None) -> None:
+                self.row = row
+                self.revision = revision
+
+            def __getitem__(self, key: str):
+                if key == "revision" and self.revision is not None:
+                    return self.revision
+                return self.row[key]
+
+        class CursorProxy:
+            def __init__(self, row: object) -> None:
+                self.row = row
+
+            def fetchone(self):
+                return self.row
+
+        class ConnectionProxy:
+            def __init__(self, connection: sqlite3.Connection, row: object) -> None:
+                self.connection = connection
+                self.row = row
+
+            def execute(self, sql: str, parameters=()):
+                if sql == "SELECT * FROM operations WHERE partition = ? AND name = ?":
+                    return CursorProxy(self.row)
+                return self.connection.execute(sql, parameters)
+
+            def __getattr__(self, name: str):
+                return getattr(self.connection, name)
+
+        @contextmanager
+        def injected_transaction(*, write: bool):
+            self.assertFalse(write)
+            with original_transaction(write=write) as connection:
+                scope = replacement_scope or ("tenant_a", "echo_1")
+                row = connection.execute(
+                    "SELECT * FROM operations WHERE partition = ? AND name = ?",
+                    scope,
+                ).fetchone()
+                self.assertIsNotNone(row)
+                assert row is not None
+                yield ConnectionProxy(
+                    connection,
+                    OperationRow(row, replacement_revision),
+                )
+
+        cases = (
+            ("foreign-partition", ("tenantXa", "echo_1"), None),
+            ("foreign-operation", ("tenant_a", "echoX1"), None),
+            ("bool-revision", None, True),
+            ("overflow-revision", None, 2**63),
+        )
+        for label, scope, revision in cases:
+            with self.subTest(case=label):
+                replacement_scope = scope
+                replacement_revision = revision
+                with mock.patch.object(
+                    self.system.store,
+                    "transaction",
+                    side_effect=injected_transaction,
+                ):
+                    with self.assertRaises(IntegrityError):
+                        self.system.function_report("tenant_a", "echo_1")
+
+    def test_function_report_explicit_receipt_id_is_like_exact(self) -> None:
+        self.system.register_operation(
+            "tenant_a",
+            "echo_1",
+            policy=CompilePolicy(2, 1, 0),
+        )
+        with self.system.store.transaction(write=True) as connection:
+            self._insert_valid_function_receipt(
+                connection,
+                receipt_id="fpr_report_idXcollider",
+                partition="tenant_a",
+                operation="echo_1",
+            )
+        with self.assertRaisesRegex(
+            NotFoundError,
+            "^function receipt does not exist for this operation$",
+        ):
+            self.system.function_report(
+                "tenant_a",
+                "echo_1",
+                receipt_id="fpr_report_id_collider",
+            )
+
+    def test_function_report_current_build_helper_is_scoped_revocation_aware_and_streaming(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        active_hashes: list[str] = []
+        for value in ({"active": 1}, {"active": 2}):
+            active_hashes.append(canonicalize(value).digest)
+            for suffix, reviewer in (("a", "alice"), ("b", "bob")):
+                self.confirm(
+                    f"current-helper-{value['active']}-{suffix}",
+                    reviewer=reviewer,
+                    input_value=value,
+                )
+        revoked_ids: list[str] = []
+        for index, reviewer in enumerate(("alice", "bob")):
+            resolved = self.confirm(
+                f"current-helper-revoked-{index}",
+                reviewer=reviewer,
+                input_value={"revoked": True},
+            )
+            self.assertIsInstance(resolved, Resolved)
+            assert isinstance(resolved, Resolved)
+            self.assertIsNotNone(resolved.example_id)
+            assert resolved.example_id is not None
+            revoked_ids.append(resolved.example_id)
+        for example_id in revoked_ids:
+            self.system.revoke_example(
+                "tenant-a",
+                example_id,
+                revoked_by="current-helper-auditor",
+                reason="exclude revoked-only scope",
+            )
+
+        original_transaction = self.system.store.transaction
+        helper_queries: list[tuple[object, ...]] = []
+        streamed_hashes: list[str] = []
+
+        class StreamingCursor:
+            def __init__(self, cursor: sqlite3.Cursor) -> None:
+                self.cursor = cursor
+
+            def __iter__(self):
+                for row in self.cursor:
+                    streamed_hashes.append(str(row["input_hash"]))
+                    yield row
+
+            def fetchall(self):
+                raise AssertionError("current build groups were eagerly materialized")
+
+            def __getattr__(self, name: str):
+                return getattr(self.cursor, name)
+
+        class ConnectionProxy:
+            def __init__(self, connection: sqlite3.Connection) -> None:
+                self.connection = connection
+
+            def execute(self, sql: str, parameters=()):
+                cursor = self.connection.execute(sql, parameters)
+                if "SELECT e.input_hash, e.input_json" in sql:
+                    normalized = " ".join(sql.split())
+                    self_test.assertIn(
+                        "WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?",
+                        normalized,
+                    )
+                    self_test.assertIn("AND x.example_id IS NULL", normalized)
+                    self_test.assertIn(
+                        "GROUP BY e.input_hash, e.input_json",
+                        normalized,
+                    )
+                    self_test.assertIn(
+                        "ORDER BY e.input_hash, e.input_json",
+                        normalized,
+                    )
+                    helper_queries.append(tuple(parameters))
+                    return StreamingCursor(cursor)
+                return cursor
+
+            def __getattr__(self, name: str):
+                return getattr(self.connection, name)
+
+        self_test = self
+
+        @contextmanager
+        def streaming_transaction(*, write: bool):
+            self.assertFalse(write)
+            with original_transaction(write=write) as connection:
+                yield ConnectionProxy(connection)
+
+        with mock.patch.object(
+            self.system.store,
+            "transaction",
+            side_effect=streaming_transaction,
+        ):
+            report = self.system.function_report("tenant-a", "echo")
+        expected_hashes = tuple(sorted(set(active_hashes)))
+        self.assertEqual(helper_queries, [("tenant-a", "echo", 1)])
+        self.assertEqual(tuple(streamed_hashes), expected_hashes)
+        self.assertEqual(report.operation_now.compile_ready_scope_count, 2)
+        self.assertEqual(
+            tuple(scope.input_hash for scope in report.operation_now.compile_ready_scopes),
+            expected_hashes,
+        )
+        self.assertEqual(report.operation_now.compile_blocked_scope_count, 0)
+        self.assertEqual(report.operation_now.compile_blocked_scopes, ())
+
+    def test_function_report_current_build_helper_keeps_digest_groups_distinct(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        for index in range(3):
+            self.confirm(
+                f"current-helper-digest-{index}",
+                reviewer=("alice", "bob", "carol")[index],
+                input_value={"digest-group": True},
+            )
+        original_hash = canonicalize({"digest-group": True}).digest
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("DROP TRIGGER examples_no_update")
+            rows = connection.execute(
+                "SELECT id, input_hash FROM examples ORDER BY confirmed_at_us, id"
+            ).fetchall()
+            self.assertEqual(len(rows), 3)
+            self.assertTrue(all(row[1] == original_hash for row in rows))
+            for position in (1, 2):
+                changed = connection.execute(
+                    "UPDATE examples SET input_hash = ? WHERE id = ?",
+                    ("f" * 64, rows[position][0]),
+                ).rowcount
+                self.assertEqual(changed, 1)
+            connection.commit()
+        finally:
+            connection.close()
+
+        with self.assertRaisesRegex(
+            IntegrityError,
+            "^canonical input does not match its stored digest$",
+        ):
+            self.system.function_report("tenant-a", "echo")
+
+    def test_function_report_support_reason_uses_decimal_framing(self) -> None:
+        self.register(confirmations=12, reviewers=1, span=0)
+        for index in range(10):
+            self.confirm(
+                f"function-report-decimal-support-{index}",
+                reviewer=f"reviewer-{index}",
+                input_value={"decimal-support": True},
+            )
+        report = self.system.function_report("tenant-a", "echo")
+        self.assertEqual(report.operation_now.compile_ready_scope_count, 0)
+        self.assertEqual(report.operation_now.compile_blocked_scope_count, 1)
+        scope = report.operation_now.compile_blocked_scopes[0]
+        self.assertEqual(scope.active_support, 10)
+        self.assertEqual(
+            scope.reasons,
+            ("support 10 is below required 12",),
+        )
+
+    def test_function_report_artifact_rows_validate_middle_and_last_scalars_and_bindings(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._compile_three_drafts("function-report-artifact-row-faults")
+        original_transaction = self.system.store.transaction
+        fault_field = ""
+        fault_position = 0
+
+        class RowsCursor:
+            def __init__(self, cursor: sqlite3.Cursor) -> None:
+                self.cursor = cursor
+
+            def fetchall(self):
+                rows = self.cursor.fetchall()
+                row = rows[fault_position]
+                if fault_field in {
+                    "sequence",
+                    "id",
+                    "operation_revision",
+                    "input_hash",
+                    "support",
+                    "reviewer_count",
+                    "span_seconds",
+                }:
+                    value: object = _CoercibleStoredScalar(row[fault_field])
+                elif fault_field == "partition":
+                    value = _LeftMismatchText(str(row[fault_field]), "tenant-b")
+                elif fault_field == "operation":
+                    value = _LeftMismatchText(str(row[fault_field]), "other")
+                else:
+                    value = _LeftMismatchText(str(row[fault_field]), "verified")
+                rows[fault_position] = _OverlayRow(row, {fault_field: value})
+                return rows
+
+            def __getattr__(self, name: str):
+                return getattr(self.cursor, name)
+
+        class ConnectionProxy:
+            def __init__(self, connection: sqlite3.Connection) -> None:
+                self.connection = connection
+
+            def execute(self, sql: str, parameters=()):
+                cursor = self.connection.execute(sql, parameters)
+                if (
+                    "FROM artifacts" in sql
+                    and "ORDER BY sequence DESC LIMIT ?" in sql
+                    and parameters[-2] == "draft"
+                ):
+                    return RowsCursor(cursor)
+                return cursor
+
+            def __getattr__(self, name: str):
+                return getattr(self.connection, name)
+
+        @contextmanager
+        def fault_transaction(*, write: bool):
+            self.assertFalse(write)
+            with original_transaction(write=write) as connection:
+                yield ConnectionProxy(connection)
+
+        scalar_fields = (
+            "sequence",
+            "id",
+            "operation_revision",
+            "input_hash",
+            "support",
+            "reviewer_count",
+            "span_seconds",
+        )
+        binding_fields = ("partition", "operation", "status")
+        for field in scalar_fields + binding_fields:
+            for position in (1, 2):
+                with self.subTest(field=field, position=position):
+                    fault_field = field
+                    fault_position = position
+                    with mock.patch.object(
+                        self.system.store,
+                        "transaction",
+                        side_effect=fault_transaction,
+                    ):
+                        if field in scalar_fields:
+                            with self.assertRaises(IntegrityError):
+                                self.system.function_report(
+                                    "tenant-a",
+                                    "echo",
+                                    projection_limit=3,
+                                )
+                        else:
+                            with self.assertRaisesRegex(
+                                IntegrityError,
+                                "^operation artifact scope or status binding mismatch$",
+                            ):
+                                self.system.function_report(
+                                    "tenant-a",
+                                    "echo",
+                                    projection_limit=3,
+                                )
+
+    def test_function_report_member_rows_validate_middle_and_last_scalars_and_bindings(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._promote_three_as_function("function-report-member-row-faults")
+        original_transaction = self.system.store.transaction
+        fault_field = ""
+        fault_position = 0
+
+        class RowsCursor:
+            def __init__(self, cursor: sqlite3.Cursor) -> None:
+                self.cursor = cursor
+
+            def fetchall(self):
+                rows = self.cursor.fetchall()
+                row = rows[fault_position]
+                if fault_field in {
+                    "membership_artifact_id",
+                    "membership_input_hash",
+                    "support",
+                    "reviewer_count",
+                }:
+                    value: object = _CoercibleStoredScalar(row[fault_field])
+                elif fault_field == "operation_revision":
+                    value = _LeftMismatchInteger(int(row[fault_field]), 10)
+                else:
+                    foreign = {
+                        "id": str(rows[0]["id"]),
+                        "partition": "tenant-b",
+                        "operation": "other",
+                        "policy_hash": "0" * 64,
+                    }[fault_field]
+                    value = _LeftMismatchText(str(row[fault_field]), foreign)
+                rows[fault_position] = _OverlayRow(row, {fault_field: value})
+                return rows
+
+            def __getattr__(self, name: str):
+                return getattr(self.cursor, name)
+
+        class ConnectionProxy:
+            def __init__(self, connection: sqlite3.Connection) -> None:
+                self.connection = connection
+
+            def execute(self, sql: str, parameters=()):
+                cursor = self.connection.execute(sql, parameters)
+                if "FROM function_memberships AS m" in sql and "LIMIT ?" in sql:
+                    return RowsCursor(cursor)
+                return cursor
+
+            def __getattr__(self, name: str):
+                return getattr(self.connection, name)
+
+        @contextmanager
+        def fault_transaction(*, write: bool):
+            self.assertFalse(write)
+            with original_transaction(write=write) as connection:
+                yield ConnectionProxy(connection)
+
+        scalar_fields = (
+            "membership_artifact_id",
+            "membership_input_hash",
+            "support",
+            "reviewer_count",
+        )
+        binding_fields = (
+            "id",
+            "partition",
+            "operation",
+            "operation_revision",
+            "policy_hash",
+        )
+        for field in scalar_fields + binding_fields:
+            for position in (1, 2):
+                with self.subTest(field=field, position=position):
+                    fault_field = field
+                    fault_position = position
+                    with mock.patch.object(
+                        self.system.store,
+                        "transaction",
+                        side_effect=fault_transaction,
+                    ):
+                        if field in scalar_fields:
+                            with self.assertRaises(IntegrityError):
+                                self.system.function_report(
+                                    "tenant-a",
+                                    "echo",
+                                    projection_limit=3,
+                                )
+                        else:
+                            message = (
+                                "^function report member artifact binding mismatch$"
+                                if field == "id"
+                                else "^function report member scope binding mismatch$"
+                            )
+                            with self.assertRaisesRegex(IntegrityError, message):
+                                self.system.function_report(
+                                    "tenant-a",
+                                    "echo",
+                                    projection_limit=3,
+                                )
+
+    def test_function_report_pending_rows_validate_middle_and_last_scalars_and_bindings(self) -> None:
+        self.system.register_operation(
+            "tenant-a",
+            "echo",
+            policy=CompilePolicy(2, 1, 0),
+        )
+        for index in range(3):
+            pending = self.system.handle(
+                "tenant-a",
+                "echo",
+                {"pending-row-fault": index},
+                request_id=f"pending-row-fault-{index}",
+            )
+            self.assertIsInstance(pending, ReviewRequired)
+        original_transaction = self.system.store.transaction
+        fault_field = ""
+        fault_position = 0
+
+        class RowsCursor:
+            def __init__(self, cursor: sqlite3.Cursor) -> None:
+                self.cursor = cursor
+
+            def fetchall(self):
+                rows = self.cursor.fetchall()
+                row = rows[fault_position]
+                if fault_field == "input_hash":
+                    values: dict[str, object] = {
+                        "input_hash": _CoercibleStoredScalar(row["input_hash"]),
+                    }
+                elif fault_field == "ids-and-revision":
+                    values = {
+                        field: _CoercibleStoredScalar(row[field])
+                        for field in ("id", "bound_request_id", "operation_revision")
+                    }
+                else:
+                    foreign = {
+                        "partition": "tenant-b",
+                        "bound_request_partition": "tenant-b",
+                        "request_id": str(rows[0]["bound_request_id"]),
+                        "status": "accepted",
+                        "bound_request_status": "resolved",
+                        "bound_proposal_id": str(rows[0]["id"]),
+                    }[fault_field]
+                    values = {
+                        fault_field: _LeftMismatchText(
+                            str(row[fault_field]),
+                            foreign,
+                        )
+                    }
+                rows[fault_position] = _OverlayRow(row, values)
+                return rows
+
+            def __getattr__(self, name: str):
+                return getattr(self.cursor, name)
+
+        class ConnectionProxy:
+            def __init__(self, connection: sqlite3.Connection) -> None:
+                self.connection = connection
+
+            def execute(self, sql: str, parameters=()):
+                cursor = self.connection.execute(sql, parameters)
+                if "ORDER BY p.id LIMIT ?" in sql:
+                    return RowsCursor(cursor)
+                return cursor
+
+            def __getattr__(self, name: str):
+                return getattr(self.connection, name)
+
+        @contextmanager
+        def fault_transaction(*, write: bool):
+            self.assertFalse(write)
+            with original_transaction(write=write) as connection:
+                yield ConnectionProxy(connection)
+
+        scalar_fields = ("input_hash", "ids-and-revision")
+        binding_fields = (
+            "partition",
+            "bound_request_partition",
+            "request_id",
+            "status",
+            "bound_request_status",
+            "bound_proposal_id",
+        )
+        for field in scalar_fields + binding_fields:
+            for position in (1, 2):
+                with self.subTest(field=field, position=position):
+                    fault_field = field
+                    fault_position = position
+                    with mock.patch.object(
+                        self.system.store,
+                        "transaction",
+                        side_effect=fault_transaction,
+                    ):
+                        if field in scalar_fields:
+                            with self.assertRaises(IntegrityError):
+                                self.system.function_report(
+                                    "tenant-a",
+                                    "echo",
+                                    projection_limit=3,
+                                )
+                        else:
+                            with self.assertRaisesRegex(
+                                IntegrityError,
+                                "^pending proposal scope or request binding mismatch$",
+                            ):
+                                self.system.function_report(
+                                    "tenant-a",
+                                    "echo",
+                                    projection_limit=3,
+                                )
+
+    def test_function_report_pending_request_join_is_like_and_case_exact(self) -> None:
+        self.system.register_operation(
+            "tenant_a",
+            "echo_1",
+            policy=CompilePolicy(2, 1, 0),
+        )
+        pending_by_request: dict[str, ReviewRequired] = {}
+        for index, request_id in enumerate(
+            (
+                "pending_join_1",
+                "pendingXjoinX1",
+                "PendingCase",
+                "pendingcase",
+                "pending_join_tail",
+            )
+        ):
+            pending = self.system.handle(
+                "tenant_a",
+                "echo_1",
+                {"pending-join": index},
+                request_id=request_id,
+            )
+            self.assertIsInstance(pending, ReviewRequired)
+            assert isinstance(pending, ReviewRequired)
+            pending_by_request[request_id] = pending
+
+        report = self.system.function_report(
+            "tenant_a",
+            "echo_1",
+            projection_limit=10,
+        )
+        self.assertEqual(report.operation_now.pending_proposal_count, 5)
+        self.assertEqual(len(report.operation_now.pending_proposals), 5)
+        self.assertEqual(
+            {
+                gap.proposal_id: gap.request_id
+                for gap in report.operation_now.pending_proposals
+            },
+            {
+                pending.proposal_id: request_id
+                for request_id, pending in pending_by_request.items()
+            },
+        )
+
+    def test_function_report_promoted_count_rejects_a_coercible_aggregate(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._promote_three_as_function("function-report-promoted-count-fault")
+        original_transaction = self.system.store.transaction
+
+        class CountCursor:
+            def __init__(self, cursor: sqlite3.Cursor) -> None:
+                self.cursor = cursor
+
+            def fetchall(self):
+                rows = self.cursor.fetchall()
+                self.assert_rows(rows)
+                return [
+                    _OverlayRow(
+                        row,
+                        {
+                            "item_count": _CoercibleStoredScalar(
+                                row["item_count"]
+                            )
+                        },
+                    )
+                    if row["status"] == "promoted"
+                    else row
+                    for row in rows
+                ]
+
+            @staticmethod
+            def assert_rows(rows: list[sqlite3.Row]) -> None:
+                if not any(row["status"] == "promoted" for row in rows):
+                    raise AssertionError("promoted aggregate row was not selected")
+
+            def __getattr__(self, name: str):
+                return getattr(self.cursor, name)
+
+        class ConnectionProxy:
+            def __init__(self, connection: sqlite3.Connection) -> None:
+                self.connection = connection
+
+            def execute(self, sql: str, parameters=()):
+                cursor = self.connection.execute(sql, parameters)
+                if "SELECT status, COUNT(*) AS item_count" in sql:
+                    return CountCursor(cursor)
+                return cursor
+
+            def __getattr__(self, name: str):
+                return getattr(self.connection, name)
+
+        @contextmanager
+        def fault_transaction(*, write: bool):
+            self.assertFalse(write)
+            with original_transaction(write=write) as connection:
+                yield ConnectionProxy(connection)
+
+        with mock.patch.object(
+            self.system.store,
+            "transaction",
+            side_effect=fault_transaction,
+        ):
+            with self.assertRaises(IntegrityError):
+                self.system.function_report(
+                    "tenant-a",
+                    "echo",
+                    projection_limit=3,
+                )
+
+    def test_function_report_stale_queries_are_like_and_case_exact(self) -> None:
+        policy = CompilePolicy(2, 1, 0)
+        scopes = (
+            ("tenant_a", "echo_1", {"stale-scope": "target"}),
+            ("tenant_a", "echoX1", {"stale-scope": "operation-like"}),
+            ("tenant_a", "ECHO_1", {"stale-scope": "operation-case"}),
+            ("tenantXa", "echo_1", {"stale-scope": "partition-like"}),
+            ("TENANT_A", "echo_1", {"stale-scope": "partition-case"}),
+        )
+        artifacts: dict[tuple[str, str], str] = {}
+        for partition, operation, value in scopes:
+            self.system.register_operation(partition, operation, policy=policy)
+            for suffix, reviewer in (("a", "alice"), ("b", "bob")):
+                self._confirm_scope(
+                    partition,
+                    operation,
+                    value,
+                    f"stale-scope-{partition}-{operation}-{suffix}",
+                    reviewer=reviewer,
+                )
+            compiled = self.system.compile(partition, operation)
+            self.assertEqual(len(compiled.created), 1)
+            artifacts[(partition, operation)] = compiled.created[0]
+        self.assertEqual(
+            self.system.revise_operation(
+                "tenant_a",
+                "echo_1",
+                policy=policy,
+                revised_by="stale-scope-reviser",
+            ),
+            2,
+        )
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("DROP TRIGGER artifacts_status_lifecycle")
+            changed = connection.execute(
+                "UPDATE artifacts SET status = 'draft', status_reason = NULL WHERE id = ?",
+                (artifacts[("tenant_a", "echo_1")],),
+            ).rowcount
+            self.assertEqual(changed, 1)
+            connection.commit()
+        finally:
+            connection.close()
+
+        report = self.system.function_report(
+            "tenant_a",
+            "echo_1",
+            projection_limit=10,
+        )
+        self.assertEqual(report.operation_now.stale_revision_anomaly_count, 1)
+        self.assertEqual(
+            tuple(
+                anomaly.artifact_id
+                for anomaly in report.operation_now.stale_revision_anomalies
+            ),
+            (artifacts[("tenant_a", "echo_1")],),
+        )
+        self.assertTrue(
+            {report.operation_now.stale_revision_anomalies[0].artifact_id}.isdisjoint(
+                {
+                    artifact_id
+                    for scope, artifact_id in artifacts.items()
+                    if scope != ("tenant_a", "echo_1")
+                }
+            )
+        )
+
+    def test_function_report_stale_validation_reaches_middle_and_last_rows(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        artifact_ids = self._compile_three_drafts("function-report-stale-row-faults")
+        self.assertEqual(
+            self.system.revise_operation(
+                "tenant-a",
+                "echo",
+                policy=CompilePolicy(2, 1, 0),
+                revised_by="stale-row-reviser",
+            ),
+            2,
+        )
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("DROP TRIGGER artifacts_status_lifecycle")
+            changed = connection.execute(
+                "UPDATE artifacts SET status = 'draft', status_reason = NULL WHERE id IN (?, ?, ?)",
+                artifact_ids,
+            ).rowcount
+            self.assertEqual(changed, 3)
+            connection.commit()
+        finally:
+            connection.close()
+        original_transaction = self.system.store.transaction
+        fault_position = 0
+
+        class RowsCursor:
+            def __init__(self, cursor: sqlite3.Cursor) -> None:
+                self.cursor = cursor
+
+            def fetchall(self):
+                rows = self.cursor.fetchall()
+                row = rows[fault_position]
+                rows[fault_position] = _OverlayRow(
+                    row,
+                    {
+                        "sequence": _CoercibleStoredScalar(row["sequence"]),
+                    },
+                )
+                return rows
+
+            def __getattr__(self, name: str):
+                return getattr(self.cursor, name)
+
+        class ConnectionProxy:
+            def __init__(self, connection: sqlite3.Connection) -> None:
+                self.connection = connection
+
+            def execute(self, sql: str, parameters=()):
+                cursor = self.connection.execute(sql, parameters)
+                if "ORDER BY id LIMIT ?" in sql and "operation_revision <> ?" in sql:
+                    return RowsCursor(cursor)
+                return cursor
+
+            def __getattr__(self, name: str):
+                return getattr(self.connection, name)
+
+        @contextmanager
+        def fault_transaction(*, write: bool):
+            self.assertFalse(write)
+            with original_transaction(write=write) as connection:
+                yield ConnectionProxy(connection)
+
+        for position in (1, 2):
+            with self.subTest(position=position):
+                fault_position = position
+                with mock.patch.object(
+                    self.system.store,
+                    "transaction",
+                    side_effect=fault_transaction,
+                ):
+                    with self.assertRaises(IntegrityError):
+                        self.system.function_report(
+                            "tenant-a",
+                            "echo",
+                            projection_limit=3,
+                        )
 
 
 if __name__ == "__main__":
