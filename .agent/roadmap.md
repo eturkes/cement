@@ -40,15 +40,19 @@ Measured gaps driving the arc:
   ordered `structure` list. Review also bound the adapter's reference plans to locator compatibility
   rather than `document_type` alone, made best-effort field names collision-free, and bound the demo's
   recurrence-gate check to layout C's own scope hash. Peak implementing-teammate context across units =
-  33% (78K/240K), range 27-33%; window pressure sits on coordination - MAIN peaked 76-96% across M1
-  sessions - so size units from `.agent/context-gauge.sh <teammate>` readings.
+  33% (78K/240K), range 27-33%; window pressure sat on coordination - MAIN peaked 76-96% across M1
+  sessions - and both loads now fall on MAIN, which carries implementation under the current authorship
+  split.
 
 - M2 - Function as object - IN-PROGRESS. Makes the aggregate deterministic function a first-class,
   verifiable, exportable artifact so paragraph 1's `regular, if large, function` and `once built and
   verified, that function is deterministic` become checkable properties instead of per-entry claims.
   Trust boundary stays exact-lookup: a function is a set of exact entries, never a wider predicate.
-  Size every unit against M1 actuals (implementing teammate 27-33%, 66-78K/240K). Gates for every unit:
-  `uv run python -m unittest discover -s tests -t .` plus `uv build`.
+  Sizing under the current authorship split: one window buys MAIN's implementation plus its coordination,
+  and M2's two recorded halves do not co-fit - `main=` ran 62-93% across u1-u4b while the delegated
+  `impl=` on those same units ran 59-92%. u4c and u5 were scoped when a teammate absorbed the
+  implementation half, so each opens with a size recheck against `main=` and splits if it does not fit.
+  Gates for every unit: `uv run python -m unittest discover -s tests -t .` plus `uv build`.
   - u1 DONE (main=62% 148K/240K, impl=67% 160K/240K) - `src/cement_runtime/function.py` (397 lines) +
     `tests/test_function.py` (749 lines, 22 tests; suite 81 -> 103). `cement-function-v1` document with
     one document-level scope (partition, operation, operation revision, policy hash) and entries carrying
@@ -339,16 +343,22 @@ Measured gaps driving the arc:
     ready-vs-blocked is not readable from stored status. The 166 Pyright `reportAttributeAccessIssue`
     errors in `tests/test_system.py` lines 221-1192 are pre-existing at `d0b7e93` - unnarrowed union
     member access in baseline outcome assertions, in a region this unit left byte-identical.
-  - u4c OPEN - the five `function` CLI commands (`show`, `export`, `eval`, `verify`, `promote`), owning
-    `cli.py` + `test_cli.py` only. Offline `eval --bundle` special-cased ahead of the `--db`/`--partition`
-    gate so `System` is never constructed; `export` writing `FunctionDocument.text` bytes exactly rather
-    than through `_emit`; `verify` making an explicit exit-code choice, since generic `main` returns 0 for
-    any returned dataclass. Depends on u4a + u4b.
-  - u5 OPEN - surface realignment: `README.md` claim pass (guarantees, request outcomes, deployment
-    boundary) against what the function object now proves, `docs/architecture.md` contract steps for the
-    function layer, and the hospital example resolving from an exported bundle with no ledger, no adapter,
-    and no LLM, covered by `tests/test_hospital_ocr_example.py`. Owns every documentation edit for M2 so
-    u1-u4c stay code-and-test only. Depends on u1-u4c.
+    The mutation verdicts above are historical, not rerunnable: both the catalogue and the replay driver
+    were scratch-local and died with `.scratch/`, so nothing in committed state reproduces them. The
+    committed suite is what still holds. Driver port tracked in `.agent/polish.md`.
+  - u4c OPEN tier=kernel - the five `function` CLI commands (`show`, `export`, `eval`, `verify`,
+    `promote`), owning `cli.py` + `test_cli.py` only. Offline `eval --bundle` special-cased ahead of the
+    `--db`/`--partition` gate so `System` is never constructed; `export` writing `FunctionDocument.text`
+    bytes exactly rather than through `_emit`; `verify` making an explicit exit-code choice, since
+    generic `main` returns 0 for any returned dataclass. Depends on u4a + u4b.
+  - u5 OPEN tier=docs - surface realignment: `README.md` claim pass (guarantees, request outcomes,
+    deployment boundary) against what the function object now proves, `docs/architecture.md` contract
+    steps for the function layer, and the hospital example resolving from an exported bundle with no
+    ledger, no adapter, and no LLM, covered by `tests/test_hospital_ocr_example.py`. Owns every
+    documentation edit for M2 so u1-u4c stay code-and-test only. `docs` tier because the only code delta
+    is example-side behind that committed test, while every claim it writes is re-derived by the M2
+    review's `audit` replayer; a claim pass finding that the function object does not prove what the
+    README asserts is spine work, not a wording fix. Depends on u1-u4c.
 
 - M3 - Trim to paragraph scope - UNPLANNED. Removes behavior outside `turns repeatedly supervised LLM
   answers into narrowly scoped deterministic behavior`, sequenced after M2 so the pure resolver is
@@ -376,12 +386,12 @@ Measured gaps driving the arc:
 
 ## Deferred - contract/deployment expansion
 
+Scope expansion, i.e. future-milestone material that planning promotes into units. Off-spine defects and
+deferred perfection on shipped surfaces live in `.agent/polish.md` instead.
+
 - Typed schemas + verifier plugin ABI (M4 seed).
 - Broader finite decision tables / constrained expression IR (M4 seed).
 - Authenticated reviewer identities, encryption, retention, remote registry/signatures.
 - Shadow sampling + production drift telemetry.
 - TypedDict projections + dynamic inspection records.
 - Owner-selected license + absolute repository/documentation URLs before public publication.
-- Candidate contract enforcement: `Candidate` accepts any `provenance` value (`[]`, `'text'`, `5`, `None`
-  stored as-is) despite the documented `Mapping` contract, and `System` coerces a non-`Mapping` to `{}`
-  rather than failing the fallback.
