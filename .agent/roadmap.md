@@ -51,7 +51,8 @@ Measured gaps driving the arc:
   Sizing under the current authorship split: one window buys MAIN's implementation plus its coordination,
   and M2's two recorded halves do not co-fit - `main=` ran 62-93% across u1-u4b while the delegated
   `impl=` on those same units ran 59-92%. u4c and u5 were scoped when a teammate absorbed the
-  implementation half, so each opens with a size recheck against `main=` and splits if it does not fit.
+  implementation half, so each opens with a size recheck against `main=` and splits if it does not fit;
+  u4c took that recheck and split six ways, since its mandatory surface sizes at ~2.5x u4a.
   Gates for every unit: `uv run python -m unittest discover -s tests -t .` plus `uv build`.
   - u1 DONE (main=62% 148K/240K, impl=67% 160K/240K) - `src/cement_runtime/function.py` (397 lines) +
     `tests/test_function.py` (749 lines, 22 tests; suite 81 -> 103). `cement-function-v1` document with
@@ -346,19 +347,59 @@ Measured gaps driving the arc:
     The mutation verdicts above are historical, not rerunnable: both the catalogue and the replay driver
     were scratch-local and died with `.scratch/`, so nothing in committed state reproduces them. The
     committed suite is what still holds. Driver port tracked in `.agent/polish.md`.
-  - u4c OPEN tier=kernel - the five `function` CLI commands (`show`, `export`, `eval`, `verify`,
-    `promote`), owning `cli.py` + `test_cli.py` only. Offline `eval --bundle` special-cased ahead of the
-    `--db`/`--partition` gate so `System` is never constructed; `export` writing `FunctionDocument.text`
-    bytes exactly rather than through `_emit`; `verify` making an explicit exit-code choice, since
-    generic `main` returns 0 for any returned dataclass. Depends on u4a + u4b.
+  - u4c split six ways per `.agent/decisions/m2u4c-design.md`, arbitrated from a CLI surface map plus a
+    consumed-API map. Two findings drive the split. (1) `cli.py` carries zero references to any
+    function-layer API, and the five names the earlier plan listed leave the milestone's own measured gap
+    half open: they close the promotion half and leave verification per-entry, because nothing exposes
+    `verify_drafts`. `inspect_function_promotion` is likewise the sole producer of the hash `promote_function`
+    makes the operator repeat, and `function_receipts` the sole way to learn a receipt ID that
+    `--receipt-id` accepts, so the mandatory surface is eight commands, not five. (2) That surface sizes at
+    244-365 production + 3,070-4,540 test lines - ~2.5x u4a's production and ~2.6x its tests - while u4a's
+    own halves already summed to 152% of one window, u4b's to 173%, u3b2's to 183%. Under the current
+    authorship split those halves add rather than alternate, so one unit cannot hold it. The cut is cheap
+    here because `cli.py` (360 lines) and `tests/test_cli.py` (121 lines) are small: re-reading them costs a
+    few thousand tokens per sub-unit, unlike the u4a/u4b/u4c cut where `system.py` re-reads dominated.
+    u4c1 freezes the cross-unit interfaces every later sub-unit inherits - the `_Outcome(payload, status,
+    raw)` protocol carrying ordinary JSON, JSON with an explicit process status, and raw document bytes; the
+    raw byte channel; nested-subparser and unclamped-limit conventions; and the replacement CLI test runner,
+    since today's runner JSON-decodes any stdout and cannot express raw bytes or a nonzero status carrying
+    stdout. Frozen rulings: `function verify` exits 6 when the set fails, payload on stdout, on the
+    `git diff --exit-code` convention - measured precedent runs the other way, root `verify` returning a
+    failing report with exit 0; the current committed snapshot, the prospective union and an immutable
+    historical receipt never swap between commands; `eval` is special-cased ahead of the `--db`/`--partition`
+    gate and constructs no `System`, though it cannot avoid importing one, since the package `__init__`
+    eagerly imports `.system` -> `.store` -> `sqlite3`. Every sub-unit writes `cli.py` + `test_cli.py` only.
+  - u4c1 OPEN tier=kernel - shared scaffolding + `function show OPERATION [--projection-limit N]` over
+    `function_report`'s current anchor. Owns and freezes every interface in Decision 3 of the design record.
+    Est. 46-69 production / 500-740 tests. Depends on u4a + u4b.
+  - u4c2 OPEN tier=kernel - `function receipts OPERATION [--operation-revision N] [--before-sequence N]
+    [--limit N]` over `function_receipts`, plus `show --receipt-id` historical mode over `function_report`'s
+    function anchor. Ordered second so `--receipt-id` stops being a flag with no operator route.
+    Est. 34-52 / 480-720. Depends on u4c1.
+  - u4c3 OPEN tier=kernel - `function verify-drafts OPERATION --actor ACTOR` over `verify_drafts`, and
+    `function verify OPERATION [--expected-function-hash HEX]` over `verify_function`, carrying the exit-6
+    ruling. Est. 44-66 / 620-920. Depends on u4c1.
+  - u4c4 OPEN tier=kernel - `function inspect OPERATION` over `inspect_function_promotion` and
+    `function promote OPERATION --expected-function-hash HEX --actor ACTOR` over `promote_function`; the
+    manifest hash inspect displays must feed promote unchanged, and a prospective change must make a stale
+    hash fail. Est. 36-55 / 510-760. Depends on u4c1.
+  - u4c5 OPEN tier=kernel - `function export OPERATION [--receipt-id ID] [--out PATH]`: live source gated on
+    `verify_function` P1-P6 passing with a failure raising to exit 5 rather than exporting a stale or
+    diagnostic document, `--receipt-id` selecting the historical source and cross-checking the reconstructed
+    receipt's operation against the positional operation, `FunctionDocument.text` written as exact UTF-8
+    bytes with nothing appended. Est. 46-67 / 520-760. Depends on u4c1 + u4c2.
+  - u4c6 OPEN tier=kernel - `function eval --bundle PATH --input JSON` over `parse_function` + `evaluate`:
+    bundle read by a dedicated strict-UTF-8 reader bounded at `FUNCTION_MAX_BYTES` (67,108,864), evaluation
+    input keeping the existing `DEFAULT_MAX_BYTES` channel including `-`, so a bundle can never travel
+    through a reader 64x too small. Est. 48-70 / 560-820. Depends on u4c1 + u4c5.
   - u5 OPEN tier=docs - surface realignment: `README.md` claim pass (guarantees, request outcomes,
     deployment boundary) against what the function object now proves, `docs/architecture.md` contract
     steps for the function layer, and the hospital example resolving from an exported bundle with no
     ledger, no adapter, and no LLM, covered by `tests/test_hospital_ocr_example.py`. Owns every
-    documentation edit for M2 so u1-u4c stay code-and-test only. `docs` tier because the only code delta
+    documentation edit for M2 so u1-u4c6 stay code-and-test only. `docs` tier because the only code delta
     is example-side behind that committed test, while every claim it writes is re-derived by the M2
     review's `audit` replayer; a claim pass finding that the function object does not prove what the
-    README asserts is spine work, not a wording fix. Depends on u1-u4c.
+    README asserts is spine work, not a wording fix. Depends on u1-u4c6.
 
 - M3 - Trim to paragraph scope - UNPLANNED. Removes behavior outside `turns repeatedly supervised LLM
   answers into narrowly scoped deterministic behavior`, sequenced after M2 so the pure resolver is
