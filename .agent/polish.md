@@ -40,6 +40,38 @@ changed is spine work, not polish.
   to `IntegrityError` or rejects a non-`int` stored value outright; one committed probe per receipt integer
   field drives both `NULL` and numeric text and expects `IntegrityError`; suite green.
 
+- `pri=2` `size=M` — port the seam mutation battery to a committed dev tool. u4c1's 9-mutant battery over
+  `_Outcome`, `main`'s channel branch, the parser slot and limit forwarding killed 9/9, but it ran from
+  `.scratch/mutants.sh` and died with the wave, so the claim outlives its driver (same defect as the u4b
+  replay driver already tracked here). Acceptance: a tracked script takes a catalogue of
+  `(file, anchor, old, new, test)` rows, asserts each patch changed the file, purges `__pycache__` with
+  `PYTHONDONTWRITEBYTECODE=1`, runs the named test per mutant, restores byte-exactly (`cmp` proves it),
+  and exits nonzero on any survivor; rerunning it from a clean checkout reproduces 9/9 without edits.
+
+- `pri=2` `size=M` — bounded projections have no cursor, and two families page in opaque-id order.
+  `function_report` clamps six detail lists with one `projection_limit`, but the only way to see a
+  truncated remainder is to raise the limit toward 10,000; there is no offset, cursor or stable sort key
+  exposed. Members project by `ordinal` and artifacts by `sequence DESC`, both canonical, while
+  `pending_proposals` orders by `p.id` (`src/cement_runtime/system.py:2740`) and
+  `stale_revision_anomalies` by artifact `id` (`src/cement_runtime/system.py:2846`) — random `prop_*`/
+  `art_*` hex, so a truncated page of either is an arbitrary subset, stable per ledger but unrelated to
+  insertion or content order. Probed: `pending-a` and `pending-b` swap places across runs at
+  `--projection-limit 1`, which is what forced the CLI test to pin set membership plus per-ledger byte
+  stability instead of insertion order. Affects every later `function` leaf that pages the same model.
+  Acceptance: both queries order by a meaningful, documented key (creation time or input hash), one probe
+  seeds three rows in each family and asserts the projected prefix at limits 1 and 2 is the canonical
+  prefix of the limit-3 projection, and the report's docstring states the ordering guarantee per family.
+
+- `pri=3` `size=S` — `stale_revision_anomalies` is unreachable through supported flows, so its projection
+  path ships behaviorally untested except through out-of-band state. `operation revise`
+  (`src/cement_runtime/system.py:509`) retires every artifact it strands, and no other command leaves a
+  draft/verified/promoted artifact on a superseded revision; the CLI test reaches the family only by
+  bumping `operations.revision` with a direct `UPDATE`. That is faithful to the family's purpose — it
+  reports ledger corruption — but it means no test exercises the transition that would produce it in
+  production. Acceptance: either a supported command can strand an artifact and a probe drives it, or the
+  model documents the family as a corruption detector, and the CLI's own probe cites that documentation
+  instead of asserting the state is otherwise reachable.
+
 - `pri=3` `size=S` — `Candidate.provenance` contract unenforced at its sole consumer, `system.py:784` in
   `System.handle`. `Candidate` is a frozen dataclass typing `provenance: Mapping[str, object]` with no
   runtime check, and `canonicalize(dict(candidate.provenance), max_bytes=65_536)` is the only site that

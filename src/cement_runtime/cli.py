@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import asdict, is_dataclass
+from dataclasses import asdict, dataclass, field, is_dataclass
 import json
 import os
 import sys
@@ -30,6 +30,24 @@ class _UsageError(Exception):
 class _JSONArgumentParser(argparse.ArgumentParser):
     def error(self, message: str) -> Never:
         raise _UsageError(message)
+
+
+_MISSING = object()
+
+
+@dataclass(frozen=True, slots=True)
+class _Outcome:
+    """One command result carrying exactly one channel: JSON payload or raw text."""
+
+    payload: Any = _MISSING
+    status: int = field(default=0, kw_only=True)
+    raw: str | None = field(default=None, kw_only=True)
+
+    def __post_init__(self) -> None:
+        if (self.payload is _MISSING) == (self.raw is None):
+            raise AssertionError("_Outcome carries exactly one output channel")
+        if type(self.status) is not int:
+            raise AssertionError("_Outcome status must be an exact int")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -146,6 +164,12 @@ def _parser() -> argparse.ArgumentParser:
     report_list.add_argument("--artifact-id")
     report_list.add_argument("--after-sequence", type=int, default=0)
     report_list.add_argument("--limit", type=int, default=100)
+
+    function = commands.add_parser("function", help="inspect the operation's function set")
+    function_commands = function.add_subparsers(dest="function_command", required=True)
+    function_show = function_commands.add_parser("show")
+    function_show.add_argument("operation")
+    function_show.add_argument("--projection-limit", type=int, default=100)
 
     events = commands.add_parser("events", help="read append-only audit projections")
     events.add_argument("--after", type=int, default=0)
@@ -328,12 +352,16 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
             after_sequence=args.after_sequence,
             limit=args.limit,
         )
+    if args.command == "function":
+        if args.function_command == "show":
+            return system.function_report(
+                args.partition,
+                args.operation,
+                projection_limit=args.projection_limit,
+            )
     if args.command == "events":
         return system.events(args.partition, after=args.after, limit=args.limit)
     raise AssertionError("argparse accepted an unknown command")
-
-
-_MISSING = object()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -356,5 +384,15 @@ def main(argv: list[str] | None = None) -> int:
     except (ValidationError, CementError) as exc:
         _emit({"error": "invalid", "message": str(exc)}, stream=sys.stderr)
         return 2
+    if isinstance(result, _Outcome):
+        if result.raw is not None:
+            binary = getattr(sys.stdout, "buffer", None)
+            if binary is not None:
+                binary.write(result.raw.encode("utf-8"))
+            else:
+                sys.stdout.write(result.raw)
+        else:
+            _emit(result.payload)
+        return result.status
     _emit(result)
     return 0

@@ -369,9 +369,22 @@ Measured gaps driving the arc:
     historical receipt never swap between commands; `eval` is special-cased ahead of the `--db`/`--partition`
     gate and constructs no `System`, though it cannot avoid importing one, since the package `__init__`
     eagerly imports `.system` -> `.store` -> `sqlite3`. Every sub-unit writes `cli.py` + `test_cli.py` only.
-  - u4c1 OPEN tier=kernel - shared scaffolding + `function show OPERATION [--projection-limit N]` over
-    `function_report`'s current anchor. Owns and freezes every interface in Decision 3 of the design record.
-    Est. 46-69 production / 500-740 tests. Depends on u4a + u4b.
+  - u4c1 DONE (main=72% 173K/240K, mate=57% 137K/240K) - shared scaffolding + `function show OPERATION
+    [--projection-limit N]` over `function_report`'s current anchor; owns and freezes every interface in
+    Decision 3 of the design record. `cli.py` +42/-4 (est. 46-69), `test_cli.py` 30 tests (est. 500-740
+    lines). Contract `.agent/decisions/m2u4c1-contract.md`. `function show` emits the whole library model
+    through `_emit`: a spike measured a hand-written projection at exactly zero byte saving (285,222 either
+    way over a 300/100/100 ledger) for +108 production lines, and the model's transitive graph reaches no
+    document, text or private cache, so Decision 3's ban holds structurally. Gate `Ran 378 tests / OK` +
+    `uv build` rc=0. Evidence: MAIN's 9-mutant battery over the seam killed 9/9, each with a positive
+    control proving the patch changed behavior; an independent 88-mutant campaign killed 84, proved 2
+    equivalent and left 2 actionable (dispatch guard swallowing the `events` tail, exact-type check
+    rejecting `_Outcome` subclasses), both now pinned and killed; a diff-blind suite written from the
+    contract alone failed 29/30 at `a717544` and passed 30/30 against this implementation.
+    Ruled during the unit: `stale_revision_anomalies` is reachable only from out-of-band ledger state,
+    because `operation revise` retires every artifact it strands; `pending_proposals` and
+    `stale_revision_anomalies` page in opaque id order, so a truncated page is arbitrary though
+    per-ledger stable (both -> `.agent/polish.md`).
   - u4c2 OPEN tier=kernel - `function receipts OPERATION [--operation-revision N] [--before-sequence N]
     [--limit N]` over `function_receipts`, plus `show --receipt-id` historical mode over `function_report`'s
     function anchor. Ordered second so `--receipt-id` stops being a flag with no operator route.
