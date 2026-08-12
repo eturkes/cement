@@ -385,10 +385,47 @@ Measured gaps driving the arc:
     because `operation revise` retires every artifact it strands; `pending_proposals` and
     `stale_revision_anomalies` page in opaque id order, so a truncated page is arbitrary though
     per-ledger stable (both -> `.agent/polish.md`).
-  - u4c2 OPEN tier=kernel - `function receipts OPERATION [--operation-revision N] [--before-sequence N]
-    [--limit N]` over `function_receipts`, plus `show --receipt-id` historical mode over `function_report`'s
-    function anchor. Ordered second so `--receipt-id` stops being a flag with no operator route.
-    Est. 34-52 / 480-720. Depends on u4c1.
+  - u4c2 DONE (main=87% 209K/240K, mate=44% 105K/240K) - receipt enumeration plus historical `show`.
+    `cli.py` +15, `test_cli.py` +429/-12 (17 new tests); suite 380 -> 396. Contract
+    `.agent/decisions/m2u4c2-contract.md`. Both leaves forward unclamped and return the bare library
+    model, so `_emit` and the whole u4c1 seam stay byte-identical; production cost landed at the low end
+    of the 34-52 estimate because the unit consumes two already-shipped APIs and adds no library delta.
+    Ruled during the unit. No material design fork, so no spike wave: payload shape follows u4c1's
+    emit-the-model ruling (`FunctionReceiptPage` = 16 scalar fields plus a cursor, reaching no document),
+    `function receipts` keeps its roadmap name against the repo's `<group> list` convention because the
+    `function` group's leaves are verbs over ONE set and a third nesting level costs more than the
+    divergence, and `--receipt-id` stays a flag per u4c design Decision 1. Long-option abbreviation is
+    deliberately unpinned: `allow_abbrev` is inherited default, so pinning it would turn a later
+    sub-unit's legal flag addition into a red gate.
+    Review. One correctness/spec reviewer produced six accepted findings, every one a claim-vs-code gap
+    in MAIN's own contract rather than a code defect, and each was reproduced by MAIN before landing.
+    The load-bearing one: Decision 9.2 asserted `len(receipts) < limit` ⟺ terminal page, but the library
+    fetches `limit + 1` and sets the cursor only when the extra row exists, so a page of exactly `limit`
+    rows with nothing behind it is full AND terminal (probed: 2 receipts, `limit=2` → len 2, cursor
+    null). Terminality is now exactly `next_before_sequence is None`, with the exact-limit boundary
+    pinned beside the short-page one. Also landed: Decision 6 restated as *no matching receipt row*
+    rather than *no such operation*, since `function_receipts` has no FK to `operations`
+    (`store.py:205-223`) and an out-of-band orphan receipt IS enumerated; the known-limit conversion set
+    widened to `TypeError`/`ValueError`/`OverflowError` to match the tracked polish item; the exit-map
+    anchor made symbol-qualified because this unit shifts `main`'s lines; adjacent accept/reject pairs
+    added at every maximum, since a lone rejection pins nothing about where a boundary sits; and a
+    cross-revision historical probe, because three same-revision receipts cannot kill a
+    current-revision restriction on `--receipt-id` even though Decision 4 promises any revision.
+    Verification. MAIN's own 10-mutant seam battery over the new dispatch and parser lines killed 10/10,
+    each proved live by re-importing the mutated module in an isolated clone, preceded by a green
+    pristine control and followed by byte-exact restore. Two anchors had to be widened to two lines
+    first: `limit=args.limit,` occurs 4x in `cli.py`, so an occurrence-indexed patch would have mutated
+    another leaf. A diff-blind suite written from the contract alone, never the diff, passed 35/35
+    against this implementation.
+    Known limits: pagination is NOT snapshot-consistent across pages - each call opens its own read
+    transaction and the cursor is `sequence < boundary`, so a receipt promoted mid-traversal is never
+    seen by the walk in progress; row-level receipt self-binding only, since
+    `reconstruct_function_receipt` stays the sole reconstruction surface; `function receipts` cannot
+    distinguish an unregistered operation from a registered one holding zero receipts. The diff-blind
+    teammate's 13 tests are validated but NOT merged - its worktree died with the wave, so only the
+    35/35 result survives, and the merge is tracked in `.agent/polish.md`. The mutation teammate's
+    catalogue skeleton never reached an anchored campaign; MAIN's own battery is the mutation evidence
+    for this unit, and it is scratch-local, so no durable claim rests on it alone.
   - u4c3 OPEN tier=kernel - `function verify-drafts OPERATION --actor ACTOR` over `verify_drafts`, and
     `function verify OPERATION [--expected-function-hash HEX]` over `verify_function`, carrying the exit-6
     ruling. Est. 44-66 / 620-920. Depends on u4c1.

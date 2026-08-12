@@ -257,6 +257,16 @@ class CLITests(unittest.TestCase):
         self.assertEqual(len(compiled["created"]), members)
         return self.promote_set(operation)
 
+    def receipt_history(
+        self, operation: str, *, members: int, receipts: int
+    ) -> list[str]:
+        # Re-checkpointing an unchanged set is legal and seals a fresh receipt
+        # over the same function hash, so extra receipts cost no confirmations.
+        history = [self.promoted_operation(operation, members)]
+        while len(history) < receipts:
+            history.append(self.promote_set(operation))
+        return history
+
     def test_full_operator_lifecycle(self) -> None:
         registered = self.payload(
             self.run_cli(
@@ -600,16 +610,22 @@ class CLITests(unittest.TestCase):
         )
 
     def test_function_show_forwards_scope_and_limit_unclamped(self) -> None:
-        for operation, arguments, expected in (
-            ("echo", (), 100),
-            ("echo", ("--projection-limit", "1"), 1),
-            ("other_operation", ("--projection-limit", "10000"), 10_000),
-            ("other_operation", ("--projection-limit", "10001"), 10_001),
+        for operation, arguments, expected, receipt in (
+            ("echo", (), 100, None),
+            ("echo", ("--projection-limit", "1"), 1, None),
+            ("other_operation", ("--projection-limit", "10000"), 10_000, None),
+            ("other_operation", ("--projection-limit", "10001"), 10_001, None),
             # argparse `type=int` accepts every Python integer spelling and the
             # value reaches the library exactly as `int()` produced it.
-            ("echo", ("--projection-limit", "+1"), 1),
-            ("echo", ("--projection-limit", " 1 "), 1),
-            ("echo", ("--projection-limit", "1_0"), 10),
+            ("echo", ("--projection-limit", "+1"), 1, None),
+            ("echo", ("--projection-limit", " 1 "), 1, None),
+            ("echo", ("--projection-limit", "1_0"), 10, None),
+            # An unsupplied `--receipt-id` forwards the library's own `None`
+            # rather than being dropped, and a supplied one travels verbatim:
+            # `_request_id` stays the sole validator, never a CLI copy of it.
+            ("echo", ("--receipt-id", "fpr_1"), 100, "fpr_1"),
+            ("echo", ("--receipt-id", "a b"), 100, "a b"),
+            ("echo", ("--receipt-id", "fpr_2", "--projection-limit", "7"), 7, "fpr_2"),
         ):
             with mock.patch.object(System, "function_report", autospec=True) as spy:
                 spy.return_value = {"forwarded": True}
@@ -619,7 +635,10 @@ class CLITests(unittest.TestCase):
             self.assertEqual(spy.call_count, 1)
             positional = spy.call_args.args
             self.assertEqual(positional[1:], ("tenant", operation))
-            self.assertEqual(spy.call_args.kwargs, {"projection_limit": expected})
+            self.assertEqual(
+                spy.call_args.kwargs,
+                {"receipt_id": receipt, "projection_limit": expected},
+            )
 
     def test_function_show_rejects_out_of_range_projection_limit(self) -> None:
         self.register("echo")
@@ -681,11 +700,11 @@ class CLITests(unittest.TestCase):
             "other",
         )
 
-    def test_function_group_rejects_missing_and_future_arguments(self) -> None:
+    def test_function_group_rejects_missing_arguments(self) -> None:
         for arguments in (
             ("function",),
             ("function", "show"),
-            ("function", "show", "echo", "--receipt-id", "fpr_1"),
+            ("function", "receipts"),
         ):
             run = self.run_cli(*arguments)
             self.assertEqual(run.status, 2)
@@ -719,6 +738,400 @@ class CLITests(unittest.TestCase):
             result = _run(arguments, parser)
         self.assertIs(result, spy.return_value)
         self.assertNotIsInstance(result, _Outcome)
+
+    def test_function_receipts_enumerates_newest_first(self) -> None:
+        history = self.receipt_history("echo", members=2, receipts=3)
+        page = self.payload(self.run_cli("function", "receipts", "echo"))
+        self.assertEqual(set(page), {"next_before_sequence", "receipts"})
+        self.assertIsNone(page["next_before_sequence"])
+        self.assertEqual([row["id"] for row in page["receipts"]], list(reversed(history)))
+        self.assertEqual([row["sequence"] for row in page["receipts"]], [3, 2, 1])
+        for row in page["receipts"]:
+            self.assertEqual(set(row), _RECEIPT_KEYS)
+            self.assertEqual(row["partition"], "tenant")
+            self.assertEqual(row["operation"], "echo")
+            self.assertEqual(row["operation_revision"], 1)
+            self.assertEqual(row["member_count"], 2)
+
+    def test_function_receipts_pages_through_the_exclusive_cursor(self) -> None:
+        history = self.receipt_history("echo", members=2, receipts=4)
+        walked: list[str] = []
+        cursor: object = None
+        pages = 0
+        while True:
+            arguments = ["function", "receipts", "echo", "--limit", "1"]
+            if cursor is not None:
+                arguments += ["--before-sequence", str(cursor)]
+            page = self.payload(self.run_cli(*arguments))
+            pages += 1
+            self.assertLess(pages, 10)
+            walked += [row["id"] for row in page["receipts"]]
+            cursor = page["next_before_sequence"]
+            if cursor is None:
+                break
+        # The cursor is exclusive, so a full walk visits every receipt exactly
+        # once, newest first, and the terminal page reports no continuation.
+        self.assertEqual(walked, list(reversed(history)))
+        self.assertEqual(len(walked), len(set(walked)))
+        self.assertEqual(pages, 4)
+
+    def test_function_receipts_truncation_is_visible_without_a_flag(self) -> None:
+        history = self.receipt_history("echo", members=2, receipts=3)
+        page = self.payload(self.run_cli("function", "receipts", "echo", "--limit", "2"))
+        self.assertEqual(len(page["receipts"]), 2)
+        self.assertEqual(page["next_before_sequence"], page["receipts"][-1]["sequence"])
+        rest = self.payload(
+            self.run_cli(
+                "function",
+                "receipts",
+                "echo",
+                "--before-sequence",
+                str(page["next_before_sequence"]),
+            )
+        )
+        self.assertEqual([row["id"] for row in rest["receipts"]], [history[0]])
+        self.assertIsNone(rest["next_before_sequence"])
+        # A limit above the true count projects the count, never padding to it.
+        whole = self.payload(
+            self.run_cli("function", "receipts", "echo", "--limit", "10000")
+        )
+        self.assertEqual(len(whole["receipts"]), 3)
+        self.assertIsNone(whole["next_before_sequence"])
+        # Terminality is the cursor, never the page length: a page holding
+        # exactly `limit` rows with nothing behind it is full AND terminal, so
+        # a short page is sufficient evidence of the end but not necessary.
+        exact = self.payload(self.run_cli("function", "receipts", "echo", "--limit", "3"))
+        self.assertEqual(len(exact["receipts"]), 3)
+        self.assertIsNone(exact["next_before_sequence"])
+        one_short = self.payload(
+            self.run_cli("function", "receipts", "echo", "--limit", "2")
+        )
+        self.assertEqual(len(one_short["receipts"]), 2)
+        self.assertIsNotNone(one_short["next_before_sequence"])
+
+    def test_function_receipts_empty_pages_do_not_distinguish_scope(self) -> None:
+        # Deliberate divergence from `show`: enumeration runs no operations
+        # lookup, so an unregistered operation and a registered one holding no
+        # receipt collapse into one observable.
+        empty = {"next_before_sequence": None, "receipts": []}
+        self.assertEqual(self.payload(self.run_cli("function", "receipts", "echo")), empty)
+        self.register("echo")
+        self.assertEqual(self.payload(self.run_cli("function", "receipts", "echo")), empty)
+        self.receipt_history("other_operation", members=2, receipts=1)
+        self.assertEqual(
+            self.payload(
+                self.run_cli("--partition", "other", "function", "receipts", "other_operation")
+            ),
+            empty,
+        )
+        # Positive control: the same operation in its own partition is not empty.
+        self.assertEqual(
+            len(self.payload(self.run_cli("function", "receipts", "other_operation"))["receipts"]),
+            1,
+        )
+        # `show` keeps separating the two conditions with exit 3.
+        self.assertEqual(self.run_cli("function", "show", "absent_operation").status, 3)
+
+    def test_function_receipts_filters_by_operation_revision(self) -> None:
+        history = self.receipt_history("echo", members=2, receipts=2)
+        self.assertEqual(
+            self.payload(self.run_cli("operation", "revise", "echo", "--actor", "owner"))[
+                "revision"
+            ],
+            2,
+        )
+        first = self.payload(
+            self.run_cli("function", "receipts", "echo", "--operation-revision", "1")
+        )
+        self.assertEqual([row["id"] for row in first["receipts"]], list(reversed(history)))
+        second = self.payload(
+            self.run_cli("function", "receipts", "echo", "--operation-revision", "2")
+        )
+        self.assertEqual(second["receipts"], [])
+        # Unfiltered enumeration still spans every revision.
+        self.assertEqual(
+            len(self.payload(self.run_cli("function", "receipts", "echo"))["receipts"]), 2
+        )
+
+    def test_function_receipts_rejects_out_of_range_bounds(self) -> None:
+        self.register("echo")
+        for flag, value, label in (
+            ("--limit", "0", "limit"),
+            ("--limit", "-1", "limit"),
+            ("--limit", "10001", "limit"),
+            ("--operation-revision", "0", "operation_revision"),
+            ("--operation-revision", "-1", "operation_revision"),
+            ("--before-sequence", "-1", "before_sequence"),
+        ):
+            run = self.run_cli("function", "receipts", "echo", flag, value)
+            self.assertEqual(run.status, 2)
+            self.assertEqual(run.stdout_bytes, b"")
+            self.assertEqual(self.error(run)["error"], "invalid")
+            self.assertIn(label, self.error(run)["message"])
+        # The library validates `operation_revision` before `limit`, so the
+        # first bad argument is the one the operator is told about.
+        both = self.run_cli(
+            "function", "receipts", "echo", "--operation-revision", "0", "--limit", "0"
+        )
+        self.assertEqual(both.status, 2)
+        self.assertIn("operation_revision", self.error(both)["message"])
+        self.assertNotIn("limit must", self.error(both)["message"])
+
+    def test_function_receipts_bounds_are_pinned_as_adjacent_pairs(self) -> None:
+        # Each maximum is pinned by an accepted value beside its rejected
+        # successor: a lone rejection would leave the boundary's position free.
+        self.receipt_history("echo", members=2, receipts=1)
+        signed64 = 2**63 - 1
+        for flag, label, accepted in (
+            ("--operation-revision", "operation_revision", 0),
+            ("--before-sequence", "before_sequence", 1),
+            ("--limit", "limit", 1),
+        ):
+            maximum = 10_000 if flag == "--limit" else signed64
+            inside = self.payload(
+                self.run_cli("function", "receipts", "echo", flag, str(maximum))
+            )
+            self.assertEqual(len(inside["receipts"]), accepted)
+            outside = self.run_cli("function", "receipts", "echo", flag, str(maximum + 1))
+            self.assertEqual(outside.status, 2)
+            self.assertEqual(outside.stdout_bytes, b"")
+            self.assertIn(label, self.error(outside)["message"])
+
+    def test_function_receipts_accepts_a_zero_before_sequence(self) -> None:
+        self.receipt_history("echo", members=2, receipts=1)
+        # `0` sits inside the library's bound and selects `sequence < 0`, so
+        # the page is legally empty rather than an error.
+        self.assertEqual(
+            self.payload(self.run_cli("function", "receipts", "echo", "--before-sequence", "0")),
+            {"next_before_sequence": None, "receipts": []},
+        )
+        self.assertEqual(
+            len(self.payload(self.run_cli("function", "receipts", "echo"))["receipts"]), 1
+        )
+
+    def test_function_receipts_forwards_scope_and_bounds_unclamped(self) -> None:
+        for operation, arguments, expected in (
+            ("echo", (), {"operation_revision": None, "before_sequence": None, "limit": 100}),
+            (
+                "echo",
+                ("--limit", "10001"),
+                {"operation_revision": None, "before_sequence": None, "limit": 10_001},
+            ),
+            (
+                "other_operation",
+                ("--operation-revision", "1_0", "--before-sequence", "+7", "--limit", " 3 "),
+                {"operation_revision": 10, "before_sequence": 7, "limit": 3},
+            ),
+            # Out-of-range values travel too: the CLI owns no bound of its own.
+            (
+                "echo",
+                ("--operation-revision", "0", "--before-sequence", "0"),
+                {"operation_revision": 0, "before_sequence": 0, "limit": 100},
+            ),
+        ):
+            with mock.patch.object(System, "function_receipts", autospec=True) as spy:
+                spy.return_value = {"forwarded": True}
+                run = self.run_cli("function", "receipts", operation, *arguments)
+            self.assertEqual(run.status, 0)
+            self.assertEqual(run.stdout_json, {"forwarded": True})
+            self.assertEqual(spy.call_count, 1)
+            self.assertEqual(spy.call_args.args[1:], ("tenant", operation))
+            self.assertEqual(spy.call_args.kwargs, expected)
+
+    def test_function_receipts_scope_matches_exactly(self) -> None:
+        # This leaf queries the receipts table, not the operations table, so
+        # the `_` and case colliders have to reach it on their own.
+        history = self.receipt_history("echo_1", members=2, receipts=1)
+        self.assertEqual(
+            [
+                row["id"]
+                for row in self.payload(self.run_cli("function", "receipts", "echo_1"))["receipts"]
+            ],
+            history,
+        )
+        for near_miss in ("echoX1", "ECHO_1", "Echo_1", "echo"):
+            self.assertEqual(
+                self.payload(self.run_cli("function", "receipts", near_miss))["receipts"], []
+            )
+        self.assertEqual(
+            self.payload(
+                self.run_cli("--partition", "other", "function", "receipts", "echo_1")
+            )["receipts"],
+            [],
+        )
+
+    def test_function_receipts_returns_the_library_page_unwrapped(self) -> None:
+        from cement_runtime.cli import _Outcome, _parser, _run
+
+        parser = _parser()
+        arguments = parser.parse_args(
+            [
+                "--db",
+                self.database,
+                "--partition",
+                "tenant",
+                "function",
+                "receipts",
+                "echo",
+            ]
+        )
+        with mock.patch.object(System, "function_receipts", autospec=True) as spy:
+            spy.return_value = {"bare": True}
+            result = _run(arguments, parser)
+        self.assertIs(result, spy.return_value)
+        self.assertNotIsInstance(result, _Outcome)
+
+    def test_function_show_receipt_id_pins_a_historical_anchor(self) -> None:
+        history = self.receipt_history("echo", members=2, receipts=3)
+        current = self.payload(self.run_cli("function", "show", "echo"))
+        self.assertEqual(current["function_anchor"]["receipt"]["id"], history[-1])
+        for index, receipt_id in enumerate(history):
+            pinned = self.payload(
+                self.run_cli("function", "show", "echo", "--receipt-id", receipt_id)
+            )
+            anchor = pinned["function_anchor"]
+            self.assertEqual(anchor["receipt"]["id"], receipt_id)
+            self.assertEqual(anchor["receipt"]["sequence"], index + 1)
+            self.assertEqual(anchor["member_count"], 2)
+            # The anchor freezes at the named receipt while the operation half
+            # stays live, so the two halves never collapse into one number.
+            self.assertEqual(
+                pinned["operation_now"]["operation_revision"],
+                current["operation_now"]["operation_revision"],
+            )
+            self.assertEqual(
+                pinned["operation_now"]["promoted_entry_count"],
+                current["operation_now"]["promoted_entry_count"],
+            )
+        # Naming an older receipt is observable against bare `show`.
+        self.assertNotEqual(
+            self.payload(
+                self.run_cli("function", "show", "echo", "--receipt-id", history[0])
+            )["function_anchor"]["receipt"]["id"],
+            current["function_anchor"]["receipt"]["id"],
+        )
+
+    def test_function_show_receipt_id_reaches_a_superseded_revision(self) -> None:
+        # The named receipt may belong to ANY revision, so the anchor freezes
+        # at revision 1 while the operation half reports the current revision.
+        # Three same-revision receipts cannot kill a current-revision filter.
+        history = self.receipt_history("echo", members=2, receipts=1)
+        self.assertEqual(
+            self.payload(
+                self.run_cli(
+                    "operation",
+                    "revise",
+                    "echo",
+                    "--actor",
+                    "owner",
+                    "--min-confirmations",
+                    "4",
+                    "--min-reviewers",
+                    "3",
+                    "--min-span-seconds",
+                    "11",
+                )
+            )["revision"],
+            2,
+        )
+        pinned = self.payload(
+            self.run_cli("function", "show", "echo", "--receipt-id", history[0])
+        )
+        self.assertEqual(pinned["function_anchor"]["receipt"]["id"], history[0])
+        self.assertEqual(pinned["function_anchor"]["receipt"]["operation_revision"], 1)
+        self.assertEqual(pinned["operation_now"]["operation_revision"], 2)
+        self.assertNotEqual(
+            pinned["operation_now"]["policy_hash"],
+            pinned["function_anchor"]["receipt"]["policy_hash"],
+        )
+        # Bare `show` resolves the current revision, which carries no receipt.
+        self.assertIsNone(self.payload(self.run_cli("function", "show", "echo"))["function_anchor"])
+        # Enumeration reaches the superseded receipt too, unfiltered.
+        self.assertEqual(
+            [row["id"] for row in self.payload(self.run_cli("function", "receipts", "echo"))["receipts"]],
+            history,
+        )
+
+    def test_function_show_receipt_id_misses_are_not_found(self) -> None:
+        history = self.receipt_history("echo", members=2, receipts=1)
+        self.receipt_history("other_operation", members=2, receipts=1)
+        for operation, receipt_id in (
+            ("echo", "fpr_" + "0" * 32),
+            ("other_operation", history[0]),
+        ):
+            run = self.run_cli("function", "show", operation, "--receipt-id", receipt_id)
+            self.assertEqual(run.status, 3)
+            self.assertEqual(run.stdout_bytes, b"")
+            self.assertEqual(self.error(run)["error"], "not_found")
+        self.register("echo", partition="other")
+        wrong_partition = self.run_cli(
+            "--partition", "other", "function", "show", "echo", "--receipt-id", history[0]
+        )
+        self.assertEqual(wrong_partition.status, 3)
+        self.assertEqual(self.error(wrong_partition)["error"], "not_found")
+        # Positive control: the same id resolves inside its own scope.
+        self.assertEqual(
+            self.payload(
+                self.run_cli("function", "show", "echo", "--receipt-id", history[0])
+            )["function_anchor"]["receipt"]["id"],
+            history[0],
+        )
+
+    def test_function_show_rejects_a_malformed_receipt_id(self) -> None:
+        self.register("echo")
+        for value in ("", ".leading", "has space", "a" * 193, "identifiér"):
+            run = self.run_cli("function", "show", "echo", "--receipt-id", value)
+            self.assertEqual(run.status, 2)
+            self.assertEqual(run.stdout_bytes, b"")
+            self.assertEqual(self.error(run)["error"], "invalid")
+            self.assertIn("bounded ASCII identifier", self.error(run)["message"])
+        # A leading `-` needs the equals spelling to reach the library at all;
+        # separated, argparse claims the token first. Both exit 2, but only the
+        # equals form's message is ours to pin -- the other is argparse's.
+        equals = self.run_cli("function", "show", "echo", "--receipt-id=-lead")
+        self.assertEqual(equals.status, 2)
+        self.assertIn("bounded ASCII identifier", self.error(equals)["message"])
+        separated = self.run_cli("function", "show", "echo", "--receipt-id", "-lead")
+        self.assertEqual(separated.status, 2)
+        self.assertEqual(separated.stdout_bytes, b"")
+        self.assertEqual(self.error(separated)["error"], "invalid")
+        # 192 characters is the inclusive maximum, so a well-formed id of that
+        # length reaches lookup and misses rather than failing validation.
+        self.assertEqual(
+            self.run_cli("function", "show", "echo", "--receipt-id", "a" * 192).status, 3
+        )
+        # `receipt_id` is validated before `projection_limit`, so a run with
+        # both bad names the receipt id.
+        both = self.run_cli(
+            "function", "show", "echo", "--receipt-id", "", "--projection-limit", "0"
+        )
+        self.assertEqual(both.status, 2)
+        self.assertIn("bounded ASCII identifier", self.error(both)["message"])
+        self.assertNotIn("projection_limit", self.error(both)["message"])
+
+    def test_function_show_receipt_id_still_bounds_members(self) -> None:
+        history = self.receipt_history("echo", members=3, receipts=1)
+        pinned = self.payload(
+            self.run_cli(
+                "function",
+                "show",
+                "echo",
+                "--receipt-id",
+                history[0],
+                "--projection-limit",
+                "1",
+            )
+        )
+        anchor = pinned["function_anchor"]
+        self.assertEqual(anchor["member_count"], 3)
+        self.assertEqual(len(anchor["members"]), 1)
+        self.assertEqual(pinned["operation_now"]["projection_limit"], 1)
+        whole = self.payload(
+            self.run_cli("function", "show", "echo", "--receipt-id", history[0])
+        )
+        self.assertEqual(
+            [member["ordinal"] for member in whole["function_anchor"]["members"]], [0, 1, 2]
+        )
 
     def test_outcome_raw_channel_writes_exact_bytes(self) -> None:
         from cement_runtime.cli import _Outcome
@@ -853,9 +1266,13 @@ class CLITests(unittest.TestCase):
         # through to a `None` result that `main` would emit as `null`.
         from cement_runtime.cli import _parser, _run
 
+        # The sentinel names no leaf any u4c sub-unit will claim; `show`,
+        # `receipts`, `verify-drafts`, `verify`, `inspect`, `promote`, `export`
+        # and `eval` are all reserved, so only a hand-built namespace reaches
+        # the fall-through.
         arguments = argparse.Namespace(
             command="function",
-            function_command="receipts",
+            function_command="__unshipped__",
             db=self.database,
             partition="tenant",
         )

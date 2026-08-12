@@ -169,7 +169,13 @@ def _parser() -> argparse.ArgumentParser:
     function_commands = function.add_subparsers(dest="function_command", required=True)
     function_show = function_commands.add_parser("show")
     function_show.add_argument("operation")
+    function_show.add_argument("--receipt-id", help="pin the anchor to one historical receipt")
     function_show.add_argument("--projection-limit", type=int, default=100)
+    function_receipts = function_commands.add_parser("receipts")
+    function_receipts.add_argument("operation")
+    function_receipts.add_argument("--operation-revision", type=int)
+    function_receipts.add_argument("--before-sequence", type=int)
+    function_receipts.add_argument("--limit", type=int, default=100)
 
     events = commands.add_parser("events", help="read append-only audit projections")
     events.add_argument("--after", type=int, default=0)
@@ -357,7 +363,16 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
             return system.function_report(
                 args.partition,
                 args.operation,
+                receipt_id=args.receipt_id,
                 projection_limit=args.projection_limit,
+            )
+        if args.function_command == "receipts":
+            return system.function_receipts(
+                args.partition,
+                args.operation,
+                operation_revision=args.operation_revision,
+                before_sequence=args.before_sequence,
+                limit=args.limit,
             )
     if args.command == "events":
         return system.events(args.partition, after=args.after, limit=args.limit)

@@ -93,3 +93,18 @@ changed is spine work, not polish.
   Type noise only, no behavior at stake, and Pyright is not a configured gate. Acceptance: that region
   narrows its unions explicitly, an ad-hoc `uvx pyright tests/test_system.py` reports zero
   `reportAttributeAccessIssue`, and the suite stays green.
+
+## M2.u4c2 deferrals
+
+- pri=2 `function receipts` / historical `show`: merge the diff-blind teammate's 13 contract-derived
+  tests. They passed 35/35 against the landed implementation but were never merged, and the worktree
+  died with the wave. Acceptance: re-derive from `.agent/decisions/m2u4c2-contract.md` Decision 8/9 and
+  keep only probes MAIN's 17 do not already reach — repeated-flag last-wins, Unicode decimal digits
+  reaching `type=int`, cross-leaf flag isolation in both directions, and surplus-positional rejection
+  are the named non-overlapping ones. Gate: suite green, no existing test weakened.
+- pri=2 `--receipt-id` inherits a repo-wide message vocabulary leak: `_request_id` reports the label
+  `request_id` for `proposal_id` (`system.py:1087,1128,1229`), `artifact_id` (`3704,4466,4829,4968`),
+  `example_id` (`4761`), `report_id` (`5006`) and now the receipt id. Pre-existing, pinned as-is by
+  u4c2 because fixing it means editing `system.py` (outside the CLI write set) or duplicating library
+  validation in the CLI. Acceptance: one label parameter threaded through `_request_id`, every caller
+  naming its own field, existing message pins updated in one pass.
