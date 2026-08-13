@@ -184,6 +184,16 @@ def _parser() -> argparse.ArgumentParser:
     function_verify.add_argument(
         "--expected-function-hash", help="fail unless the committed set hashes to this digest"
     )
+    function_inspect = function_commands.add_parser("inspect")
+    function_inspect.add_argument("operation")
+    function_promote = function_commands.add_parser("promote")
+    function_promote.add_argument("operation")
+    function_promote.add_argument(
+        "--expected-function-hash",
+        required=True,
+        help="repeat the prospective digest `function inspect` reports",
+    )
+    function_promote.add_argument("--actor", required=True)
 
     events = commands.add_parser("events", help="read append-only audit projections")
     events.add_argument("--after", type=int, default=0)
@@ -404,6 +414,26 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
                     "checks": [asdict(check) for check in verification.checks],
                 },
                 status=0 if verification.passed else 6,
+            )
+        if args.function_command == "inspect":
+            manifest = system.inspect_function_promotion(
+                args.partition,
+                args.operation,
+            )
+            # `text` and `document` carry the whole function document; u4c5's
+            # export owns those bytes, so the manifest reaches stdout projected.
+            return {
+                "operation_revision": manifest.operation_revision,
+                "function_hash": manifest.function_hash,
+                "entries": [asdict(entry) for entry in manifest.entries],
+                "skipped": list(manifest.skipped),
+            }
+        if args.function_command == "promote":
+            return system.promote_function(
+                args.partition,
+                args.operation,
+                expected_function_hash=args.expected_function_hash,
+                promoted_by=args.actor,
             )
     if args.command == "events":
         return system.events(args.partition, after=args.after, limit=args.limit)

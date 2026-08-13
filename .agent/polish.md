@@ -36,7 +36,11 @@ changed is spine work, not polish.
   stored int is required. Reachable from `latest_function_receipt`, `function_receipts`, `function_report`'s
   function anchor, `reconstruct_function_receipt`, and `verify_function` P6 — which catches `IntegrityError`
   only, so the leak escapes the check written to contain it. `main` has no catch-all, so the CLI surfaces
-  this as a traceback rather than mapped JSON. The standing rule in `.agent/memory.md` already requires every
+  this as a traceback rather than mapped JSON. Promotion planning adds two more reachable sites of the same
+  class: the report and artifact-build conversions on the candidate and retained paths, both reachable from
+  `inspect_function_promotion` and `promote_function`, so the corruption guarantee proved for the
+  `artifact_json` recipe does not cover them and a corrupt row there leaks the raw conversion error. The
+  standing rule in `.agent/memory.md` already requires every
   persisted-scalar conversion to translate `TypeError`/`ValueError`/`OverflowError` or to guard the exact
   stored type the way `_stored_int` does; u4a and u4b each paid for one violation, so fix the class, not the
   site. Acceptance: the audit in `.agent/decisions/m2u4c-surface.md` Section G lists every conversion site
@@ -99,6 +103,26 @@ changed is spine work, not polish.
   Type noise only, no behavior at stake, and Pyright is not a configured gate. Acceptance: that region
   narrows its unions explicitly, an ad-hoc `uvx pyright tests/test_system.py` reports zero
   `reportAttributeAccessIssue`, and the suite stays green.
+
+## M2.u4c4 deferrals
+
+- pri=2 `size=S` — the locked-recheck race is pinned only by injection, though it is real behavior. A
+  default-constructed `System` re-reads the locked prospective function inside `promote_function` and
+  raises `StateError` when it moved between `inspect` and `promote`; the CLI maps that to exit 4 with
+  `error: "conflict"`, and u4c4 drives it through `main`'s exit map with a patched `System.promote_function`
+  rather than through a real ledger. Exit 4 is the one exit class where retry IS the intended recovery
+  (`.agent/memory.md`), so the branch an operator's wrapper depends on is the one no end-to-end probe
+  reaches. Acceptance: a committed probe drives two CLI invocations against one ledger with a supported
+  command changing the prospective union between the hash read and the promote, observes exit 4 plus the
+  `expected_function_hash does not match the locked prospective function` message with no patching, and
+  asserts the ledger is unchanged by the rejected call.
+- pri=3 `size=S` — `--actor` grammar is nearly unpinned on the promote leaf. The merged suite carries a
+  single occurrence exercising the value's validation, so the accept/reject PAIR the memory rule requires
+  at every bound is absent here: an empty actor, an over-long actor and one carrying illegal characters
+  all ride on the library's `_name` behavior with no CLI-side pin, and `--actor` is what the promotion
+  receipt attributes activation to. Acceptance: one probe per shape (empty, boundary-length accepted,
+  boundary+1 rejected, illegal character) asserts the exit code and the mapped message, and the accepted
+  boundary value is read back out of the promotion receipt.
 
 ## M2.u4c3 deferrals
 

@@ -478,10 +478,47 @@ Measured gaps driving the arc:
     at best-current-judgment rather than exhausted; the milestone review's per-unit reviewer inherits
     them. The surface map died at 91% with 12 of 25 anchors failing its own validator, so it is
     attention-directing only and no claim here rests on it.
-  - u4c4 OPEN tier=kernel - `function inspect OPERATION` over `inspect_function_promotion` and
-    `function promote OPERATION --expected-function-hash HEX --actor ACTOR` over `promote_function`; the
-    manifest hash inspect displays must feed promote unchanged, and a prospective change must make a stale
-    hash fail. Est. 36-55 / 510-760. Depends on u4c1.
+  - u4c4 DONE (main=98% 235K/240K, mate=88% 212K/240K) - `function inspect OPERATION` over
+    `inspect_function_promotion` and `function promote OPERATION --expected-function-hash HEX --actor
+    ACTOR` over `promote_function`. `cli.py` +30, `test_cli.py` +1011/-7 (29 tests); suite 424 -> 453.
+    Contract `.agent/decisions/m2u4c4-contract.md`. No library delta; `system.py`, `store.py`, `models.py`,
+    `function.py`, `__init__.py`, `README.md`, `docs/`, `examples/` byte-identical.
+    Design fork, arbitrated from two prototyped spikes that BOTH self-rejected: `inspect` emits the
+    manifest minus `text` and `document`, unsliced and uncounted. BOUNDED's defects are unconditional - a
+    CLI-owned 10,000 maximum leaves prospective members 10,001-50,000 unreachable through any CLI route
+    (the same reachability defect that killed u4b's `minimal`), the flag has no library owner to forward
+    to against the frozen unclamped convention, and both spikes independently measured zero upstream
+    benefit (N=1000 peak RSS 49,816 KiB bounded vs 49,752 unbounded) because `inspect_function_promotion`
+    materializes the whole manifest before the CLI can slice. FULL's bite only at maximum cardinality,
+    where the alternative provides no relief; its own third loss condition (cannot answer behavior) does
+    not discriminate, since Decision 3 bans the document from both and u4c5/u4c6 own content. Counts
+    follow: unsliced, `entry_count == len(entries)` identically, so the field advertises a truncation
+    semantics the payload lacks.
+    Verification. MAIN's own smoke probe over sixteen branches ran before any test existed and corrected
+    the contract twice - `handle` resolves a promoted scope rather than proposing, so `challenge` agreeing
+    with the active output is the only displacement-fixture route, and a PROMOTED predecessor yields
+    `replaces_artifact_id` while a merely VERIFIED one yields `skipped: superseded-build`. The diff-blind
+    suite, written from the contract alone, was red 29/29 at baseline; against the implementation four
+    reds were the suite's own defects (an argparse paraphrase in five places, and an expectation that
+    argparse reports an unrecognized flag before a missing required one), zero were code defects.
+    Review. One contract-attack reviewer dispatched BEFORE implementation returned nine accepted findings,
+    every one a claim defect in MAIN's contract and none in the code. Load-bearing: `entries == []` does
+    not imply `skipped == []`, since rows are classified before the union is assembled (probed
+    `entries=0, skipped=1`); a non-qualifying change holds the hash but promotion additionally needs a
+    nonempty union, so the exit-0 checkpoint claim was conditional; the locked-recheck `StateError` is NOT
+    injection-only but real concurrency behavior of the default-constructed `System`; 499 B/entry is a
+    fixture result rather than a maximum, since a displacing candidate costs 533 B (25.416 MiB at 50,000);
+    `promote`'s three tuples reach 6.295 MiB jointly against a claimed ~2 MB; and "the bound buys no
+    resource benefit" was false as a class claim, since it cuts terminal bytes 99.799% while buying
+    nothing upstream.
+    Known limits: `inspect` has no cursor and no paging, so a maximum set emits tens of MiB in one write.
+    Both exit-4 branches (stale hash, empty set) carry `error: "conflict"` and are separated only by
+    message. Authority denial is genuinely CLI-unreachable (no `authority=` is ever passed), but the
+    locked-recheck race is reachable and is pinned here only through `main`'s exit map by injection - the
+    CLI-level concurrency probe is registered in `.agent/polish.md`. The corruption guarantee is scoped to
+    the `artifact_json` recipe; report and artifact-build stored-scalar conversions on both planning paths
+    can still leak raw conversion errors, widening the tracked audit. `stale_revision_anomalies` and
+    actor-grammar bounds beyond the shipped pins stay as recorded polish.
   - u4c5 OPEN tier=kernel - `function export OPERATION [--receipt-id ID] [--out PATH]`: live source gated on
     `verify_function` P1-P6 passing with a failure raising to exit 5 rather than exporting a stale or
     diagnostic document, `--receipt-id` selecting the historical source and cross-checking the reconstructed

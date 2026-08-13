@@ -98,6 +98,27 @@ _FUNCTION_CHECK_KEYS = (
     "function-hash-matches-snapshot",
     "persisted-function-receipt",
 )
+_INSPECT_KEYS = {"entries", "function_hash", "operation_revision", "skipped"}
+_PROMOTION_ENTRY_KEYS = {
+    "artifact_hash",
+    "artifact_id",
+    "disposition",
+    "entry_seal",
+    "input_hash",
+    "output_hash",
+    "replaces_artifact_id",
+}
+_PROMOTION_KEYS = {
+    "candidate_artifact_ids",
+    "function_hash",
+    "member_artifact_ids",
+    "operation_revision",
+    "promoted_at_us",
+    "receipt_hash",
+    "receipt_id",
+    "retired_artifact_ids",
+}
+_SKIPPED_KEYS = {"artifact_id", "input_hash", "reason"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -251,8 +272,10 @@ class CLITests(unittest.TestCase):
             )
 
     def promote_set(self, operation: str) -> str:
-        # The CLI cannot promote a function set until u4c3/u4c4, so drive the
-        # library for setup and assert through the CLI.
+        # Library-driven setup keeps the show/receipts/verify tests independent of
+        # the inspect/promote leaves: 18 tests consume this helper, and routing
+        # their setup through a leaf under test would fail all of them for the
+        # wrong reason.
         system = System(self.database)
         drafts = system.verify_drafts("tenant", operation, verified_by="verifier")
         self.assertTrue(drafts.passed)
@@ -1931,6 +1954,987 @@ class CLITests(unittest.TestCase):
             typing.get_type_hints(CLITests.run_cli),
             {"arguments": str, "text_only": bool, "return": _CLIRun},
         )
+
+    def test_function_inspect_projects_three_candidates_with_exact_schema(self) -> None:
+        created = self.compile_drafts("inspect-candidates", (3, 12, 27))
+        verified = self.payload(
+            self.run_cli(
+                "function", "verify-drafts", "inspect-candidates", "--actor", "verifier"
+            )
+        )
+        run = self.run_cli("function", "inspect", "inspect-candidates")
+        payload = self.payload(run)
+        self.assertEqual(set(payload), _INSPECT_KEYS)
+        self.assertEqual(payload["operation_revision"], 1)
+        self.assertRegex(payload["function_hash"], r"^[0-9a-f]{64}$")
+        self.assertEqual(payload["skipped"], [])
+        self.assertEqual(len(payload["entries"]), 3)
+        self.assertEqual(
+            [entry["input_hash"] for entry in payload["entries"]],
+            sorted(entry["input_hash"] for entry in payload["entries"]),
+        )
+        self.assertEqual(
+            {entry["artifact_id"] for entry in payload["entries"]}, set(created)
+        )
+        self.assertEqual(
+            {entry["entry_seal"] for entry in payload["entries"]},
+            {entry["entry_seal"] for entry in verified["entries"]},
+        )
+        for entry in payload["entries"]:
+            self.assertEqual(set(entry), _PROMOTION_ENTRY_KEYS)
+            self.assertEqual(entry["disposition"], "candidate")
+            self.assertIsNone(entry["replaces_artifact_id"])
+            for key in ("artifact_hash", "input_hash", "output_hash", "entry_seal"):
+                self.assertRegex(entry[key], r"^[0-9a-f]{64}$")
+        for forbidden in ("text", "document", "value", "input_hashes", "_cases"):
+            self.assertNotIn(forbidden, run.stdout_text)
+        self.assertEqual(run.stderr_text, "")
+
+    def test_function_inspect_reports_retained_and_displacing_candidate(self) -> None:
+        self.promoted_operation("inspect-mixed", 2)
+        before = System(self.database).inspect_function_promotion(
+            "tenant", "inspect-mixed"
+        )
+        connection = sqlite3.connect(self.database)
+        try:
+            row = connection.execute(
+                "SELECT input_json FROM artifacts WHERE id = ?",
+                (before.entries[0].artifact_id,),
+            ).fetchone()
+        finally:
+            connection.close()
+        self.assertIsNotNone(row)
+        assert row is not None
+        value = typing.cast(dict[str, int], json.loads(str(row[0])))
+        challenged = self.payload(
+            self.run_cli(
+                "challenge",
+                "inspect-mixed",
+                "--input",
+                json.dumps(value),
+                "--expected",
+                json.dumps({"kind": "echo", "value": value}),
+                "--reviewer",
+                "auditor",
+                "--note",
+                "same-output replacement build",
+            )
+        )
+        self.assertFalse(challenged["suspended"])
+        compiled = self.payload(self.run_cli("compile", "inspect-mixed"))["created"]
+        self.assertEqual(len(compiled), 1)
+        verified = self.run_cli(
+            "function", "verify-drafts", "inspect-mixed", "--actor", "verifier"
+        )
+        self.assertEqual(verified.status, 0)
+
+        run = self.run_cli("function", "inspect", "inspect-mixed")
+        payload = self.payload(run)
+        self.assertEqual(set(payload), _INSPECT_KEYS)
+        self.assertEqual(len(payload["entries"]), 2)
+        dispositions = [entry["disposition"] for entry in payload["entries"]]
+        self.assertEqual(dispositions.count("retained"), 1)
+        self.assertEqual(dispositions.count("candidate"), 1)
+        candidate = next(
+            entry for entry in payload["entries"] if entry["disposition"] == "candidate"
+        )
+        retained = next(
+            entry for entry in payload["entries"] if entry["disposition"] == "retained"
+        )
+        self.assertEqual(candidate["artifact_id"], compiled[0])
+        self.assertEqual(
+            candidate["replaces_artifact_id"], before.entries[0].artifact_id
+        )
+        self.assertNotEqual(candidate["artifact_id"], candidate["replaces_artifact_id"])
+        self.assertIn(
+            retained["artifact_id"],
+            {entry.artifact_id for entry in before.entries},
+        )
+        self.assertIsNone(retained["replaces_artifact_id"])
+        self.assertEqual(run.stderr_text, "")
+
+    def test_function_inspect_reports_an_empty_union_and_hash(self) -> None:
+        self.register("inspect-empty")
+        library = System(self.database).inspect_function_promotion(
+            "tenant", "inspect-empty"
+        )
+        run = self.run_cli("function", "inspect", "inspect-empty")
+        payload = self.payload(run)
+        self.assertEqual(payload, {
+            "entries": [],
+            "function_hash": library.function_hash,
+            "operation_revision": 1,
+            "skipped": [],
+        })
+        self.assertRegex(payload["function_hash"], r"^[0-9a-f]{64}$")
+        self.assertEqual(run.stderr_text, "")
+
+    def test_function_inspect_ignores_unverified_drafts(self) -> None:
+        created = self.compile_drafts("inspect-drafts", (4, 15, 26))
+        self.assertEqual(len(created), 3)
+        run = self.run_cli("function", "inspect", "inspect-drafts")
+        payload = self.payload(run)
+        self.assertEqual(set(payload), _INSPECT_KEYS)
+        self.assertEqual(payload["entries"], [])
+        self.assertEqual(payload["skipped"], [])
+        self.assertRegex(payload["function_hash"], r"^[0-9a-f]{64}$")
+        self.assertEqual(run.stderr_text, "")
+
+    def test_function_inspect_reports_superseded_verified_build_verbatim(self) -> None:
+        created = self.compile_drafts("inspect-skipped", (5, 16, 29))
+        old = self.payload(
+            self.run_cli(
+                "function", "verify-drafts", "inspect-skipped", "--actor", "verifier"
+            )
+        )
+        self.assertEqual(len(old["entries"]), 3)
+        connection = sqlite3.connect(self.database)
+        try:
+            row = connection.execute(
+                """
+                SELECT input_json FROM artifacts WHERE id = ?
+                """,
+                (created[1],),
+            ).fetchone()
+        finally:
+            connection.close()
+        self.assertIsNotNone(row)
+        assert row is not None
+        value = typing.cast(dict[str, int], json.loads(str(row[0])))
+        self.handle_once(
+            "inspect-skipped", value["x"], "inspect-skipped-extra", review=True
+        )
+        replacement = self.payload(self.run_cli("compile", "inspect-skipped"))["created"]
+        self.assertEqual(len(replacement), 1)
+        verified = self.payload(
+            self.run_cli(
+                "function", "verify-drafts", "inspect-skipped", "--actor", "verifier"
+            )
+        )
+        self.assertEqual(len(verified["entries"]), 1)
+
+        payload = self.payload(self.run_cli("function", "inspect", "inspect-skipped"))
+        self.assertEqual(len(payload["entries"]), 3)
+        self.assertEqual(len(payload["skipped"]), 1)
+        skipped = payload["skipped"][0]
+        self.assertEqual(set(skipped), _SKIPPED_KEYS)
+        self.assertEqual(skipped["artifact_id"], created[1])
+        self.assertEqual(skipped["reason"], "superseded-build")
+        self.assertEqual(
+            skipped["input_hash"],
+            next(entry["input_hash"] for entry in old["entries"] if entry["artifact_id"] == created[1]),
+        )
+        self.assertNotIn(
+            created[1], {entry["artifact_id"] for entry in payload["entries"]}
+        )
+
+    def test_function_inspect_scope_misses_are_not_found(self) -> None:
+        for run in (
+            self.run_cli("function", "inspect", "absent"),
+            self.run_cli(
+                "--partition", "tenantXa", "function", "inspect", "partitioned"
+            ),
+        ):
+            self.assertEqual(run.status, 3)
+            self.assertEqual(run.stdout_bytes, b"")
+            self.assertEqual(
+                self.error(run),
+                {
+                    "error": "not_found",
+                    "message": "operation is not registered in this partition",
+                },
+            )
+        self.register("partitioned", partition="tenant_a")
+        positive = self.run_cli(
+            "--partition", "tenant_a", "function", "inspect", "partitioned"
+        )
+        self.assertEqual(positive.status, 0)
+
+    def test_function_inspect_rejects_non_surface_options(self) -> None:
+        for arguments, message in (
+            (("--projection-limit", "5"), "unrecognized arguments: --projection-limit 5"),
+            (("--receipt-id", "X"), "unrecognized arguments: --receipt-id X"),
+        ):
+            run = self.run_cli("function", "inspect", "echo", *arguments)
+            self.assertEqual(run.status, 2)
+            self.assertEqual(run.stdout_bytes, b"")
+            self.assertEqual(self.error(run), {"error": "invalid", "message": message})
+        missing = self.run_cli("function", "inspect")
+        self.assertEqual(missing.status, 2)
+        self.assertEqual(missing.stdout_bytes, b"")
+        self.assertEqual(
+            self.error(missing),
+            {"error": "invalid", "message": "the following arguments are required: operation"},
+        )
+
+    def test_function_inspect_forwards_scope_positionally(self) -> None:
+        from cement_runtime.models import FunctionPromotionManifest
+
+        sentinel = FunctionPromotionManifest(
+            operation_revision=13,
+            function_hash="a" * 64,
+            text="private-manifest",
+            document=mock.sentinel.document,
+            entries=(),
+            skipped=(),
+        )
+        with mock.patch.object(
+            System, "inspect_function_promotion", autospec=True
+        ) as spy:
+            spy.return_value = sentinel
+            run = self.run_cli("function", "inspect", "echo_1")
+        self.assertEqual(run.status, 0)
+        self.assertEqual(spy.call_count, 1)
+        self.assertEqual(spy.call_args.args[1:], ("tenant", "echo_1"))
+        self.assertEqual(spy.call_args.kwargs, {})
+        self.assertEqual(
+            run.stdout_json,
+            {
+                "entries": [],
+                "function_hash": "a" * 64,
+                "operation_revision": 13,
+                "skipped": [],
+            },
+        )
+        self.assertNotIn("private-manifest", run.stdout_text)
+        self.assertNotIn("document", run.stdout_text)
+
+    def test_function_inspect_scope_matches_exactly(self) -> None:
+        self.register("echo_1", partition="tenant_a")
+        self.register("echoX1", partition="tenantXa")
+        self.register("echoX1")
+        self.register("Echo_1")
+        positive = self.run_cli(
+            "--partition", "tenant_a", "function", "inspect", "echo_1"
+        )
+        self.assertEqual(positive.status, 0)
+        self.assertEqual(self.payload(positive)["operation_revision"], 1)
+        for arguments in (
+            ("function", "inspect", "echo_1"),
+            ("--partition", "tenantXa", "function", "inspect", "echo_1"),
+        ):
+            run = self.run_cli(*arguments)
+            self.assertEqual(run.status, 3)
+            self.assertEqual(run.stdout_bytes, b"")
+            self.assertEqual(
+                self.error(run),
+                {
+                    "error": "not_found",
+                    "message": "operation is not registered in this partition",
+                },
+            )
+
+    def test_function_inspect_is_byte_deterministic(self) -> None:
+        created = self.compile_drafts("inspect-stable", (6, 17, 31))
+        self.assertEqual(len(created), 3)
+        verified = self.run_cli(
+            "function", "verify-drafts", "inspect-stable", "--actor", "verifier"
+        )
+        self.assertEqual(verified.status, 0)
+        first = self.run_cli("function", "inspect", "inspect-stable")
+        second = self.run_cli("function", "inspect", "inspect-stable")
+        self.assertEqual(first.status, 0)
+        self.assertEqual(second.status, 0)
+        self.assertEqual(first.stdout_bytes, second.stdout_bytes)
+        self.assertEqual(first.stdout_json, second.stdout_json)
+        self.assertEqual(first.stderr_text, "")
+        self.assertEqual(second.stderr_text, "")
+
+    def test_function_inspect_emits_the_tail_beyond_one_hundred_entries(self) -> None:
+        from cement_runtime.models import Candidate, ReviewRequired
+
+        class _Source:
+            def propose(self, request: typing.Any) -> Candidate:
+                return Candidate(
+                    output={"kind": "echo", "value": request.input},
+                    provenance={"model": "tail-fixture"},
+                )
+
+        operation = "inspect-tail"
+        system = System(self.database, candidate_source=_Source())
+        system.register_operation(
+            "tenant",
+            operation,
+            policy=__import__("cement_runtime").CompilePolicy(2, 1, 0),
+        )
+        for index in range(121):
+            for witness in (1, 2):
+                outcome = system.handle(
+                    "tenant",
+                    operation,
+                    {"x": index},
+                    request_id=f"inspect-tail-{index}-{witness}",
+                )
+                self.assertIsInstance(outcome, ReviewRequired)
+                assert isinstance(outcome, ReviewRequired)
+                system.review(
+                    "tenant",
+                    outcome.proposal_id,
+                    reviewer=f"reviewer-{witness}",
+                    decision="accept",
+                )
+        compiled = system.compile("tenant", operation)
+        self.assertEqual(len(compiled.created), 121)
+        verified = system.verify_drafts("tenant", operation, verified_by="verifier")
+        self.assertTrue(verified.passed)
+        expected = system.inspect_function_promotion("tenant", operation)
+        sentinel = expected.entries[-1].artifact_id
+
+        # One expensive fixture jointly pins unbounded projection, exact
+        # cardinality, canonical order, and the load-bearing final loop member.
+        payload = self.payload(self.run_cli("function", "inspect", operation))
+        self.assertEqual(len(payload["entries"]), 121)
+        self.assertEqual(
+            [entry["artifact_id"] for entry in payload["entries"]],
+            [entry.artifact_id for entry in expected.entries],
+        )
+        self.assertEqual(payload["entries"][-1]["artifact_id"], sentinel)
+        self.assertEqual(payload["function_hash"], expected.function_hash)
+
+    def test_function_inspect_corruption_maps_to_integrity(self) -> None:
+        created = self.compile_drafts("inspect-corrupt", (7, 18, 33))
+        verified = self.run_cli(
+            "function", "verify-drafts", "inspect-corrupt", "--actor", "verifier"
+        )
+        self.assertEqual(verified.status, 0)
+        self.corrupt_middle_draft(created)
+        run = self.run_cli("function", "inspect", "inspect-corrupt")
+        self.assertEqual(run.status, 5)
+        self.assertEqual(run.stdout_bytes, b"")
+        self.assertEqual(
+            self.error(run),
+            {
+                "error": "integrity",
+                "message": "artifact integrity failure: artifact document digest mismatch",
+            },
+        )
+
+
+    def test_function_promote_round_trips_the_inspected_hash_and_exact_schema(self) -> None:
+        created = self.compile_drafts("promote-roundtrip", (8, 19, 34))
+        verified = self.run_cli(
+            "function", "verify-drafts", "promote-roundtrip", "--actor", "verifier"
+        )
+        self.assertEqual(verified.status, 0)
+        inspected = self.payload(
+            self.run_cli("function", "inspect", "promote-roundtrip")
+        )
+        run = self.run_cli(
+            "function",
+            "promote",
+            "promote-roundtrip",
+            "--expected-function-hash",
+            inspected["function_hash"],
+            "--actor",
+            " release-manager ",
+        )
+        payload = self.payload(run)
+        self.assertEqual(set(payload), _PROMOTION_KEYS)
+        self.assertRegex(payload["receipt_id"], r"^fpr_[0-9a-f]{32}$")
+        self.assertRegex(payload["receipt_hash"], r"^[0-9a-f]{64}$")
+        self.assertEqual(payload["function_hash"], inspected["function_hash"])
+        self.assertEqual(payload["operation_revision"], 1)
+        self.assertEqual(set(payload["member_artifact_ids"]), set(created))
+        self.assertEqual(set(payload["candidate_artifact_ids"]), set(created))
+        self.assertEqual(payload["retired_artifact_ids"], [])
+        self.assertEqual(payload["member_artifact_ids"], sorted(created))
+        self.assertEqual(payload["candidate_artifact_ids"], sorted(created))
+        self.assertIs(type(payload["promoted_at_us"]), int)
+        for forbidden in ("text", "document", "value", "input_hashes", "_cases"):
+            self.assertNotIn(forbidden, run.stdout_text)
+        self.assertEqual(run.stderr_text, "")
+        history = self.payload(
+            self.run_cli("function", "receipts", "promote-roundtrip")
+        )
+        self.assertEqual([row["id"] for row in history["receipts"]], [payload["receipt_id"]])
+        self.assertEqual(history["receipts"][0]["promoted_by"], " release-manager ")
+
+    def test_function_promote_rejects_stale_hash_after_qualifying_change(self) -> None:
+        self.compile_drafts("promote-stale", (9, 20))
+        first_verification = self.run_cli(
+            "function", "verify-drafts", "promote-stale", "--actor", "verifier"
+        )
+        self.assertEqual(first_verification.status, 0)
+        stale = self.payload(self.run_cli("function", "inspect", "promote-stale"))[
+            "function_hash"
+        ]
+        self.confirm("promote-stale", 37, "promote-stale-new")
+        created = self.payload(self.run_cli("compile", "promote-stale"))["created"]
+        self.assertEqual(len(created), 1)
+        fresh_verification = self.run_cli(
+            "function", "verify-drafts", "promote-stale", "--actor", "verifier"
+        )
+        self.assertEqual(fresh_verification.status, 0)
+        fresh = self.payload(self.run_cli("function", "inspect", "promote-stale"))[
+            "function_hash"
+        ]
+        self.assertNotEqual(fresh, stale)
+        run = self.run_cli(
+            "function",
+            "promote",
+            "promote-stale",
+            "--expected-function-hash",
+            stale,
+            "--actor",
+            "release-manager",
+        )
+        self.assertEqual(run.status, 4)
+        self.assertEqual(run.stdout_bytes, b"")
+        self.assertEqual(
+            self.error(run),
+            {
+                "error": "conflict",
+                "message": "expected_function_hash does not match the locked prospective function",
+            },
+        )
+
+    def test_function_promote_keeps_hash_after_nonqualifying_change(self) -> None:
+        self.promoted_operation("promote-nonqualifying", 2)
+        inspected = self.payload(
+            self.run_cli("function", "inspect", "promote-nonqualifying")
+        )
+        self.handle_once(
+            "promote-nonqualifying", 41, "promote-nonqualifying-once", review=True
+        )
+        repeated = self.payload(
+            self.run_cli("function", "inspect", "promote-nonqualifying")
+        )
+        self.assertEqual(repeated["function_hash"], inspected["function_hash"])
+        self.assertEqual(repeated["entries"], inspected["entries"])
+        run = self.run_cli(
+            "function",
+            "promote",
+            "promote-nonqualifying",
+            "--expected-function-hash",
+            inspected["function_hash"],
+            "--actor",
+            "release-manager",
+        )
+        payload = self.payload(run)
+        self.assertEqual(set(payload), _PROMOTION_KEYS)
+        self.assertEqual(payload["function_hash"], inspected["function_hash"])
+        self.assertEqual(payload["candidate_artifact_ids"], [])
+        self.assertEqual(payload["retired_artifact_ids"], [])
+        self.assertEqual(len(payload["member_artifact_ids"]), 2)
+        self.assertEqual(run.stderr_text, "")
+
+    def test_function_promote_after_revision_reports_empty_set_message(self) -> None:
+        self.promoted_operation("promote-revised", 2)
+        stale = self.payload(self.run_cli("function", "inspect", "promote-revised"))[
+            "function_hash"
+        ]
+        revised = self.payload(
+            self.run_cli(
+                "operation",
+                "revise",
+                "promote-revised",
+                "--actor",
+                "owner",
+                "--min-confirmations",
+                "3",
+                "--min-reviewers",
+                "2",
+                "--min-span-seconds",
+                "1",
+            )
+        )
+        self.assertEqual(revised["revision"], 2)
+        run = self.run_cli(
+            "function",
+            "promote",
+            "promote-revised",
+            "--expected-function-hash",
+            stale,
+            "--actor",
+            "release-manager",
+        )
+        self.assertEqual(run.status, 4)
+        self.assertEqual(run.stdout_bytes, b"")
+        self.assertEqual(
+            self.error(run),
+            {
+                "error": "conflict",
+                "message": "function promotion requires at least one member",
+            },
+        )
+
+    def test_function_promote_rejects_empty_union_from_inspect(self) -> None:
+        self.register("promote-empty")
+        inspected = self.payload(self.run_cli("function", "inspect", "promote-empty"))
+        self.assertEqual(inspected["entries"], [])
+        run = self.run_cli(
+            "function",
+            "promote",
+            "promote-empty",
+            "--expected-function-hash",
+            inspected["function_hash"],
+            "--actor",
+            "release-manager",
+        )
+        self.assertEqual(run.status, 4)
+        self.assertEqual(run.stdout_bytes, b"")
+        self.assertEqual(
+            self.error(run),
+            {
+                "error": "conflict",
+                "message": "function promotion requires at least one member",
+            },
+        )
+
+    def test_function_promote_rejects_digest_one_character_short_beside_accepted(self) -> None:
+        self.register("promote-hash-short")
+        accepted = self.run_cli(
+            "function",
+            "promote",
+            "promote-hash-short",
+            "--expected-function-hash",
+            "0" * 64,
+            "--actor",
+            "release-manager",
+        )
+        self.assertEqual(accepted.status, 4)
+        self.assertEqual(
+            self.error(accepted),
+            {
+                "error": "conflict",
+                "message": "function promotion requires at least one member",
+            },
+        )
+        rejected = self.run_cli(
+            "function",
+            "promote",
+            "promote-hash-short",
+            "--expected-function-hash",
+            "0" * 63,
+            "--actor",
+            "release-manager",
+        )
+        self.assertEqual(rejected.status, 2)
+        self.assertEqual(rejected.stdout_bytes, b"")
+        self.assertEqual(
+            self.error(rejected),
+            {
+                "error": "invalid",
+                "message": "expected_function_hash must be a SHA-256 hex digest",
+            },
+        )
+
+    def test_function_promote_rejects_digest_one_character_long_beside_accepted(self) -> None:
+        self.register("promote-hash-long")
+        accepted = self.run_cli(
+            "function",
+            "promote",
+            "promote-hash-long",
+            "--expected-function-hash",
+            "0" * 64,
+            "--actor",
+            "release-manager",
+        )
+        self.assertEqual(accepted.status, 4)
+        self.assertEqual(
+            self.error(accepted),
+            {
+                "error": "conflict",
+                "message": "function promotion requires at least one member",
+            },
+        )
+        rejected = self.run_cli(
+            "function",
+            "promote",
+            "promote-hash-long",
+            "--expected-function-hash",
+            "0" * 65,
+            "--actor",
+            "release-manager",
+        )
+        self.assertEqual(rejected.status, 2)
+        self.assertEqual(rejected.stdout_bytes, b"")
+        self.assertEqual(
+            self.error(rejected),
+            {
+                "error": "invalid",
+                "message": "expected_function_hash must be a SHA-256 hex digest",
+            },
+        )
+
+    def test_function_promote_rejects_uppercase_and_nonhex_hashes(self) -> None:
+        self.register("promote-hash-grammar")
+        for malformed in ("A" * 64, "g" * 64):
+            run = self.run_cli(
+                "function",
+                "promote",
+                "promote-hash-grammar",
+                "--expected-function-hash",
+                malformed,
+                "--actor",
+                "release-manager",
+            )
+            self.assertEqual(run.status, 2)
+            self.assertEqual(run.stdout_bytes, b"")
+            self.assertEqual(
+                self.error(run),
+                {
+                    "error": "invalid",
+                    "message": "expected_function_hash must be a SHA-256 hex digest",
+                },
+            )
+
+    def test_function_promote_requires_hash_and_actor(self) -> None:
+        cases = (
+            (
+                ("function", "promote", "echo", "--actor", "release-manager"),
+                "the following arguments are required: --expected-function-hash",
+            ),
+            (
+                (
+                    "function",
+                    "promote",
+                    "echo",
+                    "--expected-function-hash",
+                    "0" * 64,
+                ),
+                "the following arguments are required: --actor",
+            ),
+            (
+                ("function", "promote", "echo"),
+                "the following arguments are required: --expected-function-hash, --actor",
+            ),
+        )
+        for arguments, message in cases:
+            run = self.run_cli(*arguments)
+            self.assertEqual(run.status, 2)
+            self.assertEqual(run.stdout_bytes, b"")
+            self.assertEqual(self.error(run), {"error": "invalid", "message": message})
+
+    def test_function_promote_scope_misses_are_not_found(self) -> None:
+        self.register("promote-partitioned", partition="tenant_a")
+        for run in (
+            self.run_cli(
+                "function",
+                "promote",
+                "absent",
+                "--expected-function-hash",
+                "0" * 64,
+                "--actor",
+                "release-manager",
+            ),
+            self.run_cli(
+                "--partition",
+                "tenantXa",
+                "function",
+                "promote",
+                "promote-partitioned",
+                "--expected-function-hash",
+                "0" * 64,
+                "--actor",
+                "release-manager",
+            ),
+        ):
+            self.assertEqual(run.status, 3)
+            self.assertEqual(run.stdout_bytes, b"")
+            self.assertEqual(
+                self.error(run),
+                {
+                    "error": "not_found",
+                    "message": "operation is not registered in this partition",
+                },
+            )
+
+    def test_function_promote_forwards_hash_and_actor_verbatim(self) -> None:
+        from cement_runtime.models import FunctionSetPromotion
+
+        supplied = " A" + "B" * 62 + " "
+        actor = " release manager "
+        sentinel = FunctionSetPromotion(
+            receipt_id="fpr_probe",
+            receipt_hash="b" * 64,
+            function_hash="c" * 64,
+            operation_revision=17,
+            member_artifact_ids=("art_member",),
+            candidate_artifact_ids=("art_member",),
+            retired_artifact_ids=(),
+            promoted_at_us=19,
+        )
+        with mock.patch.object(System, "promote_function", autospec=True) as spy:
+            spy.return_value = sentinel
+            run = self.run_cli(
+                "function",
+                "promote",
+                "echo_1",
+                "--expected-function-hash",
+                supplied,
+                "--actor",
+                actor,
+            )
+        self.assertEqual(run.status, 0)
+        self.assertEqual(spy.call_count, 1)
+        self.assertEqual(spy.call_args.args[1:], ("tenant", "echo_1"))
+        self.assertEqual(
+            spy.call_args.kwargs,
+            {"expected_function_hash": supplied, "promoted_by": actor},
+        )
+        self.assertEqual(set(typing.cast(dict[str, typing.Any], run.stdout_json)), _PROMOTION_KEYS)
+        self.assertEqual(run.stderr_text, "")
+
+    def test_function_promote_scope_matches_exactly(self) -> None:
+        self.register("echo_1", partition="tenant_a")
+        self.register("echoX1", partition="tenantXa")
+        self.register("echoX1")
+        self.register("Echo_1")
+        correct_hash = System(self.database).inspect_function_promotion(
+            "tenant_a", "echo_1"
+        ).function_hash
+        positive = self.run_cli(
+            "--partition",
+            "tenant_a",
+            "function",
+            "promote",
+            "echo_1",
+            "--expected-function-hash",
+            correct_hash,
+            "--actor",
+            "release-manager",
+        )
+        self.assertEqual(positive.status, 4)
+        self.assertEqual(
+            self.error(positive),
+            {
+                "error": "conflict",
+                "message": "function promotion requires at least one member",
+            },
+        )
+        for arguments in (
+            ("function", "promote", "echo_1"),
+            ("--partition", "tenantXa", "function", "promote", "echo_1"),
+        ):
+            run = self.run_cli(
+                *arguments,
+                "--expected-function-hash",
+                correct_hash,
+                "--actor",
+                "release-manager",
+            )
+            self.assertEqual(run.status, 3)
+            self.assertEqual(run.stdout_bytes, b"")
+            self.assertEqual(
+                self.error(run),
+                {
+                    "error": "not_found",
+                    "message": "operation is not registered in this partition",
+                },
+            )
+
+    def test_function_promote_maps_library_boundary_failures(self) -> None:
+        cases: tuple[tuple[BaseException, int, str, str], ...] = (
+            (ValidationError("invalid hash"), 2, "invalid", "invalid hash"),
+            (NotFoundError("missing scope"), 3, "not_found", "missing scope"),
+            (StateError("authority denied"), 4, "conflict", "authority denied"),
+            (
+                StateError("function promotion candidates changed during authorization"),
+                4,
+                "conflict",
+                "function promotion candidates changed during authorization",
+            ),
+            (IntegrityError("corrupt ledger"), 5, "integrity", "corrupt ledger"),
+        )
+        for exception, status, error, message in cases:
+            with self.subTest(message=message):
+                with mock.patch.object(
+                    System, "promote_function", side_effect=exception
+                ) as spy:
+                    run = self.run_cli(
+                        "function",
+                        "promote",
+                        "echo",
+                        "--expected-function-hash",
+                        "0" * 64,
+                        "--actor",
+                        "release-manager",
+                    )
+                self.assertEqual(run.status, status)
+                self.assertEqual(run.stdout_bytes, b"")
+                self.assertEqual(
+                    self.error(run), {"error": error, "message": message}
+                )
+                self.assertEqual(spy.call_count, 1)
+
+    def test_function_promote_corruption_maps_to_integrity(self) -> None:
+        created = self.compile_drafts("promote-corrupt", (10, 21, 35))
+        verified = self.run_cli(
+            "function", "verify-drafts", "promote-corrupt", "--actor", "verifier"
+        )
+        self.assertEqual(verified.status, 0)
+        expected = System(self.database).inspect_function_promotion(
+            "tenant", "promote-corrupt"
+        ).function_hash
+        self.corrupt_middle_draft(created)
+        run = self.run_cli(
+            "function",
+            "promote",
+            "promote-corrupt",
+            "--expected-function-hash",
+            expected,
+            "--actor",
+            "release-manager",
+        )
+        self.assertEqual(run.status, 5)
+        self.assertEqual(run.stdout_bytes, b"")
+        self.assertEqual(
+            self.error(run),
+            {
+                "error": "integrity",
+                "message": "artifact integrity failure: artifact document digest mismatch",
+            },
+        )
+
+    def test_function_hash_options_do_not_leak_between_nested_leaves(self) -> None:
+        required_promote = self.run_cli("function", "promote", "echo", "--actor", "a")
+        self.assertEqual(required_promote.status, 2)
+        self.assertEqual(required_promote.stdout_bytes, b"")
+        self.assertEqual(
+            self.error(required_promote),
+            {
+                "error": "invalid",
+                "message": "the following arguments are required: --expected-function-hash",
+            },
+        )
+        optional_verify = self.run_cli("function", "verify", "echo")
+        self.assertEqual(optional_verify.status, 3)
+        self.assertEqual(optional_verify.stdout_bytes, b"")
+        self.assertEqual(
+            self.error(optional_verify),
+            {
+                "error": "not_found",
+                "message": "operation is not registered in this partition",
+            },
+        )
+        actor_on_verify = self.run_cli("function", "verify", "echo", "--actor", "a")
+        self.assertEqual(actor_on_verify.status, 2)
+        self.assertEqual(
+            self.error(actor_on_verify),
+            {"error": "invalid", "message": "unrecognized arguments: --actor a"},
+        )
+        actor_on_inspect = self.run_cli("function", "inspect", "echo", "--actor", "a")
+        self.assertEqual(actor_on_inspect.status, 2)
+        self.assertEqual(
+            self.error(actor_on_inspect),
+            {"error": "invalid", "message": "unrecognized arguments: --actor a"},
+        )
+
+    def test_root_promote_keeps_scope_hash_surface_and_exit_map(self) -> None:
+        missing_actor = self.run_cli(
+            "promote", "art_probe", "--scope-hash", "0" * 64
+        )
+        self.assertEqual(missing_actor.status, 2)
+        self.assertEqual(missing_actor.stdout_bytes, b"")
+        self.assertEqual(
+            self.error(missing_actor),
+            {"error": "invalid", "message": "the following arguments are required: --actor"},
+        )
+        # argparse reports missing required options before unrecognized ones, so
+        # the root flag is only visibly rejected once the nested surface is satisfied.
+        nested_option = self.run_cli(
+            "function",
+            "promote",
+            "echo",
+            "--expected-function-hash",
+            "0" * 64,
+            "--scope-hash",
+            "0" * 64,
+            "--actor",
+            "release-manager",
+        )
+        self.assertEqual(nested_option.status, 2)
+        self.assertEqual(nested_option.stdout_bytes, b"")
+        self.assertEqual(
+            self.error(nested_option),
+            {
+                "error": "invalid",
+                "message": "unrecognized arguments: --scope-hash " + "0" * 64,
+            },
+        )
+        with mock.patch.object(System, "promote", autospec=True) as spy:
+            spy.side_effect = NotFoundError("artifact does not exist in this partition")
+            root = self.run_cli(
+                "promote",
+                "art_probe",
+                "--scope-hash",
+                "0" * 64,
+                "--actor",
+                "release-manager",
+            )
+        self.assertEqual(root.status, 3)
+        self.assertEqual(root.stdout_bytes, b"")
+        self.assertEqual(
+            self.error(root),
+            {
+                "error": "not_found",
+                "message": "artifact does not exist in this partition",
+            },
+        )
+        self.assertEqual(spy.call_args.args[1:], ("tenant", "art_probe"))
+        self.assertEqual(
+            spy.call_args.kwargs,
+            {"scope_hash": "0" * 64, "promoted_by": "release-manager"},
+        )
+
+    def test_function_inspect_and_promote_return_bare_values(self) -> None:
+        from cement_runtime.cli import _Outcome, _parser, _run
+        from cement_runtime.models import FunctionPromotionManifest, FunctionSetPromotion
+
+        parser = _parser()
+        inspected = FunctionPromotionManifest(
+            operation_revision=1,
+            function_hash="a" * 64,
+            text="private",
+            document=mock.sentinel.document,
+            entries=(),
+            skipped=(),
+        )
+        promoted = FunctionSetPromotion(
+            receipt_id="fpr_probe",
+            receipt_hash="b" * 64,
+            function_hash="a" * 64,
+            operation_revision=1,
+            member_artifact_ids=(),
+            candidate_artifact_ids=(),
+            retired_artifact_ids=(),
+            promoted_at_us=1,
+        )
+        inspect_args = argparse.Namespace(
+            command="function",
+            function_command="inspect",
+            db=self.database,
+            partition="tenant",
+            operation="echo",
+        )
+        with mock.patch.object(
+            System, "inspect_function_promotion", return_value=inspected
+        ):
+            inspect_result = _run(inspect_args, parser)
+        self.assertNotIsInstance(inspect_result, _Outcome)
+        self.assertEqual(
+            inspect_result,
+            {
+                "entries": [],
+                "function_hash": "a" * 64,
+                "operation_revision": 1,
+                "skipped": [],
+            },
+        )
+        promote_args = argparse.Namespace(
+            command="function",
+            function_command="promote",
+            db=self.database,
+            partition="tenant",
+            operation="echo",
+            expected_function_hash="a" * 64,
+            actor="manager",
+        )
+        with mock.patch.object(System, "promote_function", return_value=promoted):
+            promote_result = _run(promote_args, parser)
+        self.assertIs(promote_result, promoted)
+        self.assertNotIsInstance(promote_result, _Outcome)
 
 
 if __name__ == "__main__":
