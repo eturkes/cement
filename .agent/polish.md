@@ -100,6 +100,24 @@ changed is spine work, not polish.
   narrows its unions explicitly, an ad-hoc `uvx pyright tests/test_system.py` reports zero
   `reportAttributeAccessIssue`, and the suite stays green.
 
+## M2.u4c3 deferrals
+
+- pri=2 `size=S` — port the agent-report anchor validator to a committed dev tool. u4c3 gated every
+  Wave-1 and Wave-2 report on `.scratch/validate-anchors.py`, which parses fenced ```anchors blocks of
+  TAB-separated `path<TAB>line<TAB>fragment` rows, resolves each against a `--root`, and exits nonzero on
+  any bad anchor or leftover `TODO-FILL` sentinel. It caught a surface map whose own claims were 12/25
+  wrong, which is exactly the failure a reported-but-unverified number hides. Gitignored, so no clone
+  reruns it — third instance of this class alongside the replay driver and the seam battery. Acceptance:
+  a tracked dev tool validates a report from a clean checkout, a seeded bad anchor exits nonzero with the
+  offending line printed, a seeded `TODO-FILL` exits nonzero, and a clean report exits 0.
+- pri=3 `size=S` — `verify_drafts` reruns are not idempotent on a failing draft. A failed row hits none
+  of the status transitions at `src/cement_runtime/system.py:3582-3600`, so it stays `draft`, stays
+  eligible, and every rerun commits a fresh report plus `artifact.verification_failed` event with a
+  distinct report ID. Harmless today because the negative branch needs out-of-band corruption, but exit 6
+  makes an automated retry-on-nonzero wrapper amplify it. Acceptance: either a failed row carries a
+  status or reason that makes it ineligible until the operator clears it, or the model documents
+  unbounded report growth per rerun and a probe pins the `+1 report / +1 event` invariant per invocation.
+
 ## M2.u4c2 deferrals
 
 - pri=2 `function receipts` / historical `show`: merge the diff-blind teammate's 13 contract-derived

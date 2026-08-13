@@ -427,9 +427,57 @@ Measured gaps driving the arc:
     35/35 result survives, and the merge is tracked in `.agent/polish.md`. The mutation teammate's
     catalogue skeleton never reached an anchored campaign; MAIN's own battery is the mutation evidence
     for this unit, and it is scratch-local, so no durable claim rests on it alone.
-  - u4c3 OPEN tier=kernel - `function verify-drafts OPERATION --actor ACTOR` over `verify_drafts`, and
-    `function verify OPERATION [--expected-function-hash HEX]` over `verify_function`, carrying the exit-6
-    ruling. Est. 44-66 / 620-920. Depends on u4c1.
+  - u4c3 DONE (main=88% 211K/240K, mate=91% 219K/240K) - `function verify-drafts OPERATION --actor
+    ACTOR` over `verify_drafts` and `function verify OPERATION [--expected-function-hash HEX]` over
+    `verify_function`. `cli.py` +32, `test_cli.py` +580 (28 tests); suite 396 -> 424. Contract
+    `.agent/decisions/m2u4c3-contract.md`. Production landed at the low end of the 44-66 estimate because
+    both leaves forward to already-shipped APIs and add no library delta.
+    Design fork, arbitrated from two prototyped spikes that BOTH self-rejected: `verify-drafts` exits 6
+    when `not verification.passed`, `skipped` never affecting status. Both spikes independently measured
+    that a false draft verdict is unreachable through any supported flow - ordinary evidence growth
+    supersedes, suspends or retires rather than leaving a failing draft eligible - so the branch is
+    corruption detection, not lifecycle gating, and both independently named the same dominant hazard:
+    sibling verbs over one `passed` field mapping false to 6 in one leaf and 0 in the other silently drop
+    the gate of any script moved between them. The ruling rests on the asymmetry between the two
+    self-rejections rather than on either verdict token - PLAIN's defect is unconditional and sits on the
+    contract (`$?` cannot separate all-pass from all-fail, so every caller reimplements the gate; its own
+    stop-script needed 11 lines plus a structural JSON parser), STRICT's is conditional and pre-existing
+    (rerun non-idempotence belongs to `verify_drafts`, not to the exit code, and fires only in the
+    corruption-only branch). Cost over PLAIN, from PLAIN's own accounting: ~4-6 production, ~12-20 test
+    lines. `function verify` emits the four-field projection Decision 4 named - `passed`, `entries`,
+    `function_hash`, ordered `checks` - never the nested document; `verify-drafts` emits its whole model,
+    which reaches no document.
+    Verification. MAIN's own end-to-end smoke probe over eleven branches found the contract's own
+    corruption recipe defective before any test was written: the committed library precedent leaves
+    `artifacts_build_fields_immutable` dropped, which works there because one long-lived `System` checked
+    its fingerprint at construction, while every CLI invocation builds a fresh one and exits 5 on the
+    schema check without ever reading the corrupt row. The recipe now captures and recreates the trigger.
+    A diff-blind suite written from the contract alone failed 25 of 28 at baseline; against the landed
+    implementation two of its own predicates were wrong rather than the code - the corruption fixture had
+    not adopted the amended recipe, and the exit-map test patched `cli._run` itself, replacing the status
+    branch it meant to pin, so it now patches the library boundary and leaves `_run` under test.
+    Review. One contract-attack reviewer dispatched BEFORE implementation, per the u4c2 lesson. Four
+    accepted findings, every one a claim-soundness defect in MAIN's own contract and none in the code.
+    The load-bearing one: the ruling defended its retry hazard as "already true of exit codes 2/3/4/5,
+    which are equally non-retryable", which is false as a class claim - 2 and 3 fail before any write, 4
+    is the one class where retry IS the intended recovery since the locked-recheck `StateError` rolls
+    back, 5 reports uncleanable corruption, and only 6 guarantees a committed row and repeats the write.
+    Also landed: the single-skip-reason claim scoped to `_draft_verification_plan` since promotion
+    planning carries its own site; the absolute `1->2->3` rerun count replaced by the per-target `+1
+    report / +1 failure event per invocation` invariant, since the absolute figure was fixture-dependent;
+    and `OverflowError` restored to the known-limit exception set per the standing persisted-scalar rule.
+    Known limits: the negative `verify-drafts` branch is unreachable through supported flows, so the
+    suite proves the CLI's handling of an already-corrupt ledger, never that ordinary operation produces
+    one. Rerun after exit 6 is not idempotent - each invocation commits a fresh report and event for the
+    same unchanged bad draft - so exit 6 is a verdict class and a generic retry-on-nonzero wrapper
+    amplifies exactly this code. Exit 6 now means two different objects across two leaves, distinguished
+    only by payload. `$?` cannot separate authority denial from the locked-recheck `StateError` (both 4),
+    nor an unregistered operation from a wrong partition (both 3). No `orc` was dispatched: a reference
+    implementation of a leaf that forwards to a library method is the same forwarding code, so a
+    differential oracle would add no independent judgment. The reviewer's lenses 3/5 and part of 4 closed
+    at best-current-judgment rather than exhausted; the milestone review's per-unit reviewer inherits
+    them. The surface map died at 91% with 12 of 25 anchors failing its own validator, so it is
+    attention-directing only and no claim here rests on it.
   - u4c4 OPEN tier=kernel - `function inspect OPERATION` over `inspect_function_promotion` and
     `function promote OPERATION --expected-function-hash HEX --actor ACTOR` over `promote_function`; the
     manifest hash inspect displays must feed promote unchanged, and a prospective change must make a stale

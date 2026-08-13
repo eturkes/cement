@@ -176,6 +176,14 @@ def _parser() -> argparse.ArgumentParser:
     function_receipts.add_argument("--operation-revision", type=int)
     function_receipts.add_argument("--before-sequence", type=int)
     function_receipts.add_argument("--limit", type=int, default=100)
+    function_verify_drafts = function_commands.add_parser("verify-drafts")
+    function_verify_drafts.add_argument("operation")
+    function_verify_drafts.add_argument("--actor", required=True)
+    function_verify = function_commands.add_parser("verify")
+    function_verify.add_argument("operation")
+    function_verify.add_argument(
+        "--expected-function-hash", help="fail unless the committed set hashes to this digest"
+    )
 
     events = commands.add_parser("events", help="read append-only audit projections")
     events.add_argument("--after", type=int, default=0)
@@ -373,6 +381,29 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
                 operation_revision=args.operation_revision,
                 before_sequence=args.before_sequence,
                 limit=args.limit,
+            )
+        if args.function_command == "verify-drafts":
+            drafts = system.verify_drafts(
+                args.partition,
+                args.operation,
+                verified_by=args.actor,
+            )
+            return _Outcome(drafts, status=0 if drafts.passed else 6)
+        if args.function_command == "verify":
+            verification = system.verify_function(
+                args.partition,
+                args.operation,
+                expected_function_hash=args.expected_function_hash,
+            )
+            # The result nests a FunctionDocument, which never reaches stdout.
+            return _Outcome(
+                {
+                    "passed": verification.passed,
+                    "entries": verification.entries,
+                    "function_hash": verification.function_hash,
+                    "checks": [asdict(check) for check in verification.checks],
+                },
+                status=0 if verification.passed else 6,
             )
     if args.command == "events":
         return system.events(args.partition, after=args.after, limit=args.limit)

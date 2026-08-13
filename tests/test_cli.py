@@ -15,6 +15,13 @@ from unittest import mock
 
 from cement_runtime import System
 from cement_runtime.cli import main
+from cement_runtime.errors import IntegrityError, NotFoundError, StateError, ValidationError
+from cement_runtime.models import (
+    DraftVerification,
+    FunctionCheck,
+    FunctionVerification,
+    VerificationReport,
+)
 
 _REPORT_KEYS = {"function_anchor", "operation", "operation_now", "partition"}
 _OPERATION_NOW_KEYS = {
@@ -82,6 +89,15 @@ _ANOMALY_KEYS = {
     "reason",
     "status",
 }
+_FUNCTION_VERIFY_KEYS = {"checks", "entries", "function_hash", "passed"}
+_FUNCTION_CHECK_KEYS = (
+    "duplicate-input-digests",
+    "abi-canonicalizer-uniform",
+    "sealed-passing-reports",
+    "current-promotion-receipts",
+    "function-hash-matches-snapshot",
+    "persisted-function-receipt",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,6 +272,67 @@ class CLITests(unittest.TestCase):
         compiled = self.payload(self.run_cli("compile", operation))
         self.assertEqual(len(compiled["created"]), members)
         return self.promote_set(operation)
+
+    def compile_drafts(self, operation: str, values: tuple[int, ...]) -> list[str]:
+        self.register(operation)
+        for index, value in enumerate(values):
+            self.confirm(operation, value, f"{operation}-draft-{index}")
+        created = self.payload(self.run_cli("compile", operation))["created"]
+        self.assertEqual(len(created), len(values))
+        return typing.cast(list[str], created)
+
+    def corrupt_middle_draft(self, artifact_ids: list[str]) -> str:
+        self.assertGreaterEqual(len(artifact_ids), 3)
+        connection = sqlite3.connect(self.database)
+        try:
+            rows = connection.execute(
+                """
+                SELECT id FROM artifacts WHERE id IN (?, ?, ?)
+                ORDER BY input_hash, sequence, id
+                """,
+                tuple(artifact_ids[:3]),
+            ).fetchall()
+            target = str(rows[1][0])
+            # Every CLI invocation builds a fresh System, so the trigger has to
+            # come back or the schema fingerprint fails before the row is read.
+            trigger = connection.execute(
+                """
+                SELECT sql FROM sqlite_master
+                WHERE type = 'trigger' AND name = 'artifacts_build_fields_immutable'
+                """
+            ).fetchone()[0]
+            connection.execute("DROP TRIGGER artifacts_build_fields_immutable")
+            connection.execute(
+                "UPDATE artifacts SET artifact_json = '{}' WHERE id = ?",
+                (target,),
+            )
+            connection.execute(trigger)
+            connection.commit()
+        finally:
+            connection.close()
+        return target
+
+    def report_and_failure_event_counts(self, artifact_id: str) -> tuple[int, int]:
+        connection = sqlite3.connect(self.database)
+        try:
+            report_count = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM test_reports WHERE artifact_id = ?",
+                    (artifact_id,),
+                ).fetchone()[0]
+            )
+            event_count = int(
+                connection.execute(
+                    """
+                    SELECT COUNT(*) FROM events
+                    WHERE subject_id = ? AND kind = 'artifact.verification_failed'
+                    """,
+                    (artifact_id,),
+                ).fetchone()[0]
+            )
+        finally:
+            connection.close()
+        return report_count, event_count
 
     def receipt_history(
         self, operation: str, *, members: int, receipts: int
@@ -1306,6 +1383,509 @@ class CLITests(unittest.TestCase):
         self.assertIsNone(_decoded("{"))
         self.assertEqual(_decoded('{"ok":true}'), {"ok": True})
         self.assertEqual(_decoded("[]"), [])
+
+    def test_function_verify_drafts_emits_every_passing_entry_and_exits_zero(self) -> None:
+        created = self.compile_drafts("drafts-pass", (3, 12, 27))
+        run = self.run_cli(
+            "function", "verify-drafts", "drafts-pass", "--actor", "verifier"
+        )
+        payload = self.payload(run)
+        self.assertTrue(payload["passed"])
+        self.assertEqual(len(payload["entries"]), 3)
+        self.assertEqual(payload["skipped"], [])
+        self.assertEqual(
+            [entry["report"]["passed"] for entry in payload["entries"]],
+            [True, True, True],
+        )
+        self.assertEqual(
+            {entry["artifact_id"] for entry in payload["entries"]}, set(created)
+        )
+        self.assertTrue(all(entry["entry_seal"] for entry in payload["entries"]))
+        self.assertEqual(run.stderr_text, "")
+
+    def test_function_verify_drafts_treats_an_empty_eligible_batch_as_a_vacuous_pass(self) -> None:
+        self.register("drafts-empty")
+        run = self.run_cli(
+            "function", "verify-drafts", "drafts-empty", "--actor", "verifier"
+        )
+        payload = self.payload(run)
+        self.assertTrue(payload["passed"])
+        self.assertEqual(payload["entries"], [])
+        self.assertEqual(payload["skipped"], [])
+        self.assertEqual(run.stderr_text, "")
+
+    def test_function_verify_drafts_reports_a_superseded_build_as_a_benign_skip(self) -> None:
+        created = self.compile_drafts("drafts-skip", (4, 15, 26))
+        system = System(self.database)
+        with system.store.transaction(write=False) as connection:
+            rows = connection.execute(
+                """
+                SELECT id, input_hash, input_json FROM artifacts
+                WHERE id IN (?, ?, ?) ORDER BY input_hash, sequence, id
+                """,
+                tuple(created),
+            ).fetchall()
+        middle = rows[1]
+        value = typing.cast(dict[str, int], json.loads(str(middle["input_json"])))
+        self.handle_once("drafts-skip", value["x"], "drafts-skip-extra", review=True)
+        newer = self.payload(self.run_cli("compile", "drafts-skip"))["created"]
+        self.assertEqual(len(newer), 1)
+
+        run = self.run_cli(
+            "function", "verify-drafts", "drafts-skip", "--actor", "verifier"
+        )
+        payload = self.payload(run)
+        self.assertTrue(payload["passed"])
+        self.assertEqual(len(payload["entries"]), 3)
+        self.assertTrue(all(entry["report"]["passed"] for entry in payload["entries"]))
+        self.assertEqual(
+            payload["skipped"],
+            [
+                {
+                    "artifact_id": str(middle["id"]),
+                    "input_hash": str(middle["input_hash"]),
+                    "reason": "superseded-build",
+                }
+            ],
+        )
+        self.assertNotIn(
+            str(middle["id"]),
+            {entry["artifact_id"] for entry in payload["entries"]},
+        )
+        self.assertEqual(run.stderr_text, "")
+
+    def test_function_verify_drafts_exits_six_when_the_middle_of_three_entries_fails(self) -> None:
+        created = self.compile_drafts("drafts-fail", (5, 16, 29))
+        target = self.corrupt_middle_draft(created)
+        run = self.run_cli(
+            "function", "verify-drafts", "drafts-fail", "--actor", "verifier"
+        )
+        self.assertEqual(run.status, 6)
+        self.assertEqual(run.stderr_text, "")
+        self.assertIsInstance(run.stdout_json, dict)
+        payload = typing.cast(dict[str, typing.Any], run.stdout_json)
+        self.assertFalse(payload["passed"])
+        self.assertEqual(
+            [entry["report"]["passed"] for entry in payload["entries"]],
+            [True, False, True],
+        )
+        self.assertEqual(payload["entries"][1]["artifact_id"], target)
+        self.assertIsNone(payload["entries"][1]["entry_seal"])
+        self.assertIsNotNone(payload["entries"][0]["entry_seal"])
+        self.assertIsNotNone(payload["entries"][2]["entry_seal"])
+
+    def test_function_verify_drafts_repeats_a_negative_verdict_for_the_same_corrupt_ledger(self) -> None:
+        created = self.compile_drafts("drafts-rerun", (6, 17, 31))
+        target = self.corrupt_middle_draft(created)
+        first = self.run_cli(
+            "function", "verify-drafts", "drafts-rerun", "--actor", "verifier"
+        )
+        first_counts = self.report_and_failure_event_counts(target)
+        second = self.run_cli(
+            "function", "verify-drafts", "drafts-rerun", "--actor", "verifier"
+        )
+        second_counts = self.report_and_failure_event_counts(target)
+        for run in (first, second):
+            self.assertEqual(run.status, 6)
+            self.assertEqual(run.stderr_text, "")
+            self.assertFalse(typing.cast(dict[str, typing.Any], run.stdout_json)["passed"])
+        self.assertEqual(second_counts, (first_counts[0] + 1, first_counts[1] + 1))
+
+    def test_function_verify_drafts_commits_the_failed_report_and_event_before_exit_six(self) -> None:
+        created = self.compile_drafts("drafts-durable", (7, 18, 33))
+        target = self.corrupt_middle_draft(created)
+        before = self.report_and_failure_event_counts(target)
+        run = self.run_cli(
+            "function", "verify-drafts", "drafts-durable", "--actor", "verifier"
+        )
+        after = self.report_and_failure_event_counts(target)
+        self.assertEqual(run.status, 6)
+        self.assertEqual(run.stderr_text, "")
+        self.assertEqual(after, (before[0] + 1, before[1] + 1))
+        connection = sqlite3.connect(self.database)
+        try:
+            status = connection.execute(
+                "SELECT status FROM artifacts WHERE id = ?", (target,)
+            ).fetchone()[0]
+        finally:
+            connection.close()
+        self.assertEqual(status, "draft")
+
+    def test_function_verify_drafts_rejects_an_unregistered_operation(self) -> None:
+        run = self.run_cli(
+            "function", "verify-drafts", "absent", "--actor", "verifier"
+        )
+        self.assertEqual(run.status, 3)
+        self.assertEqual(run.stdout_bytes, b"")
+        self.assertEqual(self.error(run)["error"], "not_found")
+
+    def test_function_verify_drafts_does_not_cross_partition_or_like_colliding_scopes(self) -> None:
+        self.register("echo_1", partition="other")
+        self.register("echoX1")
+        self.register("Echo_1")
+        run = self.run_cli(
+            "function", "verify-drafts", "echo_1", "--actor", "verifier"
+        )
+        self.assertEqual(run.status, 3)
+        self.assertEqual(run.stdout_bytes, b"")
+        self.assertEqual(self.error(run)["error"], "not_found")
+        positive = self.run_cli(
+            "--partition",
+            "other",
+            "function",
+            "verify-drafts",
+            "echo_1",
+            "--actor",
+            "verifier",
+        )
+        self.assertEqual(positive.status, 0)
+
+    def test_function_verify_drafts_requires_the_actor_option(self) -> None:
+        self.register("drafts-actor-required")
+        run = self.run_cli("function", "verify-drafts", "drafts-actor-required")
+        self.assertEqual(run.status, 2)
+        self.assertEqual(run.stdout_bytes, b"")
+        self.assertEqual(self.error(run)["error"], "invalid")
+
+    def test_function_verify_drafts_rejects_an_empty_actor(self) -> None:
+        self.register("drafts-actor-empty")
+        run = self.run_cli(
+            "function", "verify-drafts", "drafts-actor-empty", "--actor", ""
+        )
+        self.assertEqual(run.status, 2)
+        self.assertEqual(run.stdout_bytes, b"")
+        self.assertEqual(self.error(run)["error"], "invalid")
+
+    def test_function_verify_projects_a_passing_promoted_set_without_document_content(self) -> None:
+        self.promoted_operation("verify-pass", 3)
+        system = System(self.database)
+        library = system.verify_function("tenant", "verify-pass")
+        self.assertIsNotNone(library.document)
+        assert library.document is not None
+        document_text = library.document.text
+
+        run = self.run_cli("function", "verify", "verify-pass")
+        payload = self.payload(run)
+        self.assertEqual(set(payload), _FUNCTION_VERIFY_KEYS)
+        self.assertTrue(payload["passed"])
+        self.assertEqual(payload["entries"], 3)
+        self.assertEqual(payload["function_hash"], library.function_hash)
+        self.assertEqual(
+            [check["key"] for check in payload["checks"]], list(_FUNCTION_CHECK_KEYS)
+        )
+        self.assertTrue(all(check["passed"] for check in payload["checks"]))
+        self.assertNotIn("document", run.stdout_text)
+        self.assertNotIn(document_text, run.stdout_text)
+        self.assertNotIn("_cases", run.stdout_text)
+        self.assertEqual(run.stderr_text, "")
+
+    def test_function_verify_accepts_the_matching_expected_function_hash(self) -> None:
+        self.promoted_operation("verify-match", 2)
+        expected = System(self.database).verify_function(
+            "tenant", "verify-match"
+        ).function_hash
+        self.assertIsNotNone(expected)
+        run = self.run_cli(
+            "function",
+            "verify",
+            "verify-match",
+            "--expected-function-hash",
+            str(expected),
+        )
+        self.assertEqual(run.status, 0)
+        self.assertTrue(self.payload(run)["passed"])
+        self.assertEqual(run.stderr_text, "")
+
+    def test_function_verify_exits_six_with_a_diagnostic_hash_for_a_different_valid_digest(self) -> None:
+        self.promoted_operation("verify-mismatch", 2)
+        actual = System(self.database).verify_function(
+            "tenant", "verify-mismatch"
+        ).function_hash
+        self.assertIsNotNone(actual)
+        different = "0" * 64 if actual != "0" * 64 else "1" * 64
+        run = self.run_cli(
+            "function",
+            "verify",
+            "verify-mismatch",
+            "--expected-function-hash",
+            different,
+        )
+        self.assertEqual(run.status, 6)
+        self.assertEqual(run.stderr_text, "")
+        self.assertIsInstance(run.stdout_json, dict)
+        payload = typing.cast(dict[str, typing.Any], run.stdout_json)
+        self.assertEqual(set(payload), _FUNCTION_VERIFY_KEYS)
+        self.assertFalse(payload["passed"])
+        self.assertEqual(payload["function_hash"], actual)
+        self.assertIsNotNone(payload["function_hash"])
+
+    def test_function_verify_fails_only_the_receipt_check_without_a_function_checkpoint(self) -> None:
+        self.register("verify-no-checkpoint")
+        self.confirm("verify-no-checkpoint", 11, "verify-no-checkpoint-a")
+        self.confirm("verify-no-checkpoint", 23, "verify-no-checkpoint-b")
+        created = self.payload(self.run_cli("compile", "verify-no-checkpoint"))["created"]
+        self.assertEqual(len(created), 2)
+        system = System(self.database)
+        for artifact_id in created:
+            report = system.verify("tenant", artifact_id, verified_by="verifier")
+            self.assertTrue(report.passed)
+            system.promote(
+                "tenant",
+                artifact_id,
+                scope_hash=report.scope_hash,
+                promoted_by="release-manager",
+            )
+
+        run = self.run_cli("function", "verify", "verify-no-checkpoint")
+        self.assertEqual(run.status, 6)
+        self.assertEqual(run.stderr_text, "")
+        payload = typing.cast(dict[str, typing.Any], run.stdout_json)
+        self.assertFalse(payload["passed"])
+        self.assertEqual(payload["entries"], 2)
+        self.assertEqual(
+            [check["key"] for check in payload["checks"]], list(_FUNCTION_CHECK_KEYS)
+        )
+        self.assertEqual(
+            [check["passed"] for check in payload["checks"]],
+            [True, True, True, True, True, False],
+        )
+
+    def test_function_verify_treats_an_empty_promoted_set_as_a_vacuous_pass(self) -> None:
+        self.register("verify-empty")
+        run = self.run_cli("function", "verify", "verify-empty")
+        payload = self.payload(run)
+        self.assertTrue(payload["passed"])
+        self.assertEqual(payload["entries"], 0)
+        self.assertEqual(set(payload), _FUNCTION_VERIFY_KEYS)
+        self.assertTrue(all(check["passed"] for check in payload["checks"]))
+        self.assertEqual(run.stderr_text, "")
+
+    def test_function_verify_rejects_a_digest_one_character_short_beside_an_accepted_digest(self) -> None:
+        self.register("verify-lower-bound")
+        accepted = self.run_cli(
+            "function",
+            "verify",
+            "verify-lower-bound",
+            "--expected-function-hash",
+            "0" * 64,
+        )
+        self.assertIn(accepted.status, (0, 6))
+        self.assertEqual(accepted.stderr_text, "")
+        rejected = self.run_cli(
+            "function",
+            "verify",
+            "verify-lower-bound",
+            "--expected-function-hash",
+            "0" * 63,
+        )
+        self.assertEqual(rejected.status, 2)
+        self.assertEqual(rejected.stdout_bytes, b"")
+        self.assertEqual(self.error(rejected)["error"], "invalid")
+
+    def test_function_verify_rejects_a_digest_one_character_long_beside_an_accepted_digest(self) -> None:
+        self.register("verify-upper-bound")
+        accepted = self.run_cli(
+            "function",
+            "verify",
+            "verify-upper-bound",
+            "--expected-function-hash",
+            "0" * 64,
+        )
+        self.assertIn(accepted.status, (0, 6))
+        self.assertEqual(accepted.stderr_text, "")
+        rejected = self.run_cli(
+            "function",
+            "verify",
+            "verify-upper-bound",
+            "--expected-function-hash",
+            "0" * 65,
+        )
+        self.assertEqual(rejected.status, 2)
+        self.assertEqual(rejected.stdout_bytes, b"")
+        self.assertEqual(self.error(rejected)["error"], "invalid")
+
+    def test_function_verify_rejects_uppercase_and_nonhex_expected_hashes_without_normalizing(self) -> None:
+        self.register("verify-digest-grammar")
+        accepted = self.run_cli(
+            "function",
+            "verify",
+            "verify-digest-grammar",
+            "--expected-function-hash",
+            "a" * 64,
+        )
+        self.assertIn(accepted.status, (0, 6))
+        self.assertEqual(accepted.stderr_text, "")
+        for malformed in ("A" * 64, "g" * 64):
+            run = self.run_cli(
+                "function",
+                "verify",
+                "verify-digest-grammar",
+                "--expected-function-hash",
+                malformed,
+            )
+            self.assertEqual(run.status, 2)
+            self.assertEqual(run.stdout_bytes, b"")
+            self.assertEqual(self.error(run)["error"], "invalid")
+
+    def test_function_verify_rejects_an_unregistered_operation(self) -> None:
+        run = self.run_cli("function", "verify", "absent")
+        self.assertEqual(run.status, 3)
+        self.assertEqual(run.stdout_bytes, b"")
+        self.assertEqual(self.error(run)["error"], "not_found")
+
+    def test_function_verify_does_not_cross_partition_or_like_colliding_scopes(self) -> None:
+        self.register("check_1", partition="other")
+        self.register("checkX1")
+        self.register("Check_1")
+        run = self.run_cli("function", "verify", "check_1")
+        self.assertEqual(run.status, 3)
+        self.assertEqual(run.stdout_bytes, b"")
+        self.assertEqual(self.error(run)["error"], "not_found")
+        positive = self.run_cli(
+            "--partition", "other", "function", "verify", "check_1"
+        )
+        self.assertEqual(positive.status, 0)
+
+    def test_function_verify_drafts_forwards_scope_positionally_and_actor_by_keyword(self) -> None:
+        sentinel = DraftVerification(
+            passed=True, operation_revision=13, entries=(), skipped=()
+        )
+        with mock.patch.object(System, "verify_drafts", autospec=True) as spy:
+            spy.return_value = sentinel
+            run = self.run_cli(
+                "function", "verify-drafts", "echo_1", "--actor", " actor "
+            )
+        self.assertEqual(run.status, 0)
+        self.assertEqual(spy.call_count, 1)
+        self.assertEqual(spy.call_args.args[1:], ("tenant", "echo_1"))
+        self.assertEqual(spy.call_args.kwargs, {"verified_by": " actor "})
+
+    def test_function_verify_forwards_none_as_the_default_expected_hash(self) -> None:
+        sentinel = FunctionVerification(
+            passed=True,
+            entries=0,
+            document=None,
+            function_hash=None,
+            checks=(),
+        )
+        with mock.patch.object(System, "verify_function", autospec=True) as spy:
+            spy.return_value = sentinel
+            run = self.run_cli("function", "verify", "echo_1")
+        self.assertEqual(run.status, 0)
+        self.assertEqual(spy.call_args.args[1:], ("tenant", "echo_1"))
+        self.assertEqual(spy.call_args.kwargs, {"expected_function_hash": None})
+
+    def test_function_verify_forwards_the_expected_hash_byte_for_byte(self) -> None:
+        supplied = "A" * 64
+        sentinel = FunctionVerification(
+            passed=False,
+            entries=17,
+            document=None,
+            function_hash="c" * 64,
+            checks=(FunctionCheck(key="probe", passed=False, detail="probe"),),
+        )
+        with mock.patch.object(System, "verify_function", autospec=True) as spy:
+            spy.return_value = sentinel
+            run = self.run_cli(
+                "function",
+                "verify",
+                "echo_1",
+                "--expected-function-hash",
+                supplied,
+            )
+        self.assertEqual(run.status, 6)
+        self.assertEqual(run.stderr_text, "")
+        self.assertEqual(spy.call_args.args[1:], ("tenant", "echo_1"))
+        self.assertEqual(
+            spy.call_args.kwargs, {"expected_function_hash": supplied}
+        )
+
+    def test_function_verify_rejects_show_only_options(self) -> None:
+        run = self.run_cli(
+            "function", "verify", "echo", "--projection-limit", "5"
+        )
+        self.assertEqual(run.status, 2)
+        self.assertEqual(run.stdout_bytes, b"")
+        self.assertEqual(self.error(run)["error"], "invalid")
+
+    def test_function_show_rejects_verify_drafts_only_options(self) -> None:
+        run = self.run_cli("function", "show", "echo", "--actor", "x")
+        self.assertEqual(run.status, 2)
+        self.assertEqual(run.stdout_bytes, b"")
+        self.assertEqual(self.error(run)["error"], "invalid")
+
+    def test_root_verify_keeps_its_default_actor_while_function_verify_drafts_requires_one(self) -> None:
+        missing_nested = self.run_cli("function", "verify-drafts", "echo")
+        self.assertEqual(missing_nested.status, 2)
+        with mock.patch.object(System, "verify", autospec=True) as spy:
+            spy.return_value = VerificationReport(
+                id="report_probe",
+                artifact_id="art_probe",
+                scope_hash="0" * 64,
+                passed=True,
+                tests=11,
+                failures=(),
+                created_at_us=13,
+            )
+            root = self.run_cli("verify", "art_probe")
+        self.assertEqual(root.status, 0)
+        self.assertEqual(spy.call_args.args[1:], ("tenant", "art_probe"))
+        self.assertEqual(spy.call_args.kwargs, {"verified_by": "local-system"})
+
+    def test_operation_register_keeps_its_exact_runner_bytes(self) -> None:
+        run = self.run_cli(
+            "operation",
+            "register",
+            "verify-regression",
+            "--min-confirmations",
+            "2",
+            "--min-reviewers",
+            "1",
+            "--min-span-seconds",
+            "0",
+        )
+        self.assertEqual(run.status, 0)
+        self.assertEqual(
+            run.stdout_bytes,
+            b'{\n  "operation": "verify-regression",\n  "revision": 1\n}\n',
+        )
+        self.assertEqual(run.stderr_text, "")
+
+    def test_function_verdicts_preserve_the_symbol_qualified_exit_map(self) -> None:
+        verdict = FunctionVerification(
+            passed=False,
+            entries=19,
+            document=None,
+            function_hash="d" * 64,
+            checks=(FunctionCheck(key="probe", passed=False, detail="negative"),),
+        )
+        cases: tuple[tuple[BaseException | None, int], ...] = (
+            (ValidationError("invalid"), 2),
+            (NotFoundError("missing"), 3),
+            (StateError("state"), 4),
+            (IntegrityError("integrity"), 5),
+            (None, 6),
+        )
+        for exception, expected in cases:
+            with self.subTest(expected=expected):
+                replacement: typing.Any
+                if exception is None:
+                    replacement = mock.Mock(return_value=verdict)
+                else:
+                    replacement = mock.Mock(side_effect=exception)
+                # Patching the library boundary keeps `_run`'s own status
+                # branch under test; patching `_run` would replace it.
+                with mock.patch.object(System, "verify_function", replacement):
+                    run = self.run_cli("function", "verify", "echo")
+                self.assertEqual(run.status, expected)
+                if expected == 6:
+                    self.assertEqual(run.stderr_text, "")
+                    self.assertFalse(
+                        typing.cast(dict[str, typing.Any], run.stdout_json)["passed"]
+                    )
+                else:
+                    self.assertEqual(run.stdout_bytes, b"")
+                    self.assertIsInstance(run.stderr_json, dict)
 
     def test_cli_run_shape_is_exact(self) -> None:
         self.assertTrue(_CLIRun.__dataclass_params__.frozen)
