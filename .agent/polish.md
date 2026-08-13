@@ -48,6 +48,16 @@ changed is spine work, not polish.
   to `IntegrityError` or rejects a non-`int` stored value outright; one committed probe per receipt integer
   field drives both `NULL` and numeric text and expects `IntegrityError`; suite green.
 
+- `pri=3` `size=S` — port the report anchor validator to a committed dev tool. Every `map` brief makes its
+  report's `path:line` claims machine-checkable through `.scratch/validate-anchors.py` (fenced ```anchors
+  block, TAB-separated `path`/`line`/`exact fragment`, exit 0 only when every row resolves and no
+  `TODO-FILL` cell remains), and u4c5's map passed 268 anchors under MAIN's rerun — but the validator is
+  gitignored, so a brief naming it is unrunnable in any clone and the next wave silently loses the check.
+  Acceptance: a tracked script under a dev-tools path takes `REPORT.md [--root DIR]`, reports
+  `ANCHORS-CHECKED`/`ANCHORS-BAD`/`UNFILLED-CELLS` and exits nonzero on any bad anchor or unfilled cell,
+  proven from a clean checkout by a committed fixture report carrying one resolving anchor, one stale
+  anchor and one `TODO-FILL` cell; briefs cite the tracked path.
+
 - `pri=2` `size=M` — port the seam mutation battery to a committed dev tool. u4c1's 9-mutant battery over
   `_Outcome`, `main`'s channel branch, the parser slot and limit forwarding killed 9/9, but it ran from
   `.scratch/mutants.sh` and died with the wave, so the claim outlives its driver (same defect as the u4b

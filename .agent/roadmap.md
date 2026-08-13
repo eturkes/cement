@@ -519,15 +519,44 @@ Measured gaps driving the arc:
     the `artifact_json` recipe; report and artifact-build stored-scalar conversions on both planning paths
     can still leak raw conversion errors, widening the tracked audit. `stale_revision_anomalies` and
     actor-grammar bounds beyond the shipped pins stay as recorded polish.
-  - u4c5 OPEN tier=kernel - `function export OPERATION [--receipt-id ID] [--out PATH]`: live source gated on
-    `verify_function` P1-P6 passing with a failure raising to exit 5 rather than exporting a stale or
-    diagnostic document, `--receipt-id` selecting the historical source and cross-checking the reconstructed
-    receipt's operation against the positional operation, `FunctionDocument.text` written as exact UTF-8
-    bytes with nothing appended. Est. 46-67 / 520-760. Depends on u4c1 + u4c2.
+  - u4c5 split two ways per `.agent/decisions/m2u4c5-design.md`, arbitrated from an anchored fact map plus
+    two prototyped design spikes that BOTH self-rejected on disjoint evidence. The prescribed disposition
+    is overruled: a failed live verification does NOT raise to exit 5. INTEGRITY measured `artifact
+    suspend` alone driving a checkpointed set to `passed=False` through committed commands with vector
+    `[T,T,T,T,T,F]`, so `{"error":"integrity"}` misnames ordinary drift, and the aggregate-limit vector
+    misnames a capacity bound - reachable because `System.promote` carries no aggregate count guard, only
+    `build_function` and set promotion do. VERDICT measured the opposing defect: `function export OP > f`
+    at exit 6 leaves `f` holding 1,078 bytes of verdict JSON, because the redirect truncates the target
+    before Cement runs, so stdout must never change media type by verdict. Ruling takes each spike's
+    measured strength - no bundle bytes, empty stdout, the ordered check vector on stderr as
+    `{error:"unverified", message, checks}`, exit 6 - keeping one exit-6 meaning across the `function`
+    group and the token/exit bijection intact. Mechanics stay inside the write set: `_run` raises a
+    private `_Unverified` and `main` gains one appended `except` branch, leaving `_Outcome`, `_emit` and
+    every existing mapping byte-identical. The split follows: the arbitrated surface sizes at 80-100
+    production + 800-1,070 test lines against u4c4's landed `+30 / +1,011` at `main=98%`, so it does not
+    fit one window. The cut is by CHANNEL - source selection is one judgment surface whose branches decide
+    each other, while the file channel is a self-contained writer plus a hostile-path matrix sharing no
+    judgment with it. Decisions 1, 3 and 4 of the record bind both sub-units.
+  - u4c5a OPEN tier=kernel - `function export OPERATION [--receipt-id ID]`: source selection, verification
+    gate, raw byte channel. Live source from `verify_function` with a negative verdict at exit 6 on stderr;
+    `--receipt-id` from `reconstruct_function_receipt`, cross-checked against the positional operation
+    because the library's lookup keys on partition + id alone, reusing `function_report`'s exact
+    `function receipt does not exist for this operation` at exit 3; historical failure staying exit 5,
+    since a receipt is immutable and a receipt that will not reconstruct is corruption;
+    `FunctionDocument.text` written as exact UTF-8 bytes with nothing appended, non-ASCII and no-`.buffer`
+    hosts both pinned; an empty promoted set exporting its real 304-byte `"entries":[]` document at exit 0.
+    Est. 45-55 / 480-620. Depends on u4c1 + u4c2.
+  - u4c5b OPEN tier=kernel - `function export ... [--out PATH]`: same-directory temp, write, flush, fsync,
+    `os.replace`, so the destination holds old bytes or new bytes and never a prefix - a direct writer was
+    measured leaving a 17-byte partial. Existing symlink or non-regular target rejected before any write,
+    missing parent reported separately, every other OS error translated, all at exit 2 mirroring
+    `store.py`'s own messages, since `main` has no catch-all and a bare `OSError` was measured escaping it.
+    Emits `{out, bytes, function_hash}` at exit 0, writes nothing on any failure path, and takes mode 0600
+    from the replacing inode. Est. 35-45 / 320-450. Depends on u4c5a.
   - u4c6 OPEN tier=kernel - `function eval --bundle PATH --input JSON` over `parse_function` + `evaluate`:
     bundle read by a dedicated strict-UTF-8 reader bounded at `FUNCTION_MAX_BYTES` (67,108,864), evaluation
     input keeping the existing `DEFAULT_MAX_BYTES` channel including `-`, so a bundle can never travel
-    through a reader 64x too small. Est. 48-70 / 560-820. Depends on u4c1 + u4c5.
+    through a reader 64x too small. Est. 48-70 / 560-820. Depends on u4c1 + u4c5a.
   - u5 OPEN tier=docs - surface realignment: `README.md` claim pass (guarantees, request outcomes,
     deployment boundary) against what the function object now proves, `docs/architecture.md` contract
     steps for the function layer, and the hospital example resolving from an exported bundle with no
