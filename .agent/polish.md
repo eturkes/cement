@@ -8,15 +8,19 @@ Gate for every row unless it says otherwise: `uv run python -m unittest discover
 changed is spine work, not polish.
 
 - `pri=1` `size=M` — port the mutant replay driver to committed state. `.scratch/main-replay/replay.py`
-  produced u4b's recorded mutation verdicts and is gone with `.scratch/`, so a gate backing a durable
-  roadmap claim cannot rerun from a clean checkout, and the next campaign rebuilds it from scratch.
-  Regeneration spec is recorded in `.agent/memory.md`: N isolated clones of `src`/`tests`/`examples`,
+  produced u4b's recorded mutation verdicts and is gitignored, so a gate backing a durable roadmap claim
+  cannot rerun from a clean checkout. It survives on this workstation together with u4b's catalogue
+  (`.scratch/agents/rev2b-m2u4b-mutants.jsonl`) and the wave's result sets
+  (`.scratch/main-replay/final-*.jsonl`), so the port is a copy-and-harden while that holds — `.scratch/`
+  is machine-local and unbacked, so treat the window as closing. Regeneration spec, should the sources go,
+  is recorded in `.agent/memory.md`: N isolated clones of `src`/`tests`/`examples`,
   `PYTHONDONTWRITEBYTECODE=1` plus `__pycache__` purge, per-mutant proof that the interpreter loaded the
   mutated module from its clone, byte-exact restore, `--reanchor` over a `difflib` line map, `--control`
   pristine sweep at full worker count. Throughput reference: 61 mutants at 8 workers ≈ 13 min, 254 ≈ 50
   min. Acceptance: a committed dev tool runs a catalogue `.jsonl` from a clean checkout, its `--control`
   sweep is green, and a seeded known-live mutant reports as surviving while a seeded known-dead one
-  reports as killed. u4b's own catalogue died with `.scratch/` and is not a recovery target.
+  reports as killed; where u4b's catalogue was recovered, replaying it reproduces 58 killed / 1 superseded
+  / 2 surviving, those 2 being the reviewer's proved-equivalent pair.
 
 - `pri=2` `size=M` — stored-scalar conversions in `system.py` are still unguarded in places, third recorded
   instance of one class. `_function_receipt_from_row` (`src/cement_runtime/system.py:277`) validates string
@@ -82,11 +86,13 @@ changed is spine work, not polish.
   probe per shape (`[]`, `'text'`, `5`, `None`) raises `ValidationError` out of `handle`, with `[]`
   failing rather than silently becoming `{}`.
 
-- `pri=4` `size=S` — `.agent/decisions/` input pointers are dead. Seven records open with `Inputs:` lines
-  citing `.scratch/agents/*.md`, plus `.scratch/main-verify/tree`, `.scratch/main-verify/f1probe.py` and
-  `.scratch/m2u3b1.patch`; `.scratch/` no longer exists, so every one resolves to nothing while reading
-  as a live reference. Acceptance: each record's inputs either carry the substance inline or are marked
-  expired, and no tracked file cites a `.scratch/` path as though it were retrievable.
+- `pri=4` `size=S` — `.agent/decisions/` input pointers read as live references but resolve nowhere except
+  this workstation. Seven records open with `Inputs:` lines citing `.scratch/agents/*.md`, plus
+  `.scratch/main-verify/tree`, `.scratch/main-verify/f1probe.py` and `.scratch/m2u3b1.patch`; `.scratch/`
+  is gitignored, so all 14 resolve to nothing in any clone. Here 11 still resolve and 3 are gone outright
+  (`m2u3b1.patch` and both `main-verify/` entries), so the substance behind most is still recoverable —
+  rescue before the window closes. Acceptance: each record's inputs either carry the substance inline or
+  are marked expired, and no tracked file cites a `.scratch/` path as though it were retrievable.
 
 - `pri=5` `size=M` — 166 Pyright `reportAttributeAccessIssue` errors across `tests/test_system.py` lines
   221-1192, pre-existing at `d0b7e93`: unnarrowed union member access in baseline outcome assertions.

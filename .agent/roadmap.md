@@ -344,9 +344,10 @@ Measured gaps driving the arc:
     ready-vs-blocked is not readable from stored status. The 166 Pyright `reportAttributeAccessIssue`
     errors in `tests/test_system.py` lines 221-1192 are pre-existing at `d0b7e93` - unnarrowed union
     member access in baseline outcome assertions, in a region this unit left byte-identical.
-    The mutation verdicts above are historical, not rerunnable: both the catalogue and the replay driver
-    were scratch-local and died with `.scratch/`, so nothing in committed state reproduces them. The
-    committed suite is what still holds. Driver port tracked in `.agent/polish.md`.
+    The mutation verdicts above are historical, not rerunnable from committed state: both the catalogue
+    and the replay driver are gitignored scratch artifacts, so no clone reproduces them. The committed
+    suite is what still holds. Both survive on the workstation that ran the wave, so the driver port
+    tracked in `.agent/polish.md` is a copy there rather than a rebuild.
   - u4c split six ways per `.agent/decisions/m2u4c-design.md`, arbitrated from a CLI surface map plus a
     consumed-API map. Two findings drive the split. (1) `cli.py` carries zero references to any
     function-layer API, and the five names the earlier plan listed leave the milestone's own measured gap
