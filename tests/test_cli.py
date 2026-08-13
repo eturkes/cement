@@ -2936,6 +2936,492 @@ class CLITests(unittest.TestCase):
         self.assertIs(promote_result, promoted)
         self.assertNotIsInstance(promote_result, _Outcome)
 
+    # -- function export -----------------------------------------------------
+
+    def live_document(self, operation: str, *, partition: str = "tenant") -> str:
+        verification = System(self.database).verify_function(partition, operation)
+        self.assertTrue(verification.passed)
+        assert verification.document is not None
+        return verification.document.text
+
+    def confirm_text(self, operation: str, value: str, tag: str) -> None:
+        # `confirm` hardcodes integer inputs; the byte-exactness pins need a
+        # corpus whose canonical text is non-ASCII.
+        adapter = pathlib.Path("examples/echo_adapter.py").resolve()
+        source = json.dumps([sys.executable, str(adapter)])
+        for number in (1, 2):
+            handled = self.payload(
+                self.run_cli(
+                    "handle",
+                    operation,
+                    "--input",
+                    json.dumps({"x": value}),
+                    "--request-id",
+                    f"{tag}-{number}",
+                    "--source-command",
+                    source,
+                )
+            )
+            self.run_cli(
+                "proposal",
+                "review",
+                str(handled["proposal_id"]),
+                "--reviewer",
+                "operator",
+                "--decision",
+                "accept",
+            )
+
+    def corrupt_receipt_membership(self, receipt_id: str) -> None:
+        connection = sqlite3.connect(self.database)
+        try:
+            # Same fresh-System constraint as `corrupt_middle_draft`: the
+            # immutability trigger has to be restored or the CLI exits 5 on the
+            # schema fingerprint before it ever reads the row.
+            trigger = connection.execute(
+                """
+                SELECT sql FROM sqlite_master
+                WHERE type = 'trigger' AND name = 'function_memberships_no_update'
+                """
+            ).fetchone()[0]
+            connection.execute("DROP TRIGGER function_memberships_no_update")
+            connection.execute(
+                """
+                UPDATE function_memberships SET entry_seal = ?
+                WHERE receipt_id = ? AND ordinal = 1
+                """,
+                ("0" * 64, receipt_id),
+            )
+            connection.execute(trigger)
+            connection.commit()
+        finally:
+            connection.close()
+
+    def test_function_export_writes_the_live_document_bytes_exactly(self) -> None:
+        self.promoted_operation("echo", 2)
+        expected = self.live_document("echo").encode("utf-8")
+        run = self.run_cli("function", "export", "echo")
+        self.assertEqual(run.status, 0)
+        self.assertEqual(run.stdout_bytes, expected)
+        self.assertFalse(run.stdout_bytes.endswith(b"\n"))
+        self.assertEqual(run.stderr_text, "")
+        # The same bytes reach a host with no `.buffer`, through the text path.
+        text_host = self.run_cli("function", "export", "echo", text_only=True)
+        self.assertEqual(text_host.stdout_bytes, expected)
+        self.assertEqual(text_host.status, 0)
+
+    def test_function_export_round_trips_through_parse_function(self) -> None:
+        from cement_runtime import evaluate, parse_function
+        from cement_runtime.json_value import canonicalize
+
+        self.promoted_operation("echo", 2)
+        run = self.run_cli("function", "export", "echo")
+        parsed = parse_function(run.stdout_text)
+        verification = System(self.database).verify_function("tenant", "echo")
+        self.assertEqual(parsed.function_hash, verification.function_hash)
+        match = evaluate(parsed, input_json=canonicalize({"x": 1}))
+        self.assertTrue(match.matched)
+        self.assertEqual(match.output, {"kind": "echo", "value": {"x": 1}})
+        miss = evaluate(parsed, input_json=canonicalize({"x": 4}))
+        self.assertFalse(miss.matched)
+
+    def test_function_export_emits_non_ascii_literally(self) -> None:
+        self.register("unicode")
+        self.confirm_text("unicode", "Grüße 日本語", "unicode-a")
+        self.run_cli("compile", "unicode")
+        self.promote_set("unicode")
+        run = self.run_cli("function", "export", "unicode")
+        self.assertEqual(run.status, 0)
+        self.assertIn("Grüße 日本語", run.stdout_text)
+        self.assertNotIn("\\u", run.stdout_text)
+        self.assertGreater(len(run.stdout_bytes), len(run.stdout_text))
+        self.assertEqual(run.stdout_bytes, self.live_document("unicode").encode("utf-8"))
+
+    def test_function_export_of_an_empty_promoted_set_exports_its_document(self) -> None:
+        self.register("empty")
+        run = self.run_cli("function", "export", "empty")
+        self.assertEqual(run.status, 0)
+        self.assertEqual(run.stderr_text, "")
+        self.assertEqual(run.stdout_bytes, self.live_document("empty").encode("utf-8"))
+        document = typing.cast(dict[str, typing.Any], json.loads(run.stdout_text))
+        self.assertEqual(document["entries"], [])
+        self.assertEqual(document["abi"], "cement-function-v2")
+        self.assertEqual(document["scope"]["operation"], "empty")
+
+    def test_function_export_refuses_a_drifted_set_with_the_whole_check_vector(self) -> None:
+        self.promoted_operation("echo", 2)
+        anchor = self.payload(self.run_cli("function", "show", "echo"))["function_anchor"]
+        member = str(anchor["members"][0]["artifact_id"])
+        self.run_cli("artifact", "suspend", member, "--actor", "operator", "--reason", "drift")
+        run = self.run_cli("function", "export", "echo")
+        self.assertEqual(run.status, 6)
+        self.assertEqual(run.stdout_bytes, b"")
+        failure = self.error(run)
+        self.assertEqual(set(failure), {"checks", "error", "message"})
+        self.assertEqual(failure["error"], "unverified")
+        checks = typing.cast(list[dict[str, typing.Any]], failure["checks"])
+        self.assertEqual(
+            [check["key"] for check in checks],
+            [
+                "duplicate-input-digests",
+                "abi-canonicalizer-uniform",
+                "sealed-passing-reports",
+                "current-promotion-receipts",
+                "function-hash-matches-snapshot",
+                "persisted-function-receipt",
+            ],
+        )
+        self.assertEqual([check["passed"] for check in checks], [True] * 5 + [False])
+        self.assertEqual(set(checks[0]), {"detail", "key", "passed"})
+        self.assertEqual(
+            failure["message"],
+            "function verification failed; no bundle exported: persisted-function-receipt: "
+            "latest receipt does not bind the promoted snapshot",
+        )
+
+    def test_function_export_message_names_every_failing_check_in_order(self) -> None:
+        verdict = FunctionVerification(
+            passed=False,
+            entries=3,
+            document=None,
+            function_hash="c" * 64,
+            checks=(
+                FunctionCheck(key="first", passed=False, detail="one failed"),
+                FunctionCheck(key="second", passed=True, detail="two held"),
+                FunctionCheck(key="third", passed=False, detail="three failed"),
+            ),
+        )
+        with mock.patch.object(System, "verify_function", return_value=verdict):
+            run = self.run_cli("function", "export", "echo")
+        self.assertEqual(run.status, 6)
+        self.assertEqual(run.stdout_bytes, b"")
+        failure = self.error(run)
+        self.assertEqual(
+            failure["message"],
+            "function verification failed; no bundle exported: first: one failed; "
+            "third: three failed",
+        )
+        checks = typing.cast(list[dict[str, typing.Any]], failure["checks"])
+        self.assertEqual([check["key"] for check in checks], ["first", "second", "third"])
+        self.assertNotIn("function_hash", failure)
+        self.assertNotIn("entries", failure)
+
+    def test_unverified_stays_outside_the_cement_error_hierarchy(self) -> None:
+        from cement_runtime.cli import _Unverified
+        from cement_runtime.errors import CementError
+
+        # Inheriting CementError would put every refused export inside main's
+        # residual clause and silently downgrade exit 6 to exit 2.
+        self.assertTrue(issubclass(_Unverified, Exception))
+        self.assertFalse(issubclass(_Unverified, CementError))
+        self.assertEqual(str(_Unverified({"message": "carried"})), "carried")
+
+    def test_function_export_preserves_the_symbol_qualified_exit_map(self) -> None:
+        verdict = FunctionVerification(
+            passed=False,
+            entries=1,
+            document=None,
+            function_hash="d" * 64,
+            checks=(FunctionCheck(key="probe", passed=False, detail="negative"),),
+        )
+        cases: tuple[tuple[BaseException | None, int], ...] = (
+            (ValidationError("invalid"), 2),
+            (NotFoundError("missing"), 3),
+            (StateError("state"), 4),
+            (IntegrityError("integrity"), 5),
+            (None, 6),
+        )
+        for exception, expected in cases:
+            with self.subTest(expected=expected):
+                replacement: typing.Any
+                if exception is None:
+                    replacement = mock.Mock(return_value=verdict)
+                else:
+                    replacement = mock.Mock(side_effect=exception)
+                # Patch the library boundary; patching `_run` would replace the
+                # branch under test.
+                with mock.patch.object(System, "verify_function", replacement):
+                    run = self.run_cli("function", "export", "echo")
+                self.assertEqual(run.status, expected)
+                self.assertEqual(run.stdout_bytes, b"")
+                self.assertIsInstance(run.stderr_json, dict)
+                self.assertEqual(
+                    self.error(run)["error"],
+                    "unverified" if expected == 6 else self.error(run)["error"],
+                )
+
+    def test_function_export_rejects_an_unregistered_or_foreign_operation(self) -> None:
+        self.promoted_operation("echo_1", 2)
+        for arguments, partition in (
+            (("function", "export", "ghost"), "tenant"),
+            (("function", "export", "echo_1"), "tenant_other"),
+        ):
+            run = self.run_cli("--partition", partition, *arguments)
+            self.assertEqual(run.status, 3)
+            self.assertEqual(run.stdout_bytes, b"")
+            self.assertEqual(
+                self.error(run),
+                {
+                    "error": "not_found",
+                    "message": "operation is not registered in this partition",
+                },
+            )
+
+    def test_function_export_exports_one_historical_receipt(self) -> None:
+        receipt = self.promoted_operation("echo", 2)
+        reconstruction = System(self.database).reconstruct_function_receipt("tenant", receipt)
+        with mock.patch.object(System, "verify_function") as never:
+            run = self.run_cli("function", "export", "echo", "--receipt-id", receipt)
+        self.assertEqual(never.call_count, 0)
+        self.assertEqual(run.status, 0)
+        self.assertEqual(run.stderr_text, "")
+        self.assertEqual(run.stdout_bytes, reconstruction.document.text.encode("utf-8"))
+        self.assertFalse(run.stdout_bytes.endswith(b"\n"))
+
+    def test_function_export_cross_checks_the_receipt_operation_exactly(self) -> None:
+        receipt = self.promoted_operation("echo_1", 2)
+        accepted = self.run_cli("function", "export", "echo_1", "--receipt-id", receipt)
+        self.assertEqual(accepted.status, 0)
+        for operation in ("echoX1", "ECHO_1", "echo", "echo_12"):
+            with self.subTest(operation=operation):
+                run = self.run_cli("function", "export", operation, "--receipt-id", receipt)
+                self.assertEqual(run.status, 3)
+                self.assertEqual(run.stdout_bytes, b"")
+                self.assertEqual(
+                    self.error(run),
+                    {
+                        "error": "not_found",
+                        "message": "function receipt does not exist for this operation",
+                    },
+                )
+
+    def test_function_export_reports_a_missing_receipt_row_separately(self) -> None:
+        receipt = self.promoted_operation("echo", 2)
+        for partition, receipt_id in (
+            ("tenant", "fpr_" + "0" * 32),
+            ("tenant", "not-an-id"),
+            ("tenant", "req_" + "0" * 32),
+            ("tenant_other", receipt),
+        ):
+            with self.subTest(partition=partition, receipt_id=receipt_id):
+                run = self.run_cli(
+                    "--partition", partition, "function", "export", "echo", "--receipt-id", receipt_id
+                )
+                self.assertEqual(run.status, 3)
+                self.assertEqual(run.stdout_bytes, b"")
+                self.assertEqual(
+                    self.error(run),
+                    {
+                        "error": "not_found",
+                        "message": "function receipt does not exist in this partition",
+                    },
+                )
+
+    def test_function_export_bounds_the_receipt_id_grammar(self) -> None:
+        self.promoted_operation("echo", 2)
+        for receipt_id in ("", "a" * 193, "fpr_x!y"):
+            with self.subTest(receipt_id=receipt_id):
+                run = self.run_cli("function", "export", "echo", "--receipt-id", receipt_id)
+                self.assertEqual(run.status, 2)
+                self.assertEqual(run.stdout_bytes, b"")
+                self.assertEqual(
+                    self.error(run),
+                    {
+                        "error": "invalid",
+                        "message": "request_id must be a bounded ASCII identifier",
+                    },
+                )
+        # Adjacent accept side: the maximum-length id is grammar-valid and
+        # therefore reaches lookup, which is a not_found rather than an invalid.
+        accepted = self.run_cli("function", "export", "echo", "--receipt-id", "a" * 192)
+        self.assertEqual(accepted.status, 3)
+        self.assertEqual(self.error(accepted)["error"], "not_found")
+
+    def test_function_export_reports_a_corrupt_receipt_as_integrity(self) -> None:
+        self.promoted_operation("echo_1", 2)
+        receipt = self.promoted_operation("beta", 2)
+        self.corrupt_receipt_membership(receipt)
+        for operation in ("beta", "echo_1"):
+            with self.subTest(operation=operation):
+                # Reconstruction precedes the operation cross-check, so a
+                # corrupt foreign receipt reports corruption, not not_found.
+                run = self.run_cli("function", "export", operation, "--receipt-id", receipt)
+                self.assertEqual(run.status, 5)
+                self.assertEqual(run.stdout_bytes, b"")
+                self.assertEqual(
+                    self.error(run),
+                    {
+                        "error": "integrity",
+                        "message": "function receipt membership digest mismatch",
+                    },
+                )
+
+    def test_function_export_guards_a_passing_verification_without_a_document(self) -> None:
+        verdict = FunctionVerification(
+            passed=True,
+            entries=0,
+            document=None,
+            function_hash="e" * 64,
+            checks=(FunctionCheck(key="probe", passed=True, detail="held"),),
+        )
+        with mock.patch.object(System, "verify_function", return_value=verdict):
+            run = self.run_cli("function", "export", "echo")
+        self.assertEqual(run.status, 5)
+        self.assertEqual(run.stdout_bytes, b"")
+        self.assertEqual(
+            self.error(run),
+            {
+                "error": "integrity",
+                "message": "function verification passed without an exportable document",
+            },
+        )
+
+    def test_function_export_forwards_the_operator_scope_exactly(self) -> None:
+        receipt = self.promoted_operation("echo", 2)
+        document = System(self.database).verify_function("tenant", "echo")
+        with mock.patch.object(
+            System, "verify_function", autospec=True, return_value=document
+        ) as live:
+            self.run_cli("function", "export", "echo")
+        self.assertEqual(live.call_args.args[1:], ("tenant", "echo"))
+        self.assertEqual(live.call_args.kwargs, {})
+        reconstruction = System(self.database).reconstruct_function_receipt("tenant", receipt)
+        with mock.patch.object(
+            System,
+            "reconstruct_function_receipt",
+            autospec=True,
+            return_value=reconstruction,
+        ) as historical:
+            self.run_cli("function", "export", "echo", "--receipt-id", receipt)
+        self.assertEqual(historical.call_args.args[1:], ("tenant", receipt))
+        self.assertEqual(historical.call_args.kwargs, {})
+
+    def test_function_export_sources_never_mix(self) -> None:
+        receipt = self.promoted_operation("echo", 2)
+        historical = self.run_cli("function", "export", "echo", "--receipt-id", receipt)
+        self.confirm("echo", 99, "echo-grown")
+        self.run_cli("compile", "echo")
+        self.promote_set("echo")
+        live = self.run_cli("function", "export", "echo")
+        self.assertEqual(live.status, 0)
+        self.assertNotEqual(live.stdout_bytes, historical.stdout_bytes)
+        self.assertEqual(len(json.loads(historical.stdout_text)["entries"]), 2)
+        self.assertEqual(len(json.loads(live.stdout_text)["entries"]), 3)
+        # The older receipt keeps exporting its own immutable bytes.
+        again = self.run_cli("function", "export", "echo", "--receipt-id", receipt)
+        self.assertEqual(again.stdout_bytes, historical.stdout_bytes)
+
+    def test_function_export_serves_a_receipt_from_a_superseded_revision(self) -> None:
+        receipt = self.promoted_operation("echo", 2)
+        historical = self.run_cli("function", "export", "echo", "--receipt-id", receipt)
+        self.assertEqual(historical.status, 0)
+        revised = self.payload(
+            self.run_cli(
+                "operation",
+                "revise",
+                "echo",
+                "--min-confirmations",
+                "3",
+                "--min-reviewers",
+                "1",
+                "--min-span-seconds",
+                "0",
+                "--actor",
+                "owner",
+            )
+        )
+        self.assertEqual(revised["revision"], 2)
+        after = self.run_cli("function", "export", "echo", "--receipt-id", receipt)
+        self.assertEqual(after.status, 0)
+        self.assertEqual(after.stdout_bytes, historical.stdout_bytes)
+        live = self.run_cli("function", "export", "echo")
+        self.assertEqual(live.status, 0)
+        self.assertNotEqual(live.stdout_bytes, historical.stdout_bytes)
+        self.assertEqual(json.loads(live.stdout_text)["scope"]["operation_revision"], 2)
+
+    def test_function_export_grades_the_operation_by_grammar_on_both_sources(self) -> None:
+        receipt = self.promoted_operation("echo", 2)
+        # An unset shell variable produces the empty operation, so both sources
+        # must call it a usage error rather than a missing receipt.
+        for operation in ("", "♥", ".leading", "a" * 129):
+            for arguments in ((), ("--receipt-id", receipt)):
+                with self.subTest(operation=operation, historical=bool(arguments)):
+                    run = self.run_cli("function", "export", operation, *arguments)
+                    self.assertEqual(run.status, 2)
+                    self.assertEqual(run.stdout_bytes, b"")
+                    self.assertEqual(
+                        self.error(run),
+                        {
+                            "error": "invalid",
+                            "message": "operation must be 1-128 ASCII letters, digits, "
+                            "'.', '_', ':', '/', or '-'",
+                        },
+                    )
+        # Adjacent accept side: the maximum-length operation is grammar-valid
+        # and therefore reaches the receipt comparison.
+        accepted = self.run_cli(
+            "function", "export", "a" * 128, "--receipt-id", receipt
+        )
+        self.assertEqual(accepted.status, 3)
+        self.assertEqual(
+            self.error(accepted)["message"],
+            "function receipt does not exist for this operation",
+        )
+
+    def test_function_export_reports_the_whole_capacity_vector(self) -> None:
+        keys = (
+            "duplicate-input-digests",
+            "abi-canonicalizer-uniform",
+            "sealed-passing-reports",
+            "current-promotion-receipts",
+            "function-hash-matches-snapshot",
+            "persisted-function-receipt",
+        )
+        detail = "not evaluated because 50001 promoted entries exceed FUNCTION_MAX_ENTRIES=50000"
+        verdict = FunctionVerification(
+            passed=False,
+            entries=50_001,
+            document=None,
+            function_hash=None,
+            checks=tuple(FunctionCheck(key=key, passed=False, detail=detail) for key in keys),
+        )
+        with mock.patch.object(System, "verify_function", return_value=verdict):
+            run = self.run_cli("function", "export", "echo")
+        self.assertEqual(run.status, 6)
+        self.assertEqual(run.stdout_bytes, b"")
+        failure = self.error(run)
+        self.assertEqual(set(failure), {"checks", "error", "message"})
+        checks = typing.cast(list[dict[str, typing.Any]], failure["checks"])
+        self.assertEqual([check["key"] for check in checks], list(keys))
+        self.assertEqual([check["passed"] for check in checks], [False] * 6)
+        self.assertEqual(
+            failure["message"],
+            "function verification failed; no bundle exported: "
+            + "; ".join(f"{key}: {detail}" for key in keys),
+        )
+
+    def test_function_export_rejects_options_it_does_not_own(self) -> None:
+        for arguments, message in (
+            (("--out", "/tmp/bundle.json"), "unrecognized arguments: --out /tmp/bundle.json"),
+            (
+                ("--expected-function-hash", "a" * 64),
+                f"unrecognized arguments: --expected-function-hash {'a' * 64}",
+            ),
+            (("--projection-limit", "5"), "unrecognized arguments: --projection-limit 5"),
+        ):
+            with self.subTest(arguments=arguments):
+                run = self.run_cli("function", "export", "echo", *arguments)
+                self.assertEqual(run.status, 2)
+                self.assertEqual(run.stdout_bytes, b"")
+                self.assertEqual(self.error(run), {"error": "invalid", "message": message})
+        missing = self.run_cli("function", "export")
+        self.assertEqual(missing.status, 2)
+        self.assertEqual(missing.stdout_bytes, b"")
+        self.assertEqual(
+            self.error(missing),
+            {"error": "invalid", "message": "the following arguments are required: operation"},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

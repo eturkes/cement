@@ -65,6 +65,13 @@ changed is spine work, not polish.
   `(file, anchor, old, new, test)` rows, asserts each patch changed the file, purges `__pycache__` with
   `PYTHONDONTWRITEBYTECODE=1`, runs the named test per mutant, restores byte-exactly (`cmp` proves it),
   and exits nonzero on any survivor; rerunning it from a clean checkout reproduces 9/9 without edits.
+  u4c5a is the second instance and its driver is the better seed: `.scratch/mutate-u4c5a.py` already runs
+  a 16-mutant catalogue over the export leaf (16/16 killed), asserts each anchor matches exactly once
+  before patching, asserts `text != before`, rejects any run whose selected-test count moves, restores in
+  a `finally` and proves the restore with a sha256 compare. It is gitignored like its predecessors, so the
+  port is a copy-and-harden while it survives on this workstation. Its one measured trap is worth keeping:
+  an anchor matching 2 times is reported as ANCHOR-MISS, not silently applied — `"checks": [asdict(check)
+  for check in verification.checks],` occurs in both the `verify` and `export` leaves.
 
 - `pri=2` `size=M` — bounded projections have no cursor, and two families page in opaque-id order.
   `function_report` clamps six detail lists with one `projection_limit`, but the only way to see a
@@ -113,6 +120,26 @@ changed is spine work, not polish.
   Type noise only, no behavior at stake, and Pyright is not a configured gate. Acceptance: that region
   narrows its unions explicitly, an ad-hoc `uvx pyright tests/test_system.py` reports zero
   `reportAttributeAccessIssue`, and the suite stays green.
+
+## M2.u4c5a deferrals
+
+- pri=3 `size=S` — merge-or-drop decision on the diff-blind teammate's export suite. 28 tests written from
+  the contract alone, preserved byte-identically at `.scratch/agents/test-m2u4c5a-suite.py` (its worktree
+  is gone); 36 failures + 2 errors at baseline, 28/28 green against the shipped implementation, and MAIN's
+  own 21 tests carry every contract pin, so nothing merged. The question is whether any of its 28 probes
+  covers a case the shipped 21 leave open, or whether all 28 are re-expressions — u4c1's suite contributed
+  three genuinely new probes, u4c4's contributed none. `.scratch/` is machine-local and unbacked, so treat
+  the window as closing. Acceptance: each of the 28 is mapped to the shipped test that subsumes it or
+  merged into `tests/test_cli.py` under the existing naming, the file is then deleted rather than left
+  dangling, and the suite is green with the merged count recorded.
+
+- pri=3 `size=S` — exit 6 now names three objects across three leaves (`verify-drafts` failed drafts,
+  `verify` a failed committed set, `export` a refused export) with one meaning and three payload shapes,
+  distinguished by command and channel alone. Nothing is wrong; the surface is simply at the point where a
+  reader of `$?` cannot tell them apart, and u4c6's `eval` may add a fourth. Acceptance: a decision record
+  either fixes the three shapes as final and documents the discriminator (command + channel), or defines
+  one shared negative-verdict envelope and the leaves emit it; either way `README.md`/`docs/` state the
+  exit-6 contract once, and the M2 review's claim replayer re-derives it.
 
 ## M2.u4c4 deferrals
 

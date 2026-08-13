@@ -20,11 +20,23 @@ from .errors import (
 from .json_value import DEFAULT_MAX_BYTES, JSONValue, parse_json
 from .models import CompilePolicy
 from .source import CommandCandidateSource
-from .system import System
+from .system import System, _name
 
 
 class _UsageError(Exception):
     pass
+
+
+class _Unverified(Exception):
+    """A negative verification verdict carrying its finished stderr payload.
+
+    Deliberately not a `CementError`: `main`'s residual clause catches that base
+    and would downgrade a refused export to exit 2.
+    """
+
+    def __init__(self, payload: dict[str, Any]) -> None:
+        super().__init__(payload["message"])
+        self.payload = payload
 
 
 class _JSONArgumentParser(argparse.ArgumentParser):
@@ -194,6 +206,11 @@ def _parser() -> argparse.ArgumentParser:
         help="repeat the prospective digest `function inspect` reports",
     )
     function_promote.add_argument("--actor", required=True)
+    function_export = function_commands.add_parser("export")
+    function_export.add_argument("operation")
+    function_export.add_argument(
+        "--receipt-id", help="export one immutable historical receipt instead of the current set"
+    )
 
     events = commands.add_parser("events", help="read append-only audit projections")
     events.add_argument("--after", type=int, default=0)
@@ -435,6 +452,38 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
                 expected_function_hash=args.expected_function_hash,
                 promoted_by=args.actor,
             )
+        if args.function_command == "export":
+            # The historical branch passes the operation to no library call, so
+            # without this the same positional is graded by grammar on one
+            # branch and by receipt membership on the other.
+            _name(args.operation, "operation")
+            if args.receipt_id is not None:
+                # Reconstruction keys on partition + receipt ID alone, so the
+                # positional operation is checked here or not at all.
+                reconstruction = system.reconstruct_function_receipt(
+                    args.partition,
+                    args.receipt_id,
+                )
+                if reconstruction.receipt.operation != args.operation:
+                    raise NotFoundError("function receipt does not exist for this operation")
+                return _Outcome(raw=reconstruction.document.text)
+            verification = system.verify_function(args.partition, args.operation)
+            if not verification.passed:
+                raise _Unverified(
+                    {
+                        "error": "unverified",
+                        "message": "function verification failed; no bundle exported: "
+                        + "; ".join(
+                            f"{check.key}: {check.detail}"
+                            for check in verification.checks
+                            if not check.passed
+                        ),
+                        "checks": [asdict(check) for check in verification.checks],
+                    }
+                )
+            if verification.document is None:
+                raise IntegrityError("function verification passed without an exportable document")
+            return _Outcome(raw=verification.document.text)
     if args.command == "events":
         return system.events(args.partition, after=args.after, limit=args.limit)
     raise AssertionError("argparse accepted an unknown command")
@@ -460,6 +509,9 @@ def main(argv: list[str] | None = None) -> int:
     except (ValidationError, CementError) as exc:
         _emit({"error": "invalid", "message": str(exc)}, stream=sys.stderr)
         return 2
+    except _Unverified as exc:
+        _emit(exc.payload, stream=sys.stderr)
+        return 6
     if isinstance(result, _Outcome):
         if result.raw is not None:
             binary = getattr(sys.stdout, "buffer", None)

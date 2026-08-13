@@ -537,15 +537,44 @@ Measured gaps driving the arc:
     fit one window. The cut is by CHANNEL - source selection is one judgment surface whose branches decide
     each other, while the file channel is a self-contained writer plus a hostile-path matrix sharing no
     judgment with it. Decisions 1, 3 and 4 of the record bind both sub-units.
-  - u4c5a OPEN tier=kernel - `function export OPERATION [--receipt-id ID]`: source selection, verification
-    gate, raw byte channel. Live source from `verify_function` with a negative verdict at exit 6 on stderr;
+  - u4c5a DONE (main=100% 241K/240K then 44% 105K/240K across one compaction, mate=55% 132K/240K) -
+    `function export OPERATION [--receipt-id ID]`: source selection, verification gate, raw byte channel.
+    `cli.py` +54/-1, `test_cli.py` +486 (21 tests); suite 453 -> 474. Contract
+    `.agent/decisions/m2u4c5a-contract.md`. No library delta; `system.py`, `store.py`, `models.py`,
+    `function.py`, `__init__.py`, `README.md`, `docs/`, `examples/` byte-identical.
+    Shipped. Live source from `verify_function`, negative verdict at exit 6 on stderr as
+    `{error:"unverified", message, checks}` through a private `_Unverified` that subclasses `Exception`
+    directly, since a `CementError` subclass would be swallowed by `main`'s existing clause and exit 2;
     `--receipt-id` from `reconstruct_function_receipt`, cross-checked against the positional operation
     because the library's lookup keys on partition + id alone, reusing `function_report`'s exact
     `function receipt does not exist for this operation` at exit 3; historical failure staying exit 5,
     since a receipt is immutable and a receipt that will not reconstruct is corruption;
     `FunctionDocument.text` written as exact UTF-8 bytes with nothing appended, non-ASCII and no-`.buffer`
-    hosts both pinned; an empty promoted set exporting its real 304-byte `"entries":[]` document at exit 0.
-    Est. 45-55 / 480-620. Depends on u4c1 + u4c2.
+    hosts both pinned, round-tripping through `parse_function` + `evaluate`. An empty promoted set exports
+    its real `"entries":[]` document at exit 0; its length is a fixture property, not the 304-byte constant
+    the design record named, since the document embeds partition, operation and policy hash.
+    Verification. MAIN's own smoke probe over both sources ran before any test existed and confirmed byte
+    equality, no trailing newline, empty stderr on success, round-trip hash match and every exit code
+    0/2/3/5/6 with exact strings. The diff-blind suite, written from the contract alone, was 36 failures +
+    2 errors at baseline and 28/28 green against the implementation, finding no code defect. A 16-mutant
+    seam battery over the parser slot, both dispatch branches and `main`'s new clause killed 16/16 under
+    the shipped tests, positive control green and `cli.py` restored byte-identical.
+    Review. One contract-attack reviewer dispatched BEFORE implementation returned 78 rows, 7 accepted -
+    six claim defects in MAIN's contract and ONE behavioral defect in the code. Load-bearing: the
+    historical branch passed the positional operation to no library call, so the same argument was graded
+    by grammar on the live branch and by receipt membership on the other, and an unset `$OP` reported
+    not_found (3) where `function show` reports invalid (2). Fixed by importing the library's own `_name`
+    and grading before either call. The rest were record corrections: the reconstruction core raises 20
+    `IntegrityError`s plus 7 in its scalar helper rather than 23, the repo has 13 top-level parser groups
+    rather than 12, `IntegrityError`/`NotFoundError` are the first EXPLICIT raises here rather than the
+    first raises at all, and prototype-measured byte counts (1,032/1,056, 1,078, 304) are fixture results
+    demoted out of normative prose - what a committed test pins is the claim.
+    Known limits: exit 6 now names three objects across three leaves, one meaning and three payload
+    shapes, separated by command and channel rather than by `$?`. Exit 3 covers three conditions on this
+    leaf, separated only by message. The aggregate-limit vector is reachable only through the legacy
+    per-artifact `System.promote`, so the CLI's handling of it is pinned by injection while the library
+    route into that state stays reasoned. Stored-scalar conversions reachable through the reconstruction
+    path can still leak raw conversion errors past `main`, which remains the tracked audit.
   - u4c5b OPEN tier=kernel - `function export ... [--out PATH]`: same-directory temp, write, flush, fsync,
     `os.replace`, so the destination holds old bytes or new bytes and never a prefix - a direct writer was
     measured leaving a 17-byte partial. Existing symlink or non-regular target rejected before any write,
