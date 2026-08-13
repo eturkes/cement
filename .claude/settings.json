@@ -1,11 +1,11 @@
 {
   "permissions": {
     "deny": [
-      "Read(/.serena/cache/*/**)",
-      "Read(/.venv/*/**)",
-      "Read(/dist/*/**)",
-      "Read(/.ruff_cache/*/**)",
-      "Read(**/__pycache__/*/**)"
+      "Read(/.serena/cache/)",
+      "Read(/.venv/)",
+      "Read(/dist/)",
+      "Read(/.ruff_cache/)",
+      "Read(__pycache__/)"
     ]
   }
 }
