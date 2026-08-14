@@ -693,18 +693,54 @@ Measured gaps driving the arc:
     behavior, since function identity is verified-content identity - but it means no committed bundle may
     be byte-compared against a fresh export, and the demo transcript now carries a second per-run dynamic
     value needing its own mask beside `art_[0-9a-f]{32}`.
-  - u5a OPEN tier=data - the hospital example resolves from an exported bundle with no ledger, no adapter
-    and no LLM, covered by `tests/test_hospital_ocr_example.py`. Final phase of `run_demo.py` over
-    `parse_function` + `evaluate`, printing the verified function hash before the ledger goes away and
-    asserting the parsed bundle's hash equals it, since that assertion is the only thing linking an
-    offline answer to the verified set. The suite additionally proves the shipped operator route once
-    through one `function export --out` plus `function eval --bundle` subprocess pair. Exported entries =
-    2 (layouts A and B); layout C is reviewed but never promoted, so the miss case is free and real.
-    Ledger-freedom proof standard is the committed precedent at `tests/test_cli.py:4693` - patch
-    `System.__init__` AND `sqlite3.connect` to raise - never import-freedom. Also pins the example README
-    transcript, which no test currently defends (claim rows E027-E030), retiring the standing manual
-    rerun-and-rediff obligation; both dynamic values must be masked for that pin to hold. Owns the example
-    README delta its own code forces. Est. +64 production / +97 test. Depends on u1-u4c6.
+  - u5a DONE (main=96% 231K/240K, mate=56% 134K/240K) tier=data - the hospital example resolves from an
+    exported bundle with no ledger, adapter or LLM. `run_demo.py` +89/-1, `README.md` +22/-4,
+    `tests/test_hospital_ocr_example.py` +397/-2 (9 tests); suite 535 -> 544. Contract
+    `.agent/decisions/m2u5a-contract.md`. No library delta; `src/`, `docs/`, `pipeline.py`,
+    `plan_adapter.py`, `documents/` byte-identical.
+    Shipped. Act 5 checkpoints both promoted layouts as one `cement-function-v2` set
+    (`inspect_function_promotion` -> `promote_function` -> `verify_function`) and prints the verified
+    hash and the 3,341-byte bundle length; Act 6 runs after the temporary ledger is deleted and answers
+    A03 from the exported text alone, with C01 as a real miss. `verify_function` is the source rather
+    than `manifest.document`, since it is exactly what `function export`'s live branch uses, and the
+    2-entry membership costs no extra fixture because Act 4 already gates layout C. The audit trace gains
+    exactly one event, `function.promoted`, and therefore sits between Act 5 and Act 6 - the trace needs
+    the ledger that Act 6 proves gone.
+    Overruled from the design record: the prescribed `assert parsed_hash == verified_hash` is NOT the
+    identity binding. `python -O` strips it, so the one link the record calls load-bearing disappears
+    while the demo still prints `All checks passed.` `resolve_offline` now REQUIRES
+    `expected_function_hash` and passes it to `parse_function`, which raises `IntegrityError` at every
+    optimization level. Also amended: the CLI leg is one export plus TWO evals, since the exit-6 miss is
+    a separate shipped behavior the library-level probe cannot reach and the second subprocess costs
+    ~0.26 s against the 2,136 ms the upstream ruling was rejecting.
+    Verification. MAIN's live probe ran against a real ledger before any contract line existed and
+    reproduced the design record's corpus exactly (2 retained entries, 0 skipped, 2/0/0
+    members/candidates/retired, six ordered checks passing, 3,341-byte bundle byte-identical to
+    `function export --out`, cross-run hash instability). The transcript pin retires the standing manual
+    rerun-and-rediff obligation for claim rows E027-E030.
+    Review. One contract-attack reviewer dispatched BEFORE implementation returned 13 findings, 7 high.
+    Two were real gaps in the landed code rather than claim defects. (1) No predicate bound `main()` to
+    the verified document, to `resolve_offline`, or to the ledger being gone, so a correct-but-unused
+    helper with Act 6 inside the `with` block would have passed everything; a main-path test now records
+    the temporary directory, wraps `verify_function`, and asserts both calls carry that exact document
+    text with the directory already absent. (2) P3/P4 graded hash and output shape only, so a resolver
+    that decoded the JSON itself and returned `pipeline.reference_plan(...)` passed both under both
+    ledger patches - proved by the reviewer's own mutant; `parse_function` and `evaluate` are now
+    call-bound. The `-O` defect above was its third. Accepted claim corrections: the suite baseline was
+    535 not 496 (MAIN found this independently); the global 64-hex mask erases value and equality alike,
+    so the transcript test now pins each pattern's occurrence count at 1; "a leaf that needed a ledger
+    would exit 2" is false, since `eval` dispatches ahead of the `--db` gate; cross-run hash inequality
+    is default-entropy behavior, not a semantic invariant, and two ledgers coincide byte-for-byte with
+    the ID stream and clock held fixed; the probe passed `--expected-function-hash` while the contract
+    omitted it; P5 asserted neither exit 0 nor empty stderr; and the record carried provenance wording
+    against the Authoring rule. No change needed on the probe-root finding: the break was MAIN's copy
+    placement, and the reviewer reproduced every figure after fixing it.
+    Known limits: the CLI leg proves the operator route and invocation shape, never that the child
+    process opened nothing - `eval` runs before the `--db` gate, so absent `CEMENT_DB`/`CEMENT_PARTITION`
+    rules out configuration alone, and `tests/test_cli.py`'s in-process patch stays the ledger-freedom
+    pin for that leaf. Bundle-identity instability is pinned by observation rather than mechanism. The
+    transcript pin cannot detect a change correct in both the demo and the README. Both deferrals are
+    registered in `.agent/polish.md`.
   - u5b OPEN tier=docs - claim pass over `README.md`, `docs/architecture.md`, `docs/threat-model.md` and
     every remaining `examples/hospital_ocr/README.md` claim row, driven from
     `.agent/decisions/m2u5-claims.md`. Owns every M2 documentation edit u5a does not force, so u1-u4c6

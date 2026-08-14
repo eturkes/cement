@@ -5,6 +5,9 @@ bespoke extraction-plan call while keeping this demo offline and repeatable.
 Cement can return a reviewed plan deterministically for a known layout
 signature, but the adapter and reviewer remain responsible for whether that
 plan extracts future documents correctly.
+
+The closing acts seal every promoted layout into one verified function and then
+resolve a document from those exported bytes after the ledger is deleted.
 """
 
 from __future__ import annotations
@@ -19,10 +22,15 @@ from cement_runtime import (
     Candidate,
     CandidateRequest,
     CompilePolicy,
+    FunctionDocument,
+    FunctionMatch,
     Resolved,
     ReviewRequired,
     System,
+    evaluate,
+    parse_function,
 )
+from cement_runtime.json_value import canonicalize
 
 import pipeline
 from plan_adapter import PlanProposer
@@ -62,6 +70,54 @@ def _signature_bytes(signature: pipeline.JSONValue) -> bytes:
         sort_keys=True,
         separators=(",", ":"),
     ).encode("utf-8")
+
+
+def checkpoint_function(system: System) -> FunctionDocument:
+    """Seal every promoted entry of this operation as one verified function.
+
+    Returns the portable document whose `.text` is the exportable bundle and
+    whose `.function_hash` is the identity an operator carries away.
+    """
+
+    manifest = system.inspect_function_promotion(PARTITION, OPERATION)
+    system.promote_function(
+        PARTITION,
+        OPERATION,
+        expected_function_hash=manifest.function_hash,
+        promoted_by="informatics-lead",
+    )
+    verification = system.verify_function(
+        PARTITION,
+        OPERATION,
+        expected_function_hash=manifest.function_hash,
+    )
+    assert verification.passed
+    assert verification.document is not None
+    return verification.document
+
+
+def resolve_offline(
+    bundle_text: str,
+    ocr_text: str,
+    *,
+    expected_function_hash: str,
+) -> tuple[str, FunctionMatch]:
+    """Answer one document from exported bytes alone, with no ledger reachable.
+
+    `expected_function_hash` is the identity the operator carried away from the
+    verified set. It is required, and `parse_function` raises `IntegrityError`
+    when the bundle does not match it, so the binding survives `python -O` while
+    a bare `assert` would not. The hash is returned beside the match for callers
+    that report it.
+    """
+
+    function = parse_function(
+        bundle_text,
+        expected_function_hash=expected_function_hash,
+    )
+    signature = pipeline.layout_signature(ocr_text)
+    match = evaluate(function, input_json=canonicalize(signature))
+    return function.function_hash, match
 
 
 def _print_event_trace(system: System) -> None:
@@ -243,7 +299,7 @@ def main() -> None:
         print(f"B01 patient JSON: {json.dumps(extracted_b, sort_keys=True)}")
 
         print("\n=== Act 4: layout C remains gated after one confirmation ===")
-        _, c_signature_01 = _document("layout_c_lab_slip_01.txt")
+        c_text_01, c_signature_01 = _document("layout_c_lab_slip_01.txt")
         c_input_hash = hashlib.sha256(_signature_bytes(c_signature_01)).hexdigest()
         assert _signature_bytes(c_signature_01) != _signature_bytes(a_signature_01)
         assert _signature_bytes(c_signature_01) != _signature_bytes(b_signature_01)
@@ -284,9 +340,41 @@ def main() -> None:
         print("Layout C: reviewed once but not promoted; policy still gates it.")
         print("Gate reasons: " + "; ".join(str(reason) for reason in reasons))
 
+        print("\n=== Act 5: both promoted layouts become one exportable function ===")
+        function = checkpoint_function(system)
+        bundle_text = function.text
+        print(
+            f"Function checkpoint: {len(function.input_hashes)} verified entries, "
+            "one per promoted layout."
+        )
+        print(f"Verified function hash: {function.function_hash}")
+        print(
+            f"Exported bundle: {len(bundle_text.encode('utf-8'))} bytes carrying "
+            "no ledger."
+        )
+
         _print_event_trace(system)
 
     assert not os.path.exists(temporary_directory)
+
+    print("\n=== Act 6: the exported function answers with no ledger ===")
+    print("The temporary ledger and its audit trail are gone; only the bundle remains.")
+    offline_hash, offline_a = resolve_offline(
+        bundle_text, a_text_03, expected_function_hash=function.function_hash
+    )
+    assert offline_hash == function.function_hash
+    assert offline_a.matched
+    offline_extracted = pipeline.apply_plan(offline_a.output, a_text_03)
+    assert offline_extracted == extracted_a
+    print("A03 offline: the bundle returned the same plan under the same verified hash.")
+    print(f"A03 offline patient JSON: {json.dumps(offline_extracted, sort_keys=True)}")
+    _, offline_c = resolve_offline(
+        bundle_text, c_text_01, expected_function_hash=function.function_hash
+    )
+    assert not offline_c.matched
+    assert offline_c.output is None
+    print("C01 offline: layout C never entered the function, so the bundle reports a miss.")
+
     print(
         "\nProduction policy defaults remain stricter; this demo relaxes them only "
         "for a fast, self-contained run."

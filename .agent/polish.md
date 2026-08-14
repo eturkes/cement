@@ -224,3 +224,21 @@ changed is spine work, not polish.
   u4c2 because fixing it means editing `system.py` (outside the CLI write set) or duplicating library
   validation in the CLI. Acceptance: one label parameter threaded through `_request_id`, every caller
   naming its own field, existing message pins updated in one pass.
+
+## M2.u5a deferrals
+
+- pri=2 Bundle-identity determinism is pinned by observation, not by mechanism.
+  `test_bundle_identity_is_per_run_while_its_length_is_stable` runs two clean lifecycles under default
+  entropy and asserts unequal hashes; the review proved that holding the ID stream and clock fixed makes
+  two independent ledgers byte-identical, so the test observes provenance entropy rather than the
+  documented causal path. Acceptance: one test that fixes the entropy sources and proves two runs equal
+  byte-for-byte, then varies exactly one evidence or verification-example ID and proves the root
+  `function_hash` moves while the length holds at 3,341. Retire the two-run observation test once the
+  mechanism test lands, and keep the example README's per-run sentence bound to whichever test survives.
+- pri=3 The example's offline phase proves ledger-freedom through `System.__init__` +
+  `sqlite3.connect` patches in-process only. The three CLI subprocesses prove the operator route and
+  invocation shape, never that the child process opened nothing — `eval` dispatches ahead of the `--db`
+  gate, so absent `CEMENT_DB`/`CEMENT_PARTITION` rules out configuration alone. Acceptance: a
+  process-level probe (syscall trace, `sitecustomize` audit hook, or an `open`/`connect` audit hook via
+  `sys.addaudithook`) asserting the `function eval` child opens no database file, with the `python -S`
+  gap stated wherever the claim is made.

@@ -21,6 +21,9 @@ ocr(path) -> layout_signature(ocr_text) -> System.handle(...)
   promoted exact signature -> confirmed plan
   miss -> PlanProposer.propose(...) -> supervisor review
 confirmed plan + ocr_text -> apply_plan(...) -> patient JSON
+
+promoted set -> checkpoint_function(...) -> exported bundle
+exported bundle + ocr_text -> resolve_offline(...) -> confirmed plan or miss
 ```
 
 `pipeline.py` supplies the deterministic document path:
@@ -29,8 +32,10 @@ confirmed plan + ocr_text -> apply_plan(...) -> patient JSON
 2. `layout_signature(ocr_text)` records the document type plus one ordered list of label and section keys. It uses block position, not the presence of filled values. Patient values and section body text never enter the signature, including prose with colons.
 3. `System.handle(...)` either returns the promoted exact-scope plan or asks `PlanProposer.propose(...)` for a supervised candidate.
 4. `apply_plan(plan, ocr_text)` applies label and section locators and returns extracted strings.
+5. `checkpoint_function(system)` seals every promoted layout into one verified function and returns the exportable bundle.
+6. `resolve_offline(bundle_text, ocr_text, expected_function_hash=...)` parses that bundle, checks it against the hash the operator holds, and resolves one layout without a ledger.
 
-`plan_adapter.py` defines `PlanProposer`, a `cement_runtime.CandidateSource`-compatible deterministic stand-in for a production provider adapter. It deliberately does not call an LLM. `run_demo.py` drives review, compilation, verification, promotion, exact resolution, extraction, and audit output.
+`plan_adapter.py` defines `PlanProposer`, a `cement_runtime.CandidateSource`-compatible deterministic stand-in for a production provider adapter. It deliberately does not call an LLM. `run_demo.py` drives review, compilation, verification, promotion, exact resolution, extraction, and audit output. It then checkpoints the promoted set, deletes the ledger, and answers one more document from the exported bytes.
 
 ### Scope and policy
 
@@ -154,9 +159,9 @@ The driver uses the Python standard library plus `cement_runtime`, creates a tem
 
 ## Expected output
 
-Act 1 shows two reviewed confirmations for layout A, then deterministic compilation, verification, and explicit promotion. Act 2 sends a third patient's document through the same patient-free signature. Cement returns the promoted plan while adapter calls stay flat. Then `apply_plan` emits patient JSON. Act 3 shows that genuinely new layout B does not inherit layout A's plan. Layout B follows its own supervised lifecycle before it resolves without the adapter. Act 4 leaves layout C at one confirmation and reports the policy gate instead of promoting it. The final trace records the complete control-plane sequence.
+Act 1 shows two reviewed confirmations for layout A, then deterministic compilation, verification, and explicit promotion. Act 2 sends a third patient's document through the same patient-free signature. Cement returns the promoted plan while adapter calls stay flat. Then `apply_plan` emits patient JSON. Act 3 shows that genuinely new layout B does not inherit layout A's plan. Layout B follows its own supervised lifecycle before it resolves without the adapter. Act 4 leaves layout C at one confirmation and reports the policy gate instead of promoting it. Act 5 seals both promoted layouts into one verified function and prints its hash and byte count. The trace then records the complete control-plane sequence. Act 6 runs after the ledger is deleted. It answers layout A from the exported bundle alone and reports layout C as a miss.
 
-The demo generates the layout-A artifact ID per run. The block masks its 32-hex suffix as `art_<hex>`. Every other line is byte-stable.
+Two values change per run. The demo generates the layout-A artifact ID, and it computes a new function hash each time, because each entry seals its own run-specific evidence. The block masks the 32-hex artifact suffix as `art_<hex>` and the 64-hex digest as `<function-hash>`. Every other line is byte-stable. `tests/test_hospital_ocr_example.py` compares the masked demo output against this block.
 
 ```text
 Hospital OCR layout-learning demo (offline; no LLM or network).
@@ -186,6 +191,11 @@ B01 patient JSON: {"allergies": "Penicillin", "current_medications": "Lisinopril
 Layout C: reviewed once but not promoted; policy still gates it.
 Gate reasons: support 1 is below required 2
 
+=== Act 5: both promoted layouts become one exportable function ===
+Function checkpoint: 2 verified entries, one per promoted layout.
+Verified function hash: <function-hash>
+Exported bundle: 3341 bytes carrying no ledger.
+
 === Audit event trace ===
 01. operation.registered
 02. proposal.created
@@ -206,6 +216,13 @@ Gate reasons: support 1 is below required 2
 17. request.resolved_by_artifact
 18. proposal.created
 19. proposal.accepted
+20. function.promoted
+
+=== Act 6: the exported function answers with no ledger ===
+The temporary ledger and its audit trail are gone; only the bundle remains.
+A03 offline: the bundle returned the same plan under the same verified hash.
+A03 offline patient JSON: {"assessment": "Tension-type headaches, improving.", "encounter_date": "2026-02-21", "mrn": "MG-100913", "patient_name": "Sofia Patel", "provider": "Dr. Amina Shah"}
+C01 offline: layout C never entered the function, so the bundle reports a miss.
 
 Production policy defaults remain stricter; this demo relaxes them only for a fast, self-contained run.
 All checks passed.
@@ -218,6 +235,7 @@ All checks passed.
 - Treat layout drift as an explicit edge case. A changed layout is a new canonical input, enters supervised fallback, and solidifies through the same lifecycle. Act 4 exposes the recurrence gate as `support 1 is below required 2` rather than applying an old template silently.
 - Isolate learning by partition. `mercy-general` scopes this evidence and its promoted artifacts to one hospital.
 - Keep demonstration policy visibly relaxed. Production defaults require more confirmations, more reviewers, and a real observation span.
+- Export the verified function to leave the ledger behind. Act 5 seals both promoted layouts into one self-verifying bundle. Act 6 resolves a document from that bundle with no database, adapter, or LLM. The bundle carries a new hash on every run, because each entry seals its own run-specific evidence.
 
 ## Pointers
 
@@ -225,4 +243,4 @@ All checks passed.
 - [Architecture](../../docs/architecture.md) - state model, exact-scope guarantees, and trust boundary
 - [Candidate adapter protocol](../../docs/adapter-protocol.md) - candidate request, output, and failure contract
 
-Read `run_demo.py` for the lifecycle driver, `pipeline.py` for signature and extraction mechanics, and `plan_adapter.py` for the deterministic candidate source.
+Read `run_demo.py` for the lifecycle driver, `pipeline.py` for signature and extraction mechanics, and `plan_adapter.py` for the deterministic candidate source. `checkpoint_function` and `resolve_offline` in `run_demo.py` are the two helpers the offline phase uses.
