@@ -1,23 +1,29 @@
 import argparse
 import contextlib
+import dataclasses
 import errno
 import inspect
 import io
 import json
 import os
 import pathlib
+import socket
 import stat
 import sqlite3
 import sys
 import tempfile
+import types
 import typing
 import unittest
 from dataclasses import dataclass
 from unittest import mock
 
 from cement_runtime import System
+from cement_runtime import cli as cement_cli
 from cement_runtime.cli import main
 from cement_runtime.errors import IntegrityError, NotFoundError, StateError, ValidationError
+from cement_runtime.function import FUNCTION_MAX_BYTES, FunctionMatch
+from cement_runtime.json_value import DEFAULT_MAX_BYTES, canonicalize
 from cement_runtime.models import (
     DraftVerification,
     FunctionCheck,
@@ -3950,6 +3956,797 @@ class CLITests(unittest.TestCase):
                 self.assertEqual(run.stdout_bytes, b"")
                 self.assertFalse(destination.exists())
                 self.assertEqual(self.temps(root), [])
+
+    # --- function eval -----------------------------------------------------
+
+    def run_offline(self, *arguments: str, text_only: bool = False) -> _CLIRun:
+        # The eval leaf must resolve with no ledger globals at all, so the frozen
+        # runner is reused with an empty prefix rather than replaced.
+        saved = self.base
+        self.base = []
+        try:
+            return self.run_cli(*arguments, text_only=text_only)
+        finally:
+            self.base = saved
+
+    def exported_bundle(self, members: int = 3) -> tuple[pathlib.Path, str, str]:
+        self.promoted_operation("echo", members)
+        destination = pathlib.Path(self.temporary.name) / "bundle.json"
+        self.assertEqual(
+            self.run_cli("function", "export", "echo", "--out", str(destination)).status, 0
+        )
+        text = destination.read_text(encoding="utf-8")
+        return destination, text, json.loads(text)["function_hash"]
+
+    def resealed(self, text: str, mutate: typing.Callable[[dict], None]) -> str:
+        # The outer hash is recomputed over the tampered content, or the
+        # whole-document check rejects first and the entry check stays unpinned.
+        content = json.loads(text)
+        mutate(content)
+        body = {key: value for key, value in content.items() if key != "function_hash"}
+        content["function_hash"] = canonicalize(body).digest
+        return json.dumps(content)
+
+    def written(self, name: str, payload: bytes) -> pathlib.Path:
+        path = pathlib.Path(self.temporary.name) / name
+        path.write_bytes(payload)
+        return path
+
+    def eval_error(self, bundle: object, value: str = '{"x": 1}') -> tuple[int, str]:
+        run = self.run_offline("function", "eval", "--bundle", str(bundle), "--input", value)
+        self.assertEqual(run.stdout_bytes, b"")
+        return run.status, self.error(run)["message"]
+
+    def test_function_eval_hit_reports_the_output_and_the_answering_identity(self) -> None:
+        bundle, _, digest = self.exported_bundle()
+        run = self.run_offline("function", "eval", "--bundle", str(bundle), "--input", '{"x": 1}')
+        payload = self.payload(run)
+        self.assertEqual(run.stderr_text, "")
+        self.assertTrue(payload["matched"])
+        self.assertEqual(payload["output"], {"kind": "echo", "value": {"x": 1}})
+        self.assertRegex(str(payload["artifact_hash"]), r"\A[0-9a-f]{64}\Z")
+        # The answer names the function that produced it, and it is the same
+        # identity the ledger-side verifier reports for the promoted set.
+        self.assertEqual(payload["function_hash"], digest)
+        self.assertEqual(
+            self.payload(self.run_cli("function", "verify", "echo"))["function_hash"], digest
+        )
+
+    def test_function_eval_miss_is_exit_six_with_the_same_identity(self) -> None:
+        bundle, _, digest = self.exported_bundle()
+        run = self.run_offline("function", "eval", "--bundle", str(bundle), "--input", '{"x": 99}')
+        self.assertEqual(run.status, 6)
+        self.assertEqual(run.stderr_text, "")
+        self.assertEqual(
+            run.stdout_bytes,
+            json.dumps(
+                {
+                    "artifact_hash": None,
+                    "function_hash": digest,
+                    "matched": False,
+                    "output": None,
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+                indent=2,
+            ).encode("utf-8")
+            + b"\n",
+        )
+
+    def test_function_eval_payload_key_set_is_frozen_on_both_verdicts(self) -> None:
+        bundle, _, _ = self.exported_bundle()
+        keys = {"artifact_hash", "function_hash", "matched", "output"}
+        for value, status in (('{"x": 1}', 0), ('{"x": 99}', 6)):
+            with self.subTest(value=value):
+                run = self.run_offline(
+                    "function", "eval", "--bundle", str(bundle), "--input", value
+                )
+                self.assertEqual(run.status, status)
+                self.assertIsInstance(run.stdout_json, dict)
+                self.assertEqual(set(typing.cast(dict, run.stdout_json)), keys)
+
+    def test_function_eval_constructs_no_system(self) -> None:
+        bundle, _, _ = self.exported_bundle()
+        expected = self.run_offline(
+            "function", "eval", "--bundle", str(bundle), "--input", '{"x": 1}'
+        )
+        # Ledger freedom is proved by construction failure. The import graph
+        # reaches sqlite3 through the package __init__ either way.
+        with mock.patch.object(
+            System, "__init__", side_effect=AssertionError("System constructed")
+        ):
+            run = self.run_offline(
+                "function", "eval", "--bundle", str(bundle), "--input", '{"x": 1}'
+            )
+        self.assertEqual(run.status, 0)
+        self.assertEqual(run.stdout_bytes, expected.stdout_bytes)
+
+    def test_function_eval_ignores_supplied_ledger_globals(self) -> None:
+        bundle, _, _ = self.exported_bundle()
+        offline = self.run_offline(
+            "function", "eval", "--bundle", str(bundle), "--input", '{"x": 1}'
+        )
+        run = self.run_cli("function", "eval", "--bundle", str(bundle), "--input", '{"x": 1}')
+        self.assertEqual(run.stdout_bytes, offline.stdout_bytes)
+
+    def test_function_eval_lookup_is_canonical_not_textual(self) -> None:
+        bundle, _, _ = self.exported_bundle()
+        hits = ('{"x": 1}', '{ "x" : 1 }', '{"x":1}\n')
+        for value in hits:
+            with self.subTest(hit=value):
+                run = self.run_offline(
+                    "function", "eval", "--bundle", str(bundle), "--input", value
+                )
+                self.assertEqual(run.status, 0)
+        for value in ('{"x": "1"}', '{"X": 1}', '{"x": 1, "y": null}', "{}"):
+            with self.subTest(miss=value):
+                run = self.run_offline(
+                    "function", "eval", "--bundle", str(bundle), "--input", value
+                )
+                self.assertEqual(run.status, 6)
+
+    def test_function_eval_reads_input_from_either_stdin_host(self) -> None:
+        bundle, _, _ = self.exported_bundle()
+        expected = self.run_offline(
+            "function", "eval", "--bundle", str(bundle), "--input", '{"x": 1}'
+        ).stdout_bytes
+        source = io.StringIO('{"x": 1}')
+        with mock.patch.object(sys, "stdin", source):
+            run = self.run_offline("function", "eval", "--bundle", str(bundle), "--input", "-")
+        self.assertEqual(run.stdout_bytes, expected)
+        binary = types.SimpleNamespace(buffer=io.BytesIO(b'{"x": 1}'))
+        with mock.patch.object(sys, "stdin", binary):
+            run = self.run_offline("function", "eval", "--bundle", str(bundle), "--input", "-")
+        self.assertEqual(run.stdout_bytes, expected)
+
+    def test_function_eval_expected_hash_binds_caller_held_identity(self) -> None:
+        bundle, _, digest = self.exported_bundle()
+        run = self.run_offline(
+            "function", "eval", "--bundle", str(bundle), "--input", '{"x": 1}',
+            "--expected-function-hash", digest,
+        )
+        self.assertEqual(run.status, 0)
+        self.assertEqual(self.payload(run)["function_hash"], digest)
+
+    def test_function_eval_expected_hash_rejects_another_identity(self) -> None:
+        bundle, _, digest = self.exported_bundle()
+        other = ("0" if digest[0] != "0" else "1") + digest[1:]
+        run = self.run_offline(
+            "function", "eval", "--bundle", str(bundle), "--input", '{"x": 1}',
+            "--expected-function-hash", other,
+        )
+        self.assertEqual(run.status, 5)
+        self.assertEqual(run.stdout_bytes, b"")
+        self.assertEqual(self.error(run)["error"], "integrity")
+        self.assertEqual(
+            self.error(run)["message"], "function does not match expected_function_hash"
+        )
+
+    def test_function_eval_expected_hash_must_be_a_digest(self) -> None:
+        bundle, _, digest = self.exported_bundle()
+        for value in ("", "zz", digest[:63], digest + "0", digest.upper()):
+            with self.subTest(value=value):
+                run = self.run_offline(
+                    "function", "eval", "--bundle", str(bundle), "--input", '{"x": 1}',
+                    "--expected-function-hash", value,
+                )
+                self.assertEqual(run.status, 2)
+                self.assertEqual(
+                    self.error(run)["message"],
+                    "expected_function_hash must be a SHA-256 hex digest",
+                )
+
+    def test_function_eval_detects_entry_tamper_at_every_position(self) -> None:
+        _, text, _ = self.exported_bundle()
+        entries = len(json.loads(text)["entries"])
+        self.assertGreaterEqual(entries, 3)
+        # The middle and the last entry both, because a loop-quantified digest
+        # check is weakened at the last position first.
+        for index in (1, entries - 1):
+            for field, replacement in (
+                ("output", {"kind": "echo", "value": {"x": 4242}}),
+                ("input", {"x": 4242}),
+            ):
+                with self.subTest(index=index, field=field):
+                    victim = self.written(
+                        f"tamper-{field}-{index}.json",
+                        self.resealed(
+                            text,
+                            lambda content, i=index, f=field, r=replacement: content["entries"][
+                                i
+                            ].update({f: r}),
+                        ).encode("utf-8"),
+                    )
+                    status, message = self.eval_error(victim)
+                    self.assertEqual(status, 5)
+                    self.assertEqual(
+                        message, f"function entry {index} {field} digest mismatch"
+                    )
+
+    def test_function_eval_detects_a_flipped_embedded_hash(self) -> None:
+        _, text, digest = self.exported_bundle()
+        other = ("0" if digest[0] != "0" else "1") + digest[1:]
+        victim = self.written("flipped.json", text.replace(digest, other).encode("utf-8"))
+        self.assertEqual(self.eval_error(victim), (5, "function hash mismatch"))
+
+    def test_function_eval_rejects_malformed_bundles(self) -> None:
+        _, text, _ = self.exported_bundle()
+        cases = {
+            "empty.json": (b"", "invalid JSON: Expecting value: line 1 column 1 (char 0)"),
+            "prose.json": (b"not-json", "invalid JSON: Expecting value: line 1 column 1 (char 0)"),
+            "binary.json": (b"\xff\xfe", "function bundle is not valid UTF-8"),
+            "shape.json": (
+                b"{}",
+                "invalid function: expected keys ['abi', 'canonicalizer', 'entries',"
+                " 'function_hash', 'scope']",
+            ),
+            "dupe.json": (
+                b'{"abi": "cement-function-v2", "abi": "cement-function-v2"}',
+                "duplicate JSON object key: 'abi'",
+            ),
+            "abi.json": (
+                text.replace("cement-function-v2", "cement-function-v3").encode("utf-8"),
+                "unsupported function ABI",
+            ),
+            "canon.json": (
+                text.replace("cement-json-v1", "cement-json-v2").encode("utf-8"),
+                "unsupported function canonicalizer",
+            ),
+        }
+        for name, (payload, message) in cases.items():
+            with self.subTest(name=name):
+                self.assertEqual(
+                    self.eval_error(self.written(name, payload)), (2, message)
+                )
+
+    def test_function_eval_requires_a_regular_file(self) -> None:
+        root = pathlib.Path(self.temporary.name)
+        (root / "folder").mkdir()
+        os.mkfifo(root / "pipe")
+        # Only objects whose open succeeds reach the identity verdict; a socket
+        # fails during open and is graded by the neighbouring read-error test.
+        for path in (
+            root / "folder",
+            root / "pipe",
+            pathlib.Path("/dev/null"),
+            pathlib.Path("/dev/zero"),
+        ):
+            with self.subTest(path=str(path)):
+                self.assertEqual(
+                    self.eval_error(path),
+                    (2, "function bundle path must identify a regular file"),
+                )
+
+    def test_function_eval_reports_unreadable_paths_uniformly(self) -> None:
+        root = pathlib.Path(self.temporary.name)
+        (root / "dangling").symlink_to(root / "absent.json")
+        blocked = root / "blocked"
+        (blocked / "inner").mkdir(parents=True)
+        (blocked / "inner" / "bundle.json").write_text("{}", encoding="utf-8")
+        blocked.chmod(0o000)
+        self.addCleanup(blocked.chmod, 0o700)
+        listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.addCleanup(listener.close)
+        listener.bind(str(root / "socket"))
+        regular = root / "plain.json"
+        regular.write_text("{}", encoding="utf-8")
+        cases = (
+            root / "absent.json",
+            root / "dangling",
+            blocked / "inner" / "bundle.json",
+            # A socket refuses the open itself, so it never reaches `S_ISREG`.
+            root / "socket",
+            # A trailing slash fails during open even on a regular file.
+            f"{regular}/",
+            # `-` is an ordinary filename here; only `--input` reads stdin.
+            "-",
+            "",
+        )
+        for path in cases:
+            with self.subTest(path=str(path)):
+                self.assertEqual(
+                    self.eval_error(path), (2, "function bundle could not be read")
+                )
+
+    def test_function_eval_follows_a_symlink_to_a_regular_bundle(self) -> None:
+        bundle, _, _ = self.exported_bundle()
+        link = pathlib.Path(self.temporary.name) / "link.json"
+        link.symlink_to(bundle)
+        direct = self.run_offline(
+            "function", "eval", "--bundle", str(bundle), "--input", '{"x": 1}'
+        )
+        run = self.run_offline("function", "eval", "--bundle", str(link), "--input", '{"x": 1}')
+        self.assertEqual(run.status, 0)
+        self.assertEqual(run.stdout_bytes, direct.stdout_bytes)
+
+    def test_function_eval_bundle_size_bound_is_an_adjacent_pair(self) -> None:
+        root = pathlib.Path(self.temporary.name)
+        for size, expected in (
+            (FUNCTION_MAX_BYTES, "invalid JSON: Expecting value: line 1 column 1 (char 0)"),
+            (FUNCTION_MAX_BYTES + 1, f"function bundle exceeds {FUNCTION_MAX_BYTES} bytes"),
+        ):
+            with self.subTest(size=size):
+                path = root / "sized.json"
+                with path.open("wb") as handle:
+                    # Multibyte content, so a byte cap cannot pass as a character
+                    # cap; the sparse tail keeps the fixture cheap.
+                    handle.write("é".encode("utf-8") * 4)
+                    handle.truncate(size)
+                self.assertEqual(path.stat().st_size, size)
+                self.assertEqual(self.eval_error(path), (2, expected))
+                path.unlink()
+
+    def test_function_eval_reader_materializes_exactly_one_byte_past_the_bound(self) -> None:
+        bundle, _, _ = self.exported_bundle()
+        requested: list[int] = []
+        real_fdopen = os.fdopen
+
+        class _Recorder:
+            def __init__(self, stream: typing.Any) -> None:
+                self.stream = stream
+
+            def read(self, size: int = -1) -> bytes:
+                requested.append(size)
+                return typing.cast(bytes, self.stream.read(size))
+
+            def __enter__(self) -> "_Recorder":
+                self.stream.__enter__()
+                return self
+
+            def __exit__(self, *arguments: object) -> object:
+                return self.stream.__exit__(*arguments)
+
+        def fdopen(descriptor: int, mode: str = "r", *rest: object) -> typing.Any:
+            return _Recorder(real_fdopen(descriptor, mode, *rest))  # type: ignore[arg-type]
+
+        # An unbounded read returns byte-identical results for every in-bounds
+        # fixture, so the bind is the only observable that distinguishes them.
+        # `io.BufferedReader.read` is immutable, so the stream is wrapped instead.
+        with mock.patch.object(os, "fdopen", fdopen):
+            run = self.run_offline(
+                "function", "eval", "--bundle", str(bundle), "--input", '{"x": 1}'
+            )
+        self.assertEqual(run.status, 0)
+        self.assertIn(FUNCTION_MAX_BYTES + 1, requested)
+
+    def test_function_eval_input_keeps_the_default_channel_bounds(self) -> None:
+        bundle, _, _ = self.exported_bundle()
+        filler = "y" * (DEFAULT_MAX_BYTES - len('{"x": ""}'))
+        accepted = json.dumps({"x": filler})
+        self.assertEqual(len(accepted.encode("utf-8")), DEFAULT_MAX_BYTES)
+        self.assertEqual(
+            self.run_offline(
+                "function", "eval", "--bundle", str(bundle), "--input", accepted
+            ).status,
+            6,
+        )
+        rejected = json.dumps({"x": filler + "y"})
+        self.assertEqual(len(rejected.encode("utf-8")), DEFAULT_MAX_BYTES + 1)
+        self.assertEqual(
+            self.eval_error(bundle, rejected),
+            (2, f"JSON source exceeds {DEFAULT_MAX_BYTES} bytes"),
+        )
+
+    def test_function_eval_input_depth_bound_is_an_adjacent_pair(self) -> None:
+        bundle, _, _ = self.exported_bundle()
+        self.assertEqual(
+            self.run_offline(
+                "function", "eval", "--bundle", str(bundle),
+                "--input", "[" * 64 + "1" + "]" * 64,
+            ).status,
+            6,
+        )
+        status, message = self.eval_error(bundle, "[" * 65 + "1" + "]" * 65)
+        self.assertEqual(status, 2)
+        self.assertEqual(message, "JSON exceeds maximum depth 64")
+
+    def test_function_eval_grades_the_input_before_reading_the_bundle(self) -> None:
+        _, text, digest = self.exported_bundle()
+        other = ("0" if digest[0] != "0" else "1") + digest[1:]
+        tampered = self.written("double.json", text.replace(digest, other).encode("utf-8"))
+        # A structurally unusable request is repaired by no amount of bundle
+        # work, so the cheap local check wins over the 64 MiB channel.
+        status, message = self.eval_error(tampered, "{oops")
+        self.assertEqual(status, 2)
+        self.assertNotEqual(message, "function hash mismatch")
+        self.assertEqual(self.eval_error(tampered), (5, "function hash mismatch"))
+        opened: list[str] = []
+        real_open = os.open
+
+        def spy(path: object, *arguments: object, **keywords: object) -> int:
+            opened.append(str(path))
+            return real_open(path, *arguments, **keywords)  # type: ignore[arg-type]
+
+        with mock.patch.object(os, "open", spy):
+            self.eval_error(tampered, "{oops")
+        self.assertNotIn(str(tampered), opened)
+
+    def test_function_eval_binds_the_parsed_document_to_the_evaluator(self) -> None:
+        bundle, _, digest = self.exported_bundle()
+        seen: dict[str, object] = {}
+        real_parse = cement_cli.parse_function
+        real_evaluate = cement_cli.evaluate
+
+        def parse(source: str, **keywords: object) -> object:
+            document = real_parse(source, **keywords)  # type: ignore[arg-type]
+            seen["document"] = document
+            return document
+
+        def evaluate(document: object, *, input_json: object) -> object:
+            seen["evaluated"] = document
+            seen["input"] = input_json
+            return real_evaluate(document, input_json=input_json)  # type: ignore[arg-type]
+
+        with mock.patch.object(cement_cli, "parse_function", parse), mock.patch.object(
+            cement_cli, "evaluate", evaluate
+        ):
+            run = self.run_offline(
+                "function", "eval", "--bundle", str(bundle), "--input", '{ "x" : 1 }'
+            )
+        self.assertEqual(run.status, 0)
+        # A validator whose result is discarded is not a check: the document that
+        # answered must be the one that was validated, and the evaluated key must
+        # be the canonicalized input, not the operator's raw text.
+        self.assertIs(seen["evaluated"], seen["document"])
+        self.assertEqual(getattr(seen["input"], "text"), '{"x":1}')
+        self.assertEqual(getattr(seen["document"], "function_hash"), digest)
+
+    def test_function_eval_exit_six_names_the_miss_and_nothing_else(self) -> None:
+        bundle, text, digest = self.exported_bundle()
+        other = ("0" if digest[0] != "0" else "1") + digest[1:]
+        negatives = (
+            ("--bundle", str(self.written("bad.json", b"{}")), "--input", '{"x": 1}'),
+            ("--bundle", str(bundle), "--input", "{oops"),
+            ("--bundle", str(pathlib.Path(self.temporary.name) / "absent"), "--input", '{"x": 1}'),
+            (
+                "--bundle", str(self.written("flip.json", text.replace(digest, other).encode())),
+                "--input", '{"x": 1}',
+            ),
+            ("--bundle", str(bundle), "--input", '{"x": 1}', "--expected-function-hash", other),
+        )
+        for arguments in negatives:
+            with self.subTest(arguments=arguments):
+                self.assertNotEqual(
+                    self.run_offline("function", "eval", *arguments).status, 6
+                )
+        self.assertEqual(
+            self.run_offline(
+                "function", "eval", "--bundle", str(bundle), "--input", '{"x": 99}'
+            ).status,
+            6,
+        )
+
+    def test_function_eval_requires_both_channels(self) -> None:
+        bundle, _, _ = self.exported_bundle()
+        for arguments, message in (
+            (("--input", '{"x": 1}'), "the following arguments are required: --bundle"),
+            (("--bundle", str(bundle)), "the following arguments are required: --input"),
+            ((), "the following arguments are required: --bundle, --input"),
+        ):
+            with self.subTest(arguments=arguments):
+                run = self.run_offline("function", "eval", *arguments)
+                self.assertEqual(run.status, 2)
+                self.assertEqual(run.stdout_bytes, b"")
+                self.assertEqual(self.error(run)["message"], message)
+
+    def test_function_eval_answers_an_empty_exported_function(self) -> None:
+        # The spine case for a freshly registered operation: verification passes
+        # vacuously, so the export is a real document with no entries.
+        self.register("echo")
+        destination = pathlib.Path(self.temporary.name) / "empty.json"
+        self.assertEqual(
+            self.run_cli("function", "export", "echo", "--out", str(destination)).status, 0
+        )
+        document = json.loads(destination.read_text(encoding="utf-8"))
+        self.assertEqual(document["entries"], [])
+        run = self.run_offline(
+            "function", "eval", "--bundle", str(destination), "--input", '{"x": 1}'
+        )
+        self.assertEqual(run.status, 6)
+        self.assertEqual(run.stderr_text, "")
+        self.assertEqual(
+            run.stdout_json,
+            {
+                "artifact_hash": None,
+                "function_hash": document["function_hash"],
+                "matched": False,
+                "output": None,
+            },
+        )
+
+    def test_function_eval_payload_covers_every_match_field(self) -> None:
+        # The hand-built projection cannot drift silently: a field added to the
+        # library model must be a deliberate CLI decision, not an omission.
+        bundle, _, _ = self.exported_bundle()
+        payload = self.payload(
+            self.run_offline("function", "eval", "--bundle", str(bundle), "--input", '{"x": 1}')
+        )
+        self.assertLessEqual(
+            {field.name for field in dataclasses.fields(FunctionMatch)}, set(payload)
+        )
+
+    def test_function_eval_rejects_lexically_impossible_paths(self) -> None:
+        # `ValidationError` subclasses `ValueError`, so these arrive at the same
+        # residual clause as `OSError` and must not escape as raw exceptions.
+        for path in ("a\x00b", "\udc80", "\x00"):
+            with self.subTest(path=repr(path)):
+                self.assertEqual(
+                    self.eval_error(path), (2, "function bundle could not be read")
+                )
+
+    def test_function_eval_failure_precedence_is_a_matrix(self) -> None:
+        bundle, text, digest = self.exported_bundle()
+        other = ("0" if digest[0] != "0" else "1") + digest[1:]
+        root = pathlib.Path(self.temporary.name)
+        flipped = self.written("precedence.json", text.replace(digest, other).encode("utf-8"))
+        shapeless = self.written("precedence-shape.json", b"{}")
+        cases = (
+            # bad input beats every bundle verdict, in either direction of fault
+            ("{oops", str(flipped), 2, "hash"),
+            ("{oops", str(root / "absent"), 2, "read"),
+            ("{oops", str(root), 2, "regular file"),
+            # a structurally invalid bundle beats expected-hash grading
+            (None, str(shapeless), 2, "invalid function"),
+        )
+        for value, path, status, fragment in cases:
+            with self.subTest(path=path, value=value):
+                run = self.run_offline(
+                    "function", "eval", "--bundle", path,
+                    "--input", value if value is not None else '{"x": 1}',
+                    "--expected-function-hash", other,
+                )
+                self.assertEqual(run.status, status)
+                message = self.error(run)["message"]
+                if value is None:
+                    self.assertIn(fragment, message)
+                else:
+                    self.assertNotIn(fragment, message)
+        # argparse preempts all four steps
+        run = self.run_offline("function", "eval", "--bundle", str(bundle))
+        self.assertEqual(run.status, 2)
+        self.assertEqual(
+            self.error(run)["message"], "the following arguments are required: --input"
+        )
+
+    def test_function_eval_never_reaches_the_ledger_globals(self) -> None:
+        bundle, _, _ = self.exported_bundle()
+        offline = self.run_offline(
+            "function", "eval", "--bundle", str(bundle), "--input", '{"x": 1}'
+        )
+        saved = self.base
+        self.base = ["--db", str(pathlib.Path(self.temporary.name) / "absent" / "no.db")]
+        try:
+            with mock.patch.object(
+                System, "__init__", side_effect=AssertionError("System constructed")
+            ):
+                run = self.run_cli("function", "eval", "--bundle", str(bundle),
+                                   "--input", '{"x": 1}')
+        finally:
+            self.base = saved
+        # A supplied but unusable ledger path is never opened, and the missing
+        # `--partition` never reaches the gate that would reject it.
+        self.assertEqual(run.status, 0)
+        self.assertEqual(run.stdout_bytes, offline.stdout_bytes)
+
+    def test_function_eval_null_output_hit_is_not_a_miss(self) -> None:
+        # Both verdicts carry `output: null` here, so `matched` and
+        # `artifact_hash` are the only discriminators the payload offers.
+        _, text, _ = self.exported_bundle()
+
+        def blank(content: dict) -> None:
+            entry = next(item for item in content["entries"] if item["input"] == {"x": 1})
+            entry["output"] = None
+            entry["output_hash"] = canonicalize(None).digest
+
+        path = self.written("null-output.json", self.resealed(text, blank).encode("utf-8"))
+        hit = self.payload(
+            self.run_offline("function", "eval", "--bundle", str(path), "--input", '{"x": 1}')
+        )
+        negative = self.run_offline(
+            "function", "eval", "--bundle", str(path), "--input", '{"x": 99}'
+        )
+        self.assertEqual(negative.status, 6)
+        miss = json.loads(negative.stdout_bytes)
+        self.assertIsNone(hit["output"])
+        self.assertIsNone(miss["output"])
+        self.assertTrue(hit["matched"])
+        self.assertFalse(miss["matched"])
+        self.assertRegex(str(hit["artifact_hash"]), r"\A[0-9a-f]{64}\Z")
+        self.assertIsNone(miss["artifact_hash"])
+
+    def test_function_eval_maps_library_faults_without_widening(self) -> None:
+        # Only the two documented classes are translated. Anything else keeps
+        # travelling, so the mapping cannot mask an implementation fault.
+        document = mock.Mock(function_hash="f" * 64)
+        reader = mock.patch.object(cement_cli, "_read_function_bundle", return_value="sealed")
+        parsed = mock.patch.object(cement_cli, "parse_function", return_value=document)
+        for stage, fault, expected in (
+            ("parse_function", ValidationError("bad bundle"), (2, "invalid")),
+            ("parse_function", IntegrityError("bundle digest"), (5, "integrity")),
+            ("evaluate", ValidationError("bad stored output"), (2, "invalid")),
+        ):
+            with self.subTest(stage=stage, fault=type(fault).__name__):
+                with reader, contextlib.ExitStack() as stack:
+                    if stage == "evaluate":
+                        stack.enter_context(parsed)
+                    stack.enter_context(mock.patch.object(cement_cli, stage, side_effect=fault))
+                    run = self.run_offline(
+                        "function", "eval", "--bundle", "bundle.json", "--input", "null"
+                    )
+                self.assertEqual(run.stdout_bytes, b"")
+                self.assertEqual((run.status, self.error(run)["error"]), expected)
+        with reader, parsed, mock.patch.object(
+            cement_cli, "evaluate", side_effect=RuntimeError("unrelated")
+        ), self.assertRaisesRegex(RuntimeError, "unrelated"):
+            self.run_offline("function", "eval", "--bundle", "bundle.json", "--input", "null")
+
+    def test_function_eval_translates_injected_reader_failures(self) -> None:
+        # Every descriptor step can fail on an otherwise healthy path, and all
+        # of them owe the caller one message rather than a traceback.
+        bundle, _, _ = self.exported_bundle()
+        for stage in ("open", "fstat", "fdopen"):
+            with self.subTest(stage=stage):
+                with mock.patch.object(
+                    cement_cli.os, stage, side_effect=OSError(errno.EIO, "injected")
+                ):
+                    self.assertEqual(
+                        self.eval_error(bundle), (2, "function bundle could not be read")
+                    )
+        real_fdopen = os.fdopen
+
+        class _Failing:
+            def __init__(self, stream: typing.Any) -> None:
+                self.stream = stream
+
+            def read(self, size: int = -1) -> bytes:
+                raise OSError(errno.EIO, "injected")
+
+            def __enter__(self) -> "_Failing":
+                self.stream.__enter__()
+                return self
+
+            def __exit__(self, *arguments: object) -> object:
+                return self.stream.__exit__(*arguments)
+
+        def fdopen(descriptor: int, mode: str = "r", *rest: object) -> typing.Any:
+            return _Failing(real_fdopen(descriptor, mode, *rest))  # type: ignore[arg-type]
+
+        # The read owns the descriptor by then, so its failure travels through
+        # the stream's own close rather than the pre-handover branch.
+        with mock.patch.object(os, "fdopen", fdopen):
+            self.assertEqual(
+                self.eval_error(bundle), (2, "function bundle could not be read")
+            )
+
+    def test_function_eval_reads_a_file_named_dash(self) -> None:
+        # `-` is an ordinary value on this flag, so a real file of that name is
+        # readable. A reserved-dash special case cannot pass this.
+        bundle, text, _ = self.exported_bundle()
+        root = pathlib.Path(self.temporary.name)
+        (root / "-").write_text(text, encoding="utf-8")
+        direct = self.run_offline(
+            "function", "eval", "--bundle", str(bundle), "--input", '{"x": 1}'
+        )
+        saved = os.getcwd()
+        os.chdir(root)
+        try:
+            run = self.run_offline("function", "eval", "--bundle", "-", "--input", '{"x": 1}')
+        finally:
+            os.chdir(saved)
+        self.assertEqual(run.status, 0)
+        self.assertEqual(run.stdout_bytes, direct.stdout_bytes)
+
+    def test_function_eval_grades_only_the_last_repeated_flag(self) -> None:
+        # Repetition keeps the final occurrence, so an earlier bundle is never
+        # opened and an earlier input is never graded.
+        bundle, _, digest = self.exported_bundle()
+        run = self.run_offline(
+            "function", "eval",
+            "--bundle", str(pathlib.Path(self.temporary.name) / "absent.json"),
+            "--bundle", str(bundle),
+            "--input", "{oops",
+            "--input", '{"x": 1}',
+            "--expected-function-hash", "zz",
+            "--expected-function-hash", digest,
+        )
+        self.assertEqual(run.status, 0)
+        self.assertTrue(self.payload(run)["matched"])
+
+    def test_function_eval_forwards_the_expected_hash_unvalidated(self) -> None:
+        # Bundle validation runs in `parse_function`'s own order, so every
+        # document fault outranks expected-hash grammar. Pre-grading the flag
+        # in the leaf would reverse the reported cause.
+        bundle, text, _ = self.exported_bundle()
+
+        def flip(content: dict) -> None:
+            entry = next(item for item in content["entries"] if item["input"] == {"x": 1})
+            entry["output"] = {"kind": "echo", "value": {"x": 4242}}
+
+        cases = (
+            (self.written("order-shape.json", b"{}"), 2, "invalid function: expected keys"),
+            (
+                self.written("order-entry.json", self.resealed(text, flip).encode("utf-8")),
+                5,
+                "output digest mismatch",
+            ),
+            (bundle, 2, "expected_function_hash must be a SHA-256 hex digest"),
+        )
+        for path, status, fragment in cases:
+            with self.subTest(path=path.name):
+                run = self.run_offline(
+                    "function", "eval", "--bundle", str(path),
+                    "--input", '{"x": 1}', "--expected-function-hash", "zz",
+                )
+                self.assertEqual(run.status, status)
+                self.assertIn(fragment, self.error(run)["message"])
+
+    def test_function_eval_rejects_decimal_input_before_lookup(self) -> None:
+        # A decimal token never becomes a miss: the canonicalizer refuses it, so
+        # the verdict is an invalid request rather than a negative answer.
+        bundle, _, _ = self.exported_bundle()
+        for value in ('{"x": 1.0}', '{"x": 1e0}'):
+            with self.subTest(value=value):
+                status, message = self.eval_error(bundle, value)
+                self.assertEqual(status, 2)
+                self.assertIn("rejects decimal/exponent number", message)
+
+    def test_function_eval_opens_no_store_or_connection(self) -> None:
+        # A failing `System` alone leaves a direct store or connection unproved.
+        bundle, _, _ = self.exported_bundle()
+        expected = self.run_offline(
+            "function", "eval", "--bundle", str(bundle), "--input", '{"x": 1}'
+        )
+        with mock.patch.object(
+            System, "__init__", side_effect=AssertionError("System constructed")
+        ), mock.patch.object(
+            sqlite3, "connect", side_effect=AssertionError("connection opened")
+        ):
+            run = self.run_offline(
+                "function", "eval", "--bundle", str(bundle), "--input", '{"x": 1}'
+            )
+        self.assertEqual(run.status, 0)
+        self.assertEqual(run.stdout_bytes, expected.stdout_bytes)
+
+    def test_function_eval_help_reuses_the_shipped_flag_register(self) -> None:
+        # The register is set by the shipped leaves, not invented here: short
+        # lowercase fragments, except where a term the project capitalizes opens
+        # the line. `--input` reuses the shipped sentence for the same channel.
+        def options(*path: str) -> dict[str, argparse.Action]:
+            node = cement_cli._parser()
+            for name in path:
+                node = next(
+                    action
+                    for action in node._actions
+                    if isinstance(action, argparse._SubParsersAction)
+                ).choices[name]
+            return {action.dest: action for action in node._actions}
+
+        actions = options("function", "eval")
+        self.assertEqual(
+            set(actions) - {"help"}, {"bundle", "input", "expected_function_hash"}
+        )
+        self.assertTrue(actions["bundle"].required)
+        self.assertTrue(actions["input"].required)
+        self.assertFalse(actions["expected_function_hash"].required)
+        self.assertEqual(actions["input"].help, options("handle")["input"].help)
+        for name in ("bundle", "input", "expected_function_hash"):
+            with self.subTest(option=name):
+                text = str(actions[name].help)
+                self.assertEqual(text, text.strip())
+                self.assertLessEqual(len(text.split()), 20)
+                for filler in ("simply", "robust", "seamlessly", "leverage"):
+                    self.assertNotIn(filler, text.lower())
+
+    def test_function_eval_leaves_a_shipped_leaf_untouched(self) -> None:
+        run = self.run_cli(
+            "operation", "register", "regression",
+            "--min-confirmations", "2", "--min-reviewers", "1", "--min-span-seconds", "0",
+        )
+        self.assertEqual(run.status, 0)
+        self.assertEqual(
+            run.stdout_bytes,
+            b'{\n  "operation": "regression",\n  "revision": 1\n}\n',
+        )
 
 
 if __name__ == "__main__":

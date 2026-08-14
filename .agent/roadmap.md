@@ -617,10 +617,53 @@ Measured gaps driving the arc:
     external mutation; a concurrent external writer owns its own effects. No directory fsync, so rename
     durability across a crash is out of scope. Mode is unconditionally 0600 and an existing destination's
     mode is not preserved. A parent that refuses the unlink keeps a leftover temp at 0600.
-  - u4c6 OPEN tier=kernel - `function eval --bundle PATH --input JSON` over `parse_function` + `evaluate`:
-    bundle read by a dedicated strict-UTF-8 reader bounded at `FUNCTION_MAX_BYTES` (67,108,864), evaluation
-    input keeping the existing `DEFAULT_MAX_BYTES` channel including `-`, so a bundle can never travel
-    through a reader 64x too small. Est. 48-70 / 560-820. Depends on u4c1 + u4c5a.
+  - u4c6 DONE (main=66% 158K/240K across one compaction, mate=90% 217K/240K) - `function eval
+    --bundle PATH --input JSON [--expected-function-hash HEX]` over `parse_function` + `evaluate`: bundle
+    read by a dedicated strict-UTF-8 reader bounded at `FUNCTION_MAX_BYTES` (67,108,864), evaluation input
+    keeping the existing `DEFAULT_MAX_BYTES` channel including `-`, so a bundle can never travel through a
+    reader 64x too small.
+    Est. 48-70 / 560-820; actual +71/-2 `cli.py`, +797 `tests/test_cli.py`. Depends on u4c1 + u4c5a.
+    Arbitration. A miss is a VERDICT, not a fault: exit 6 with the payload on stdout, extending the group
+    rule `exit 6 = the command executed correctly and the answer is negative` to a fourth leaf rather than
+    opening a fifth code. Bundle digest failures keep the native `IntegrityError` and exit 5, because this
+    leaf constructs no `System` and all four reachable `IntegrityError` sites sit below `parse_function`, so
+    exit 5 has exactly one leaf-local meaning. The scope line gained `--expected-function-hash`, overruling
+    the fact map's frozen reading, and the payload gained `function_hash` - MAIN's own addition, proposed by
+    neither spike and the load-bearing half, since without it no CLI output links an answer back to the
+    verified set and `sha256sum` cannot substitute for a canonical-content digest. Payload is a 4-key
+    projection `{artifact_hash, function_hash, matched, output}`.
+    Verification. MAIN's smoke probe over every contract branch ran against a real ledger before any test
+    existed and found TWO real code defects: `ValidationError` subclasses `ValueError`, so the residual
+    `except (OSError, ValueError)` rewrote the reader's own regular-file and oversize verdicts as read
+    failures, and `os.fdopen` refuses a directory itself, which made `S_ISREG` unreachable for the case it
+    most obviously serves. Both fixed by an `except ValidationError: raise` guard and by grading `fstat` on
+    the descriptor before the handover. The diff-blind suite, contract-only, was 35/36 red at baseline and
+    34/36 green against the implementation; both residual failures were suite-or-contract defects, zero were
+    code defects - the third consecutive convergence with no implementation defect found by the suite.
+    Review. The contract-attack reviewer returned 35 findings, 9 high, and every one was a claim defect
+    rather than a code defect. Its single code-level high (raw `ValueError`/`UnicodeError` escaping on a NUL
+    or lone-surrogate path) was already closed by the wider catch, with only the contract wording lagging.
+    The substantive corrections: `1` vs `1.0` is not a miss but exit 2, since `cement-json-v1` rejects the
+    token before evaluation; the exact-max bundle row is content-dependent, so the reader ADMITS 67,108,864
+    bytes and the outcome belongs to the fixture; an AF_UNIX socket fails during open and never reaches the
+    identity verdict; the leaf census was six stale, at 27 others rather than 21; `function verify` and
+    `function eval` disagree on expected-hash mismatch status (6 vs 5) so "exact semantics" was wrong;
+    "cheapest first" was false by ~1000x on a near-limit input, so precedence is now named for locality; and
+    the contract cited `.scratch/` paths that travel to no clone. Merge. Nine tests were added and two
+    widened, drawn from both wave-2 sources rather than deferred: the diff-blind suite contributed
+    null-output hit versus miss, injected reader failures at every descriptor step, and the library-fault
+    map proved non-widening; the reviewer contributed a real file named `-`, last-wins repeated flags, the
+    internal parse order that puts every bundle defect ahead of expected-hash grammar, decimals as exit 2,
+    ledger freedom under a raising `sqlite3.connect`, a help pin anchored on `handle --input`'s shipped
+    string, and socket/trailing-slash/character-device rows on the two reader tests. Its remaining 27
+    overlapped the primary suite, so nothing was preserved for a later merge decision.
+    Known limits: the size pre-check is advisory and the authoritative bound is on materialized bytes, so
+    growth after the read observes EOF is outside the snapshot. One open prevents path-reopen substitution
+    but takes no lock, so in-place writes are read and then rejected by hash rather than prevented.
+    `S_ISREG` admits procfs/FUSE/network files and `O_NONBLOCK` is no timeout guarantee. FIFOs, sockets and
+    devices are refused, which removes the ledger-free `cat bundle.json | ... --bundle /dev/stdin` route.
+    `_emit` performs no flush, so payload and status guarantees assume a healthy stdout. `_input` still does
+    not translate an `OSError` from stdin, and the input value is canonicalized twice per invocation.
   - u5 OPEN tier=docs - surface realignment: `README.md` claim pass (guarantees, request outcomes,
     deployment boundary) against what the function object now proves, `docs/architecture.md` contract
     steps for the function layer, and the hospital example resolving from an exported bundle with no

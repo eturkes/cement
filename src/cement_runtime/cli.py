@@ -21,8 +21,8 @@ from .errors import (
     StateError,
     ValidationError,
 )
-from .function import FunctionDocument
-from .json_value import DEFAULT_MAX_BYTES, JSONValue, parse_json
+from .function import FUNCTION_MAX_BYTES, FunctionDocument, evaluate, parse_function
+from .json_value import DEFAULT_MAX_BYTES, JSONValue, canonicalize, parse_json
 from .models import CompilePolicy
 from .source import CommandCandidateSource
 from .system import System, _name
@@ -222,6 +222,12 @@ def _parser() -> argparse.ArgumentParser:
     function_export.add_argument(
         "--out", help="write the bundle atomically to PATH instead of stdout"
     )
+    function_eval = function_commands.add_parser("eval")
+    function_eval.add_argument("--bundle", required=True, help="path of an exported bundle file")
+    function_eval.add_argument("--input", required=True, help="JSON text; '-' reads stdin")
+    function_eval.add_argument(
+        "--expected-function-hash", help="require the bundle to hash to this digest"
+    )
 
     events = commands.add_parser("events", help="read append-only audit projections")
     events.add_argument("--after", type=int, default=0)
@@ -368,7 +374,68 @@ def _write_export(target: pathlib.Path, document: FunctionDocument) -> dict[str,
     return {"out": str(target), "bytes": len(payload), "function_hash": document.function_hash}
 
 
+def _read_function_bundle(value: str) -> str:
+    """Read one bounded regular file as strict UTF-8 text.
+
+    `O_NONBLOCK` keeps the identity check reachable on a FIFO with no writer,
+    which a plain open would wait on with no timeout to end the wait. The
+    `fstat` size test only shortens the oversize path; the bounded read is the
+    gate that still holds when a regular file grows between the two.
+    """
+    try:
+        descriptor = os.open(value, os.O_RDONLY | os.O_NONBLOCK)
+    except (OSError, ValueError) as exc:
+        raise ValidationError("function bundle could not be read") from exc
+    try:
+        try:
+            # Identity is graded on the descriptor, before any buffered stream:
+            # `fdopen` refuses a directory itself, which would report a read
+            # failure where the honest verdict is the file type.
+            info = os.fstat(descriptor)
+            if not stat.S_ISREG(info.st_mode):
+                raise ValidationError("function bundle path must identify a regular file")
+            if info.st_size > FUNCTION_MAX_BYTES:
+                raise ValidationError(f"function bundle exceeds {FUNCTION_MAX_BYTES} bytes")
+            stream = os.fdopen(descriptor, "rb")
+        except BaseException:
+            os.close(descriptor)
+            raise
+        with stream:
+            raw = stream.read(FUNCTION_MAX_BYTES + 1)
+    except ValidationError:
+        # `ValidationError` subclasses `ValueError`, so the residual clause below
+        # would otherwise rewrite this helper's own two verdicts as a read failure.
+        raise
+    except (OSError, ValueError) as exc:
+        raise ValidationError("function bundle could not be read") from exc
+    if len(raw) > FUNCTION_MAX_BYTES:
+        raise ValidationError(f"function bundle exceeds {FUNCTION_MAX_BYTES} bytes")
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValidationError("function bundle is not valid UTF-8") from exc
+
+
 def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
+    if args.command == "function" and args.function_command == "eval":
+        # Ahead of the ledger gate and constructing no System: the bundle is the
+        # whole evaluation domain. The input is graded first because it costs no
+        # filesystem work, and a bundle read costs up to 64 MiB.
+        input_json = canonicalize(_input(args.input))
+        document = parse_function(
+            _read_function_bundle(args.bundle),
+            expected_function_hash=args.expected_function_hash,
+        )
+        match = evaluate(document, input_json=input_json)
+        return _Outcome(
+            {
+                "artifact_hash": match.artifact_hash,
+                "function_hash": document.function_hash,
+                "matched": match.matched,
+                "output": match.output,
+            },
+            status=0 if match.matched else 6,
+        )
     if not args.db:
         parser.error("--db or CEMENT_DB is required")
     if not args.partition:

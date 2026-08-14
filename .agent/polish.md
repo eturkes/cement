@@ -135,6 +135,22 @@ changed is spine work, not polish.
   surfaces, flags a seeded 30-word instruction and a seeded `simply`, and leaves possessives and
   terminal-punctuation-free bullets unflagged.
 
+## M2.u4c6 deferrals
+
+- pri=2 `size=S` — `_input` does not translate an `OSError` raised by `sys.stdin.read` /
+  `sys.stdin.buffer.read` (`cli.py:237,247`), so a read failure on `--input -` escapes `main` as a raw
+  traceback on EVERY leaf that accepts the flag, not just `function eval`. u4c6 inherited the limit rather
+  than adding a leaf-local message, because the fix belongs to the shared helper. Acceptance: the two
+  stream reads translate to the leaf's existing exit 2 `invalid` vocabulary, one committed test injects an
+  `OSError` at each of the two stdin hosts, and no existing `--input -` message changes.
+- pri=3 `size=S` — `_emit` performs no explicit flush, so payload-and-status guarantees on every leaf
+  assume a healthy stdout: a buffered embedding stream may retain data after `main` returns, and a
+  `BrokenPipeError` or an exit-time flush failure can replace the intended status with a raw exception or
+  Python's exit 120. Same cross-resource class as u4c5b's file receipt, now restated for stdout by u4c6's
+  reviewer. Acceptance: a decision record either accepts the limit repo-wide and states it once in
+  `README.md`/`docs/`, or `main` flushes before returning and one committed test proves a broken pipe maps
+  to a stated code; either way one test pins a custom buffered stream's observed behavior.
+
 ## M2.u4c5a deferrals
 
 - pri=3 `size=S` — merge-or-drop decision on the diff-blind teammate's export suite. 28 tests written from
@@ -147,13 +163,14 @@ changed is spine work, not polish.
   merged into `tests/test_cli.py` under the existing naming, the file is then deleted rather than left
   dangling, and the suite is green with the merged count recorded.
 
-- pri=3 `size=S` — exit 6 now names three objects across three leaves (`verify-drafts` failed drafts,
-  `verify` a failed committed set, `export` a refused export) with one meaning and three payload shapes,
-  distinguished by command and channel alone. Nothing is wrong; the surface is simply at the point where a
-  reader of `$?` cannot tell them apart, and u4c6's `eval` may add a fourth. Acceptance: a decision record
-  either fixes the three shapes as final and documents the discriminator (command + channel), or defines
-  one shared negative-verdict envelope and the leaves emit it; either way `README.md`/`docs/` state the
-  exit-6 contract once, and the M2 review's claim replayer re-derives it.
+- pri=3 `size=S` — exit 6 now names FOUR objects across four leaves (`verify-drafts` failed drafts,
+  `verify` a failed committed set, `export` a refused export, `eval` an input outside the domain) with one
+  meaning and four payload shapes, distinguished by command and channel alone. Nothing is wrong; the
+  surface is simply at the point where a reader of `$?` cannot tell them apart. The decision-record part is
+  DONE — `.agent/decisions/m2u4c6-contract.md` Decision 1 fixes the four shapes as final and names the
+  discriminator (command + channel), noting that a generic status-only supervisor cannot discriminate.
+  Remaining acceptance: `README.md`/`docs/` state the exit-6 contract once, and the M2 review's claim
+  replayer re-derives it across all four leaves.
 
 ## M2.u4c4 deferrals
 

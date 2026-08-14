@@ -35,7 +35,7 @@ Mandatory surface, eight commands:
 | `function inspect OPERATION` | `inspect_function_promotion` | sole producer of the hash `promote` demands; promotion is unusable without it |
 | `function promote OPERATION --expected-function-hash HEX --actor ACTOR` | `promote_function` | one repeated hash replaces N typed scope hashes |
 | `function export OPERATION [--receipt-id ID] [--out PATH]` | `verify_function` + `reconstruct_function_receipt` | produces the sealed ledger-free bundle |
-| `function eval --bundle PATH --input JSON` | `parse_function` + `evaluate` | proves determinism with no ledger, no adapter, no LLM |
+| `function eval --bundle PATH --input JSON [--expected-function-hash HEX]` | `parse_function` + `evaluate` | proves determinism with no ledger, no adapter, no LLM |
 
 Deliberately omitted, with reasons: `latest_function_receipt` (`receipts --limit 1` reaches the same newest
 row; the two differ only in unregistered-operation and no-current-receipt diagnostics, which `show` already
