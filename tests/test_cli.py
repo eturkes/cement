@@ -3602,7 +3602,13 @@ class CLITests(unittest.TestCase):
         unusable = "export output path must identify a non-symlink regular file"
         absent = "export output directory does not exist"
         unsafe = "export output could not be written safely"
+        separator = "export output path must not end with a directory separator"
         cases: tuple[tuple[str, str, str], ...] = (
+            # `Path` drops a trailing separator, so these two would otherwise
+            # grade as the bare name: the first replaces a regular file the
+            # caller asserted was a directory, the second creates one.
+            ("regular-file-with-a-trailing-slash", str(regular) + "/", separator),
+            ("absent-name-with-a-trailing-slash", str(root / "absent-dir") + "/", separator),
             ("parent-missing", str(root / "missing" / "bundle.json"), absent),
             ("parent-is-a-regular-file", str(regular / "bundle.json"), absent),
             ("target-is-a-directory", str(directory), unusable),
@@ -3625,6 +3631,7 @@ class CLITests(unittest.TestCase):
                 self.assertEqual(self.error(run), {"error": "invalid", "message": message})
                 self.assertEqual(self.temps(root), [])
         self.assertEqual(regular.read_bytes(), b"regular")
+        self.assertFalse((root / "absent-dir").exists())
         self.assertTrue(link.is_symlink())
         self.assertEqual(referent.read_bytes(), b"referent-bytes")
         self.assertTrue(dangling.is_symlink())
@@ -4098,6 +4105,37 @@ class CLITests(unittest.TestCase):
         with mock.patch.object(sys, "stdin", binary):
             run = self.run_offline("function", "eval", "--bundle", str(bundle), "--input", "-")
         self.assertEqual(run.stdout_bytes, expected)
+
+    def test_function_eval_maps_a_stdin_read_failure_on_both_hosts(self) -> None:
+        # A stream fault is host I/O, not bad JSON, so it reaches the leaf as
+        # `OSError`. Untranslated it escapes `main`'s map as a traceback and
+        # leaves automation with no status class on every `--input -` leaf.
+        bundle, _, _ = self.exported_bundle()
+
+        class FailingText(io.StringIO):
+            def read(self, *args: object) -> str:
+                raise OSError("stdin read failed")
+
+        class FailingBytes(io.BytesIO):
+            def read(self, *args: object) -> bytes:
+                raise OSError("stdin read failed")
+
+        hosts = (
+            ("text-only", FailingText()),
+            ("buffer-bearing", types.SimpleNamespace(buffer=FailingBytes())),
+        )
+        for label, host in hosts:
+            with self.subTest(host=label):
+                with mock.patch.object(sys, "stdin", host):
+                    run = self.run_offline(
+                        "function", "eval", "--bundle", str(bundle), "--input", "-"
+                    )
+                self.assertEqual(run.status, 2)
+                self.assertEqual(run.stdout_bytes, b"")
+                self.assertEqual(
+                    self.error(run),
+                    {"error": "invalid", "message": "JSON stdin could not be read"},
+                )
 
     def test_function_eval_expected_hash_binds_caller_held_identity(self) -> None:
         bundle, _, digest = self.exported_bundle()

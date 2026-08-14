@@ -236,6 +236,11 @@ is negative. The leaf names the object, and the object selects the payload chann
 Every other nonzero exit reports a failure to complete. Exit 2 covers usage and validation. Exit 3
 means an absent object, exit 4 a state or authority conflict, and exit 5 an integrity failure.
 
+The root `verify` command does not use exit 6. It reports a failed verification as exit 0 with
+`"passed": false` in its payload. Read the `passed` field to get the verdict from root `verify`. Read
+the exit status to get the verdict from the `function` commands in the table above. A script that
+changes between these two commands must change its verdict check at the same time.
+
 Read [docs/adapter-protocol.md](docs/adapter-protocol.md) for the command adapter protocol. Read
 [docs/architecture.md](docs/architecture.md) and [docs/threat-model.md](docs/threat-model.md) for the
 full state model and trust boundaries.

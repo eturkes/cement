@@ -911,6 +911,22 @@ class ShippedCommandRoundTripTests(unittest.TestCase):
 
 
 class DemoTranscriptTests(unittest.TestCase):
+    def test_demo_refuses_to_run_where_python_removes_its_assertions(self) -> None:
+        # Every verdict in the demo is an `assert`, so `-O` and `-OO` erase all
+        # 38 of them while the final success line still prints. The claim would
+        # then be unbacked, so the demo must fail closed instead.
+        for flag in ("-O", "-OO"):
+            with self.subTest(flag=flag):
+                result = subprocess.run(
+                    [sys.executable, flag, "run_demo.py"],
+                    capture_output=True,
+                    text=True,
+                    cwd=str(EXAMPLE_DIR),
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("without -O or -OO", result.stderr)
+                self.assertNotIn("All checks passed.", result.stdout)
+
     def test_demo_output_matches_the_pinned_readme_transcript(self) -> None:
         # Two values move per run: the layout-A artifact ID and the function
         # hash. Everything else is byte-stable, so the README block is a gate.

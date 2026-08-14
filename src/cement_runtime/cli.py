@@ -239,8 +239,14 @@ def _input(value: str) -> JSONValue:
     if value != "-":
         return parse_json(value).value
     binary = getattr(sys.stdin, "buffer", None)
+    # Both reads are host I/O, so a stream fault arrives as `OSError`. Every
+    # leaf accepting `--input -` would otherwise lose the JSON-first contract
+    # and hand automation a traceback instead of a status class.
     if binary is not None:
-        raw = binary.read(DEFAULT_MAX_BYTES + 1)
+        try:
+            raw = binary.read(DEFAULT_MAX_BYTES + 1)
+        except OSError as exc:
+            raise ValidationError("JSON stdin could not be read") from exc
         if len(raw) > DEFAULT_MAX_BYTES:
             raise ValidationError(f"JSON stdin exceeds {DEFAULT_MAX_BYTES} bytes")
         try:
@@ -250,7 +256,10 @@ def _input(value: str) -> JSONValue:
     else:
         # StringIO and embedding hosts expose text-only streams. The parser's
         # UTF-8 byte check remains authoritative after this bounded char read.
-        source = sys.stdin.read(DEFAULT_MAX_BYTES + 1)
+        try:
+            source = sys.stdin.read(DEFAULT_MAX_BYTES + 1)
+        except OSError as exc:
+            raise ValidationError("JSON stdin could not be read") from exc
         if len(source) > DEFAULT_MAX_BYTES:
             raise ValidationError(f"JSON stdin exceeds {DEFAULT_MAX_BYTES} characters")
     return parse_json(source).value
@@ -337,6 +346,14 @@ def _export_temporary(target: pathlib.Path) -> tuple[int, pathlib.Path]:
 def _export_target(value: str) -> pathlib.Path:
     target = pathlib.Path(value)
     with _export_failures():
+        # `Path` drops a trailing separator, so `name/` would grade as the plain
+        # regular file `name` and replace it, discarding the directory the
+        # caller asserted. `os.open` refuses that spelling and so does the
+        # bundle reader, so refuse it here rather than diverge.
+        if value.endswith(("/", os.sep)):
+            raise ValidationError(
+                "export output path must not end with a directory separator"
+            )
         _reject_export_target(target)
         if not target.parent.is_dir():
             raise ValidationError("export output directory does not exist")

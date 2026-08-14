@@ -22,31 +22,45 @@ changed is spine work, not polish.
   reports as killed; where u4b's catalogue was recovered, replaying it reproduces 58 killed / 1 superseded
   / 2 surviving, those 2 being the reviewer's proved-equivalent pair.
 
-- `pri=2` `size=M` — stored-scalar conversions in `system.py` are still unguarded in places, third recorded
-  instance of one class. `_function_receipt_from_row` (`src/cement_runtime/system.py:277`) validates string
-  fields inside a try translating `(IndexError, KeyError, TypeError, ValidationError)` that closes at
-  `src/cement_runtime/system.py:309`, then converts six integer fields with bare `int(...)` at
-  `src/cement_runtime/system.py:320-325`. A second unguarded site sits in `compile` itself —
-  `revision = int(registered["revision"])` at `src/cement_runtime/system.py:1626` — probed to leak a raw
-  `TypeError` on a NULL stored revision, while `verify_drafts`, `verify_function` and
-  `inspect_function_promotion` all raise `IntegrityError` on the same corrupt row through exact-type
-  guards, so the guarded pattern is already available and simply unapplied. Probed: `sequence`/`operation_revision`/`member_count`/
-  `promoted_at_us` set to `NULL` or non-numeric text leak raw `TypeError`/`ValueError` instead of
-  `IntegrityError`; separately, numeric text (`sequence='1'` and each sibling) is ACCEPTED where an exact
-  stored int is required. Reachable from `latest_function_receipt`, `function_receipts`, `function_report`'s
-  function anchor, `reconstruct_function_receipt`, and `verify_function` P6 — which catches `IntegrityError`
-  only, so the leak escapes the check written to contain it. `main` has no catch-all, so the CLI surfaces
-  this as a traceback rather than mapped JSON. Promotion planning adds two more reachable sites of the same
-  class: the report and artifact-build conversions on the candidate and retained paths, both reachable from
-  `inspect_function_promotion` and `promote_function`, so the corruption guarantee proved for the
-  `artifact_json` recipe does not cover them and a corrupt row there leaks the raw conversion error. The
-  standing rule in `.agent/memory.md` already requires every
-  persisted-scalar conversion to translate `TypeError`/`ValueError`/`OverflowError` or to guard the exact
-  stored type the way `_stored_int` does; u4a and u4b each paid for one violation, so fix the class, not the
-  site. Acceptance: the audit in `.agent/decisions/m2u4c-surface.md` Section G lists every conversion site
-  with its guard status; every site reachable from a public API either translates all three exception types
-  to `IntegrityError` or rejects a non-`int` stored value outright; one committed probe per receipt integer
-  field drives both `NULL` and numeric text and expects `IntegrityError`; suite green.
+- `pri=4` `size=M` — stored-scalar conversions in `system.py` are unguarded at several sites, third
+  recorded instance of one class, and NONE of them is reachable through any supported route. Scope
+  correction from the M2 review, which retired the escalating severity three earlier rows had assigned it:
+  the storage layer already enforces what the missing guards would. All 13 user tables are `STRICT`
+  (`sqlite_sequence` alone is not), so a non-numeric `TEXT` is unstorable in an `INTEGER` column and
+  numeric `TEXT` converts to `INTEGER` at write; every integer column the unguarded sites read is
+  `NOT NULL`, so `NULL` is unstorable too. Exactly three nullable `INTEGER` columns exist repo-wide -
+  `requests.lease_until_us` (`store.py:56`), `proposals.reviewed_at_us` (`store.py:97`),
+  `artifacts.promoted_at_us` (`store.py:163`) - and every conversion reading one is already guarded:
+  `or 0` at `system.py:621`, `or now_us` at `system.py:993`, `is not None` at `system.py:1211` and
+  `system.py:5159`. So the guarded/unguarded split tracks the nullable/NOT NULL split exactly, and the
+  earlier `NULL`/non-numeric-text probes all reached their sites through a rewritten schema or a
+  fabricated row. A fresh `System` - which every CLI invocation constructs - rejects a rewritten schema
+  through its fingerprint check and maps it to exit 5, so the in-process rewrite route dies at
+  construction. Remaining true statement: numeric text is accepted where an exact stored int is required,
+  and a hostile in-process caller holding a fabricated row or a cursor proxy reaches raw
+  `TypeError`/`ValueError`. Keep the row for defense in depth and consistency with the `_stored_int`
+  pattern the memory rule already prescribes, not for reachability. Acceptance: the audit in
+  `.agent/decisions/m2u4c-surface.md` Section G lists every conversion site with its guard status and its
+  column's nullability; every site reachable from a public API either translates
+  `TypeError`/`ValueError`/`OverflowError` to `IntegrityError` or rejects a non-`int` stored value
+  outright; one committed probe drives numeric text through a receipt integer field and expects
+  `IntegrityError`; any probe needing a schema rewrite or a fabricated row is labelled as such and is
+  never cited as a real-ledger repro; suite green.
+
+- `pri=2` `size=M` — `function_receipts` has no index carrying `(partition, operation, sequence)`, so
+  receipt pagination costs O(all receipts in the partition) per page. `EXPLAIN QUERY PLAN` shows
+  `USE TEMP B-TREE FOR ORDER BY` on the default all-revision query: measured 1,001 of 1,001 rows visited
+  for `limit=3`, and 899 of 899 on the cursor path, against 3 when a revision filter applies. Receipt
+  history is unbounded and append-only, so the cost grows without limit while `limit + 1` bounds only the
+  rows Python materializes. No answer is ever wrong, which is why this is polish and not a review fix, and
+  the roadmap's u4a "exact bounded materialization" claim has been narrowed to say so. The fix is not
+  free: adding the index moves `SCHEMA_VERSION` 2 -> 3, changes the schema fingerprint, forces the
+  pre-1.0 ledger reset u3b1 already established as the migration posture, and churns every
+  schema-structure pin. Acceptance: an index covering `(partition, operation, sequence)` exists,
+  `EXPLAIN QUERY PLAN` on both the default and the cursor receipt queries reports no
+  `USE TEMP B-TREE FOR ORDER BY`, a probe over a 1,001-receipt ledger asserts rows visited stays within a
+  small constant of the page size on both paths, `SCHEMA_VERSION` and the fingerprint move together, and
+  the suite is green with the reset documented.
 
 - `pri=3` `size=S` — port the report anchor validator to a committed dev tool. Every `map` brief makes its
   report's `path:line` claims machine-checkable through `.scratch/validate-anchors.py` (fenced ```anchors
@@ -66,7 +80,7 @@ changed is spine work, not polish.
   `PYTHONDONTWRITEBYTECODE=1`, runs the named test per mutant, restores byte-exactly (`cmp` proves it),
   and exits nonzero on any survivor; rerunning it from a clean checkout reproduces 9/9 without edits.
   u4c5b is the third instance and the seed with the widest catalogue: `.scratch/mutants-u4c5b.py` carries
-  14 mutants over the `--out` writer (13 killed, 1 proved equivalent), whole-file `str.replace` with an
+  13 mutants over the `--out` writer (12 killed, 1 proved equivalent), whole-file `str.replace` with an
   identity-check per mutant, kill decided by the suite's rc rather than by parsed names (subTest failures
   print no inline `FAIL`), a restore in `finally` plus a `RESTORED-IDENTICAL` compare, and a documented
   equivalent mutant so a survivor list of exactly `[installed-file-unlinked]` is the closure signal.
@@ -180,10 +194,15 @@ changed is spine work, not polish.
   `error: "conflict"`, and u4c4 drives it through `main`'s exit map with a patched `System.promote_function`
   rather than through a real ledger. Exit 4 is the one exit class where retry IS the intended recovery
   (`.agent/memory.md`), so the branch an operator's wrapper depends on is the one no end-to-end probe
-  reaches. Acceptance: a committed probe drives two CLI invocations against one ledger with a supported
-  command changing the prospective union between the hash read and the promote, observes exit 4 plus the
-  `expected_function_hash does not match the locked prospective function` message with no patching, and
-  asserts the ledger is unchanged by the rejected call.
+  reaches. Acceptance, corrected by the M2 review — the original text named a message the described
+  scenario cannot produce: `promote_function` compares member, candidate and retired IDs BEFORE the hash
+  (`src/cement_runtime/system.py:4262-4277`), so a changed prospective union raises
+  `function promotion candidates changed during authorization`, and the expected-hash branch runs only
+  once those identities still match. So: a committed probe drives two CLI invocations against one ledger
+  with a supported command changing the prospective union between the hash read and the promote, observes
+  exit 4 with `function promotion candidates changed during authorization` and no patching, and asserts
+  the rejected call adds no receipt and no status transition; the stale-hash message keeps its own
+  separate pre-invocation probe.
 - pri=3 `size=S` — `--actor` grammar is nearly unpinned on the promote leaf. The merged suite carries a
   single occurrence exercising the value's validation, so the accept/reject PAIR the memory rule requires
   at every bound is absent here: an empty actor, an over-long actor and one carrying illegal characters
@@ -242,3 +261,106 @@ changed is spine work, not polish.
   process-level probe (syscall trace, `sitecustomize` audit hook, or an `open`/`connect` audit hook via
   `sys.addaudithook`) asserting the `function eval` child opens no database file, with the `python -S`
   gap stated wherever the claim is made.
+
+## M2 review deferrals
+
+- `pri=4` `size=S` — `_verify_row`'s `except (IntegrityError, ValidationError)`
+  (`src/cement_runtime/system.py:3522`) has an unreachable second arm, so no honest probe pins it.
+  Removing `ValidationError` from the catch leaves the whole suite green. Reachability was traced and the
+  arm is defensive breadth, not a gap in coverage of live behavior: `_validate_promoted` raises
+  `IntegrityError` at all six of its raise sites; `_run_verification` wraps `_artifact_from_row` and
+  re-raises as `IntegrityError` (`src/cement_runtime/system.py:3739-3741`); and the two remaining
+  `ValidationError` sources inside the try read immutable stored bytes — `parse_json(row["input_json"])`
+  (`src/cement_runtime/system.py:3806`) and `canonicalize(execution.output)`
+  (`src/cement_runtime/system.py:3827`), where `execute` runs the stored artifact against the stored
+  input. `input_json` cannot be corrupted in place at all: `artifacts_build_fields_immutable`
+  (`src/cement_runtime/store.py:310-318`) aborts the UPDATE. Acceptance: either the arm is documented as
+  deliberate breadth over inputs the schema already fixes, or one probe pins it behind a dropped
+  immutability trigger and is labelled a fabricated-corruption probe that is never cited as a real-ledger
+  repro; suite green either way.
+
+- `pri=3` `size=S` — `main` does not handle `KeyboardInterrupt`, so operator cancellation leaks a
+  traceback. A console probe held an exclusive SQLite lock, ran `cement ... function show`, and sent
+  SIGINT during the wait: the process returned `-2` with a Python traceback on stderr ending in
+  `KeyboardInterrupt`. That contradicts the JSON-first, traceback-free CLI posture everywhere else, and no
+  record states the traceback is intentional. Acceptance: SIGINT during a blocked database operation
+  terminates with a chosen interrupt status and no traceback, one committed probe pins it, and if JSON is
+  deliberately omitted for interrupts the exception is documented once in `README.md`/`docs/`.
+
+- `pri=3` `size=S` — `verify_drafts`'s `verified_by` bound is unpinned at the CLI. The library validates
+  it with `_text(..., maximum=256)` (`src/cement_runtime/system.py:155-166,3645-3648`), but the scoped CLI
+  suite (`tests/test_cli.py:1574-1588`) pins only required/nonempty behavior, so weakening the leaf to
+  accept oversized or control-bearing provenance leaves the suite green. This is the accept/reject PAIR
+  the memory rule requires at every bound. Acceptance: adjacent 256-byte accepted and 257-byte rejected
+  UTF-8 cases plus an accepted-printable/rejected-control pair through `function verify-drafts`, asserting
+  exit 0 against invalid/2 with exact empty stdout on rejection, and the accepted boundary value read back
+  out of the verification report.
+
+- `pri=3` `size=S` — `--out` writes no parent-directory `fsync`, so the atomic rename is durable against
+  process death but not against power loss. Source-derived only; the review ran no power-loss simulation.
+  Same cross-resource class as the `_emit` stdout-flush row. Acceptance: either the export path fsyncs the
+  parent directory after `os.replace` and one probe pins the call, or a decision record states the
+  durability bound once and `README.md`/`docs/` repeat it wherever export durability is claimed.
+
+- `pri=2` `size=M` — nine integrity checks across the function ABI and the P5 verifier are each
+  individually deletable with the whole suite still green, so the committed tests do not pin them. In
+  `src/cement_runtime/function.py:153-182`, deleting any ONE of four digest-syntax checks keeps all 23
+  `FunctionTests` green: `evidence_snapshot_hash`, `output_hash`, `entry_seal` and `report.test_set_hash`.
+  Three of those admit malformed values once the outer hash is recomputed; the `output_hash` mutant still
+  rejects, but only through the later digest mismatch, which silently converts a promised
+  `ValidationError` into an `IntegrityError`. In `src/cement_runtime/system.py:3264-3338`, five P5 field
+  checks delete cleanly with all 42 verifier tests green: projected document ABI, canonicalizer, embedded
+  hash, scope and entries-array type. Those five are currently redundant with `build_function`, but u2
+  claims field-by-field reconstruction and self-checking rather than reliance on one constructor
+  invariant, so the redundancy IS the defense-in-depth the claim promises. Production code is correct
+  today; the exposure is that an integrity-boundary regression ships undetected. Acceptance: outer-rehashed
+  malformed-value subtests for all four `function.py` fields asserting `ValidationError`, plus
+  parameterized altered `build_function` results per P5 field asserting that only
+  `function-hash-matches-snapshot` fails with its field-specific detail; all nine deletion mutants then
+  fail, proven by a rerun of the catalogue that produced them.
+
+- `pri=3` `size=S` — two real-scale boundary pairs are asserted only against patched-down limits. The 1M
+  item ceiling (`tests/test_function.py:598-623`) is exercised by patching `FUNCTION_MAX_ITEMS` to a small
+  fixture value, so nothing committed drives the declared number. The M2 review ran the real-scale probes
+  and they pass: exactly 1,000,000 accepted and 1,000,001 rejected, and likewise for the byte gate, depth
+  67/68 and entry count 50,000/50,001. Acceptance: commit the exact-max/max+1 pair at the declared value
+  for items, with the slow cases marked so the default gate stays usable, and keep the patched-down
+  fixtures for the fast path.
+
+- `pri=4` `size=S` — the single-snapshot race test (`tests/test_system.py:4007-4101`) infers transaction
+  lifetime from writer blocking plus a coherent result, so no committed assertion inspects
+  `connection.in_transaction` at an inner verification call. The proof is therefore load- and
+  timing-dependent rather than local, and a refactor could weaken it without failing. Acceptance: a
+  targeted test wraps `_promoted_function_rows`, asserts `connection.in_transaction is True` before
+  delegating, and verifies one successful result.
+
+- `pri=3` `size=S` — two test fixtures create temporary directories inside the repository root:
+  `tempfile.TemporaryDirectory(dir=".")` at `tests/test_cli.py:165` and `tests/test_system.py:183`. An
+  interrupted run leaves `tmp*/cli.db` directories behind in the working tree, which the M2 review had to
+  clean before it could read a trustworthy `git status`. Acceptance: both fixtures allocate outside the
+  repository, or the suite removes them on teardown even when the run is interrupted, and a deliberately
+  interrupted run leaves `git status` clean.
+
+- `pri=3` `size=L` — the function layer outgrew one class. `System` (`src/cement_runtime/system.py:403`)
+  spans 4,920 lines and 62 methods, and four judgment-bearing methods are individually oversized:
+  `verify_function` 452 lines / cyclomatic complexity 67, `function_report` 356 / 36,
+  `_function_promotion_plan` 227 / 31, `promote_function` 272 / 26. Transaction ownership is genuinely
+  cohesive, so the class boundary is not wrong in kind — the function layer simply now carries several
+  E/F-rated methods inside the same service object, which makes every integrity change reason across
+  oversized methods and makes review and mutation coverage more expensive. Acceptance: the public `System`
+  facade and its transaction ownership stay unchanged while cohesive function-layer internals move out;
+  operation-policy normalization and artifact/report/member validation each get one owner; validation
+  depth stays explicit; no E/F-rated function-layer method remains; the full suite, `uv build`, the
+  healthy lifecycle and the degraded and recovery matrices are unchanged.
+
+- `pri=3` `size=M` — three validation contracts are assembled independently at five sites
+  (`src/cement_runtime/system.py:1995,2311,2929,3893,3940`). Operation-policy scalar and canonical
+  validation is built separately by verify, report and promotion planning; receipt-member
+  artifact/report/binding checks are built separately by reconstruction, report projection and
+  promotion-entry construction. Pylint finds no token-level clone, so this is conceptual duplication with
+  partly implicit differences in depth — which is the dangerous shape: a correction can land on one
+  surface while another keeps accepting or reporting a different record, and bounded report projection
+  versus full receipt verification is exactly where that divergence is hardest to audit. Acceptance: one
+  helper or normalized record owns each binding family, callers select row-only, bounded-projection or
+  full-reconstruction validation explicitly, and the receipt-discovery contracts, projection-limit
+  contracts, degraded scenarios and full suite are unchanged.

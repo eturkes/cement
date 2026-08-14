@@ -139,6 +139,11 @@ def _print_event_trace(system: System) -> None:
 
 
 def main() -> None:
+    if not __debug__:
+        raise SystemExit(
+            "This demo verifies its results with assert statements. "
+            "Python removes them under -O and -OO. Run this demo again without -O or -OO."
+        )
     print("Hospital OCR layout-learning demo (offline; no LLM or network).")
     print(
         "Cement receives patient-independent layout signatures and returns "

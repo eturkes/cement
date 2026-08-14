@@ -44,7 +44,7 @@ Measured gaps driving the arc:
   sessions - and both loads now fall on MAIN, which carries implementation under the current authorship
   split.
 
-- M2 - Function as object - IMPLEMENTED. Makes the aggregate deterministic function a first-class,
+- M2 - Function as object - REVIEWED. Makes the aggregate deterministic function a first-class,
   verifiable, exportable artifact so paragraph 1's `regular, if large, function` and `once built and
   verified, that function is deterministic` become checkable properties instead of per-entry claims.
   Trust boundary stays exact-lookup: a function is a set of exact entries, never a wider predicate.
@@ -63,13 +63,17 @@ Measured gaps driving the arc:
     `input_hash`; the portable document embeds that hash as its sole excluded field, so reordering keeps
     one hash and a bundle self-checks with no sidecar. Optional `expected_function_hash` adds
     caller-held-identity binding. Evaluation is digest lookup decided by canonical input text, returning
-    detached output. `ValidationError` = structure/bounds; `IntegrityError` = digest mismatch. Limits:
+    detached output. `ValidationError` = structure/bounds; `IntegrityError` = digest mismatch — a
+    taxonomy that holds for validated built-in inputs, NOT for every public entry point: `build_function`
+    deliberately propagates caller-iterator exceptions, a hostile `str` subclass makes `parse_function`
+    leak the raw exception it was fed, and malformed trusted `CanonicalJSON` makes `evaluate` leak
+    `TypeError`. Limits:
     64 MiB, 50_000 entries, 1M items, depth 67. (An earlier "~1_600 entries" reading of the default
     canonicalizer walls was wrong: the function ABI uses `FUNCTION_MAX_ITEMS` = 1M, not
     `DEFAULT_MAX_ITEMS`, and `test_entry_count_accepts_maximum_and_rejects_one_past` builds 50,000.)
   - u2 DONE (main=84% 202K/240K, impl=80% 191K/240K) - `System.verify_function` in `system.py` (+485)
     plus `FunctionCheck`/`FunctionVerification` in `models.py` (+26) and 31 tests in `test_system.py`
-    (+2041; suite 103 -> 134). Read-only verifier: one `Store.transaction(write=False)`, no schema, no
+    (+2037/-4; suite 103 -> 134). Read-only verifier: one `Store.transaction(write=False)`, no schema, no
     authority call, no event, no persisted identity - u3 owns the receipt that binds a function hash.
     Five ordered checks (`duplicate-input-digests`, `abi-canonicalizer-uniform`, `sealed-passing-reports`,
     `current-promotion-receipts`, `function-hash-matches-snapshot`) over all promoted rows for
@@ -84,7 +88,7 @@ Measured gaps driving the arc:
     the 50,000-entry count guard are still materialized before the 64 MiB/item bounds apply (streaming
     deferred); the result binds one committed snapshot and is never a lease.
   - u3a DONE (main=91% 218K/240K, impl=72% 173K/240K) - pre-promotion entry identity, draft
-    eligibility, and batch verification. `function.py` (+8/-7), `system.py` (+513/-223), `models.py`,
+    eligibility, and batch verification. `function.py` (+8/-7), `system.py` (+515/-223), `models.py`,
     `__init__.py`, `test_function.py`, `test_system.py`; suite 134 -> 162. Scope source: u3 was split
     here into u3a and u3b per the scout's sizing verdict, and both u3 blockers were settled by a
     four-way spike wave arbitrated in `.agent/decisions/m2u3a-design.md`.
@@ -92,8 +96,11 @@ Measured gaps driving the arc:
     `promote` creates only at commit time while binding promoter and clock. Resolution = raise the
     document to `cement-function-v2` and replace the entry's `promotion_hash` with `entry_seal`, a
     `cement-function-entry-seal-v1` digest over 14 ordered fields - exactly `cement-promotion-v2` minus
-    `promoted_by` and `promoted_at_us`. The seal is recomputed on demand, never stored, so u3a carries no
-    schema delta, and `cement-promotion-v2` stays byte-identical with its dispatch fast path untouched.
+    `promoted_by` and `promoted_at_us`. u3a recomputes the seal on demand and stores nothing, so u3a
+    carries no schema delta, and `cement-promotion-v2` stays byte-identical with its dispatch fast path
+    untouched. u3b1 later persists the derived seal in `function_memberships.entry_seal`
+    (`store.py:232`, insert at `system.py:4373`) under insert-only triggers, so "never stored" describes
+    u3a alone, not the milestone-final schema.
     Consequence, accepted: function identity is now verified-content identity, so re-promoting identical
     content yields one hash, and activation provenance stays in the ledger receipt.
     Rejected with probe evidence: making the ledger receipt itself pre-promotion computable (dropping
@@ -133,7 +140,10 @@ Measured gaps driving the arc:
     that union - now possible before promotion because every entry seal is - show it with an inspectable
     deterministic manifest (`inspect_function_promotion`), and require the operator to repeat it once as
     `expected_function_hash` (`promote_function`). Promote in one `BEGIN IMMEDIATE` that revalidates
-    under its own write lock, rechecks plan identity against what was authorized, bulk-retires
+    under its own write lock, rechecks plan identity against what was authorized - operation revision,
+    candidate IDs, member IDs and the sorted non-null `replaces_artifact_id` set, four fields that do not
+    include the manifest hash, which is instead compared against the operator's typed
+    `expected_function_hash` (`system.py:4265-4275`) - bulk-retires
     predecessors before bulk-activating candidates (the partial unique index forbids two promoted rows
     for one scope even transiently), then writes immutable membership rows and the set receipt that
     seals them. Carries the schema delta u3a avoided: `function_receipts` + `function_memberships`,
@@ -146,7 +156,7 @@ Measured gaps driving the arc:
     its demotion is semantic and lands with u3b2's receipt check, u4 owns the final CLI surface.
     Depends on u3a. Design record: `.agent/decisions/m2u3b-design.md`.
     Landed across one implementation pass plus three fix passes; suite 162 -> 230. Files: `store.py`
-    +81/-14, `system.py` +655/-10, `models.py` +33, `__init__.py` +6, `test_system.py` +4462/-51.
+    +81/-14, `system.py` +648/-3, `models.py` +33, `__init__.py` +6, `test_system.py` +4416/-5.
     Review. Two diff-blind reviewers - correctness/spec plus an independent 146-mutant catalogue -
     produced findings arbitrated in `.agent/decisions/m2u3b1-findings.md`. Two were production defects in
     `promote_function`, both reproduced by MAIN before dispatch. An empty prospective union performed
@@ -169,7 +179,7 @@ Measured gaps driving the arc:
     Known limit: `verify_function` still exposes P1-P5 only, so a promoted set carries no receipt check
     until u3b2 appends P6.
   - u3b2 DONE (main=93% 222K/240K, impl=90% 216K/240K) - function-receipt verification and historical
-    reconstruction. `system.py` +377/-2, `models.py` +34, `__init__.py` +5/-1, `test_system.py` +3225/-65;
+    reconstruction. `system.py` +365/-1, `models.py` +34, `__init__.py` +5/-1, `test_system.py` +3194/-66;
     suite 230 -> 293. Design record `.agent/decisions/m2u3b2-design.md`, findings
     `.agent/decisions/m2u3b2-findings.md`.
     Surface. `verify_function` gains ordered check P6 `persisted-function-receipt` after an unchanged
@@ -227,7 +237,7 @@ Measured gaps driving the arc:
     the same defect: a receipt's membership is immutable while its "complement" moves, so a three-promotion
     probe held `member_count=2` fixed while the same report's promoted count went to 4.
   - u4a DONE (main=93% 223K/240K, impl=59% 142K/240K) - receipt discovery/enumeration.
-    `system.py` +91, `models.py` +6, `__init__.py` +2, `test_system.py` +1163/-1; suite 293 -> 314
+    `system.py` +91, `models.py` +6, `__init__.py` +2, `test_system.py` +1161/-2; suite 293 -> 314
     across one implementation pass plus one fix pass. `store.py`, `cli.py`, `function.py`, `README.md`,
     `docs/` byte-identical, verified by MAIN at every gate rerun.
     Review. Two diff-blind reviewers, one correctness/spec/claim-soundness and one independent
@@ -241,9 +251,16 @@ Measured gaps driving the arc:
     was altered after `System` construction leaked a raw `ValueError` instead of `IntegrityError`. The
     revision is now type- and range-checked before conversion and before the helper call. Everything
     else - the 10,001-row continuation boundary, exact `=` scoping against `_`/case `LIKE` collisions,
-    one-snapshot lifetime of the latest lookup, exact bounded `limit + 1` materialization,
+    one-snapshot lifetime of the latest lookup, Python-side bounded `limit + 1` materialization,
     validate-only-returned-rows placement, `before_sequence=False`, inclusive `limit=1`, and the frozen
     public signature/model shape - was a committed-test gap on already-correct code.
+    Correction from M2 review: `limit + 1` bounds the rows Python builds, not the rows SQLite visits.
+    `function_receipts` has no index carrying `(partition, operation, sequence)`, so the default query
+    sorts through a temp B-tree over every receipt in the partition - measured at 1,001 of 1,001 rows
+    visited for `limit=3`, and 899 of 899 on the cursor path, against 3 with a revision filter. No answer
+    is ever wrong, so this is a resource gap, registered in `.agent/polish.md` rather than fixed here.
+    The 10,001-row census is also not the sole pin for four rules: max, DESC, `limit + 1` and cursor
+    exclusivity each die to independent mutants; only their joint boundary concentrates there.
     Rejected with reasoning recorded in the design record: a finding wanting the
     current-revision-without-receipt branch to reuse the shared unknown-operation message. The two
     conditions differ and merging the strings would discard diagnostic information and make a
@@ -378,7 +395,7 @@ Measured gaps driving the arc:
     lines). Contract `.agent/decisions/m2u4c1-contract.md`. `function show` emits the whole library model
     through `_emit`: a spike measured a hand-written projection at exactly zero byte saving (285,222 either
     way over a 300/100/100 ledger) for +108 production lines, and the model's transitive graph reaches no
-    document, text or private cache, so Decision 3's ban holds structurally. Gate `Ran 378 tests / OK` +
+    document, text or private cache, so Decision 3's ban holds structurally. Gate `Ran 380 tests / OK` +
     `uv build` rc=0. Evidence: MAIN's 9-mutant battery over the seam killed 9/9, each with a positive
     control proving the patch changed behavior; an independent 88-mutant campaign killed 84, proved 2
     equivalent and left 2 actionable (dispatch guard swallowing the `events` tail, exact-type check
@@ -431,7 +448,7 @@ Measured gaps driving the arc:
     for this unit, and it is scratch-local, so no durable claim rests on it alone.
   - u4c3 DONE (main=88% 211K/240K, mate=91% 219K/240K) - `function verify-drafts OPERATION --actor
     ACTOR` over `verify_drafts` and `function verify OPERATION [--expected-function-hash HEX]` over
-    `verify_function`. `cli.py` +32, `test_cli.py` +580 (28 tests); suite 396 -> 424. Contract
+    `verify_function`. `cli.py` +31, `test_cli.py` +580 (28 tests); suite 396 -> 424. Contract
     `.agent/decisions/m2u4c3-contract.md`. Production landed at the low end of the 44-66 estimate because
     both leaves forward to already-shipped APIs and add no library delta.
     Design fork, arbitrated from two prototyped spikes that BOTH self-rejected: `verify-drafts` exits 6
@@ -482,7 +499,7 @@ Measured gaps driving the arc:
     attention-directing only and no claim here rests on it.
   - u4c4 DONE (main=98% 235K/240K, mate=88% 212K/240K) - `function inspect OPERATION` over
     `inspect_function_promotion` and `function promote OPERATION --expected-function-hash HEX --actor
-    ACTOR` over `promote_function`. `cli.py` +30, `test_cli.py` +1011/-7 (29 tests); suite 424 -> 453.
+    ACTOR` over `promote_function`. `cli.py` +30, `test_cli.py` +1006/-2 (29 tests); suite 424 -> 453.
     Contract `.agent/decisions/m2u4c4-contract.md`. No library delta; `system.py`, `store.py`, `models.py`,
     `function.py`, `__init__.py`, `README.md`, `docs/`, `examples/` byte-identical.
     Design fork, arbitrated from two prototyped spikes that BOTH self-rejected: `inspect` emits the
@@ -532,7 +549,10 @@ Measured gaps driving the arc:
     before Cement runs, so stdout must never change media type by verdict. Ruling takes each spike's
     measured strength - no bundle bytes, empty stdout, the ordered check vector on stderr as
     `{error:"unverified", message, checks}`, exit 6 - keeping one exit-6 meaning across the `function`
-    group and the token/exit bijection intact. Mechanics stay inside the write set: `_run` raises a
+    group. Correction from M2 review: the token/exit relation is a one-way map, not a bijection. An
+    `error` token determines its exit uniquely, but exit 6 does not determine a token - `verify-drafts`,
+    `verify` and `eval` emit tokenless stdout models while `export` emits the stderr token `unverified`,
+    so leaf plus channel is what discriminates, exactly as the README exit-6 table states. Mechanics stay inside the write set: `_run` raises a
     private `_Unverified` and `main` gains one appended `except` branch, leaving `_Outcome`, `_emit` and
     every existing mapping byte-identical. The split follows: the arbitrated surface sizes at 80-100
     production + 800-1,070 test lines against u4c4's landed `+30 / +1,011` at `main=98%`, so it does not
@@ -541,7 +561,7 @@ Measured gaps driving the arc:
     judgment with it. Decisions 1, 3 and 4 of the record bind both sub-units.
   - u4c5a DONE (main=100% 241K/240K then 44% 105K/240K across one compaction, mate=55% 132K/240K) -
     `function export OPERATION [--receipt-id ID]`: source selection, verification gate, raw byte channel.
-    `cli.py` +54/-1, `test_cli.py` +486 (21 tests); suite 453 -> 474. Contract
+    `cli.py` +53/-1, `test_cli.py` +486 (21 tests); suite 453 -> 474. Contract
     `.agent/decisions/m2u4c5a-contract.md`. No library delta; `system.py`, `store.py`, `models.py`,
     `function.py`, `__init__.py`, `README.md`, `docs/`, `examples/` byte-identical.
     Shipped. Live source from `verify_function`, negative verdict at exit 6 on stderr as
@@ -601,8 +621,8 @@ Measured gaps driving the arc:
     Verification. MAIN's 16-branch smoke probe ran against a real ledger before any test existed. The
     diff-blind suite, contract-only, went 37 failures + 4 errors at baseline to 38/38 green against the
     implementation with zero divergences and no code defect - the second consecutive full convergence. A
-    14-mutant campaign over the guard, the recheck, the temp naming, the translation, the ordering and the
-    resolved path killed 13 and proved 1 equivalent (`temporary = None` after a successful rename, whose
+    13-mutant campaign over the guard, the recheck, the temp naming, the translation, the ordering and the
+    resolved path killed 12 and proved 1 equivalent (`temporary = None` after a successful rename, whose
     unlink is suppressed either way), `cli.py` restored byte-identical.
     Review. The contract-attack reviewer, dispatched before implementation, returned 11 findings, 2 high,
     and TWO were real code defects rather than claim defects - the first time this milestone. (1) The
@@ -624,7 +644,7 @@ Measured gaps driving the arc:
     read by a dedicated strict-UTF-8 reader bounded at `FUNCTION_MAX_BYTES` (67,108,864), evaluation input
     keeping the existing `DEFAULT_MAX_BYTES` channel including `-`, so a bundle can never travel through a
     reader 64x too small.
-    Est. 48-70 / 560-820; actual +71/-2 `cli.py`, +797 `tests/test_cli.py`. Depends on u4c1 + u4c5a.
+    Est. 48-70 / 560-820; actual +69/-2 `cli.py`, +797 `tests/test_cli.py`. Depends on u4c1 + u4c5a.
     Arbitration. A miss is a VERDICT, not a fault: exit 6 with the payload on stdout, extending the group
     rule `exit 6 = the command executed correctly and the answer is negative` to a fourth leaf rather than
     opening a fifth code. Bundle digest failures keep the native `IntegrityError` and exit 5, because this
@@ -773,6 +793,44 @@ Measured gaps driving the arc:
     of architecture's owning scope, resolved with a pointer. B022's Go+CEL row closed by recasting the
     unsupported "the project evaluated" origin story as present-tense rationale, which the Authoring
     rule requires independently. Depends on u5a.
+  - M2 review (`6f4f260..e5ff481`, 22 commits) - 10 reviewers: one per unit group, one cross-cutting on
+    integration plus project-`CLAUDE.md` conformance, one claim replayer. Gate reran green from the
+    reviewed tree and again after every fix.
+    FIXED in this review, each red-green proven with the source restored byte-identically between runs:
+    (1) The entry seal left 2 of its 14 ordered fields unpinned. `reviewer_count` and `span_seconds` sat
+    at 2 and 3 in `_entry_seal_decimal_boundary`, and decimal agrees with hex below 10, so encoding both
+    as hex kept all 294 `test_system` tests green. Helper parameterized, two >9 boundary tests added; each
+    mutant now dies to its own test. (2) `--out name/` replaced a regular file: `pathlib.Path` drops a
+    trailing separator, so the lstat guard graded the bare name while the bundle READER refuses the same
+    spelling through `os.open`. `_export_target` now rejects a trailing separator - exit 2, message
+    `export output path must not end with a directory separator`. (3) `_input("-")` leaked a raw `OSError`
+    from either stdin host on every `--input -` leaf, breaking the JSON-first exit contract; both reads
+    now translate to exit 2 `JSON stdin could not be read`. (4) `run_demo.py` printed `All checks passed.`
+    under `-O`/`-OO`, where Python strips all 38 `assert` verdicts backing it; the demo now exits 1 with a
+    message and a test pins both flags.
+    Claims corrected: 10 unreplayable numstats and one suite count in this file, u4c5b's mutation campaign
+    (13 mutants / 12 killed / 1 equivalent, not 14 / 13 / 1), the token/exit "bijection" (one-way only),
+    the u1 exception taxonomy (holds for validated built-in inputs, not every public entry point), u3b1
+    plan identity (four ID fields, not the manifest hash), u3a's "never stored" seal (u3b1 persists it),
+    u4a's "exact bounded materialization" (bounds Python's rows, not SQLite's), and three stale
+    `.agent/memory.md` facts. README now states that root `verify` reports a failed verdict as exit 0 with
+    `passed: false` while the `function` leaves use exit 6.
+    Rulings against reviewers, each re-derived by MAIN: the stored-scalar `int()` class is UNREACHABLE,
+    not a live defect - guarded/unguarded tracks nullable/NOT NULL exactly, all 13 user tables are STRICT,
+    and a fresh `System` rejects a rewritten schema at construction, so its polish row dropped pri=2 to
+    pri=4 and three lenses withdrew escalated wording. `_verify_row`'s `ValidationError` arm is
+    unreachable defensive breadth, so the proposed pin was withdrawn rather than forced through a dropped
+    immutability trigger. `promote_function`'s authority ABA needs a raw SQLite rebind inside a host
+    callback, and M3 deletes that callback. The receipt pagination index is real and measured - 1,001 of
+    1,001 rows visited at `limit=3` - but returns no wrong answer, so it is off-spine polish rather than a
+    `SCHEMA_VERSION` bump inside a review.
+    Deferred to `.agent/polish.md`: 12 rows, including nine individually-deletable integrity checks across
+    the function ABI and the P5 verifier, the pagination index, the oversized function layer
+    (`System` 4,920 lines / 62 methods, four E/F methods), and duplicated validation ownership at five
+    sites. No review finding required a scope-source change.
+    Process note: three reviewers were repeatedly killed by a provider content filter that fires on
+    corruption-probe phrasing; framing probes as fail-closed validation of our own library, and closing
+    the corruption questions by schema mechanism, recovered every one of them.
 
 - M3 - Trim to paragraph scope - UNPLANNED. Removes behavior outside `turns repeatedly supervised LLM
   answers into narrowly scoped deterministic behavior`, sequenced after M2 so the pure resolver is

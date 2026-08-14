@@ -12500,6 +12500,8 @@ class SystemTests(unittest.TestCase):
         *,
         support: int,
         test_count: int,
+        reviewer_count: int = 2,
+        span_seconds: int = 3,
     ) -> tuple[str, str]:
         artifact: dict[str, object] = {
             "id": "artifact-decimal-boundary",
@@ -12508,8 +12510,8 @@ class SystemTests(unittest.TestCase):
             "policy_hash": "c" * 64,
             "evidence_snapshot_hash": "d" * 64,
             "support": support,
-            "reviewer_count": 2,
-            "span_seconds": 3,
+            "reviewer_count": reviewer_count,
+            "span_seconds": span_seconds,
             "scope_hash": "e" * 64,
         }
         report: dict[str, object] = {
@@ -12568,6 +12570,22 @@ class SystemTests(unittest.TestCase):
         actual, decimal_oracle = self._entry_seal_decimal_boundary(
             support=4,
             test_count=10,
+        )
+        self.assertEqual(actual, decimal_oracle)
+
+    def test_function_entry_seal_reviewer_count_uses_decimal_at_ten(self) -> None:
+        actual, decimal_oracle = self._entry_seal_decimal_boundary(
+            support=4,
+            test_count=4,
+            reviewer_count=10,
+        )
+        self.assertEqual(actual, decimal_oracle)
+
+    def test_function_entry_seal_span_seconds_uses_decimal_at_ten(self) -> None:
+        actual, decimal_oracle = self._entry_seal_decimal_boundary(
+            support=4,
+            test_count=4,
+            span_seconds=10,
         )
         self.assertEqual(actual, decimal_oracle)
 
