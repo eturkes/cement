@@ -2,7 +2,7 @@
 
 Cement turns repeatedly supervised LLM answers into narrowly scoped deterministic behavior.
 The goal is to aggregate repeated work into a regular, if large, function that covers many situations
-and edge cases—a goal that would be difficult to achieve without LLMs. Once built and verified, that
+and edge cases. That goal would be difficult to reach without LLMs. Once built and verified, the
 function is deterministic.
 
 The safety boundary is intentionally small: Cement compiles only exact lookups. A promoted artifact
@@ -59,7 +59,7 @@ The relaxed thresholds above are for a local demonstration. Defaults require thr
 two recorded reviewers, and a seven-day observation span.
 
 Ask the registered operation to handle JSON. The bundled adapter is a deterministic protocol stub,
-not an LLM; replace its command with your provider wrapper.
+not an LLM. Replace its command with your provider wrapper.
 
 ```bash
 uv run cement --db demo.db --partition acme handle support.reply \
@@ -77,8 +77,8 @@ uv run cement --db demo.db --partition acme proposal review prop_REPLACE_ME \
   --reviewer operator-1 --decision accept
 ```
 
-Repeat with a distinct request ID until the operation policy is satisfied, then run the independently
-gated lifecycle:
+Repeat with a distinct request ID until the confirmations satisfy the operation policy. Then run the
+independently gated lifecycle:
 
 ```bash
 uv run cement --db demo.db --partition acme compile support.reply
@@ -115,8 +115,9 @@ outcome = system.handle(
 )
 ```
 
-Include every fact that can change the answer - identity, locale, permissions, time, external-state
-revision, and policy revision - in the JSON input. Hidden context cannot be compiled safely.
+Put every fact that can change the answer into the JSON input, including identity, locale,
+permissions, time, external-state revision, and policy revision. Cement cannot compile hidden context
+safely.
 
 ## Request outcomes
 
@@ -124,33 +125,33 @@ revision, and policy revision - in the JSON input. Hidden context cannot be comp
 
 | Status | Meaning | Caller action |
 |---|---|---|
-| `resolved` | Current promoted artifact or still-valid confirmed fixture produced the output. | Re-run live authorization/policy, then apply the plan idempotently. |
+| `resolved` | Current promoted artifact or still-valid confirmed fixture produced the output. | Re-run live authorization/policy. Then apply the plan idempotently. |
 | `review_required` | A hidden candidate awaits supervision. | Inspect the named proposal on the separate review surface. |
-| `in_progress` | This partition's generation lease is active. | Poll `request REQUEST_ID`; no input needs to be resubmitted while the lease is active. |
-| `fallback_failed` | The candidate source failed, or its generation lease expired, and no output was stored. | For a stored source failure, retry `handle` with `--retry-failed` or use a new ID. For `generation_lease_expired`, resubmit the original `handle` input and request ID to reclaim the lease. |
-| `rejected` | A supervisor rejected the proposal. | Use a new request ID if a fresh candidate is wanted. |
-| `reconciliation_required` | A previously returned source was revoked/suspended, failed integrity checks, or belongs to an obsolete operation revision. No cached output is returned. | Reconcile any effects already attempted, then submit a new request ID. |
+| `in_progress` | This partition's generation lease is active. | Poll `request REQUEST_ID`. While the lease is active, the input needs no resubmission. |
+| `fallback_failed` | The candidate source failed, or its generation lease expired, and Cement stored no output. | For a stored source failure, retry `handle` with `--retry-failed` or use a new ID. For `generation_lease_expired`, resubmit the original `handle` input and request ID to reclaim the lease. |
+| `rejected` | A supervisor rejected the proposal. | Use a new request ID to request another candidate. |
+| `reconciliation_required` | A previously returned source lost validity through revocation, suspension, a failed integrity check, or an obsolete operation revision. Cement returns no cached output. | Reconcile any effects already attempted. Then submit a new request ID. |
 
-Replaying a request ID is content-idempotent, not a promise to replay an unsafe old output: quarantine
-or an explicit operation revision can move a prior request to `reconciliation_required`. Pending
-proposals from an older revision may only be rejected, never accepted or corrected. IDs may be reused
-by another partition without coupling the two requests.
+Replaying a request ID is content-idempotent. It does not promise to replay an unsafe old output.
+Quarantine or an explicit operation revision can move a prior request to `reconciliation_required`.
+Cement allows only rejection for pending proposals from an older revision. Another partition can
+reuse the same ID without coupling the two requests.
 
 `cement-json-v1` accepts null, booleans, strings, signed 64-bit integers, arrays, and string-keyed
-objects. Decimal/exponent numbers are rejected; encode domain decimals as strings with a documented
-application format. Each input/output is capped at 1 MiB, combined records and artifacts at 3 MiB,
+objects. It rejects decimal and exponent numbers. Encode domain decimals as strings with a documented
+application format. Cement caps each input/output at 1 MiB, combined records and artifacts at 3 MiB,
 nesting at 64 levels, and container items at 100,000.
 
 Proposal and report feeds plus example and artifact insertion catalogs carry monotonic `sequence`
-values. Page them by passing the last observed value to `--after-sequence`. Example revocations and
-artifact lifecycle changes do not reinsert catalog rows: consume `events --after SEQUENCE`, then
-refetch named records or rescan the affected operation catalog. Report test rows use the last `key` with
-`report show --after-test-key`. CLI usage and domain failures are JSON on stderr with stable nonzero
-exit classes; JSON read from stdin is byte-bounded before parsing.
+values. To page them, pass the last observed value to `--after-sequence`. Example revocations and
+artifact lifecycle changes do not reinsert catalog rows. Consume `events --after SEQUENCE`. Then
+refetch named records or rescan the affected operation catalog. Report test rows use the last `key`
+with `report show --after-test-key`. CLI usage and domain failures are JSON on stderr with stable
+nonzero exit classes. Cement bounds JSON from stdin by byte count before it parses the input.
 
-The command adapter protocol is documented in [docs/adapter-protocol.md](docs/adapter-protocol.md).
-The full state model and trust boundaries are in [docs/architecture.md](docs/architecture.md) and
-[docs/threat-model.md](docs/threat-model.md).
+Read [docs/adapter-protocol.md](docs/adapter-protocol.md) for the command adapter protocol. Read
+[docs/architecture.md](docs/architecture.md) and [docs/threat-model.md](docs/threat-model.md) for the
+full state model and trust boundaries.
 
 ## Examples
 
@@ -164,7 +165,7 @@ uv run python -m unittest discover -s tests -v
 uv build
 ```
 
-The project has no runtime package dependencies. `uv_build` is used only to produce the wheel and
+The project has no runtime package dependencies. It uses `uv_build` only to produce the wheel and
 source distribution.
 
 ## Deployment boundary
@@ -177,9 +178,9 @@ remain deployment responsibilities.
 
 The callback gates operation registration/revision, proposal review, compilation, verification,
 promotion, challenge, evidence revocation, and artifact suspension. `handle` and read APIs assume the
-embedding service has already authorized access to the exact partition. Calling `operation revise`
-always creates a semantic revision and retires older builds, even when threshold values are unchanged.
+embedding service has already authorized access to the exact partition. `operation revise`
+always creates a semantic revision and retires older builds, even when threshold values stay unchanged.
 Linux is the strongest command-adapter deployment target: Cement uses a subreaper supervisor there to
 kill and reap detached descendants. This is lifecycle containment for a trusted provider wrapper, not
-an arbitrary-code sandbox. A host cgroup/container boundary remains necessary if cleanup must survive
-simultaneous runtime/supervisor termination or OOM.
+an arbitrary-code sandbox. If cleanup must survive simultaneous runtime/supervisor
+termination or OOM, a host cgroup/container boundary remains necessary.

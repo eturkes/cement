@@ -19,17 +19,17 @@
 
 - Strict bounded JSON; duplicate keys, decimal/non-finite numbers, non-string keys, deep/large
   containers, and signed-64-bit overflow fail closed. Decimal quantities use application-defined
-  strings. Unicode is preserved without case folding or normalization.
-- Partition + operation revision + byte-stable canonical equality controls scope. Unknown or near-match
-  input falls back.
+  strings. Cement preserves Unicode without case folding or normalization.
+- Partition, operation revision, and byte-stable canonical equality control scope. Unknown or
+  near-match input falls back.
 - Artifacts are inert data: no code, templates, loops, filesystem, process, network, environment,
   clock, randomness, or external effects.
 - Candidate commands bypass the shell, have timeout/output limits, and run outside database locks. On
-  Linux, a child-subreaper kills and reaps detached descendants before accepting output; this is
-  lifecycle containment for the trusted adapter, not a hostile-code sandbox. The outer watchdog
-  covers unexpected supervisor exit for the shared process group, but a cgroup/container is required
-  to contain detached descendants across simultaneous supervisor/watchdog failure or OOM.
-- Proposed output is visible only through the review API. Accepted output may differ and the final
+  Linux, a child-subreaper kills and reaps detached descendants before accepting output. That
+  mechanism is lifecycle containment for the trusted adapter, not a hostile-code sandbox. The outer
+  watchdog covers unexpected supervisor exit for the shared process group. A cgroup/container is
+  necessary to contain detached descendants across simultaneous supervisor/watchdog failure or OOM.
+- Proposed output is visible only through the review API. Accepted output can differ, and the final
   edited value is the fixture.
 - Evidence conflicts block compilation. Evidence snapshots and policy/artifact digests block stale
   verification and promotion.
@@ -39,22 +39,31 @@
 
 - Authenticate and authorize proposal review, operation revision, promotion, challenge, revocation,
   suspension, database access, and audit access.
-- Put identity, permissions, locale, policy revision, external-state revision, and every other mutable
-  answer dependency into the input. Exclude behavior with hidden context from compilation.
+- Put every mutable answer dependency into the input, including identity, permissions, locale, policy
+  revision, and external-state revision. Exclude behavior with hidden context from compilation.
 - Minimize, redact, encrypt, expire, and back up evidence according to its data classification. The
   ledger is plaintext and a blind copy of a live SQLite database is unsafe.
-- Treat results as plans. Re-run live policy and authorization immediately before an effect; use the
+- Treat results as plans. Re-run live policy and authorization immediately before an effect. Use the
   request ID as an idempotency key. Stop for reconciliation after uncertain effect commit state.
-- Keep provider wrappers pure. Model calls may repeat after timeout or lease recovery.
-- Monitor promoted scopes. Challenge them when policy or expected behavior changes; revise the
-  operation rather than attempting to overwrite contradictory history.
-- Deploy command adapters on Linux; add an external cgroup/job/container boundary whenever
-  crash-resilient process-tree containment is required, on every platform.
-- Protect or sign exported artifacts if the database-file trust root is insufficient.
+- Keep provider wrappers pure. Model calls can repeat after timeout or lease recovery.
+- Monitor promoted scopes. When policy or expected behavior changes, challenge them. Revise the
+  operation instead of overwriting contradictory history.
+- Deploy command adapters on Linux. If crash-resilient process-tree containment is required, add an
+  external cgroup/job/container boundary on every platform.
+- If the database-file trust root is insufficient, protect or sign exported artifacts.
 
 ## Deliberately absent
 
-Remote API/authentication, encryption/key erasure, external signatures, arbitrary code sandboxing,
-generalized-rule synthesis, domain schemas/oracles, active shadow sampling, quotas across principals,
-and distributed consensus are outside this local release. The exact artifact format leaves those gaps
-visible instead of implying they are solved.
+This local release excludes:
+
+- Remote API and authentication.
+- Encryption and key erasure.
+- External signatures.
+- Arbitrary code sandboxing.
+- Generalized-rule synthesis.
+- Domain schemas and oracles.
+- Active shadow sampling.
+- Quotas across principals.
+- Distributed consensus.
+
+The exact artifact format leaves those gaps visible. It does not imply that Cement solves them.

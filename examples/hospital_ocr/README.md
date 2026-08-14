@@ -1,16 +1,16 @@
 # Hospital OCR layout learning
 
-Hospital document layouts often lead to a new throwaway LLM extraction script for each run. This offline example turns that per-layout work into a durable pipeline: derive a patient-independent layout signature, supervise the extraction plan proposed for that signature, then let Cement return the promoted plan deterministically whenever the same layout recurs. The demo uses no LLM or network.
+Hospital document layouts often lead to a new throwaway LLM extraction script for each run. This offline example turns that per-layout work into a durable pipeline. It derives a patient-independent layout signature. A supervisor reviews the extraction plan proposed for that signature. Cement then returns the promoted plan deterministically whenever the same layout recurs. The demo uses no LLM or network.
 
 ## Boundary
 
-Cement does not learn a parser or generalize across layouts. It resolves one integrity-valid promoted artifact for an exact `(partition, operation, operation revision, canonical input)` scope. Here the canonical input is a layout signature, not the patient document. A01, A02, and A03 contain different patients and values but produce one byte-identical signature, so the promoted plan is reused across patients. This is not merely a lookup of byte-identical patient OCR.
+Cement does not learn a parser or generalize across layouts. It resolves one integrity-valid promoted artifact for an exact `(partition, operation, operation revision, canonical input)` scope. Here the canonical input is a layout signature, not the patient document. A01, A02, and A03 contain different patients and values but produce one byte-identical signature, so Cement reuses the promoted plan across patients. The demo is more than a lookup of byte-identical patient OCR.
 
 After promotion, a known patient-independent signature returns its confirmed extraction plan without calling the proposal adapter or an LLM. A genuinely new or changed layout produces a different canonical input and therefore a new scope. It follows the gated fallback path instead of silently receiving a plan for another layout. There is no cross-layout generalization.
 
-The example parser recognizes only its explicit block grammar and fails closed otherwise; producing a known signature never certifies extraction correctness.
+The example parser recognizes only its explicit block grammar and fails closed otherwise. A known signature never certifies extraction correctness.
 
-Cement guarantees deterministic plan return only inside that exact valid scope. It does not guarantee that the plan extracts every future document correctly, or that a supervisor accepted a semantically correct plan. Confirmation counts, reviewer counts, observation spans, replay verification, and explicit promotion are operational gates; plan quality remains the adapter and reviewer's responsibility.
+Cement guarantees deterministic plan return only inside that exact valid scope. It does not guarantee that the plan extracts every future document correctly, or that a supervisor accepted a semantically correct plan. Confirmation counts, reviewer counts, observation spans, replay verification, and explicit promotion are operational gates. Plan quality remains the adapter and reviewer's responsibility.
 
 ## How the example maps to Cement
 
@@ -26,7 +26,7 @@ confirmed plan + ocr_text -> apply_plan(...) -> patient JSON
 `pipeline.py` supplies the deterministic document path:
 
 1. `ocr(path)` reads simulated OCR text and normalizes line endings and blank lines.
-2. `layout_signature(ocr_text)` records the document type plus one ordered list of label and section keys, using block position rather than whether values happen to be filled. Patient values and section body text—including prose with colons—never enter the signature.
+2. `layout_signature(ocr_text)` records the document type plus one ordered list of label and section keys. It uses block position, not the presence of filled values. Patient values and section body text never enter the signature, including prose with colons.
 3. `System.handle(...)` either returns the promoted exact-scope plan or asks `PlanProposer.propose(...)` for a supervised candidate.
 4. `apply_plan(plan, ocr_text)` applies label and section locators and returns extracted strings.
 
@@ -154,9 +154,9 @@ The driver uses the Python standard library plus `cement_runtime`, creates a tem
 
 ## Expected output
 
-Act 1 shows two reviewed confirmations for layout A, then deterministic compilation, verification, and explicit promotion. Act 2 sends a third patient's document through the same patient-free signature: Cement returns the promoted plan while adapter calls stay flat, then `apply_plan` emits patient JSON. Act 3 shows that genuinely new layout B does not inherit layout A's plan; it follows its own supervised lifecycle before resolving without the adapter. Act 4 leaves layout C at one confirmation and reports the policy gate instead of promoting it. The final trace records the complete control-plane sequence.
+Act 1 shows two reviewed confirmations for layout A, then deterministic compilation, verification, and explicit promotion. Act 2 sends a third patient's document through the same patient-free signature. Cement returns the promoted plan while adapter calls stay flat. Then `apply_plan` emits patient JSON. Act 3 shows that genuinely new layout B does not inherit layout A's plan. Layout B follows its own supervised lifecycle before it resolves without the adapter. Act 4 leaves layout C at one confirmation and reports the policy gate instead of promoting it. The final trace records the complete control-plane sequence.
 
-The layout-A artifact ID is generated per run. The block masks its 32-hex suffix as `art_<hex>`; every other line is byte-stable.
+The demo generates the layout-A artifact ID per run. The block masks its 32-hex suffix as `art_<hex>`. Every other line is byte-stable.
 
 ```text
 Hospital OCR layout-learning demo (offline; no LLM or network).
@@ -213,8 +213,8 @@ All checks passed.
 
 ## Teaching points
 
-- Canonicalize before learning. The exact recurring input is an ordered layout structure with no patient values. Structural position, not whether a particular patient's field is filled, determines the signature, so distinct patients can share one scope safely.
-- Keep decimal quantities as strings. `cement-json-v1` rejects decimal and exponent numbers; layout C marks `potassium` and `creatinine` as `decimal_string` and extracts values such as `"4.2"` and `"0.9"`.
+- Canonicalize before learning. The exact recurring input is an ordered layout structure with no patient values. Structural position determines the signature, not the presence of a filled field. Distinct patients can therefore share one scope safely.
+- Keep decimal quantities as strings. `cement-json-v1` rejects decimal and exponent numbers. Layout C marks `potassium` and `creatinine` as `decimal_string` and extracts values such as `"4.2"` and `"0.9"`.
 - Treat layout drift as an explicit edge case. A changed layout is a new canonical input, enters supervised fallback, and solidifies through the same lifecycle. Act 4 exposes the recurrence gate as `support 1 is below required 2` rather than applying an old template silently.
 - Isolate learning by partition. `mercy-general` scopes this evidence and its promoted artifacts to one hospital.
 - Keep demonstration policy visibly relaxed. Production defaults require more confirmations, more reviewers, and a real observation span.

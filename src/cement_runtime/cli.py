@@ -70,7 +70,10 @@ class _Outcome:
 def _parser() -> argparse.ArgumentParser:
     parser = _JSONArgumentParser(
         prog="cement",
-        description="Supervised LLM fallback -> verified exact deterministic artifacts",
+        description=(
+            "Supervised LLM fallback that compiles confirmed behavior"
+            " into exact deterministic artifacts"
+        ),
     )
     parser.add_argument("--db", default=os.environ.get("CEMENT_DB"), help="SQLite ledger path")
     parser.add_argument(
@@ -101,7 +104,7 @@ def _parser() -> argparse.ArgumentParser:
     handle.add_argument("--retry-failed", action="store_true")
     handle.add_argument(
         "--source-command",
-        help='JSON argv, e.g. \'["python","adapter.py"]\'; never run through a shell',
+        help='JSON argv, e.g. \'["python","adapter.py"]\'; Cement runs it without a shell',
     )
     handle.add_argument("--source-id", default="command-adapter")
     handle.add_argument("--source-timeout", type=float, default=60.0)
@@ -130,7 +133,7 @@ def _parser() -> argparse.ArgumentParser:
     compile_command.add_argument("operation")
     compile_command.add_argument("--actor", default="local-system")
 
-    verify = commands.add_parser("verify", help="replay full exact scope + boundaries")
+    verify = commands.add_parser("verify", help="replay the full exact scope and boundaries")
     verify.add_argument("artifact_id")
     verify.add_argument("--actor", default="local-system")
 
@@ -199,7 +202,7 @@ def _parser() -> argparse.ArgumentParser:
     function_verify = function_commands.add_parser("verify")
     function_verify.add_argument("operation")
     function_verify.add_argument(
-        "--expected-function-hash", help="fail unless the committed set hashes to this digest"
+        "--expected-function-hash", help="require the committed set to hash to this digest"
     )
     function_inspect = function_commands.add_parser("inspect")
     function_inspect.add_argument("operation")

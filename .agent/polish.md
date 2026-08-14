@@ -126,6 +126,15 @@ changed is spine work, not polish.
   narrows its unions explicitly, an ad-hoc `uvx pyright tests/test_system.py` reports zero
   `reportAttributeAccessIssue`, and the suite stays green.
 
+- `pri=3` `size=S` — port the human-facing register audit to committed state. `.scratch/register/audit.py`
+  measured the ASD-STE100 pass over `README.md`, `docs/*.md` and `examples/hospital_ocr/README.md`, so the
+  conformance numbers that pass recorded cannot rerun from a clean checkout; its spec sits in
+  `.agent/memory.md`. Two known false positives survive: a possessive `'s` counts as a contraction, and a
+  block without terminal punctuation joins the next block into one over-length sentence. Acceptance: a
+  committed dev tool run from a clean checkout reports zero sentences over the caps across the four
+  surfaces, flags a seeded 30-word instruction and a seeded `simply`, and leaves possessives and
+  terminal-punctuation-free bullets unflagged.
+
 ## M2.u4c5a deferrals
 
 - pri=3 `size=S` — merge-or-drop decision on the diff-blind teammate's export suite. 28 tests written from

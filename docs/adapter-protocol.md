@@ -1,7 +1,7 @@
 # Candidate adapter protocol
 
-`CommandCandidateSource` invokes a trusted executable directly with `shell=False`. One compact JSON
-object is written to stdin:
+`CommandCandidateSource` invokes a trusted executable directly with `shell=False`. Cement writes one
+compact JSON object to stdin:
 
 ```json
 {
@@ -28,28 +28,30 @@ The command writes exactly one JSON object to stdout:
 }
 ```
 
-Both fields are required; additional top-level fields fail closed. Output is bounded; duplicate object
-keys, decimal/exponent and non-finite numbers, signed-64-bit overflow, invalid Unicode, and oversized
-or deep containers are rejected. Encode domain decimals as strings. Stderr is excluded from stored
-errors because it may contain secrets. Exit failure, timeout, malformed JSON, or an oversized result
-becomes an inert `fallback_failed` request.
+The response must contain both fields. Additional top-level fields fail closed. Cement bounds the
+output. It rejects duplicate object keys, decimal/exponent and non-finite numbers, signed-64-bit
+overflow,
+invalid Unicode, and oversized or deep containers. Encode domain decimals as strings. Cement excludes
+stderr from stored errors, because stderr can contain secrets. Exit failure, timeout, malformed JSON,
+or an oversized result becomes an inert `fallback_failed` request.
 
 On Linux with `/proc`, Cement launches the adapter beneath a private child-subreaper. The supervisor
-enforces the primary timeout and stdout/stderr limits, terminates the adapter, discovers and
-terminates descendants that detach into new sessions, reaps them, and only then releases stdout to the
-runtime while the supervisor remains alive. The outer watchdog also kills the shared process group if
-the supervisor exits unexpectedly. Detached descendants can still outlive simultaneous watchdog and
-supervisor failure, including OOM; use a cgroup/container job boundary for that crash-resilient
-guarantee. Cleanup failure is inert. Other POSIX hosts receive process-group cleanup only; hosts without
-that facility terminate only the direct process. Use Linux or an external job/container boundary when
-descendant containment matters. This mechanism controls lifecycle; it does not make an untrusted
-executable safe.
+enforces the primary timeout and the stdout/stderr limits. It terminates the adapter. It discovers and
+terminates descendants that detach into new sessions, then reaps them. It releases stdout to the
+runtime only after that cleanup, and it stays alive throughout. If the supervisor exits unexpectedly,
+the outer watchdog also kills the shared process group. Detached descendants can still outlive
+simultaneous watchdog and supervisor failure, including OOM. Use a cgroup/container job boundary for
+that crash-resilient guarantee. Cleanup failure is inert. Other POSIX hosts receive process-group
+cleanup only. Hosts without that facility terminate only the direct process. When descendant
+containment matters, use Linux or an external job/container boundary. This mechanism controls
+lifecycle. It does not make an untrusted executable safe.
 
 The adapter receives no stored examples and cannot verify or promote its own proposal. Treat all
 request fields as untrusted prompt content. Keep system instructions and provider credentials outside
-the request. The command inherits the current environment by default so it can access deliberately
-configured credentials; the Python API can instead pass an exact environment mapping.
+the request. The command inherits the current environment by default, so it can access deliberately
+configured credentials. The Python API can instead pass an exact environment mapping.
 
-Provider calls may be retried after a failed request or an expired generation lease. They must create
-no external effects. `request_id` is partition-local and available for provider-side idempotency and
-tracing; adapters that use a global idempotency namespace should key on `(partition, request_id)`.
+Cement can invoke the adapter again after a failed request or an expired generation lease. Provider
+calls must create no external effects. `request_id` is partition-local and available for provider-side
+idempotency and tracing. Adapters that use a global idempotency namespace must key on
+`(partition, request_id)`.

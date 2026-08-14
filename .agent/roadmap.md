@@ -625,7 +625,9 @@ Measured gaps driving the arc:
     deployment boundary) against what the function object now proves, `docs/architecture.md` contract
     steps for the function layer, and the hospital example resolving from an exported bundle with no
     ledger, no adapter, and no LLM, covered by `tests/test_hospital_ocr_example.py`. Owns every
-    documentation edit for M2 so u1-u4c6 stay code-and-test only. `docs` tier because the only code delta
+    documentation edit for M2 so u1-u4c6 stay code-and-test only. The human-facing ASD-STE100 register
+    pass over `README.md`, `docs/` and the example README landed off-spine and claim-preserving, so u5
+    inherits that register and moves claims alone. `docs` tier because the only code delta
     is example-side behind that committed test, while every claim it writes is re-derived by the M2
     review's `audit` replayer; a claim pass finding that the function object does not prove what the
     README asserts is spine work, not a wording fix. Depends on u1-u4c6.
