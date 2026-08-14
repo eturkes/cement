@@ -1,6 +1,6 @@
 # Hospital OCR layout learning
 
-Hospital document layouts often lead to a new throwaway LLM extraction script for each run. This offline example turns that per-layout work into a durable pipeline. It derives a patient-independent layout signature. A supervisor reviews the extraction plan proposed for that signature. Cement then returns the promoted plan deterministically whenever the same layout recurs. The demo uses no LLM or network.
+Hospital document layouts often lead to a new throwaway LLM extraction script for each run. This offline example turns that per-layout work into a durable pipeline. It derives a patient-independent layout signature. A supervisor reviews the extraction plan proposed for that signature. Cement then returns the promoted plan deterministically whenever the same layout recurs. The demo finally seals every promoted layout into one portable function and answers a document after the ledger is gone. The demo uses no LLM or network.
 
 ## Boundary
 

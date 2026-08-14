@@ -44,7 +44,7 @@ Measured gaps driving the arc:
   sessions - and both loads now fall on MAIN, which carries implementation under the current authorship
   split.
 
-- M2 - Function as object - IN-PROGRESS. Makes the aggregate deterministic function a first-class,
+- M2 - Function as object - IMPLEMENTED. Makes the aggregate deterministic function a first-class,
   verifiable, exportable artifact so paragraph 1's `regular, if large, function` and `once built and
   verified, that function is deterministic` become checkable properties instead of per-entry claims.
   Trust boundary stays exact-lookup: a function is a set of exact entries, never a wider predicate.
@@ -741,21 +741,38 @@ Measured gaps driving the arc:
     pin for that leaf. Bundle-identity instability is pinned by observation rather than mechanism. The
     transcript pin cannot detect a change correct in both the demo and the README. Both deferrals are
     registered in `.agent/polish.md`.
-  - u5b OPEN tier=docs - claim pass over `README.md`, `docs/architecture.md`, `docs/threat-model.md` and
-    every remaining `examples/hospital_ocr/README.md` claim row, driven from
-    `.agent/decisions/m2u5-claims.md`. Owns every M2 documentation edit u5a does not force, so u1-u4c6
-    stay code-and-test only. The four FALSE rows are load-bearing: architecture's "cannot replay a
-    historical promotion receipt" is contradicted by `reconstruct_function_receipt`, its
-    database-as-sole-integrity-trust-root claim is contradicted by offline bundle evaluation under an
-    independently held function hash, its runtime module list names `unittest` (not imported) and omits
-    M2's additions, and README's Development gate command diverges from the configured gate. The
-    human-facing ASD-STE100 register pass landed off-spine and claim-preserving, so u5b inherits that
-    register and moves claims alone. Folds in the tracked M2.u4c5a polish row whose remaining acceptance
-    is that `README.md`/`docs/` state the exit-6 contract once - README's paging/exit paragraph is already
-    INCOMPLETE for omitting the class, so the sentence gets written either way. `docs` tier because it
-    ships no code, while every claim it writes is re-derived by the M2 review's `audit` replayer; a claim
-    pass finding that the function object does not prove what the README asserts is spine work, not a
-    wording fix. Depends on u5a.
+  - u5b DONE (main=82% 196K/240K, mate=75% 180K/240K) tier=docs - claim pass over `README.md`,
+    `docs/architecture.md`, `docs/threat-model.md` and the example README opening, driven from
+    `.agent/decisions/m2u5-claims.md`. Docs-only: `src/`, `tests/` and every example module stay
+    byte-identical (0-byte code diff); suite 544 unchanged, `uv build` rc=0.
+    Shipped. All 4 FALSE rows corrected. The Development gate command is now
+    `uv run python -m unittest discover -s tests -t .`. Architecture no longer implies that a historical
+    promotion receipt cannot be replayed, since `reconstruct_function_receipt` survives supersession,
+    revision retirement and revocation of every member's evidence. The database file is the trust root
+    for the LEDGER alone, with the exported bundle's separate identity transfer stated beside it. The
+    runtime module list drops `unittest` (absent from `src/`) and stops reading as an inventory. The 3
+    STALE rows now show the shipped set workflow (`function verify-drafts` -> `function inspect` ->
+    `function promote`) instead of the one-artifact-at-a-time lifecycle, and the README flow diagram
+    carries set verification, promotion, export and offline evaluation with its miss branch. The 20
+    INCOMPLETE rows gained the M2 function layer across all three docs, including the eight-leaf
+    `function` group table and the exit-6 contract - which closes the tracked M2.u4c5a polish row.
+    Review. One reviewer judged 88 assertions (68 PASS / 16 FAIL / 3 WEAK / 1 UNVERIFIED) by
+    re-deriving each against shipped code, and returned 14 findings: 1 high, 6 med, 7 low. All 14 were
+    accepted and fixed. The high finding was a security-relevant defect MAIN introduced: the threat
+    model's Trusted list named the bundle FILE, while `parse_function` validates it as untrusted input
+    and the same document later called it untrusted, so an operator could read a self-consistent
+    attacker-chosen bundle as trusted. Trusted now names the host runtime and the expected-hash channel;
+    bundle files moved to Untrusted. Other accepted corrections: `--expected-function-hash` on
+    `function verify` pins one read snapshot, never later consumption; `HASH_FROM_VERIFY` had no
+    producing command in the quick start; `function eval` is ledger-free, not capability-free, since it
+    opens and reads a path; `unicodedata` does control-character validation, not canonicalization;
+    per-artifact promotion leaves check six failing until a set checkpoint, so a live export exits 6;
+    contract steps were reordered so promotion precedes the check requiring its receipt; exit 2 covers
+    validation as well as usage; and 5 sentences over the 25-word ASD-STE100 limit were split.
+    Rulings against the reviewer: F02 asked README to name all six check keys - declined as duplication
+    of architecture's owning scope, resolved with a pointer. B022's Go+CEL row closed by recasting the
+    unsupported "the project evaluated" origin story as present-tense rationale, which the Authoring
+    rule requires independently. Depends on u5a.
 
 - M3 - Trim to paragraph scope - UNPLANNED. Removes behavior outside `turns repeatedly supervised LLM
   answers into narrowly scoped deterministic behavior`, sequenced after M2 so the pure resolver is

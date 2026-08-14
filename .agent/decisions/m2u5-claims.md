@@ -13,6 +13,10 @@ are u5b's work list; the `SCOPE` rows are deliberately left for M3.
 
 `T:` = committed test name. `S:` = source anchor, resolved in the anchor manifest at the end.
 
+Consumed: u5a pinned rows E006, E012 and E027-E030; u5b resolved every remaining non-TRUE,
+non-SCOPE row. The verdicts below are the survey that scoped that work, not current state - the u5a and
+u5b roadmap records carry the dispositions. `SCOPE` rows remain open for M3.
+
 ---
 
 # Part 1 — documentation claim inventory

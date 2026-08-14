@@ -22,6 +22,13 @@ handle(request)
                                          verified artifact
                                               ↓ explicit scope-hash promotion
                                          promoted exact match
+                                              ↓ set verification + set promotion
+                                    one function: every promoted match
+                                              ↓ export
+                                         portable bundle
+                                              ↓ evaluate, with no ledger
+                                         ├─ exact match → resolved JSON plan
+                                         └─ no exact match → inert miss
 ```
 
 ## Guarantees
@@ -33,14 +40,35 @@ handle(request)
   resolution, time, and receipt digest.
 - Compilation is deterministic and model-free. Conflicts block builds; no majority vote hides them.
 - Verification replays every active example in the exact scope plus partition, operation, revision,
-  and input boundary probes.
+  and input boundary probes. Set verification adds six ordered checks over the complete promoted set.
 - Promotion names the verified scope hash and atomically rechecks operation policy, artifact content,
   the complete evidence snapshot, and the sealed verification test set. Its receipt binds all of
-  those values; retirement and suspension are one-way states.
+  those values; retirement and suspension are one-way states. Set promotion repeats one function hash,
+  retires predecessors, activates candidates, and writes one immutable receipt plus ordered
+  memberships in the same transaction.
 - Counterexamples, evidence revocation, ambiguity, or runtime integrity failure quarantine affected
   artifacts before fallback.
 - Request IDs are partition-local idempotency keys bound to immutable operation and input content.
   Candidate generation runs outside database transactions under a recoverable lease.
+
+The promoted artifacts of one operation aggregate into a single portable object:
+
+- `cement-function-v2` is a capability-free JSON document. It gives the opening sentence a concrete
+  referent: the whole promoted set is one function, not one entry.
+- Entry order is normalized by input hash, so equal content produces equal bytes and one equal
+  `function_hash`. The embedded hash proves normalized self-consistency. An independently obtained
+  expected hash also pins caller-held identity. Neither mode proves origin or supplies a signature.
+- Function identity is verified-content identity. The promoter and the promotion time never change the
+  `function_hash`; the promotion receipt keeps that provenance separate.
+- `verify_function` is read-only and authority-free. It returns six ordered checks over one snapshot of
+  the complete promoted set. The sixth check requires the latest persisted receipt to bind that
+  snapshot, so individually valid artifacts cannot pass as a set without a current checkpoint.
+- An exported bundle evaluates with no ledger, no adapter, and no LLM. It stays deterministic after the
+  ledger changes, so a revocation or a policy revision needs a newly verified export.
+- An empty promoted set is a supported function, not an error. It verifies vacuously, exports a real
+  empty document, and evaluates every input as a miss.
+- Every verification result is one committed snapshot. It is not a lease and states nothing about
+  future ledger state.
 
 Cement returns data, not effects. The caller must run every resolved plan through current
 authentication, authorization, policy, and idempotent effect execution. Determinism is not permission.
@@ -82,14 +110,57 @@ independently gated lifecycle:
 
 ```bash
 uv run cement --db demo.db --partition acme compile support.reply
-uv run cement --db demo.db --partition acme verify art_REPLACE_ME
-uv run cement --db demo.db --partition acme report show report_REPLACE_ME
-uv run cement --db demo.db --partition acme promote art_REPLACE_ME \
-  --scope-hash HASH_FROM_VERIFY --actor release-manager
+uv run cement --db demo.db --partition acme function verify-drafts support.reply \
+  --actor release-manager
+uv run cement --db demo.db --partition acme function inspect support.reply
+uv run cement --db demo.db --partition acme function promote support.reply \
+  --expected-function-hash HASH_FROM_INSPECT --actor release-manager
 ```
+
+`function verify-drafts` verifies every current-build draft of the operation in one locked transaction.
+`function inspect` then previews the retained members, the verified candidates, the replacements, and
+the skipped rows. It returns the prospective function hash that `function promote` must repeat.
+Promotion fails if the set drifts after the preview. The per-artifact `verify` and `promote` commands
+remain available for one artifact at a time. Per-artifact promotion leaves the sixth set check failing
+until you promote a set checkpoint. A live export then exits 6.
 
 Run `compile` periodically with a scheduler of your choice. It creates drafts and never verifies or
 promotes them automatically.
+
+### The function group
+
+`cement function` has eight leaves:
+
+| Leaf | Purpose |
+|---|---|
+| `show` | Report the receipt anchor beside the current operation state. |
+| `receipts` | Page the receipt history in descending sequence order. |
+| `verify-drafts` | Verify every current-build draft in one locked transaction. |
+| `verify` | Run the six ordered checks over the current promoted set. |
+| `inspect` | Preview the prospective set and return its function hash. |
+| `promote` | Promote the whole set atomically against a repeated hash. |
+| `export` | Emit bundle bytes for the live set or for a historical receipt. |
+| `eval` | Answer one canonical input from a bundle, with no ledger. |
+
+Pass `--expected-function-hash` to `function verify` to pin the verified snapshot. The check then fails
+on set growth and on any other drift. That result is one read snapshot, not a lease. A later export can
+still see a different set. [docs/architecture.md](docs/architecture.md) names the six checks in their
+returned order.
+
+Verify the set and export it. Then answer inputs where no ledger exists:
+
+```bash
+uv run cement --db demo.db --partition acme function verify support.reply
+uv run cement --db demo.db --partition acme function export support.reply \
+  --out support.function.json
+uv run cement function eval --bundle support.function.json \
+  --input '{"question":"Where is my invoice?"}' \
+  --expected-function-hash HASH_FROM_VERIFY
+```
+
+`function eval` needs no `--db` and no `--partition`. It returns `artifact_hash`, `function_hash`,
+`matched`, and `output`. `function export --receipt-id` serves a historical receipt, including one from
+a superseded operation revision.
 
 ## Library API
 
@@ -146,8 +217,24 @@ Proposal and report feeds plus example and artifact insertion catalogs carry mon
 values. To page them, pass the last observed value to `--after-sequence`. Example revocations and
 artifact lifecycle changes do not reinsert catalog rows. Consume `events --after SEQUENCE`. Then
 refetch named records or rescan the affected operation catalog. Report test rows use the last `key`
-with `report show --after-test-key`. CLI usage and domain failures are JSON on stderr with stable
+with `report show --after-test-key`. `function receipts` pages in the other direction. It returns rows
+in descending sequence order, and `--before-sequence` takes an exclusive cursor. Set promotion emits
+one `function.promoted` event with bounded ID projections; the membership table stays authoritative
+for the exact member list. CLI usage and domain failures are JSON on stderr with stable
 nonzero exit classes. Cement bounds JSON from stdin by byte count before it parses the input.
+
+Exit 6 is the negative-verdict class. It means that the command completed correctly and that its answer
+is negative. The leaf names the object, and the object selects the payload channel:
+
+| Leaf | Exit-6 answer | Payload |
+|---|---|---|
+| `function verify-drafts` | The batch completed and at least one report failed. | `stdout` |
+| `function verify` | At least one of the six set checks failed. | `stdout` |
+| `function export` | The live set is unverified, so no bundle bytes exist. | `stderr` |
+| `function eval` | The bundle holds no exact case for the canonical input. | `stdout` |
+
+Every other nonzero exit reports a failure to complete. Exit 2 covers usage and validation. Exit 3
+means an absent object, exit 4 a state or authority conflict, and exit 5 an integrity failure.
 
 Read [docs/adapter-protocol.md](docs/adapter-protocol.md) for the command adapter protocol. Read
 [docs/architecture.md](docs/architecture.md) and [docs/threat-model.md](docs/threat-model.md) for the
@@ -156,12 +243,13 @@ full state model and trust boundaries.
 ## Examples
 
 [Hospital OCR layout-learning](examples/hospital_ocr/README.md) - offline walkthrough of supervised
-per-layout extraction plans becoming deterministic reuse.
+per-layout extraction plans becoming deterministic reuse. It ends by sealing the promoted layouts into
+one function, deleting the ledger, and answering a document from the exported bundle alone.
 
 ## Development
 
 ```bash
-uv run python -m unittest discover -s tests -v
+uv run python -m unittest discover -s tests -t .
 uv build
 ```
 
@@ -175,6 +263,15 @@ with mode `0600`, but evidence is plaintext. CLI actor names are recorded assert
 authentication. A library deployment can supply an `authority(partition, actor, action, subject)`
 callback; remote authentication, encryption, retention, signing, and tenant-aware API authorization
 remain deployment responsibilities.
+
+An exported bundle is a second deployment object with its own boundary. It executes without the
+database and without the authority callback, so the ledger's file permissions no longer protect it.
+The bundle is plaintext and carries the exact inputs, the exact outputs, and the governance digests.
+Classify it with your other sensitive data. Apply the same retention and disclosure rules.
+`function export --out` writes atomically through a mode-0600 temporary file and refuses a non-regular
+destination. The reader accepts one strict UTF-8 regular file and bounds it at 64 MiB, independently
+from the 1 MiB bound on the evaluation input. `function eval` is ledger-free, not import-free: it opens
+and reads the bundle path, and importing `cement_runtime` still loads `sqlite3`.
 
 The callback gates operation registration/revision, proposal review, compilation, verification,
 promotion, challenge, evidence revocation, and artifact suspension. `handle` and read APIs assume the
