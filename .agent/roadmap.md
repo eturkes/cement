@@ -64,7 +64,9 @@ Measured gaps driving the arc:
     one hash and a bundle self-checks with no sidecar. Optional `expected_function_hash` adds
     caller-held-identity binding. Evaluation is digest lookup decided by canonical input text, returning
     detached output. `ValidationError` = structure/bounds; `IntegrityError` = digest mismatch. Limits:
-    64 MiB, 50_000 entries, 1M items, depth 67 (default canonicalizer walls admit only ~1_600 entries).
+    64 MiB, 50_000 entries, 1M items, depth 67. (An earlier "~1_600 entries" reading of the default
+    canonicalizer walls was wrong: the function ABI uses `FUNCTION_MAX_ITEMS` = 1M, not
+    `DEFAULT_MAX_ITEMS`, and `test_entry_count_accepts_maximum_and_rejects_one_past` builds 50,000.)
   - u2 DONE (main=84% 202K/240K, impl=80% 191K/240K) - `System.verify_function` in `system.py` (+485)
     plus `FunctionCheck`/`FunctionVerification` in `models.py` (+26) and 31 tests in `test_system.py`
     (+2041; suite 103 -> 134). Read-only verifier: one `Store.transaction(write=False)`, no schema, no
@@ -664,16 +666,60 @@ Measured gaps driving the arc:
     devices are refused, which removes the ledger-free `cat bundle.json | ... --bundle /dev/stdin` route.
     `_emit` performs no flush, so payload and status guarantees assume a healthy stdout. `_input` still does
     not translate an `OSError` from stdin, and the input value is canonicalized twice per invocation.
-  - u5 OPEN tier=docs - surface realignment: `README.md` claim pass (guarantees, request outcomes,
-    deployment boundary) against what the function object now proves, `docs/architecture.md` contract
-    steps for the function layer, and the hospital example resolving from an exported bundle with no
-    ledger, no adapter, and no LLM, covered by `tests/test_hospital_ocr_example.py`. Owns every
-    documentation edit for M2 so u1-u4c6 stay code-and-test only. The human-facing ASD-STE100 register
-    pass over `README.md`, `docs/` and the example README landed off-spine and claim-preserving, so u5
-    inherits that register and moves claims alone. `docs` tier because the only code delta
-    is example-side behind that committed test, while every claim it writes is re-derived by the M2
-    review's `audit` replayer; a claim pass finding that the function object does not prove what the
-    README asserts is spine work, not a wording fix. Depends on u1-u4c6.
+  - u5 split two ways per `.agent/decisions/m2u5-design.md`, arbitrated from two anchored maps (docs
+    claim inventory 144 rows / 281 anchors; function-layer surface map 279 anchors) plus two prototyped
+    spikes that each reached a green gate in its own worktree and BOTH self-rejected on disjoint measured
+    evidence. u5 was scoped when a teammate absorbed the implementation half and carried a standing
+    instruction to recheck size against `main=`; the recheck, taken after arbitration when the surface is
+    known, fails. The docs half is 32 claim rows needing an edit (4 FALSE, 3 STALE, 20 INCOMPLETE, 5
+    UNPINNED) plus 33 undocumented capabilities and 4 internal contradictions over 584 lines of markdown,
+    every replacement sentence MAIN-authored normative prose carrying an evidence anchor; the example half
+    measures +64 production / +97 test lines against a corpus that must be re-driven. Wave 1 alone cost
+    MAIN 78% of one window before any contract line existed. The halves share no judgment surface and
+    carry different tiers, so the cut is clean and ordered example-first, which lets the claim pass
+    document a finished system. Claim inventory + guarantee ledger travel as
+    `.agent/decisions/m2u5-claims.md`, since both maps were gitignored scratch.
+    The fork ruling: inline LOCATION, library CHANNEL, one shipped-CLI round-trip proved in the test.
+    `standalone` carries five unconditional defects and its first is unfixable inside its own constraint -
+    `run_demo.py` deletes its temporary ledger and never creates a function receipt, so `function export`
+    cannot run against what the walkthrough just built, and the separate script teaches an unprinted setup
+    path. `inline`'s two unconditional defects are size and readability, and its dominant conditional one
+    is that the library channel exercises no shipped CLI behavior - which the suite can buy once for
+    ~0.6 s instead of every demo line paying 2,136.001 ms of per-document process startup.
+    Measured and binding on both sub-units: the exported bundle is NOT reproducible across clean runs.
+    Two runs export 3,341 bytes with different SHA-256 values while no random identifier reaches the text;
+    run-specific evidence IDs feed `evidence_snapshot_hash`, verification example IDs feed
+    `report.test_set_hash`, both feed `entry_seal`, and that moves the root `function_hash`. Honest
+    behavior, since function identity is verified-content identity - but it means no committed bundle may
+    be byte-compared against a fresh export, and the demo transcript now carries a second per-run dynamic
+    value needing its own mask beside `art_[0-9a-f]{32}`.
+  - u5a OPEN tier=data - the hospital example resolves from an exported bundle with no ledger, no adapter
+    and no LLM, covered by `tests/test_hospital_ocr_example.py`. Final phase of `run_demo.py` over
+    `parse_function` + `evaluate`, printing the verified function hash before the ledger goes away and
+    asserting the parsed bundle's hash equals it, since that assertion is the only thing linking an
+    offline answer to the verified set. The suite additionally proves the shipped operator route once
+    through one `function export --out` plus `function eval --bundle` subprocess pair. Exported entries =
+    2 (layouts A and B); layout C is reviewed but never promoted, so the miss case is free and real.
+    Ledger-freedom proof standard is the committed precedent at `tests/test_cli.py:4693` - patch
+    `System.__init__` AND `sqlite3.connect` to raise - never import-freedom. Also pins the example README
+    transcript, which no test currently defends (claim rows E027-E030), retiring the standing manual
+    rerun-and-rediff obligation; both dynamic values must be masked for that pin to hold. Owns the example
+    README delta its own code forces. Est. +64 production / +97 test. Depends on u1-u4c6.
+  - u5b OPEN tier=docs - claim pass over `README.md`, `docs/architecture.md`, `docs/threat-model.md` and
+    every remaining `examples/hospital_ocr/README.md` claim row, driven from
+    `.agent/decisions/m2u5-claims.md`. Owns every M2 documentation edit u5a does not force, so u1-u4c6
+    stay code-and-test only. The four FALSE rows are load-bearing: architecture's "cannot replay a
+    historical promotion receipt" is contradicted by `reconstruct_function_receipt`, its
+    database-as-sole-integrity-trust-root claim is contradicted by offline bundle evaluation under an
+    independently held function hash, its runtime module list names `unittest` (not imported) and omits
+    M2's additions, and README's Development gate command diverges from the configured gate. The
+    human-facing ASD-STE100 register pass landed off-spine and claim-preserving, so u5b inherits that
+    register and moves claims alone. Folds in the tracked M2.u4c5a polish row whose remaining acceptance
+    is that `README.md`/`docs/` state the exit-6 contract once - README's paging/exit paragraph is already
+    INCOMPLETE for omitting the class, so the sentence gets written either way. `docs` tier because it
+    ships no code, while every claim it writes is re-derived by the M2 review's `audit` replayer; a claim
+    pass finding that the function object does not prove what the README asserts is spine work, not a
+    wording fix. Depends on u5a.
 
 - M3 - Trim to paragraph scope - UNPLANNED. Removes behavior outside `turns repeatedly supervised LLM
   answers into narrowly scoped deterministic behavior`, sequenced after M2 so the pure resolver is
