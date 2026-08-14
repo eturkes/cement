@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterator
+import contextlib
 from dataclasses import asdict, dataclass, field, is_dataclass
 import json
 import os
+import pathlib
+import stat
 import sys
 from typing import Any, Never
 
@@ -17,6 +21,7 @@ from .errors import (
     StateError,
     ValidationError,
 )
+from .function import FunctionDocument
 from .json_value import DEFAULT_MAX_BYTES, JSONValue, parse_json
 from .models import CompilePolicy
 from .source import CommandCandidateSource
@@ -211,6 +216,9 @@ def _parser() -> argparse.ArgumentParser:
     function_export.add_argument(
         "--receipt-id", help="export one immutable historical receipt instead of the current set"
     )
+    function_export.add_argument(
+        "--out", help="write the bundle atomically to PATH instead of stdout"
+    )
 
     events = commands.add_parser("events", help="read append-only audit projections")
     events.add_argument("--after", type=int, default=0)
@@ -255,6 +263,106 @@ def _emit(value: Any, *, stream: Any = None) -> None:
     if is_dataclass(value) and not isinstance(value, type):
         value = asdict(value)
     stream.write(json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
+
+
+def _reject_export_target(target: pathlib.Path) -> None:
+    """Admit an absent name or a plain regular file, and nothing else.
+
+    One `lstat` rather than a chain of `Path` predicates: each predicate is its
+    own syscall, so a link installed between two of them is admitted by exactly
+    the check meant to refuse it. `lstat` does not follow the final component,
+    so a symlink answers `S_ISLNK` and `os.replace` never destroys the link.
+    """
+    try:
+        mode = os.lstat(target).st_mode
+    except (FileNotFoundError, NotADirectoryError):
+        # Both belong to the parent, which the caller grades with its own message.
+        return
+    if not stat.S_ISREG(mode):
+        raise ValidationError("export output path must identify a non-symlink regular file")
+
+
+@contextlib.contextmanager
+def _export_failures() -> Iterator[None]:
+    """Collapse every OS-level `--out` failure into this leaf's own exit 2.
+
+    The `Path` predicates raise `EACCES` on a search-denied ancestor and `main`
+    maps no bare `OSError`, so the structural checks need the same translation
+    the writer gives its syscalls.
+    """
+    try:
+        yield
+    except ValidationError:
+        raise
+    except (OSError, ValueError, UnicodeError) as exc:
+        raise ValidationError("export output could not be written safely") from exc
+
+
+# Draws from a 2**48 name space, so exhaustion means the directory is hostile
+# rather than crowded, and the writer reports that as any other failure.
+_EXPORT_ATTEMPTS = 128
+
+
+def _export_temporary(target: pathlib.Path) -> tuple[int, pathlib.Path]:
+    """Open a fresh 0600 file beside the destination, provably not the destination.
+
+    `tempfile.mkstemp` derives its name from a prefix alone, so a target whose
+    own name reproduces that prefix can be drawn as its own temp: the payload is
+    then written straight through the destination name, which appears as an
+    empty file before the bundle exists. Naming the candidate here keeps the two
+    distinct before anything is created. The leading dot hides a leftover from a
+    plain `ls`, and the cap keeps the whole name inside `NAME_MAX` for target
+    names up to the filesystem maximum.
+    """
+    for _ in range(_EXPORT_ATTEMPTS):
+        candidate = target.with_name(f".{target.name[:64]}.{os.urandom(6).hex()}")
+        if candidate == target:
+            continue
+        try:
+            return os.open(candidate, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), candidate
+        except FileExistsError:
+            continue
+    raise ValidationError("export output could not be written safely")
+
+
+def _export_target(value: str) -> pathlib.Path:
+    target = pathlib.Path(value)
+    with _export_failures():
+        _reject_export_target(target)
+        if not target.parent.is_dir():
+            raise ValidationError("export output directory does not exist")
+        return target.parent.resolve() / target.name
+
+
+def _write_export(target: pathlib.Path, document: FunctionDocument) -> dict[str, Any]:
+    payload = document.text.encode("utf-8")
+    temporary: pathlib.Path | None = None
+    try:
+        with _export_failures():
+            descriptor, temporary = _export_temporary(target)
+            try:
+                stream = os.fdopen(descriptor, "wb")
+            except BaseException:
+                os.close(descriptor)
+                raise
+            with stream:
+                # `os.open`'s mode is masked by the umask, so a permissive one
+                # would otherwise publish a world-readable bundle.
+                os.fchmod(stream.fileno(), 0o600)
+                stream.write(payload)
+                stream.flush()
+                os.fsync(stream.fileno())
+            # Rerun the guard here, not only at selection time: rename(2) carries
+            # no target-identity predicate, so this is the narrowest window
+            # available.
+            _reject_export_target(target)
+            os.replace(temporary, target)
+            temporary = None
+    finally:
+        if temporary is not None:
+            with contextlib.suppress(OSError):
+                os.unlink(temporary)
+    return {"out": str(target), "bytes": len(payload), "function_hash": document.function_hash}
 
 
 def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
@@ -457,6 +565,10 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
             # without this the same positional is graded by grammar on one
             # branch and by receipt membership on the other.
             _name(args.operation, "operation")
+            # The destination is graded before any ledger work: a structurally
+            # unusable path is repaired by no ledger change, and a shell redirect
+            # preempts the producer the same way.
+            target = _export_target(args.out) if args.out is not None else None
             if args.receipt_id is not None:
                 # Reconstruction keys on partition + receipt ID alone, so the
                 # positional operation is checked here or not at all.
@@ -466,24 +578,30 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
                 )
                 if reconstruction.receipt.operation != args.operation:
                     raise NotFoundError("function receipt does not exist for this operation")
-                return _Outcome(raw=reconstruction.document.text)
-            verification = system.verify_function(args.partition, args.operation)
-            if not verification.passed:
-                raise _Unverified(
-                    {
-                        "error": "unverified",
-                        "message": "function verification failed; no bundle exported: "
-                        + "; ".join(
-                            f"{check.key}: {check.detail}"
-                            for check in verification.checks
-                            if not check.passed
-                        ),
-                        "checks": [asdict(check) for check in verification.checks],
-                    }
-                )
-            if verification.document is None:
-                raise IntegrityError("function verification passed without an exportable document")
-            return _Outcome(raw=verification.document.text)
+                document = reconstruction.document
+            else:
+                verification = system.verify_function(args.partition, args.operation)
+                if not verification.passed:
+                    raise _Unverified(
+                        {
+                            "error": "unverified",
+                            "message": "function verification failed; no bundle exported: "
+                            + "; ".join(
+                                f"{check.key}: {check.detail}"
+                                for check in verification.checks
+                                if not check.passed
+                            ),
+                            "checks": [asdict(check) for check in verification.checks],
+                        }
+                    )
+                if verification.document is None:
+                    raise IntegrityError(
+                        "function verification passed without an exportable document"
+                    )
+                document = verification.document
+            if target is None:
+                return _Outcome(raw=document.text)
+            return _write_export(target, document)
     if args.command == "events":
         return system.events(args.partition, after=args.after, limit=args.limit)
     raise AssertionError("argparse accepted an unknown command")

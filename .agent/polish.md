@@ -65,7 +65,12 @@ changed is spine work, not polish.
   `(file, anchor, old, new, test)` rows, asserts each patch changed the file, purges `__pycache__` with
   `PYTHONDONTWRITEBYTECODE=1`, runs the named test per mutant, restores byte-exactly (`cmp` proves it),
   and exits nonzero on any survivor; rerunning it from a clean checkout reproduces 9/9 without edits.
-  u4c5a is the second instance and its driver is the better seed: `.scratch/mutate-u4c5a.py` already runs
+  u4c5b is the third instance and the seed with the widest catalogue: `.scratch/mutants-u4c5b.py` carries
+  14 mutants over the `--out` writer (13 killed, 1 proved equivalent), whole-file `str.replace` with an
+  identity-check per mutant, kill decided by the suite's rc rather than by parsed names (subTest failures
+  print no inline `FAIL`), a restore in `finally` plus a `RESTORED-IDENTICAL` compare, and a documented
+  equivalent mutant so a survivor list of exactly `[installed-file-unlinked]` is the closure signal.
+  u4c5a's driver is the better seed for anchor handling: `.scratch/mutate-u4c5a.py` already runs
   a 16-mutant catalogue over the export leaf (16/16 killed), asserts each anchor matches exactly once
   before patching, asserts `text != before`, rejects any run whose selected-test count moves, restores in
   a `finally` and proves the restore with a sha256 compare. It is gitignored like its predecessors, so the

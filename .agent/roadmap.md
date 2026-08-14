@@ -575,13 +575,48 @@ Measured gaps driving the arc:
     per-artifact `System.promote`, so the CLI's handling of it is pinned by injection while the library
     route into that state stays reasoned. Stored-scalar conversions reachable through the reconstruction
     path can still leak raw conversion errors past `main`, which remains the tracked audit.
-  - u4c5b OPEN tier=kernel - `function export ... [--out PATH]`: same-directory temp, write, flush, fsync,
-    `os.replace`, so the destination holds old bytes or new bytes and never a prefix - a direct writer was
-    measured leaving a 17-byte partial. Existing symlink or non-regular target rejected before any write,
-    missing parent reported separately, every other OS error translated, all at exit 2 mirroring
-    `store.py`'s own messages, since `main` has no catch-all and a bare `OSError` was measured escaping it.
-    Emits `{out, bytes, function_hash}` at exit 0, writes nothing on any failure path, and takes mode 0600
-    from the replacing inode. Est. 35-45 / 320-450. Depends on u4c5a.
+  - u4c5b DONE (main=97% 233K/240K, mate=54% 129K/240K) - `function export ... [--out PATH]`: the atomic file
+    channel. `cli.py` +136/-18, `test_cli.py` +530/-1 (22 tests); suite 474 -> 496. Contract
+    `.agent/decisions/m2u4c5b-contract.md`. No library delta; `system.py`, `store.py`, `models.py`,
+    `function.py`, `__init__.py`, `README.md`, `docs/`, `examples/` byte-identical.
+    Ordering. Two spikes built the whole writer to a green gate and both self-rejected on disjoint measured
+    defects - precheck leaves a gate-wide TOCTOU window (259 ms at 320 entries, absent->symlink injection
+    inside it returning 0 while `os.replace` removes the link), gate-first burns unbounded work before a
+    trivially unusable path (+0.99 s / +13.3 MiB at 1,000 entries, ~48 s / +651 MiB projected at the 64 MiB
+    cap). Ruled as the synthesis both recommended: the structural check runs BEFORE source selection and
+    RERUNS immediately before `os.replace`. Precedent is `--db`, which exits 2 in `Store.__init__` before
+    any ledger work, and the shell redirect, which fails before Cement runs at all. Accepted cost, pinned
+    as deliberate: a structurally bad `--out` preempts source verdicts 6/3/3/5 as exit 2, though never the
+    operation grammar.
+    Shipped. `_reject_export_target` = ONE `os.lstat` + `S_ISREG`, with `(FileNotFoundError,
+    NotADirectoryError)` falling through so the parent test keeps its own message. `_export_temporary`
+    names its own temp (`.<name[:64]>.<12 hex>`), skips any candidate equal to the destination BEFORE
+    creating anything, and opens `O_CREAT | O_EXCL` at 0600; `os.fchmod` then pins the mode against the
+    umask. Write, flush, fsync, recheck, `os.replace`, best-effort unlink in `finally`. `_export_failures`
+    wraps BOTH the precheck and the writer, so `(OSError, ValueError, UnicodeError)` becomes this leaf's
+    exit 2 with three messages over twelve causes. Success emits `{bytes, function_hash, out}` with `out`
+    resolved through a symlinked parent; the raw channel and `main`'s six clauses stay byte-identical.
+    Verification. MAIN's 16-branch smoke probe ran against a real ledger before any test existed. The
+    diff-blind suite, contract-only, went 37 failures + 4 errors at baseline to 38/38 green against the
+    implementation with zero divergences and no code defect - the second consecutive full convergence. A
+    14-mutant campaign over the guard, the recheck, the temp naming, the translation, the ordering and the
+    resolved path killed 13 and proved 1 equivalent (`temporary = None` after a successful rename, whose
+    unlink is suppressed either way), `cli.py` restored byte-identical.
+    Review. The contract-attack reviewer, dispatched before implementation, returned 11 findings, 2 high,
+    and TWO were real code defects rather than claim defects - the first time this milestone. (1) The
+    `pathlib` predicates raise `EACCES` on a search-denied ancestor, since `_ignore_error` suppresses only
+    ENOENT/ENOTDIR/EBADF/ELOOP, so a bare `PermissionError` escaped `main`. (2) `mkstemp` derives its name
+    from a prefix alone, so the target `"."*66 + <8 chars>` can be drawn as its own temp: the destination
+    appears empty before the bundle exists and `os.replace(path, path)` no-ops. A third finding retired the
+    three-stat guard for the single `lstat`. The rest were contract corrections: `PC_NAME_MAX` is 512 here
+    so the hardcoded 250-character witness proved nothing, cleanup is best-effort because a suppressed
+    unlink cannot guarantee deletion, `store.py`'s empty-path message differs in wording, and `--out`
+    abbreviates `--output` on `proposal review` under inherited `allow_abbrev`, which predates this unit.
+    Known limits: the recheck narrows the destination race to one stat/replace pair and cannot close it,
+    since `rename(2)` carries no target-identity predicate. Content is guaranteed old-or-new absent
+    external mutation; a concurrent external writer owns its own effects. No directory fsync, so rename
+    durability across a crash is out of scope. Mode is unconditionally 0600 and an existing destination's
+    mode is not preserved. A parent that refuses the unlink keeps a leftover temp at 0600.
   - u4c6 OPEN tier=kernel - `function eval --bundle PATH --input JSON` over `parse_function` + `evaluate`:
     bundle read by a dedicated strict-UTF-8 reader bounded at `FUNCTION_MAX_BYTES` (67,108,864), evaluation
     input keeping the existing `DEFAULT_MAX_BYTES` channel including `-`, so a bundle can never travel

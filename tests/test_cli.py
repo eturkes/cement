@@ -1,10 +1,12 @@
 import argparse
 import contextlib
+import errno
 import inspect
 import io
 import json
 import os
 import pathlib
+import stat
 import sqlite3
 import sys
 import tempfile
@@ -3402,7 +3404,6 @@ class CLITests(unittest.TestCase):
 
     def test_function_export_rejects_options_it_does_not_own(self) -> None:
         for arguments, message in (
-            (("--out", "/tmp/bundle.json"), "unrecognized arguments: --out /tmp/bundle.json"),
             (
                 ("--expected-function-hash", "a" * 64),
                 f"unrecognized arguments: --expected-function-hash {'a' * 64}",
@@ -3421,6 +3422,534 @@ class CLITests(unittest.TestCase):
             self.error(missing),
             {"error": "invalid", "message": "the following arguments are required: operation"},
         )
+
+    # `function export --out`: the atomic file channel.
+
+    def export_root(self) -> pathlib.Path:
+        return pathlib.Path(self.temporary.name).resolve()
+
+    def temps(self, directory: pathlib.Path) -> list[str]:
+        # Writer temps carry a leading dot; nothing else in the fixture does.
+        return sorted(entry.name for entry in directory.glob(".*"))
+
+    def test_function_export_out_writes_the_exact_bundle_and_reports_it(self) -> None:
+        self.promoted_operation("echo", 2)
+        expected = self.live_document("echo").encode("utf-8")
+        root = self.export_root()
+        destination = root / "bundle.json"
+        run = self.run_cli("function", "export", "echo", "--out", str(destination))
+        self.assertEqual(run.status, 0)
+        self.assertEqual(run.stderr_text, "")
+        self.assertEqual(destination.read_bytes(), expected)
+        self.assertEqual(stat.S_IMODE(destination.stat().st_mode), 0o600)
+        self.assertEqual(self.temps(root), [])
+        payload = self.payload(run)
+        self.assertEqual(set(payload), {"bytes", "function_hash", "out"})
+        self.assertEqual(payload["out"], str(destination))
+        self.assertEqual(payload["bytes"], len(expected))
+        document = typing.cast(dict[str, typing.Any], json.loads(expected.decode("utf-8")))
+        self.assertEqual(payload["function_hash"], document["function_hash"])
+        # The bundle itself never reaches stdout on this channel.
+        self.assertNotIn(b"cement-function-v2", run.stdout_bytes)
+
+    def test_function_export_out_replaces_an_existing_destination(self) -> None:
+        self.promoted_operation("echo", 2)
+        expected = self.live_document("echo").encode("utf-8")
+        root = self.export_root()
+        destination = root / "bundle.json"
+        destination.write_bytes(b"previous-bundle")
+        os.chmod(destination, 0o644)
+        run = self.run_cli("function", "export", "echo", "--out", str(destination))
+        self.assertEqual(run.status, 0)
+        self.assertEqual(destination.read_bytes(), expected)
+        # Replacement installs the temp's inode, so the previous mode is not kept.
+        self.assertEqual(stat.S_IMODE(destination.stat().st_mode), 0o600)
+        self.assertEqual(self.temps(root), [])
+
+    def test_function_export_out_never_exposes_a_partial_destination(self) -> None:
+        self.promoted_operation("echo", 2)
+        expected = self.live_document("echo").encode("utf-8")
+        root = self.export_root()
+        destination = root / "bundle.json"
+        destination.write_bytes(b"previous-bundle")
+        observed: list[bytes] = []
+        replace = os.replace
+
+        def watching(source: typing.Any, target: typing.Any) -> None:
+            observed.append(pathlib.Path(target).read_bytes())
+            replace(source, target)
+
+        with mock.patch("cement_runtime.cli.os.replace", watching):
+            run = self.run_cli("function", "export", "echo", "--out", str(destination))
+        self.assertEqual(run.status, 0)
+        # The payload is fully written and fsynced before the rename, and at that
+        # moment the destination still holds the old bytes: never a prefix.
+        self.assertEqual(observed, [b"previous-bundle"])
+        self.assertEqual(destination.read_bytes(), expected)
+
+    def test_function_export_out_never_writes_through_the_destination_name(self) -> None:
+        self.promoted_operation("echo", 2)
+        expected = self.live_document("echo").encode("utf-8")
+        root = self.export_root()
+        # A name that reproduces its own temp: the prefix caps at 64 characters,
+        # so `. + 64 dots + .` is the leading 66 dots, and a draw of the trailing
+        # 12 characters names the destination itself.
+        collision = os.urandom(6)
+        destination = root / ("." * 66 + collision.hex())
+        draws: list[int] = []
+        urandom = os.urandom
+
+        def drawing(size: int) -> bytes:
+            draws.append(size)
+            return collision if len(draws) == 1 else urandom(size)
+
+        existed: list[bool] = []
+        replace = os.replace
+
+        def watching(source: typing.Any, target: typing.Any) -> None:
+            existed.append(pathlib.Path(target).exists())
+            replace(source, target)
+
+        with mock.patch("cement_runtime.cli.os.urandom", drawing):
+            with mock.patch("cement_runtime.cli.os.replace", watching):
+                run = self.run_cli("function", "export", "echo", "--out", str(destination))
+        self.assertEqual(run.status, 0)
+        # The colliding draw is discarded before anything is created, so the
+        # destination is still absent when the finished bundle is renamed onto it.
+        self.assertEqual(draws, [6, 6])
+        self.assertEqual(existed, [False])
+        self.assertEqual(destination.read_bytes(), expected)
+        self.assertEqual(self.temps(root), [destination.name])
+
+    def test_function_export_out_rechecks_the_destination_before_replacing(self) -> None:
+        self.promoted_operation("echo", 2)
+        root = self.export_root()
+        destination = root / "bundle.json"
+        referent = root / "referent"
+        referent.write_bytes(b"referent-bytes")
+        verify_function = System.verify_function
+
+        def racing(self_: typing.Any, *arguments: typing.Any, **keywords: typing.Any) -> typing.Any:
+            # The destination turns into a symlink after the structural check and
+            # before the writer runs; only the recheck can still catch it.
+            destination.symlink_to(referent)
+            return verify_function(self_, *arguments, **keywords)
+
+        with mock.patch.object(System, "verify_function", racing):
+            run = self.run_cli("function", "export", "echo", "--out", str(destination))
+        self.assertEqual(run.status, 2)
+        self.assertEqual(run.stdout_bytes, b"")
+        self.assertEqual(
+            self.error(run),
+            {
+                "error": "invalid",
+                "message": "export output path must identify a non-symlink regular file",
+            },
+        )
+        self.assertTrue(destination.is_symlink())
+        self.assertEqual(referent.read_bytes(), b"referent-bytes")
+        self.assertEqual(self.temps(root), [])
+
+    def test_function_export_out_checks_the_destination_with_one_stat_each_time(self) -> None:
+        self.promoted_operation("echo", 2)
+        root = self.export_root()
+        destination = root / "bundle.json"
+        observed: list[str] = []
+        lstat = os.lstat
+
+        def counting(path: typing.Any, **keywords: typing.Any) -> os.stat_result:
+            if os.fspath(path) == str(destination):
+                observed.append("lstat")
+            return lstat(path, **keywords)
+
+        with mock.patch("cement_runtime.cli.os.lstat", counting):
+            run = self.run_cli("function", "export", "echo", "--out", str(destination))
+        self.assertEqual(run.status, 0)
+        # Two checks, one syscall each. A chain of `Path` predicates would spend
+        # several syscalls per check and admit a link installed between two of
+        # them, which is the case the guard exists to refuse.
+        self.assertEqual(observed, ["lstat", "lstat"])
+
+    def test_function_export_out_rejects_unusable_destinations(self) -> None:
+        self.promoted_operation("echo", 2)
+        root = self.export_root()
+        regular = root / "regular"
+        regular.write_bytes(b"regular")
+        directory = root / "directory"
+        directory.mkdir()
+        referent = root / "referent"
+        referent.write_bytes(b"referent-bytes")
+        link = root / "link"
+        link.symlink_to(referent)
+        dangling = root / "dangling"
+        dangling.symlink_to(root / "absent")
+        fifo = root / "fifo"
+        os.mkfifo(fifo)
+        locked = root / "locked"
+        locked.mkdir()
+        os.chmod(locked, 0o500)
+        self.addCleanup(os.chmod, locked, 0o700)
+        blocked = root / "blocked"
+        (blocked / "child").mkdir(parents=True)
+        os.chmod(blocked, 0o000)
+        self.addCleanup(os.chmod, blocked, 0o700)
+        unusable = "export output path must identify a non-symlink regular file"
+        absent = "export output directory does not exist"
+        unsafe = "export output could not be written safely"
+        cases: tuple[tuple[str, str, str], ...] = (
+            ("parent-missing", str(root / "missing" / "bundle.json"), absent),
+            ("parent-is-a-regular-file", str(regular / "bundle.json"), absent),
+            ("target-is-a-directory", str(directory), unusable),
+            ("target-is-a-symlink", str(link), unusable),
+            ("target-is-a-dangling-symlink", str(dangling), unusable),
+            ("target-is-a-fifo", str(fifo), unusable),
+            ("empty-path", "", unusable),
+            ("parent-is-unwritable", str(locked / "bundle.json"), unsafe),
+            # A search-denied ancestor makes the structural predicates themselves
+            # raise EACCES, which `main` maps only once this leaf translates it.
+            ("ancestor-is-search-denied", str(blocked / "child" / "bundle.json"), unsafe),
+            ("path-contains-nul", str(root / "bundle") + "\0x", unsafe),
+            ("path-contains-a-lone-surrogate", str(root / "\ud800"), unsafe),
+        )
+        for label, destination, message in cases:
+            with self.subTest(case=label):
+                run = self.run_cli("function", "export", "echo", "--out", destination)
+                self.assertEqual(run.status, 2)
+                self.assertEqual(run.stdout_bytes, b"")
+                self.assertEqual(self.error(run), {"error": "invalid", "message": message})
+                self.assertEqual(self.temps(root), [])
+        self.assertEqual(regular.read_bytes(), b"regular")
+        self.assertTrue(link.is_symlink())
+        self.assertEqual(referent.read_bytes(), b"referent-bytes")
+        self.assertTrue(dangling.is_symlink())
+        self.assertFalse((root / "absent").exists())
+        self.assertTrue(stat.S_ISFIFO(os.stat(fifo).st_mode))
+        self.assertEqual(list(directory.iterdir()), [])
+
+    def test_function_export_out_bounds_the_target_name_at_the_filesystem_maximum(self) -> None:
+        self.promoted_operation("echo", 2)
+        root = self.export_root()
+        maximum = os.pathconf(str(root), "PC_NAME_MAX")
+        accepted = root / ("A" * maximum)
+        run = self.run_cli("function", "export", "echo", "--out", str(accepted))
+        self.assertEqual(run.status, 0)
+        self.assertEqual(accepted.read_bytes(), self.live_document("echo").encode("utf-8"))
+        self.assertEqual(self.temps(root), [])
+        # The temp prefix is capped so `prefix + suffix` stays inside NAME_MAX;
+        # uncapped, this accepted maximum fails instead. One character above it
+        # is the adjacent rejection.
+        rejected = self.run_cli(
+            "function", "export", "echo", "--out", str(root / ("A" * (maximum + 1)))
+        )
+        self.assertEqual(rejected.status, 2)
+        self.assertEqual(
+            self.error(rejected),
+            {"error": "invalid", "message": "export output could not be written safely"},
+        )
+        self.assertEqual(self.temps(root), [])
+
+    def test_function_export_out_keeps_mode_0600_under_a_permissive_umask(self) -> None:
+        self.promoted_operation("echo", 2)
+        root = self.export_root()
+        destination = root / "bundle.json"
+        previous = os.umask(0o777)
+        self.addCleanup(os.umask, previous)
+        run = self.run_cli("function", "export", "echo", "--out", str(destination))
+        self.assertEqual(run.status, 0)
+        # `mkstemp` requests 0600 and the kernel applies the umask, so without an
+        # explicit fchmod this file lands at 0o000.
+        self.assertEqual(stat.S_IMODE(destination.stat().st_mode), 0o600)
+
+    def test_function_export_out_translates_write_failures_and_keeps_the_old_bytes(self) -> None:
+        self.promoted_operation("echo", 2)
+        root = self.export_root()
+        destination = root / "bundle.json"
+        destination.write_bytes(b"previous-bundle")
+        failures: tuple[tuple[str, str, BaseException], ...] = (
+            ("fsync", "cement_runtime.cli.os.fsync", OSError(errno.ENOSPC, "No space left")),
+            ("replace", "cement_runtime.cli.os.replace", OSError(errno.EACCES, "Permission denied")),
+        )
+        for label, target, failure in failures:
+            with self.subTest(stage=label):
+                with mock.patch(target, side_effect=failure):
+                    run = self.run_cli("function", "export", "echo", "--out", str(destination))
+                self.assertEqual(run.status, 2)
+                self.assertEqual(run.stdout_bytes, b"")
+                self.assertEqual(
+                    self.error(run),
+                    {"error": "invalid", "message": "export output could not be written safely"},
+                )
+                self.assertEqual(destination.read_bytes(), b"previous-bundle")
+                self.assertEqual(self.temps(root), [])
+
+    def test_function_export_out_exports_one_historical_receipt(self) -> None:
+        receipt = self.promoted_operation("echo", 2)
+        root = self.export_root()
+        destination = root / "bundle.json"
+        expected = self.run_cli("function", "export", "echo", "--receipt-id", receipt).stdout_bytes
+        run = self.run_cli(
+            "function", "export", "echo", "--receipt-id", receipt, "--out", str(destination)
+        )
+        self.assertEqual(run.status, 0)
+        self.assertEqual(destination.read_bytes(), expected)
+        payload = self.payload(run)
+        self.assertEqual(payload["bytes"], len(expected))
+        document = typing.cast(dict[str, typing.Any], json.loads(expected.decode("utf-8")))
+        self.assertEqual(payload["function_hash"], document["function_hash"])
+
+    def test_function_export_out_writes_non_ascii_as_exact_utf8(self) -> None:
+        self.register("unicode")
+        self.confirm_text("unicode", "Grüße 日本語", "unicode-a")
+        self.run_cli("compile", "unicode")
+        self.promote_set("unicode")
+        root = self.export_root()
+        destination = root / "bundle.json"
+        run = self.run_cli("function", "export", "unicode", "--out", str(destination))
+        self.assertEqual(run.status, 0)
+        written = destination.read_bytes()
+        self.assertEqual(written, self.live_document("unicode").encode("utf-8"))
+        self.assertIn("Grüße 日本語", written.decode("utf-8"))
+        self.assertNotIn("\\u", written.decode("utf-8"))
+        payload = self.payload(run)
+        self.assertEqual(payload["bytes"], len(written))
+        # The byte count is the written length, not the character count.
+        self.assertGreater(payload["bytes"], len(written.decode("utf-8")))
+
+    def test_function_export_out_writes_the_empty_promoted_document(self) -> None:
+        self.register("empty")
+        root = self.export_root()
+        destination = root / "bundle.json"
+        run = self.run_cli("function", "export", "empty", "--out", str(destination))
+        self.assertEqual(run.status, 0)
+        written = destination.read_bytes()
+        self.assertEqual(written, self.live_document("empty").encode("utf-8"))
+        document = typing.cast(dict[str, typing.Any], json.loads(written.decode("utf-8")))
+        self.assertEqual(document["entries"], [])
+        self.assertEqual(self.payload(run)["bytes"], len(written))
+
+    def test_function_export_out_round_trips_through_parse_function(self) -> None:
+        from cement_runtime import evaluate, parse_function
+        from cement_runtime.json_value import canonicalize
+
+        self.promoted_operation("echo", 2)
+        root = self.export_root()
+        destination = root / "bundle.json"
+        run = self.run_cli("function", "export", "echo", "--out", str(destination))
+        parsed = parse_function(destination.read_bytes().decode("utf-8"))
+        self.assertEqual(parsed.function_hash, self.payload(run)["function_hash"])
+        match = evaluate(parsed, input_json=canonicalize({"x": 1}))
+        self.assertTrue(match.matched)
+        self.assertEqual(match.output, {"kind": "echo", "value": {"x": 1}})
+
+    def test_function_export_out_and_stdout_carry_identical_bytes(self) -> None:
+        self.promoted_operation("echo", 2)
+        root = self.export_root()
+        destination = root / "bundle.json"
+        piped = self.run_cli("function", "export", "echo")
+        written = self.run_cli("function", "export", "echo", "--out", str(destination))
+        self.assertEqual(piped.status, 0)
+        self.assertEqual(written.status, 0)
+        self.assertEqual(destination.read_bytes(), piped.stdout_bytes)
+        self.assertEqual(self.payload(written)["bytes"], len(piped.stdout_bytes))
+
+    def test_function_export_out_treats_a_bare_dash_as_a_filename(self) -> None:
+        self.promoted_operation("echo", 2)
+        root = self.export_root()
+        destination = root / "-"
+        run = self.run_cli("function", "export", "echo", "--out", str(destination))
+        self.assertEqual(run.status, 0)
+        # `--out` selects a path, never a stream: `-` is an ordinary filename.
+        self.assertTrue(destination.is_file())
+        self.assertEqual(destination.read_bytes(), self.live_document("echo").encode("utf-8"))
+        self.assertNotIn(b"cement-function-v2", run.stdout_bytes)
+
+    def test_function_export_out_reports_the_resolved_destination(self) -> None:
+        self.promoted_operation("echo", 2)
+        root = self.export_root()
+        actual = root / "actual"
+        actual.mkdir()
+        alias = root / "alias"
+        alias.symlink_to(actual, target_is_directory=True)
+        argument = str(alias / "bundle.json")
+        run = self.run_cli("function", "export", "echo", "--out", argument)
+        self.assertEqual(run.status, 0)
+        reported = self.payload(run)["out"]
+        # The reported path names the file that received the bytes, so it resolves
+        # a symlinked parent instead of echoing the lexical argument back.
+        self.assertEqual(reported, str(actual / "bundle.json"))
+        self.assertNotEqual(reported, os.path.abspath(argument))
+        self.assertTrue((actual / "bundle.json").is_file())
+
+    def test_function_export_out_resolves_a_relative_destination_against_the_cwd(self) -> None:
+        self.promoted_operation("echo", 2)
+        root = self.export_root()
+        previous = pathlib.Path.cwd()
+        os.chdir(root)
+        self.addCleanup(os.chdir, previous)
+        run = self.run_cli("function", "export", "echo", "--out", "bundle.json")
+        self.assertEqual(run.status, 0)
+        self.assertEqual(self.payload(run)["out"], str(root / "bundle.json"))
+        self.assertEqual(
+            (root / "bundle.json").read_bytes(), self.live_document("echo").encode("utf-8")
+        )
+
+    def test_function_export_out_writes_nothing_when_the_source_fails(self) -> None:
+        foreign = self.promoted_operation("beta", 2)
+        self.promoted_operation("echo", 2)
+        root = self.export_root()
+        destination = root / "bundle.json"
+        corrupt = self.promoted_operation("gamma", 2)
+        self.corrupt_receipt_membership(corrupt)
+        anchor = self.payload(self.run_cli("function", "show", "echo"))["function_anchor"]
+        member = str(anchor["members"][0]["artifact_id"])
+        self.run_cli("artifact", "suspend", member, "--actor", "operator", "--reason", "drift")
+        cases: tuple[tuple[str, tuple[str, ...], int], ...] = (
+            ("drifted", ("echo",), 6),
+            ("unregistered", ("ghost",), 3),
+            ("unknown-receipt", ("echo", "--receipt-id", "fpr_" + "0" * 32), 3),
+            ("foreign-receipt", ("echo", "--receipt-id", foreign), 3),
+            ("corrupt-receipt", ("gamma", "--receipt-id", corrupt), 5),
+        )
+        for label, arguments, expected in cases:
+            with self.subTest(case=label):
+                # The good `--out` changes the code path, never the verdict.
+                bare = self.run_cli("function", "export", *arguments)
+                run = self.run_cli("function", "export", *arguments, "--out", str(destination))
+                self.assertEqual(run.status, expected)
+                self.assertEqual(bare.status, expected)
+                self.assertEqual(run.stderr_json, bare.stderr_json)
+                self.assertEqual(run.stdout_bytes, b"")
+                self.assertFalse(destination.exists())
+                self.assertEqual(self.temps(root), [])
+        verdict = FunctionVerification(
+            passed=True,
+            entries=0,
+            document=None,
+            function_hash="e" * 64,
+            checks=(FunctionCheck(key="probe", passed=True, detail="held"),),
+        )
+        with mock.patch.object(System, "verify_function", return_value=verdict):
+            guarded = self.run_cli("function", "export", "echo", "--out", str(destination))
+        self.assertEqual(guarded.status, 5)
+        self.assertEqual(guarded.stdout_bytes, b"")
+        self.assertEqual(
+            self.error(guarded),
+            {
+                "error": "integrity",
+                "message": "function verification passed without an exportable document",
+            },
+        )
+        self.assertFalse(destination.exists())
+        self.assertEqual(self.temps(root), [])
+
+    def test_function_export_out_path_faults_preempt_source_verdicts(self) -> None:
+        self.promoted_operation("echo", 2)
+        root = self.export_root()
+        referent = root / "referent"
+        referent.write_bytes(b"referent-bytes")
+        link = root / "link"
+        link.symlink_to(referent)
+        blocked = root / "blocked"
+        (blocked / "child").mkdir(parents=True)
+        os.chmod(blocked, 0o000)
+        self.addCleanup(os.chmod, blocked, 0o700)
+        missing = str(root / "missing" / "bundle.json")
+        absent = "export output directory does not exist"
+        unusable = "export output path must identify a non-symlink regular file"
+        unsafe = "export output could not be written safely"
+        anchor = self.payload(self.run_cli("function", "show", "echo"))["function_anchor"]
+        member = str(anchor["members"][0]["artifact_id"])
+        self.run_cli("artifact", "suspend", member, "--actor", "operator", "--reason", "drift")
+        cases: tuple[tuple[str, tuple[str, ...], str, str, int], ...] = (
+            ("drift-parent-missing", ("echo",), missing, absent, 6),
+            ("drift-symlink-target", ("echo",), str(link), unusable, 6),
+            # An EACCES the predicates raise preempts the verdict exactly as the
+            # structural rejections do, so the whole precheck is one class.
+            ("drift-blocked-ancestor", ("echo",), str(blocked / "child" / "b.json"), unsafe, 6),
+            ("unregistered-parent-missing", ("ghost",), missing, absent, 3),
+            (
+                "unknown-receipt-symlink-target",
+                ("echo", "--receipt-id", "fpr_" + "0" * 32),
+                str(link),
+                unusable,
+                3,
+            ),
+        )
+        for label, arguments, destination, message, without in cases:
+            with self.subTest(case=label):
+                # The same ledger state without `--out` reports the source verdict.
+                bare = self.run_cli("function", "export", *arguments)
+                self.assertEqual(bare.status, without)
+                run = self.run_cli("function", "export", *arguments, "--out", destination)
+                self.assertEqual(run.status, 2)
+                self.assertEqual(run.stdout_bytes, b"")
+                self.assertEqual(self.error(run), {"error": "invalid", "message": message})
+                self.assertEqual(self.temps(root), [])
+        # Operation grammar still precedes the destination check.
+        grammar = self.run_cli("function", "export", "", "--out", missing)
+        self.assertEqual(grammar.status, 2)
+        self.assertEqual(
+            self.error(grammar),
+            {
+                "error": "invalid",
+                "message": "operation must be 1-128 ASCII letters, digits, "
+                "'.', '_', ':', '/', or '-'",
+            },
+        )
+        self.assertTrue(link.is_symlink())
+        self.assertEqual(referent.read_bytes(), b"referent-bytes")
+
+    def test_function_export_out_path_fault_preempts_a_corrupt_receipt(self) -> None:
+        receipt = self.promoted_operation("echo", 2)
+        self.corrupt_receipt_membership(receipt)
+        root = self.export_root()
+        bare = self.run_cli("function", "export", "echo", "--receipt-id", receipt)
+        self.assertEqual(bare.status, 5)
+        run = self.run_cli(
+            "function", "export", "echo",
+            "--receipt-id", receipt,
+            "--out", str(root / "missing" / "bundle.json"),
+        )
+        self.assertEqual(run.status, 2)
+        self.assertEqual(run.stdout_bytes, b"")
+        self.assertEqual(
+            self.error(run),
+            {"error": "invalid", "message": "export output directory does not exist"},
+        )
+        self.assertEqual(self.temps(root), [])
+
+    def test_function_export_out_preserves_the_symbol_qualified_exit_map(self) -> None:
+        verdict = FunctionVerification(
+            passed=False,
+            entries=1,
+            document=None,
+            function_hash="d" * 64,
+            checks=(FunctionCheck(key="probe", passed=False, detail="negative"),),
+        )
+        root = self.export_root()
+        destination = root / "bundle.json"
+        cases: tuple[tuple[BaseException | None, int], ...] = (
+            (ValidationError("invalid"), 2),
+            (NotFoundError("missing"), 3),
+            (StateError("state"), 4),
+            (IntegrityError("integrity"), 5),
+            (None, 6),
+        )
+        for exception, expected in cases:
+            with self.subTest(expected=expected):
+                replacement: typing.Any
+                if exception is None:
+                    replacement = mock.Mock(return_value=verdict)
+                else:
+                    replacement = mock.Mock(side_effect=exception)
+                # Patch the library boundary; patching `_run` would replace the
+                # branch under test.
+                with mock.patch.object(System, "verify_function", replacement):
+                    run = self.run_cli("function", "export", "echo", "--out", str(destination))
+                self.assertEqual(run.status, expected)
+                self.assertEqual(run.stdout_bytes, b"")
+                self.assertFalse(destination.exists())
+                self.assertEqual(self.temps(root), [])
 
 
 if __name__ == "__main__":
