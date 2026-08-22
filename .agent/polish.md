@@ -62,15 +62,16 @@ changed is spine work, not polish.
   small constant of the page size on both paths, `SCHEMA_VERSION` and the fingerprint move together, and
   the suite is green with the reset documented.
 
-- `pri=3` `size=S` — port the report anchor validator to a committed dev tool. Every `map` brief makes its
-  report's `path:line` claims machine-checkable through `.scratch/validate-anchors.py` (fenced ```anchors
-  block, TAB-separated `path`/`line`/`exact fragment`, exit 0 only when every row resolves and no
-  `TODO-FILL` cell remains), and u4c5's map passed 268 anchors under MAIN's rerun — but the validator is
-  gitignored, so a brief naming it is unrunnable in any clone and the next wave silently loses the check.
-  Acceptance: a tracked script under a dev-tools path takes `REPORT.md [--root DIR]`, reports
-  `ANCHORS-CHECKED`/`ANCHORS-BAD`/`UNFILLED-CELLS` and exits nonzero on any bad anchor or unfilled cell,
-  proven from a clean checkout by a committed fixture report carrying one resolving anchor, one stale
-  anchor and one `TODO-FILL` cell; briefs cite the tracked path.
+- `pri=3` `size=S` — the report anchor validator runs from no gate. `map` briefs make each report's
+  `path:line` claims machine-checkable, and the M3 planning wave's validator is now tracked at
+  `.agent/decisions/m3-report-validate.py` (pipe-table shapes anchor/claim/qa/unit; anchor path plus line
+  must resolve and the backticked symbol must be a substring of that source line; repo root by upward
+  `pyproject.toml` search, so a relocated copy still works). Nothing reruns it, so a stale anchor in a
+  tracked record is invisible until a human reads it. The M2-era `.scratch/validate-anchors.py` variant
+  (fenced ```anchors block, TAB-separated rows, 268 anchors under MAIN's rerun at u4c5) is retired with
+  its report format. Acceptance: the validator runs from the configured gate over every tracked
+  `.agent/decisions/*.md` carrying a recognized table shape, a committed fixture report carrying one
+  resolving anchor and one stale anchor makes the gate fail, and briefs cite the tracked path.
 
 - `pri=2` `size=M` — port the seam mutation battery to a committed dev tool. u4c1's 9-mutant battery over
   `_Outcome`, `main`'s channel branch, the parser slot and limit forwarding killed 9/9, but it ran from
@@ -237,13 +238,6 @@ changed is spine work, not polish.
   keep only probes MAIN's 17 do not already reach — repeated-flag last-wins, Unicode decimal digits
   reaching `type=int`, cross-leaf flag isolation in both directions, and surplus-positional rejection
   are the named non-overlapping ones. Gate: suite green, no existing test weakened.
-- pri=2 `--receipt-id` inherits a repo-wide message vocabulary leak: `_request_id` reports the label
-  `request_id` for `proposal_id` (`system.py:1087,1128,1229`), `artifact_id` (`3704,4466,4829,4968`),
-  `example_id` (`4761`), `report_id` (`5006`) and now the receipt id. Pre-existing, pinned as-is by
-  u4c2 because fixing it means editing `system.py` (outside the CLI write set) or duplicating library
-  validation in the CLI. Acceptance: one label parameter threaded through `_request_id`, every caller
-  naming its own field, existing message pins updated in one pass.
-
 ## M2.u5a deferrals
 
 - pri=2 Bundle-identity determinism is pinned by observation, not by mechanism.
@@ -364,3 +358,43 @@ changed is spine work, not polish.
   helper or normalized record owns each binding family, callers select row-only, bounded-projection or
   full-reconstruction validation explicitly, and the receipt-discovery contracts, projection-limit
   contracts, degraded scenarios and full suite are unchanged.
+
+## M3 planning deferrals
+
+Off-spine at M3 planning. Each row carries the close check written while the evidence was fresh; the
+substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-plan-review.md` L6.
+
+- `pri=4` `size=L` — separately installable command-source distribution. M3.7 ships the runner as a
+  source/sdist example, which is sufficient. Acceptance: a second versioned wheel installs beside a
+  wheel-only `cement-runtime`; core metadata declares no provider or runtime dependency; importing core
+  loads no optional module; the second wheel exposes one documented runner command; the root configured
+  gate plus a clean two-wheel smoke pass; release and version ownership is explicit.
+
+- `pri=3` `size=M` — resolver cache or pooled read connection. M3.2b deliberately pays full P1-P6 per
+  call. Acceptance: cache identity binds database identity, current operation revision, latest receipt
+  sequence and hash, and every state change that can fail a check; first/middle/last corruption never
+  returns a cached hit; a concurrent-writer test proves invalidation; 1/1,000/50,000 benchmarks show a
+  material cold/warm improvement; cached and uncached results are byte-equal; no long-lived read
+  transaction blocks writers.
+
+- `pri=3` `size=M` — explicit quarantine/repair command after a resolver failure. Pure `resolve` only
+  reports, so ambiguity and integrity failure no longer quarantine. Acceptance: a separately named
+  mutator consumes a displayed failure identity, rechecks under one write lock, changes only
+  still-affected artifacts, emits one bounded event, is idempotent on rerun, and leaves an ordinary
+  domain miss untouched; a race that moves the state returns conflict with no write.
+
+- `pri=4` `size=M` — caller-lifecycle helper and outbox example. Core owns no request lifecycle after M3.
+  Acceptance: an optional example durably binds a caller logical-operation ID to partition, operation
+  revision, canonical input, candidate content and source revision; same-ID/different-content fails; an
+  at-least-once relay probe demonstrates duplicate proposals after the acknowledgement crash window; the
+  docs call this lost-intent protection and never exactly-once submission.
+
+- `pri=4` `size=S` — rename the generic `_request_id` validator and repair entity labels. It reports the
+  label `request_id` for `proposal_id` (`system.py:1087,1128,1229`), `artifact_id`
+  (`3704,4466,4829,4968`), `example_id` (`4761`), `report_id` (`5006`) and the receipt id. Pre-existing;
+  u4c2 pinned it as-is because fixing it meant editing `system.py` outside that unit's CLI write set.
+  Lifecycle removal makes the private name more misleading without making the rename spine work.
+  Acceptance: one `_entity_id(value, label)` owner validates proposal, artifact, example, report and
+  receipt IDs; every caller supplies its own label; exact CLI and library messages name the correct
+  entity; existing message pins update in one pass; request-lifecycle vocabulary stays absent; suite
+  green.
