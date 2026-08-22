@@ -99,17 +99,27 @@ Measured gaps driving the arc:
     M3.6b, M3.7 and M3.9a all exceed it as written and need a pre-open split. Two mechanics earned their
     cost and should repeat: scripted, count-asserted, idempotent test surgery instead of per-test hand
     edits, and a pre-implementation contract attack that ran concurrently with implementation.
-    UNPRICED SURCHARGE, settle before opening M3.2a. M3.1 carried `tags=-`, so the 92% bought NO `orc`
-    reference implementation, NO `diff` cross-check and NO divergence rulings. That split list above
-    ranks static source span alone, which is why it flags five `-`/`prod` units and not one of the four
-    `oracle` units -- M3.2a, M3.2b, M3.3, M3.4 -- even though every one of them pays a battery the
-    calibration never measured. M3.2a is therefore NOT the safe small next unit its position suggests:
-    it is the first unit billed for an unmeasured cost. Open it by first pricing the oracle surcharge
-    against M2's oracle units, or by splitting contract-and-oracle-wave from implementation across two
-    sessions and treating the first session's contract as the second's entry state.
-  - M3.2a tier=kernel tags=oracle depends=none - Store-owned enforced-read capability: existing-only
+    ORACLE SURCHARGE, SETTLED. M3.1 carried `tags=-`, so its 92% bought NO `orc`, NO `diff` and no
+    divergence rulings, and the split list above ranks static source span alone -- which is why it flags
+    five `-`/`prod` units and not one of the four `oracle` units (M3.2a, M3.2b, M3.3, M3.4), each of
+    which pays a battery the calibration never measured. Pricing route 1 (measure against M2's oracle
+    units) is UNAVAILABLE: project history holds ZERO `orc` and ZERO `diff` dispatches across 269
+    `.scratch/agents/` artifacts, and M2's single oracle mention is a rejection
+    (`.agent/archive/m2.md:454` - a forwarding leaf's reference implementation is the same forwarding
+    code). Archaeology over non-oracle analogs would manufacture a forecast and carry it across a
+    document boundary as a measurement, a defect this project has already paid for. RULING: M3.2a is the
+    ORACLE-CALIBRATION unit, run under route 2's protective split - wave 1 plus acceptance contract
+    first, MAIN gauge read at contract close, implementation opening only if projected cost fits the
+    one-window aim, else the contract becomes the next session's entry state. Record M3.2a's
+    `orc`/`diff` MAIN cost separately from its base at close; that measurement, never an estimate, sizes
+    M3.2b, M3.3 and M3.4. Tags stay as reviewed - seven campaigns were already cut to three and
+    justified per unit (`.agent/decisions/m3-plan-review.md` L86-88), so cost was the only open question.
+  - M3.2a OPEN tier=kernel tags=oracle depends=none - Store-owned enforced-read capability: existing-only
     `file:` URI with `mode=ro`, `PRAGMA query_only`, write-denying authorizer, one rolled-back
-    transaction. Runs parallel with M3.1.
+    transaction. Oracle-calibration unit per the ruling above. Measured static span = 46 production
+    lines, both methods in `store.py`: `_connect` L488-511 and `transaction` L550-571. Blast radius =
+    32 `.transaction(` call sites in `system.py` (57 `write=True` / 90 other, repo-wide), 113 in
+    `test_system.py`. Base span sits far under M3.1's, which is what leaves room for the battery.
   - M3.2b tier=kernel tags=oracle depends=M3.2a - one-snapshot P1-P6 verification plus `evaluate` behind
     a pure `resolve`; failed verification, verified miss and verified hit stay distinct; publish durable
     1/1,000/50,000 measurements.
