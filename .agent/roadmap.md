@@ -99,6 +99,14 @@ Measured gaps driving the arc:
     M3.6b, M3.7 and M3.9a all exceed it as written and need a pre-open split. Two mechanics earned their
     cost and should repeat: scripted, count-asserted, idempotent test surgery instead of per-test hand
     edits, and a pre-implementation contract attack that ran concurrently with implementation.
+    UNPRICED SURCHARGE, settle before opening M3.2a. M3.1 carried `tags=-`, so the 92% bought NO `orc`
+    reference implementation, NO `diff` cross-check and NO divergence rulings. That split list above
+    ranks static source span alone, which is why it flags five `-`/`prod` units and not one of the four
+    `oracle` units -- M3.2a, M3.2b, M3.3, M3.4 -- even though every one of them pays a battery the
+    calibration never measured. M3.2a is therefore NOT the safe small next unit its position suggests:
+    it is the first unit billed for an unmeasured cost. Open it by first pricing the oracle surcharge
+    against M2's oracle units, or by splitting contract-and-oracle-wave from implementation across two
+    sessions and treating the first session's contract as the second's entry state.
   - M3.2a tier=kernel tags=oracle depends=none - Store-owned enforced-read capability: existing-only
     `file:` URI with `mode=ro`, `PRAGMA query_only`, write-denying authorizer, one rolled-back
     transaction. Runs parallel with M3.1.
