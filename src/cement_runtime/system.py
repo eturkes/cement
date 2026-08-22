@@ -101,8 +101,6 @@ _FUNCTION_MANIFEST_MAX_DEPTH = FUNCTION_MAX_DEPTH + 2
 _FUNCTION_MANIFEST_MAX_ITEMS = 2 * FUNCTION_MAX_ITEMS
 _ID_LIST_ABI = "cement-id-list-v1"
 
-AuthorityCheck = Callable[[str, str, str, str], bool]
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -404,10 +402,10 @@ class System:
     """Local learning loop.
 
     All returned values are pure data. A caller may apply a ``Resolved`` plan only
-    after its own live authorization/policy gate. The optional authority callback
-    gates actor-bearing control-plane mutations; request routing and reads rely on
-    the embedding application's access control. Without it, database access is the
-    trust boundary.
+    after its own live authorization/policy gate. Cement makes no principal or
+    permission decision. Every control-plane mutation and every read relies on the
+    embedding application's access control, and database access is the trust
+    boundary. Actor and reviewer arguments are recorded assertions only.
     """
 
     def __init__(
@@ -415,7 +413,6 @@ class System:
         database: str | os.PathLike[str],
         *,
         candidate_source: CandidateSource | None = None,
-        authority: AuthorityCheck | None = None,
         clock_us: Callable[[], int] | None = None,
         generation_lease_seconds: int = 120,
     ) -> None:
@@ -429,13 +426,10 @@ class System:
             getattr(candidate_source, "propose", None)
         ):
             raise ValidationError("candidate_source must provide a callable propose method")
-        if authority is not None and not callable(authority):
-            raise ValidationError("authority must be callable")
         if clock_us is not None and not callable(clock_us):
             raise ValidationError("clock_us must be callable")
         self.store = Store(database)
         self.candidate_source = candidate_source
-        self._authority = authority
         self._clock_us = clock_us if clock_us is not None else (lambda: time.time_ns() // 1_000)
         self._lease_us = generation_lease_seconds * 1_000_000
 
@@ -448,15 +442,6 @@ class System:
         ):
             raise StateError("clock must return a lease-safe signed 64-bit microsecond timestamp")
         return now
-
-    def _authorize(self, partition: str, actor: str, action: str, subject: str) -> None:
-        if self._authority is not None:
-            allowed = self._authority(partition, actor, action, subject)
-            if allowed is not True:
-                close = getattr(allowed, "close", None)
-                if callable(close):
-                    close()
-                raise StateError(f"actor is not authorized for {action}")
 
     # -- operation revisions -------------------------------------------------
 
@@ -471,7 +456,6 @@ class System:
         partition = _name(partition, "partition")
         operation = _name(operation, "operation")
         registered_by = _text(registered_by, "registered_by", maximum=256)
-        self._authorize(partition, registered_by, "operation.register", operation)
         if policy is None:
             policy = CompilePolicy()
         elif type(policy) is not CompilePolicy:
@@ -518,7 +502,6 @@ class System:
         partition = _name(partition, "partition")
         operation = _name(operation, "operation")
         revised_by = _text(revised_by, "revised_by", maximum=256)
-        self._authorize(partition, revised_by, "operation.revise", operation)
         if type(policy) is not CompilePolicy:
             raise ValidationError("policy must be a CompilePolicy")
         policy_json = canonicalize(policy.as_json(), max_bytes=16_384)
@@ -1235,7 +1218,6 @@ class System:
             raise ValidationError("correct requires corrected_output")
         if decision != "correct" and corrected_output is not _UNSET:
             raise ValidationError("corrected_output is valid only with decision='correct'")
-        self._authorize(partition, reviewer, f"proposal.{decision}", proposal_id)
         now = self._now()
         with self.store.transaction(write=True) as connection:
             row = connection.execute(
@@ -1611,7 +1593,6 @@ class System:
         partition = _name(partition, "partition")
         operation = _name(operation, "operation")
         compiled_by = _text(compiled_by, "compiled_by", maximum=256)
-        self._authorize(partition, compiled_by, "artifact.compile", operation)
         now = self._now()
         created: list[str] = []
         existing: list[str] = []
@@ -3645,30 +3626,13 @@ class System:
         partition = _name(partition, "partition")
         operation = _name(operation, "operation")
         verified_by = _text(verified_by, "verified_by", maximum=256)
-        with self.store.transaction(write=False) as connection:
-            authorized_revision, authorized_rows, _ = self._draft_verification_plan(
-                connection,
-                partition=partition,
-                operation=operation,
-            )
-        authorized_ids = tuple(str(row["id"]) for row in authorized_rows)
-        for artifact_id in authorized_ids:
-            self._authorize(
-                partition,
-                verified_by,
-                "artifact.verify",
-                artifact_id,
-            )
-        now = self._now()
         with self.store.transaction(write=True) as connection:
             revision, rows, skipped = self._draft_verification_plan(
                 connection,
                 partition=partition,
                 operation=operation,
             )
-            selected_ids = tuple(str(row["id"]) for row in rows)
-            if revision != authorized_revision or selected_ids != authorized_ids:
-                raise StateError("draft eligibility changed during authorization")
+            now = self._now()
             entries: list[DraftEntry] = []
             for row in rows:
                 report, entry_seal = self._verify_row(
@@ -3703,7 +3667,6 @@ class System:
         partition = _name(partition, "partition")
         artifact_id = _request_id(artifact_id)
         verified_by = _text(verified_by, "verified_by", maximum=256)
-        self._authorize(partition, verified_by, "artifact.verify", artifact_id)
         now = self._now()
         with self.store.transaction(write=True) as connection:
             row = connection.execute(
@@ -4189,7 +4152,7 @@ class System:
         expected_function_hash: str,
         promoted_by: str,
     ) -> FunctionSetPromotion:
-        """Promote the authorized prospective union in one immediate transaction."""
+        """Promote the locked prospective union in one immediate transaction."""
 
         partition = _name(partition, "partition")
         operation = _name(operation, "operation")
@@ -4198,60 +4161,27 @@ class System:
             "expected_function_hash",
         )
         promoted_by = _text(promoted_by, "promoted_by", maximum=256)
-        with self.store.transaction(write=False) as connection:
-            authorized = self._function_promotion_plan(
-                connection,
-                partition=partition,
-                operation=operation,
-            )
-        if not authorized.entries:
-            raise StateError("function promotion requires at least one member")
-        authorized_member_ids = tuple(
-            sorted(entry.public.artifact_id for entry in authorized.entries)
-        )
-        authorized_candidate_ids = tuple(
-            sorted(
-                entry.public.artifact_id
-                for entry in authorized.entries
-                if entry.public.disposition == "candidate"
-            )
-        )
-        authorized_retired_ids = tuple(
-            sorted(
-                {
-                    entry.public.replaces_artifact_id
-                    for entry in authorized.entries
-                    if entry.public.replaces_artifact_id is not None
-                }
-            )
-        )
-        for entry in authorized.entries:
-            self._authorize(
-                partition,
-                promoted_by,
-                "artifact.promote",
-                entry.public.artifact_id,
-            )
-        now = self._now()
-        receipt_id = _new_id("fpr")
-
         with self.store.transaction(write=True) as connection:
             locked = self._function_promotion_plan(
                 connection,
                 partition=partition,
                 operation=operation,
             )
-            locked_member_ids = tuple(
-                sorted(entry.public.artifact_id for entry in locked.entries)
-            )
-            locked_candidate_ids = tuple(
-                sorted(
-                    entry.public.artifact_id
-                    for entry in locked.entries
-                    if entry.public.disposition == "candidate"
+            if not locked.entries:
+                raise StateError("function promotion requires at least one member")
+            if locked.manifest.function_hash != expected_function_hash:
+                raise ConflictError(
+                    "expected_function_hash does not match the locked prospective function"
                 )
+            now = self._now()
+            receipt_id = _new_id("fpr")
+
+            candidates = tuple(
+                entry
+                for entry in locked.entries
+                if entry.public.disposition == "candidate"
             )
-            locked_retired_ids = tuple(
+            retired_ids = tuple(
                 sorted(
                     {
                         entry.public.replaces_artifact_id
@@ -4260,27 +4190,6 @@ class System:
                     }
                 )
             )
-            if (
-                locked.manifest.operation_revision
-                != authorized.manifest.operation_revision
-                or locked_candidate_ids != authorized_candidate_ids
-                or locked_member_ids != authorized_member_ids
-                or locked_retired_ids != authorized_retired_ids
-            ):
-                raise StateError(
-                    "function promotion candidates changed during authorization"
-                )
-            if locked.manifest.function_hash != expected_function_hash:
-                raise ConflictError(
-                    "expected_function_hash does not match the locked prospective function"
-                )
-
-            candidates = tuple(
-                entry
-                for entry in locked.entries
-                if entry.public.disposition == "candidate"
-            )
-            retired_ids = locked_retired_ids
             for artifact_id in retired_ids:
                 changed = connection.execute(
                     """
@@ -4334,8 +4243,12 @@ class System:
                         "function candidate changed before locked activation"
                     )
 
-            member_ids = locked_member_ids
-            candidate_ids = locked_candidate_ids
+            member_ids = tuple(
+                sorted(entry.public.artifact_id for entry in locked.entries)
+            )
+            candidate_ids = tuple(
+                sorted(entry.public.artifact_id for entry in candidates)
+            )
             membership_rows = tuple(
                 {
                     "receipt_id": receipt_id,
@@ -4467,7 +4380,6 @@ class System:
         promoted_by = _text(promoted_by, "promoted_by", maximum=256)
         if type(scope_hash) is not str or not re.fullmatch(r"[0-9a-f]{64}", scope_hash):
             raise ValidationError("scope_hash must be a SHA-256 hex digest")
-        self._authorize(partition, promoted_by, "artifact.promote", artifact_id)
         now = self._now()
         with self.store.transaction(write=True) as connection:
             row = connection.execute(
@@ -4599,7 +4511,6 @@ class System:
         operation = _name(operation, "operation")
         reviewer = _text(reviewer, "reviewer", maximum=256)
         note = _text(note, "note", maximum=2_048, allow_empty=True)
-        self._authorize(partition, reviewer, "artifact.challenge", operation)
         input_json = canonicalize(input_value)
         expected = canonicalize(expected_output)
         now = self._now()
@@ -4761,7 +4672,6 @@ class System:
         example_id = _request_id(example_id)
         revoked_by = _text(revoked_by, "revoked_by", maximum=256)
         reason = _text(reason, "reason", maximum=2_048)
-        self._authorize(partition, revoked_by, "example.revoke", example_id)
         now = self._now()
         with self.store.transaction(write=True) as connection:
             example = connection.execute(
@@ -4829,7 +4739,6 @@ class System:
         artifact_id = _request_id(artifact_id)
         suspended_by = _text(suspended_by, "suspended_by", maximum=256)
         reason = _text(reason, "reason", maximum=2_048)
-        self._authorize(partition, suspended_by, "artifact.suspend", artifact_id)
         now = self._now()
         with self.store.transaction(write=True) as connection:
             row = connection.execute(

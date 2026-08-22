@@ -60,7 +60,7 @@ The promoted artifacts of one operation aggregate into a single portable object:
   expected hash also pins caller-held identity. Neither mode proves origin or supplies a signature.
 - Function identity is verified-content identity. The promoter and the promotion time never change the
   `function_hash`; the promotion receipt keeps that provenance separate.
-- `verify_function` is read-only and authority-free. It returns six ordered checks over one snapshot of
+- `verify_function` is read-only. It returns six ordered checks over one snapshot of
   the complete promoted set. The sixth check requires the latest persisted receipt to bind that
   snapshot, so individually valid artifacts cannot pass as a set without a current checkpoint.
 - An exported bundle evaluates with no ledger, no adapter, and no LLM. It stays deterministic after the
@@ -234,7 +234,7 @@ is negative. The leaf names the object, and the object selects the payload chann
 | `function eval` | The bundle holds no exact case for the canonical input. | `stdout` |
 
 Every other nonzero exit reports a failure to complete. Exit 2 covers usage and validation. Exit 3
-means an absent object, exit 4 a state or authority conflict, and exit 5 an integrity failure.
+means an absent object, exit 4 a state conflict, and exit 5 an integrity failure.
 
 The root `verify` command does not use exit 6. It reports a failed verification as exit 0 with
 `"passed": false` in its payload. Read the `passed` field to get the verdict from root `verify`. Read
@@ -265,12 +265,11 @@ source distribution.
 
 This release is a local control plane, not a network service or an ACL system. A new database starts
 with mode `0600`, but evidence is plaintext. CLI actor names are recorded assertions, not
-authentication. A library deployment can supply an `authority(partition, actor, action, subject)`
-callback; remote authentication, encryption, retention, signing, and tenant-aware API authorization
-remain deployment responsibilities.
+authentication. Cement makes no principal or permission decision. Authentication, authorization,
+encryption, retention, signing, and tenant-aware API access all remain deployment responsibilities.
 
 An exported bundle is a second deployment object with its own boundary. It executes without the
-database and without the authority callback, so the ledger's file permissions no longer protect it.
+database, so the ledger's file permissions no longer protect it.
 The bundle is plaintext and carries the exact inputs, the exact outputs, and the governance digests.
 Classify it with your other sensitive data. Apply the same retention and disclosure rules.
 `function export --out` writes atomically through a mode-0600 temporary file and refuses a non-regular
@@ -278,9 +277,10 @@ destination. The reader accepts one strict UTF-8 regular file and bounds it at 6
 from the 1 MiB bound on the evaluation input. `function eval` is ledger-free, not import-free: it opens
 and reads the bundle path, and importing `cement_runtime` still loads `sqlite3`.
 
-The callback gates operation registration/revision, proposal review, compilation, verification,
-promotion, challenge, evidence revocation, and artifact suspension. `handle` and read APIs assume the
-embedding service has already authorized access to the exact partition. `operation revise`
+Every library call and every CLI command assumes that your service already authorized access to the
+exact partition. That applies to operation registration and revision, proposal review, compilation,
+verification, promotion, challenge, evidence revocation, and artifact suspension. It applies equally to
+`handle` and to all reads. `operation revise`
 always creates a semantic revision and retires older builds, even when threshold values stay unchanged.
 Linux is the strongest command-adapter deployment target: Cement uses a subreaper supervisor there to
 kill and reap detached descendants. This is lifecycle containment for a trusted provider wrapper, not

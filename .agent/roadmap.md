@@ -78,13 +78,27 @@ Measured gaps driving the arc:
   it; under this milestone's own fail-closed no-migration contract nobody does, so it would uniquely pay
   two disposable transient test families plus two mid-milestone rewrites for zero operator value.
 
-  Units - 13, all OPEN, executing as 7 waves. `depends` shows the DAG; same-wave units name the same
+  Units - 13, 1 DONE + 12 OPEN, executing as 7 waves. `depends` shows the DAG; same-wave units name the same
   predecessor. Tier default `kernel`; `oracle` is kept only where an independent implementation can
   actually diverge, so deletion, forwarding and byte-preserving relocation carry none.
 
-  - M3.1 tier=kernel tags=- depends=none - delete the `authority()` callback and only callback-owned
-    scaffolds. 11 call sites; the empty-union gate (`system.py:4207-4208`, hardened by `cf274a4`) and all
-    actor/reviewer provenance survive; schema fingerprint diff must be EMPTY.
+  - M3.1 DONE tier=kernel tags=- depends=none - deleted the `authority()` callback and its scaffolds.
+    `main=` 92% 220K/240K, `mate=` 54% 129K/240K. Contract + attack record:
+    `.agent/decisions/m3u1-contract.md`. Shipped: `AuthorityCheck`, the `System.__init__` `authority`
+    keyword, `self._authority`, `_authorize` and all 11 call sites gone; both double-plan
+    authorization-window scaffolds collapsed to ONE locked plan; the empty-union gate and every
+    actor/reviewer capture, validation, persistence and event survive; `store.py` byte-identical to
+    `3a53389` at `SCHEMA_VERSION` 2. Suite 548 -> 548 (11 authorization-only tests deleted, 21 rewritten,
+    11 added as `tests/test_authority_removal.py`).
+
+    CALIBRATION RESULT, binding on M3.2a..M3.9b. One single-author kernel unit consumed 92% of MAIN.
+    Cost split, measured: ~25K wave-1 surface reading (the 61 KB track map alone), ~40K implementation,
+    ~35K a single unplanned context dump, the rest coordination and closure. So a unit of this shape
+    fits one window with NO margin, and M3.1 was the SMALLEST unit in the milestone. Every later unit
+    must therefore either shrink below M3.1's static source span or split before it opens; M3.5b, M3.6a,
+    M3.6b, M3.7 and M3.9a all exceed it as written and need a pre-open split. Two mechanics earned their
+    cost and should repeat: scripted, count-asserted, idempotent test surgery instead of per-test hand
+    edits, and a pre-implementation contract attack that ran concurrently with implementation.
   - M3.2a tier=kernel tags=oracle depends=none - Store-owned enforced-read capability: existing-only
     `file:` URI with `mode=ro`, `PRAGMA query_only`, write-denying authorizer, one rolled-back
     transaction. Runs parallel with M3.1.

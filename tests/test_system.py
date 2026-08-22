@@ -671,7 +671,6 @@ class SystemTests(unittest.TestCase):
                 invoke()
         for configuration in (
             {"candidate_source": False},
-            {"authority": 1},
             {"clock_us": 0},
         ):
             with self.subTest(configuration=configuration), self.assertRaises(ValidationError):
@@ -1121,58 +1120,6 @@ class SystemTests(unittest.TestCase):
             connection.close()
         with self.assertRaises(IntegrityError):
             self.system.reports("tenant-a")
-
-    def test_authority_denial_precedes_control_plane_mutation(self) -> None:
-        allowed = True
-        calls = []
-
-        def authority(partition, actor, action, subject):
-            calls.append((partition, actor, action, subject))
-            return allowed
-
-        guarded_db = str(pathlib.Path(self.temporary.name) / "guarded.db")
-        guarded = System(
-            guarded_db,
-            candidate_source=FakeSource(),
-            authority=authority,
-            clock_us=self.clock,
-        )
-        guarded.register_operation(
-            "tenant", "echo", policy=CompilePolicy(2, 1, 0), registered_by="owner"
-        )
-        for request_id in ("one", "two"):
-            pending = guarded.handle("tenant", "echo", 1, request_id=request_id)
-            guarded.review(
-                "tenant", pending.proposal_id, reviewer="owner", decision="accept"
-            )
-        allowed = False
-        with self.assertRaises(StateError):
-            guarded.compile("tenant", "echo", compiled_by="blocked")
-        self.assertEqual(guarded.artifacts("tenant", "echo"), [])
-        with self.assertRaises(StateError):
-            guarded.register_operation(
-                "tenant", "other", policy=CompilePolicy(2, 1, 0), registered_by="blocked"
-            )
-        allowed = True
-        artifact = guarded.compile("tenant", "echo", compiled_by="owner").created[0]
-        allowed = False
-        with self.assertRaises(StateError):
-            guarded.verify("tenant", artifact, verified_by="blocked")
-        self.assertEqual(guarded.artifact("tenant", artifact)["status"], "draft")
-        self.assertIn(("tenant", "blocked", "artifact.verify", artifact), calls)
-
-    def test_authority_requires_the_exact_boolean_true(self) -> None:
-        for index, returned in enumerate(("allow", 1, object())):
-            guarded = System(
-                str(pathlib.Path(self.temporary.name) / f"truthy-{index}.db"),
-                authority=lambda *_args, returned=returned: returned,
-                clock_us=self.clock,
-            )
-            with self.subTest(returned=returned), self.assertRaises(StateError):
-                guarded.register_operation(
-                    "tenant", "echo", policy=CompilePolicy(2, 1, 0), registered_by="owner"
-                )
-            self.assertEqual(guarded.operations("tenant"), [])
 
     def test_review_rejects_cross_table_state_corruption(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
@@ -2543,12 +2490,11 @@ class SystemTests(unittest.TestCase):
                     with self.assertRaisesRegex(IntegrityError, detail):
                         self.system.verify_function("tenant-a", operation)
 
-    def test_function_verification_pass_is_read_only_and_authority_free(self) -> None:
+    def test_function_verification_pass_is_read_only(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
         self._promote_function_entry({"x": 1}, "function-pass")
-        authority = mock.Mock(side_effect=AssertionError("authority consulted"))
         clock = mock.Mock(side_effect=AssertionError("clock consulted"))
-        reader = System(self.database, authority=authority, clock_us=clock)
+        reader = System(self.database, clock_us=clock)
 
         def snapshot() -> tuple[str, ...]:
             connection = sqlite3.connect(self.database)
@@ -2602,7 +2548,6 @@ class SystemTests(unittest.TestCase):
         self.assertEqual(before, after)
         self.assertNotIn("INSERT INTO function_receipts", "\n".join(after))
         transaction.assert_called_once_with(write=False)
-        authority.assert_not_called()
         clock.assert_not_called()
 
     def test_function_verification_duplicate_gate_and_runtime_defenses(self) -> None:
@@ -4137,6 +4082,7 @@ class SystemTests(unittest.TestCase):
     def test_verify_drafts_uses_shared_projection_and_one_locked_batch(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
         project = self.system._project_current_build
+        created = self._compile_three_drafts("batch-pass")
         with (
             mock.patch.object(
                 self.system,
@@ -4149,7 +4095,6 @@ class SystemTests(unittest.TestCase):
                 wraps=self.system.store.transaction,
             ) as transaction,
         ):
-            created = self._compile_three_drafts("batch-pass")
             result = self.system.verify_drafts(
                 "tenant-a",
                 "echo",
@@ -4158,11 +4103,8 @@ class SystemTests(unittest.TestCase):
         self.assertTrue(result.passed)
         self.assertEqual(len(result.entries), 3)
         self.assertEqual(result.skipped, ())
-        self.assertEqual(projected.call_count, 9)
-        self.assertEqual(
-            transaction.call_args_list[-2:],
-            [mock.call(write=False), mock.call(write=True)],
-        )
+        self.assertEqual(projected.call_count, 3)
+        self.assertEqual(transaction.call_args_list, [mock.call(write=True)])
         self.assertTrue(all(isinstance(entry, DraftEntry) for entry in result.entries))
         self.assertTrue(all(entry.report.passed for entry in result.entries))
         self.assertTrue(all(entry.report.tests == 8 for entry in result.entries))
@@ -4256,7 +4198,7 @@ class SystemTests(unittest.TestCase):
                 partition=partition,
                 operation=operation,
             )
-            if plan_calls == 2:
+            if plan_calls == 1:
                 enumerated.set()
                 if not allow_plan_return.wait(timeout=5):
                     raise AssertionError("locked plan release timed out")
@@ -4364,7 +4306,7 @@ class SystemTests(unittest.TestCase):
         self.assertFalse(verifier.is_alive())
         self.assertFalse(revision_writer.is_alive())
         self.assertEqual(errors, [])
-        self.assertEqual(plan_calls, 2)
+        self.assertEqual(plan_calls, 1)
         self.assertTrue(batch_finished.is_set())
         self.assertTrue(writer_finished.is_set())
         self.assertTrue(writer_committed.is_set())
@@ -4511,8 +4453,6 @@ class SystemTests(unittest.TestCase):
         newer = self.system.compile("tenant-a", "echo")
         self.assertEqual(len(newer.created), 1)
         newer_id = newer.created[0]
-        authority = mock.Mock(return_value=True)
-        self.system._authority = authority
 
         result = self.system.verify_drafts(
             "tenant-a",
@@ -4533,11 +4473,6 @@ class SystemTests(unittest.TestCase):
                 },
             ),
         )
-        self.assertEqual(
-            {call.args[3] for call in authority.call_args_list},
-            expected_selected,
-        )
-        self.assertNotIn(str(middle["id"]), {call.args[3] for call in authority.call_args_list})
         with self.system.store.transaction(write=False) as connection:
             statuses = dict(
                 connection.execute(
@@ -4745,8 +4680,6 @@ class SystemTests(unittest.TestCase):
                 (prior,),
             )
 
-        authority = mock.Mock(return_value=True)
-        self.system._authority = authority
         result = self.system.verify_drafts(
             "tenant-a", "echo", verified_by="batch-verifier"
         )
@@ -4757,10 +4690,6 @@ class SystemTests(unittest.TestCase):
             (current,),
         )
         self.assertEqual(result.skipped, ())
-        self.assertEqual(
-            [call.args[3] for call in authority.call_args_list],
-            [current],
-        )
         with self.system.store.transaction(write=False) as connection:
             prior_diagnostics = connection.execute(
                 """
@@ -4820,8 +4749,6 @@ class SystemTests(unittest.TestCase):
                     ),
                 )
 
-        authority = mock.Mock(return_value=True)
-        self.system._authority = authority
         before = self._database_dump()
         result = self.system.verify_drafts(
             "tenant-a", "echo", verified_by="batch-verifier"
@@ -4829,10 +4756,9 @@ class SystemTests(unittest.TestCase):
         self.assertTrue(result.passed)
         self.assertEqual(result.entries, ())
         self.assertEqual(result.skipped, ())
-        self.assertEqual(authority.call_args_list, [])
         self.assertEqual(self._database_dump(), before)
 
-    def test_verify_drafts_orders_entries_and_authority_by_input_hash(self) -> None:
+    def test_verify_drafts_orders_entries_by_input_hash(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
         hash_value_pairs = sorted(
             (canonicalize({"x": value}).digest, {"x": value})
@@ -4883,8 +4809,6 @@ class SystemTests(unittest.TestCase):
             connection.execute("PRAGMA reverse_unordered_selects = ON")
             return connection
 
-        authority = mock.Mock(return_value=True)
-        self.system._authority = authority
         with mock.patch.object(
             self.system.store,
             "_connect",
@@ -4900,10 +4824,6 @@ class SystemTests(unittest.TestCase):
         )
         self.assertEqual(
             tuple(entry.artifact_id for entry in result.entries),
-            expected_ids,
-        )
-        self.assertEqual(
-            tuple(call.args[3] for call in authority.call_args_list),
             expected_ids,
         )
 
@@ -4993,8 +4913,6 @@ class SystemTests(unittest.TestCase):
                 (artifact_id,),
             )
 
-        authority = mock.Mock(return_value=True)
-        self.system._authority = authority
         result = self.system.verify_drafts(
             "tenant-a", "echo", verified_by="batch-verifier"
         )
@@ -5010,7 +4928,6 @@ class SystemTests(unittest.TestCase):
                 },
             ),
         )
-        self.assertEqual(authority.call_args_list, [])
 
     def test_verify_drafts_duplicate_eligible_rows_abort_full_ledger(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
@@ -5122,49 +5039,6 @@ class SystemTests(unittest.TestCase):
             self.system.verify_drafts(
                 "tenant-a", "echo", verified_by="batch-verifier"
             )
-        self.assertEqual(self._database_dump(), before)
-
-    def test_verify_drafts_authority_denial_precedes_write_transaction(self) -> None:
-        self.register(confirmations=2, reviewers=1, span=0)
-        self._compile_three_drafts("batch-authority")
-        with self.system.store.transaction(write=False) as connection:
-            selected_ids = tuple(
-                str(row["id"])
-                for row in connection.execute(
-                    """
-                    SELECT id FROM artifacts
-                    WHERE partition = 'tenant-a' AND operation = 'echo'
-                      AND status = 'draft'
-                    ORDER BY input_hash, sequence, id
-                    """
-                )
-            )
-        denied = selected_ids[-1]
-        calls: list[tuple[str, str, str, str]] = []
-
-        def authority(partition, actor, action, subject):
-            calls.append((partition, actor, action, subject))
-            return subject != denied
-
-        self.system._authority = authority
-        before = self._database_dump()
-        with mock.patch.object(
-            self.system.store,
-            "transaction",
-            wraps=self.system.store.transaction,
-        ) as transaction:
-            with self.assertRaisesRegex(StateError, "not authorized"):
-                self.system.verify_drafts(
-                    "tenant-a", "echo", verified_by="blocked-verifier"
-                )
-        self.assertEqual(
-            calls,
-            [
-                ("tenant-a", "blocked-verifier", "artifact.verify", artifact_id)
-                for artifact_id in selected_ids
-            ],
-        )
-        self.assertEqual(transaction.call_args_list, [mock.call(write=False)])
         self.assertEqual(self._database_dump(), before)
 
     def test_verify_drafts_contains_middle_integrity_failure_per_row(self) -> None:
@@ -5531,40 +5405,6 @@ class SystemTests(unittest.TestCase):
             side_effect=fail_middle,
         ):
             with self.assertRaisesRegex(StateError, "injected middle batch failure"):
-                self.system.verify_drafts(
-                    "tenant-a", "echo", verified_by="batch-verifier"
-                )
-        self.assertEqual(calls, 2)
-        self.assertEqual(self._database_dump(), before)
-
-    def test_verify_drafts_rechecks_eligibility_after_authorization(self) -> None:
-        self.register(confirmations=2, reviewers=1, span=0)
-        self._compile_three_drafts("batch-recheck")
-        before = self._database_dump()
-        original = self.system._draft_verification_plan
-        calls = 0
-
-        def changed_plan(connection, *, partition, operation):
-            nonlocal calls
-            calls += 1
-            revision, rows, skipped = original(
-                connection,
-                partition=partition,
-                operation=operation,
-            )
-            if calls == 2:
-                return revision, rows[:-1], skipped
-            return revision, rows, skipped
-
-        with mock.patch.object(
-            self.system,
-            "_draft_verification_plan",
-            side_effect=changed_plan,
-        ):
-            with self.assertRaisesRegex(
-                StateError,
-                "eligibility changed during authorization",
-            ):
                 self.system.verify_drafts(
                     "tenant-a", "echo", verified_by="batch-verifier"
                 )
@@ -6625,9 +6465,8 @@ class SystemTests(unittest.TestCase):
     def test_function_promotion_manifest_is_deterministic_read_only_and_complete(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
         self._verify_three_function_candidates("function-manifest")
-        authority = mock.Mock(side_effect=AssertionError("authority consulted"))
         clock = mock.Mock(side_effect=AssertionError("clock consulted"))
-        reader = System(self.database, authority=authority, clock_us=clock)
+        reader = System(self.database, clock_us=clock)
         independent = System(self.database)
         before = self._database_dump()
         with (
@@ -6645,7 +6484,6 @@ class SystemTests(unittest.TestCase):
         repeated = independent.inspect_function_promotion("tenant-a", "echo")
         self.assertEqual(self._database_dump(), before)
         transaction.assert_called_once_with(write=False)
-        authority.assert_not_called()
         clock.assert_not_called()
         self.assertIsInstance(manifest, FunctionPromotionManifest)
         self.assertEqual(manifest.text, repeated.text)
@@ -7382,9 +7220,8 @@ class SystemTests(unittest.TestCase):
     def test_promote_function_rejects_malformed_expected_hash_without_preflight(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
         self._verify_three_function_candidates("function-malformed-hash")
-        authority = mock.Mock(side_effect=AssertionError("authority consulted"))
         clock = mock.Mock(side_effect=AssertionError("clock consulted"))
-        reader = System(self.database, authority=authority, clock_us=clock)
+        reader = System(self.database, clock_us=clock)
         before = self._database_dump()
         with (
             mock.patch.object(
@@ -7409,7 +7246,6 @@ class SystemTests(unittest.TestCase):
                 )
         self.assertEqual(self._database_dump(), before)
         transaction.assert_not_called()
-        authority.assert_not_called()
         clock.assert_not_called()
 
     def test_promote_function_rejects_well_formed_hash_mismatch_atomically(self) -> None:
@@ -7426,44 +7262,6 @@ class SystemTests(unittest.TestCase):
                 expected_function_hash="0" * 64,
                 promoted_by="release-manager",
             )
-        self.assertEqual(self._database_dump(), before)
-
-    def test_promote_function_authorizes_every_member_before_clock_or_write(self) -> None:
-        self.register(confirmations=2, reviewers=1, span=0)
-        self._verify_three_function_candidates("function-authority")
-        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
-        ordered_ids = tuple(entry.artifact_id for entry in manifest.entries)
-        denied = ordered_ids[-1]
-        calls: list[tuple[str, str, str, str]] = []
-
-        def authority(partition, actor, action, subject):
-            calls.append((partition, actor, action, subject))
-            return subject != denied
-
-        clock = mock.Mock(side_effect=AssertionError("clock consulted"))
-        reader = System(self.database, authority=authority, clock_us=clock)
-        before = self._database_dump()
-        with mock.patch.object(
-            reader.store,
-            "transaction",
-            wraps=reader.store.transaction,
-        ) as transaction:
-            with self.assertRaisesRegex(StateError, "not authorized"):
-                reader.promote_function(
-                    "tenant-a",
-                    "echo",
-                    expected_function_hash=manifest.function_hash,
-                    promoted_by="blocked-manager",
-                )
-        self.assertEqual(
-            calls,
-            [
-                ("tenant-a", "blocked-manager", "artifact.promote", artifact_id)
-                for artifact_id in ordered_ids
-            ],
-        )
-        self.assertEqual(transaction.call_args_list, [mock.call(write=False)])
-        clock.assert_not_called()
         self.assertEqual(self._database_dump(), before)
 
     def test_promote_function_old_manifest_rejects_middle_retained_revocation(self) -> None:
@@ -7498,42 +7296,6 @@ class SystemTests(unittest.TestCase):
         self.assertIsNotNone(status)
         assert status is not None
         self.assertEqual(status["status"], "suspended")
-
-    def test_promote_function_rechecks_candidate_set_after_authorization(self) -> None:
-        self.register(confirmations=2, reviewers=1, span=0)
-        self._verify_three_function_candidates("function-candidate-race")
-        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
-        target = manifest.entries[-1].artifact_id
-        mutator = System(self.database)
-        calls: list[str] = []
-        post_mutation: list[tuple[str, ...]] = []
-
-        def authority(partition, actor, action, subject):
-            calls.append(subject)
-            if subject == target:
-                mutator.suspend_artifact(
-                    "tenant-a",
-                    target,
-                    suspended_by="auditor",
-                    reason="authorization race probe",
-                )
-                post_mutation.append(self._database_dump())
-            return True
-
-        reader = System(self.database, authority=authority, clock_us=self.clock)
-        with self.assertRaisesRegex(
-            StateError,
-            "function promotion candidates changed during authorization",
-        ):
-            reader.promote_function(
-                "tenant-a",
-                "echo",
-                expected_function_hash=manifest.function_hash,
-                promoted_by="release-manager",
-            )
-        self.assertEqual(calls, [entry.artifact_id for entry in manifest.entries])
-        self.assertEqual(len(post_mutation), 1)
-        self.assertEqual(self._database_dump(), post_mutation[0])
 
     def test_promote_function_late_event_failure_rolls_back_every_write(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
@@ -8548,144 +8310,18 @@ class SystemTests(unittest.TestCase):
             ),
         )
 
-    def test_promote_function_plan_identity_binds_operation_revision(self) -> None:
-        self.register(confirmations=2, reviewers=1, span=0)
-        self._verify_three_function_candidates("function-plan-revision")
-        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
-        original = self.system._function_promotion_plan
-        calls = 0
-
-        def changed_revision(connection, *, partition, operation):
-            nonlocal calls
-            calls += 1
-            plan = original(
-                connection,
-                partition=partition,
-                operation=operation,
-            )
-            if calls == 2:
-                return replace(
-                    plan,
-                    manifest=replace(
-                        plan.manifest,
-                        operation_revision=plan.manifest.operation_revision + 1,
-                    ),
-                )
-            return plan
-
-        before = self._database_dump()
-        with mock.patch.object(
-            self.system,
-            "_function_promotion_plan",
-            side_effect=changed_revision,
-        ):
-            with self.assertRaisesRegex(
-                StateError,
-                "function promotion candidates changed during authorization",
-            ):
-                self.system.promote_function(
-                    "tenant-a",
-                    "echo",
-                    expected_function_hash=manifest.function_hash,
-                    promoted_by="release-manager",
-                )
-        self.assertEqual(calls, 2)
-        self.assertEqual(self._database_dump(), before)
-
-    def test_promote_function_plan_identity_binds_candidate_ids_independently(self) -> None:
-        self.register(confirmations=2, reviewers=1, span=0)
-        self._verify_three_function_candidates("function-plan-candidates")
-        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
-        original = self.system._function_promotion_plan
-        calls = 0
-
-        def changed_candidates(connection, *, partition, operation):
-            nonlocal calls
-            calls += 1
-            plan = original(
-                connection,
-                partition=partition,
-                operation=operation,
-            )
-            if calls != 2:
-                return plan
-            target = plan.entries[-1]
-            changed = replace(
-                target,
-                public=replace(target.public, disposition="retained"),
-            )
-            return replace(plan, entries=(*plan.entries[:-1], changed))
-
-        before = self._database_dump()
-        with mock.patch.object(
-            self.system,
-            "_function_promotion_plan",
-            side_effect=changed_candidates,
-        ):
-            with self.assertRaisesRegex(
-                StateError,
-                "function promotion candidates changed during authorization",
-            ):
-                self.system.promote_function(
-                    "tenant-a",
-                    "echo",
-                    expected_function_hash=manifest.function_hash,
-                    promoted_by="release-manager",
-                )
-        self.assertEqual(calls, 2)
-        self.assertEqual(self._database_dump(), before)
-
-    def test_promote_function_plan_identity_binds_member_ids_independently(self) -> None:
-        self.register(confirmations=2, reviewers=1, span=0)
-        self._promote_three_function_entries("function-plan-members")
-        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
-        original = self.system._function_promotion_plan
-        calls = 0
-
-        def changed_members(connection, *, partition, operation):
-            nonlocal calls
-            calls += 1
-            plan = original(
-                connection,
-                partition=partition,
-                operation=operation,
-            )
-            if calls == 2:
-                return replace(plan, entries=plan.entries[:-1])
-            return plan
-
-        before = self._database_dump()
-        with mock.patch.object(
-            self.system,
-            "_function_promotion_plan",
-            side_effect=changed_members,
-        ):
-            with self.assertRaisesRegex(
-                StateError,
-                "function promotion candidates changed during authorization",
-            ):
-                self.system.promote_function(
-                    "tenant-a",
-                    "echo",
-                    expected_function_hash=manifest.function_hash,
-                    promoted_by="release-manager",
-                )
-        self.assertEqual(calls, 2)
-        self.assertEqual(self._database_dump(), before)
-
     def test_promote_function_rejects_empty_union_before_side_effects(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
         manifest = self.system.inspect_function_promotion("tenant-a", "echo")
         self.assertEqual(manifest.entries, ())
-        authority = mock.Mock(return_value=False)
         clock = mock.Mock(side_effect=AssertionError("clock consulted"))
-        guarded = System(self.database, authority=authority, clock_us=clock)
+        promoter = System(self.database, clock_us=clock)
         before = self._database_dump()
         with (
             mock.patch.object(
-                guarded.store,
+                promoter.store,
                 "transaction",
-                wraps=guarded.store.transaction,
+                wraps=promoter.store.transaction,
             ) as transaction,
             mock.patch(
                 "cement_runtime.system.uuid.uuid4",
@@ -8696,65 +8332,15 @@ class SystemTests(unittest.TestCase):
                 StateError,
                 "function promotion requires at least one member",
             ):
-                guarded.promote_function(
+                promoter.promote_function(
                     "tenant-a",
                     "echo",
                     expected_function_hash=manifest.function_hash,
                     promoted_by="blocked-manager",
                 )
-        self.assertEqual(transaction.call_args_list, [mock.call(write=False)])
-        authority.assert_not_called()
+        self.assertEqual(transaction.call_args_list, [mock.call(write=True)])
         clock.assert_not_called()
         self.assertEqual(self._database_dump(), before)
-
-    def test_promote_function_plan_identity_binds_retired_ids(self) -> None:
-        self.register(confirmations=2, reviewers=1, span=0)
-        self._promote_three_as_function("function-plan-retired-base")
-        self._challenge_three_function_entries("function-plan-retired-new")
-        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
-        self.assertEqual(len(manifest.entries), 3)
-        predecessor = manifest.entries[1].replaces_artifact_id
-        self.assertIsNotNone(predecessor)
-        assert predecessor is not None
-        trigger_subject = manifest.entries[-1].artifact_id
-        mutator = System(self.database)
-        calls: list[str] = []
-        post_mutation: list[tuple[str, ...]] = []
-        locked_hashes: list[str] = []
-
-        def authority(partition, actor, action, subject):
-            calls.append(subject)
-            if subject == trigger_subject:
-                mutator.suspend_artifact(
-                    "tenant-a",
-                    predecessor,
-                    suspended_by="auditor",
-                    reason="authorization retirement-plan race",
-                )
-                locked_hashes.append(
-                    mutator.inspect_function_promotion(
-                        "tenant-a",
-                        "echo",
-                    ).function_hash
-                )
-                post_mutation.append(self._database_dump())
-            return True
-
-        guarded = System(self.database, authority=authority, clock_us=self.clock)
-        with self.assertRaisesRegex(
-            StateError,
-            "function promotion candidates changed during authorization",
-        ):
-            guarded.promote_function(
-                "tenant-a",
-                "echo",
-                expected_function_hash=manifest.function_hash,
-                promoted_by="release-manager",
-            )
-        self.assertEqual(calls, [entry.artifact_id for entry in manifest.entries])
-        self.assertEqual(locked_hashes, [manifest.function_hash])
-        self.assertEqual(len(post_mutation), 1)
-        self.assertEqual(self._database_dump(), post_mutation[0])
 
     def test_promote_function_expected_hash_binds_locked_content(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
@@ -8771,7 +8357,7 @@ class SystemTests(unittest.TestCase):
                 partition=partition,
                 operation=operation,
             )
-            if calls != 2:
+            if calls != 1:
                 return plan
             entries = list(plan.entries)
             target = entries[1]
@@ -8815,7 +8401,7 @@ class SystemTests(unittest.TestCase):
                     expected_function_hash=manifest.function_hash,
                     promoted_by="release-manager",
                 )
-        self.assertEqual(calls, 2)
+        self.assertEqual(calls, 1)
         self.assertEqual(self._database_dump(), before)
 
     def test_promote_function_expected_hash_compares_the_full_digest(self) -> None:
@@ -8839,49 +8425,6 @@ class SystemTests(unittest.TestCase):
                 expected_function_hash=wrong,
                 promoted_by="release-manager",
             )
-        self.assertEqual(self._database_dump(), before)
-
-    def test_promote_function_authorizes_every_retained_member(self) -> None:
-        self.register(confirmations=2, reviewers=1, span=0)
-        self._promote_three_as_function("function-retained-authority")
-        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
-        retained_ids = tuple(entry.artifact_id for entry in manifest.entries)
-        self.assertEqual(len(retained_ids), 3)
-        self.assertEqual(
-            tuple(entry.disposition for entry in manifest.entries),
-            ("retained", "retained", "retained"),
-        )
-        denied = retained_ids[-1]
-        calls: list[tuple[str, str, str, str]] = []
-
-        def authority(partition, actor, action, subject):
-            calls.append((partition, actor, action, subject))
-            return subject != denied
-
-        clock = mock.Mock(side_effect=AssertionError("clock consulted"))
-        guarded = System(self.database, authority=authority, clock_us=clock)
-        before = self._database_dump()
-        with mock.patch.object(
-            guarded.store,
-            "transaction",
-            wraps=guarded.store.transaction,
-        ) as transaction:
-            with self.assertRaisesRegex(StateError, "not authorized"):
-                guarded.promote_function(
-                    "tenant-a",
-                    "echo",
-                    expected_function_hash=manifest.function_hash,
-                    promoted_by="blocked-manager",
-                )
-        self.assertEqual(
-            calls,
-            [
-                ("tenant-a", "blocked-manager", "artifact.promote", artifact_id)
-                for artifact_id in retained_ids
-            ],
-        )
-        self.assertEqual(transaction.call_args_list, [mock.call(write=False)])
-        clock.assert_not_called()
         self.assertEqual(self._database_dump(), before)
 
     def test_function_promotion_requires_bound_report_ownership_for_middle_candidate(self) -> None:
@@ -9012,12 +8555,6 @@ class SystemTests(unittest.TestCase):
         )
         expected_ids = tuple(str(row["id"]) for row in rows)
         sentinel = expected_ids[-1]
-        authority_calls: list[str] = []
-
-        def authority(_partition, _actor, _action, subject):
-            authority_calls.append(subject)
-            return True
-
         def fast_entry(connection, row, *, promoted):
             self.assertTrue(promoted)
             return (
@@ -9027,7 +8564,6 @@ class SystemTests(unittest.TestCase):
 
         promoter = System(
             self.database,
-            authority=authority,
             clock_us=self.clock,
         )
         with mock.patch.object(
@@ -9050,8 +8586,10 @@ class SystemTests(unittest.TestCase):
                 expected_function_hash=manifest.function_hash,
                 promoted_by="page-manager",
             )
-        self.assertEqual(authority_calls, list(expected_ids))
-        self.assertEqual(authority_calls[-1], sentinel)
+        self.assertEqual(
+            tuple(sorted(promotion.member_artifact_ids)),
+            tuple(sorted(expected_ids)),
+        )
         self.assertEqual(len(promotion.member_artifact_ids), 1_001)
         self.assertEqual(promotion.candidate_artifact_ids, ())
         self.assertIn(sentinel, promotion.member_artifact_ids)
@@ -9231,21 +8769,17 @@ class SystemTests(unittest.TestCase):
             tuple(entry.disposition for entry in manifest.entries),
             ("retained", "retained", "retained"),
         )
-        calls: list[str] = []
-
-        def authority(partition, actor, action, subject):
-            calls.append(subject)
-            return True
-
-        guarded = System(self.database, authority=authority, clock_us=self.clock)
-        promotion = guarded.promote_function(
+        promoter = System(self.database, clock_us=self.clock)
+        promotion = promoter.promote_function(
             "tenant-a",
             "echo",
             expected_function_hash=manifest.function_hash,
             promoted_by="scope-manager",
         )
-        expected_authority = [entry.artifact_id for entry in manifest.entries]
-        self.assertEqual(calls, expected_authority)
+        self.assertEqual(
+            sorted(promotion.member_artifact_ids),
+            sorted(entry.artifact_id for entry in manifest.entries),
+        )
         self.assertEqual(set(promotion.member_artifact_ids), set(target_ids))
         self.assertEqual(promotion.candidate_artifact_ids, ())
         self.assertEqual(promotion.retired_artifact_ids, ())
@@ -9361,20 +8895,17 @@ class SystemTests(unittest.TestCase):
             target_ids,
         )
         self.assertEqual(manifest.skipped, ())
-        calls: list[str] = []
-
-        def authority(partition, actor, action, subject):
-            calls.append(subject)
-            return True
-
-        guarded = System(self.database, authority=authority, clock_us=self.clock)
-        promotion = guarded.promote_function(
+        promoter = System(self.database, clock_us=self.clock)
+        promotion = promoter.promote_function(
             "tenant-a",
             "echo",
             expected_function_hash=manifest.function_hash,
             promoted_by="scope-manager",
         )
-        self.assertEqual(calls, [entry.artifact_id for entry in manifest.entries])
+        self.assertEqual(
+            sorted(promotion.member_artifact_ids),
+            sorted(entry.artifact_id for entry in manifest.entries),
+        )
         self.assertEqual(set(promotion.member_artifact_ids), target_ids)
         self.assertEqual(set(promotion.candidate_artifact_ids), target_ids)
         self.assertEqual(promotion.retired_artifact_ids, ())
@@ -9701,7 +9232,7 @@ class SystemTests(unittest.TestCase):
         trigger_installed = False
 
         @contextmanager
-        def guarded_transaction(*, write=False):
+        def promoter_transaction(*, write=False):
             nonlocal trigger_installed
             with original_transaction(write=write) as connection:
                 if write:
@@ -9739,7 +9270,7 @@ class SystemTests(unittest.TestCase):
         with mock.patch.object(
             self.system.store,
             "transaction",
-            side_effect=guarded_transaction,
+            side_effect=promoter_transaction,
         ):
             promotion = self.system.promote_function(
                 "tenant-a",
@@ -10900,9 +10431,8 @@ class SystemTests(unittest.TestCase):
                 retired_count=4,
             )
 
-        authority = mock.Mock(side_effect=AssertionError("authority consulted"))
         clock = mock.Mock(side_effect=AssertionError("clock consulted"))
-        reader = System(self.database, authority=authority, clock_us=clock)
+        reader = System(self.database, clock_us=clock)
         original_transaction = reader.store.transaction
         write_actions = {
             getattr(sqlite3, name)
@@ -10937,7 +10467,7 @@ class SystemTests(unittest.TestCase):
         denied: list[int] = []
 
         @contextmanager
-        def guarded_transaction(*, write: bool):
+        def promoter_transaction(*, write: bool):
             self.assertFalse(write)
             with original_transaction(write=write) as connection:
                 def authorize(action, _one, _two, _database, _trigger):
@@ -10973,7 +10503,7 @@ class SystemTests(unittest.TestCase):
         with mock.patch.object(
             reader.store,
             "transaction",
-            side_effect=guarded_transaction,
+            side_effect=promoter_transaction,
         ) as transaction, mock.patch.object(
             reader,
             "_latest_function_receipt_row",
@@ -11068,7 +10598,6 @@ class SystemTests(unittest.TestCase):
             reconstruct.assert_not_called()
 
         self.assertEqual(latest_snapshot_states, [True, True, True])
-        authority.assert_not_called()
         clock.assert_not_called()
 
     def test_reconstruct_function_receipt_matches_promoted_manifest_bytes_hash_order_and_exclusion(self) -> None:
@@ -11138,9 +10667,8 @@ class SystemTests(unittest.TestCase):
         policy = CompilePolicy(2, 1, 0)
         self.system.register_operation("tenant-a", "echo", policy=policy)
         _, promotion = self._promote_three_as_function("receipt-read-only")
-        authority = mock.Mock(side_effect=AssertionError("authority consulted"))
         clock = mock.Mock(side_effect=AssertionError("clock consulted"))
-        reader = System(self.database, authority=authority, clock_us=clock)
+        reader = System(self.database, clock_us=clock)
         original_transaction = reader.store.transaction
         write_actions = {
             getattr(sqlite3, name)
@@ -11175,7 +10703,7 @@ class SystemTests(unittest.TestCase):
         denied: list[int] = []
 
         @contextmanager
-        def guarded_transaction(*, write: bool):
+        def promoter_transaction(*, write: bool):
             self.assertFalse(write)
             with original_transaction(write=write) as connection:
                 def authorize(action, _one, _two, _database, _trigger):
@@ -11193,7 +10721,7 @@ class SystemTests(unittest.TestCase):
         with mock.patch.object(
             reader.store,
             "transaction",
-            side_effect=guarded_transaction,
+            side_effect=promoter_transaction,
         ) as transaction:
             def prove_read_only(label, call):
                 denied.clear()
@@ -11331,7 +10859,6 @@ class SystemTests(unittest.TestCase):
 
             prove_read_only("public-corrupt-content", corrupt_public)
 
-        authority.assert_not_called()
         clock.assert_not_called()
 
     def test_reconstruct_function_receipt_validates_caller_structure_and_partition_scope(self) -> None:
@@ -15059,9 +14586,8 @@ class SystemTests(unittest.TestCase):
             promoted_by="null-scalar-promoter",
         )
 
-        authority = mock.Mock(side_effect=AssertionError("authority consulted"))
         clock = mock.Mock(side_effect=AssertionError("clock consulted"))
-        reader = System(self.database, authority=authority, clock_us=clock)
+        reader = System(self.database, clock_us=clock)
         connection = sqlite3.connect(self.database)
         try:
             replacements = {
@@ -15126,7 +14652,6 @@ class SystemTests(unittest.TestCase):
         ):
             reader.function_report("tenant-a", "echo")
         self.assertEqual(self._database_dump(), before)
-        authority.assert_not_called()
         clock.assert_not_called()
 
         connection = sqlite3.connect(self.database)
@@ -15186,7 +14711,6 @@ class SystemTests(unittest.TestCase):
         ):
             reader.function_report("tenant-a", "echo")
         self.assertEqual(self._database_dump(), before)
-        authority.assert_not_called()
         clock.assert_not_called()
 
     def test_current_build_projection_helper_is_lazy_ordered_and_shared_by_compile(self) -> None:
@@ -15866,9 +15390,8 @@ class SystemTests(unittest.TestCase):
             )
             self.assertIsInstance(pending, ReviewRequired)
 
-        authority = mock.Mock(side_effect=AssertionError("authority consulted"))
         clock = mock.Mock(side_effect=AssertionError("clock consulted"))
-        reader = System(self.database, authority=authority, clock_us=clock)
+        reader = System(self.database, clock_us=clock)
         original_transaction = reader.store.transaction
         write_actions = {
             getattr(sqlite3, name)
@@ -15965,7 +15488,7 @@ class SystemTests(unittest.TestCase):
                 return getattr(self.connection, name)
 
         @contextmanager
-        def guarded_transaction(*, write: bool):
+        def promoter_transaction(*, write: bool):
             self.assertFalse(write)
             with original_transaction(write=write) as connection:
                 def authorize(action, _one, _two, _database, _trigger):
@@ -15984,7 +15507,7 @@ class SystemTests(unittest.TestCase):
         with mock.patch.object(
             reader.store,
             "transaction",
-            side_effect=guarded_transaction,
+            side_effect=promoter_transaction,
         ) as transaction, mock.patch.object(
             reader,
             "_reconstruct_function_receipt",
@@ -16019,7 +15542,6 @@ class SystemTests(unittest.TestCase):
             [mock.call(write=False), mock.call(write=False)]
         )
         reconstruct.assert_not_called()
-        authority.assert_not_called()
         clock.assert_not_called()
         self.assertTrue(execute_snapshot_states)
         self.assertTrue(all(execute_snapshot_states))

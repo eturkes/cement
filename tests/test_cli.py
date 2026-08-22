@@ -2736,12 +2736,11 @@ class CLITests(unittest.TestCase):
         cases: tuple[tuple[BaseException, int, str, str], ...] = (
             (ValidationError("invalid hash"), 2, "invalid", "invalid hash"),
             (NotFoundError("missing scope"), 3, "not_found", "missing scope"),
-            (StateError("authority denied"), 4, "conflict", "authority denied"),
             (
-                StateError("function promotion candidates changed during authorization"),
+                StateError("function promotion requires at least one member"),
                 4,
                 "conflict",
-                "function promotion candidates changed during authorization",
+                "function promotion requires at least one member",
             ),
             (IntegrityError("corrupt ledger"), 5, "integrity", "corrupt ledger"),
         )

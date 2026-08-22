@@ -36,7 +36,7 @@ can pass:
 10. `verify_function` returns six ordered checks over one read snapshot of the complete promoted set:
     `duplicate-input-digests`, `abi-canonicalizer-uniform`, `sealed-passing-reports`,
     `current-promotion-receipts`, `function-hash-matches-snapshot`, and `persisted-function-receipt`.
-    The call is read-only and authority-free. A caller can supply an expected function hash. That hash
+    The call is read-only. A caller can supply an expected function hash. That hash
     detects set growth or drift. An empty promoted set passes vacuously and builds a real empty
     function.
 11. The set projects to `cement-function-v2`, a capability-free JSON document. Each entry carries the

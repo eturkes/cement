@@ -398,3 +398,33 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   receipt IDs; every caller supplies its own label; exact CLI and library messages name the correct
   entity; existing message pins update in one pass; request-lifecycle vocabulary stays absent; suite
   green.
+
+## M3.1 deferrals
+
+- `pri=3` `size=S` — every map S3 claim needs an explicit KEEP/REWRITE/DELETE row, and the source
+  docstrings need falsifiers. M3.1's D8 table covered the human-facing docs it changed and rewrote the
+  two source docstrings (`System` class contract, `promote_function`), but S3-001/004/005 KEEP claims and
+  map rows S1-009/010/138 carry no per-row disposition, so a neighbouring edit can delete a governing
+  supervision claim while the D8 table still reads satisfied. Acceptance: each S3 row carries a
+  disposition plus its falsifier, source-docstring rows included, and one check rejects obsolete callback
+  ATTRIBUTION rather than merely unclassified tokens.
+- `pri=3` `size=S` — the human-facing register audit still runs from no gate, now with a concrete
+  consumer. M3.1 ran `.scratch/register/audit.py` by hand over the three changed surfaces (README 161
+  sentences >25w=0; threat-model 92 >25w=0; architecture 141 >25w=1, pre-existing), so no clone can
+  reproduce the conformance claim. Merges with the existing register-audit port row. Acceptance: the
+  tracked tool runs from the configured gate over every changed human-facing surface and reports zero new
+  over-length sentences.
+- `pri=3` `size=S` — clock and ID allocation now run under `BEGIN IMMEDIATE` in `verify_drafts` and
+  `promote_function`, so a caller-supplied `clock_us` that blocks, or that re-enters the same ledger,
+  holds the write lock while it runs. Accepted at M3.1 as the price of correct timestamp ordering, but
+  pinned by nothing. Acceptance: one probe drives a blocking clock with a second default writer and one
+  drives a re-entrant clock through another `System`, each asserting the chosen outcome, and the lock
+  duration is recorded beside the ruling.
+- `pri=3` `size=M` — preserved invariants P6-P10 rest on the pre-existing grade of the rewritten
+  `test_system.py` / `test_cli.py` cases, which the M3.1 diff-blind table (V15/V16/V21-V24, contract
+  Part 8) shows is coarser than the invariants claim. P8 in particular was closed by MAIN comparing
+  `store.py` bytes to `3a53389` by hand, so no clone reproduces it. Acceptance: a frozen
+  `SCHEMA_VERSION` plus a digest over `SCHEMA` bytes replaces the by-hand check; identity columns are
+  read back per WRITER rather than per column; every event producer and branch pins its payload keys;
+  both the retained and the candidate 1,001-member sentinels are pinned; and invalid-identity probes
+  assert zero clock calls and zero ID allocations, not only an unchanged dump.

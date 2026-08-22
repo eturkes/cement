@@ -2,13 +2,13 @@
 
 ## Trusted
 
-- The host, Python/SQLite runtime, database file permissions, Cement interpreter, and deployment's
-  authority callback or external access control.
-- Supervisors and release managers only within the authority and context represented by their
-  partition. The CLI records identity strings but does not authenticate them.
+- The host, Python/SQLite runtime, database file permissions, Cement interpreter, and the deployment's
+  external access control. Cement enforces no permission of its own.
+- Supervisors and release managers only within the context represented by their partition. The CLI
+  records identity strings but does not authenticate them.
 - The provider adapter process as a credential-bearing transport. Its model output remains untrusted.
 - For offline evaluation, the host runtime and the channel that delivers an independently held function
-  hash. That path opens no database, calls no authority callback, and starts no adapter.
+  hash. That path opens no database and starts no adapter.
 
 ## Untrusted
 
@@ -62,8 +62,10 @@
 
 ## Deployment obligations
 
-- Authenticate and authorize proposal review, operation revision, promotion, challenge, revocation,
-  suspension, database access, and audit access.
+- Authenticate and authorize every control-plane call. That list covers operation registration and
+  revision, proposal review, compilation, verification, promotion, challenge, revocation, and
+  suspension. It also covers database access and audit access.
+- Make every permission decision in your own service. Cement records the actor name that you supply.
 - Put every mutable answer dependency into the input, including identity, permissions, locale, policy
   revision, and external-state revision. Exclude behavior with hidden context from compilation.
 - Minimize, redact, encrypt, expire, and back up evidence according to its data classification. The
