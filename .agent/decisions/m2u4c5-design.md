@@ -11,7 +11,7 @@ number this record depends on is written out here.
 
 ## Decision 1 — a failed live verification is a verdict on stderr at exit 6, never a raised `IntegrityError`
 
-Both prescriptions on record — `.agent/roadmap.md` u4c5 and `m2u4c-design.md` Decision 5 — say a failed
+Both prescriptions on record — `.agent/archive/m2.md` u4c5 and `m2u4c-design.md` Decision 5 — say a failed
 live verification "raises through to exit 5". Both spikes self-rejected, on disjoint evidence, and their
 two self-rejections do not overlap: each names a defect the other alternative does not have.
 
@@ -72,7 +72,7 @@ subclass/field pin already guards it); `_emit(..., stream=sys.stderr)` from insi
 
 ## Decision 2 — u4c5 splits two ways
 
-Sizing recheck at the unit's open, as `.agent/roadmap.md` requires. The arbitrated surface is larger than
+Sizing recheck at the unit's open, as `.agent/archive/m2.md`'s M2 header requires. The arbitrated surface is larger than
 the roadmap's pre-arbitration estimate of 46-67 production / 520-760 tests: INTEGRITY's prototype landed
 +70 production carrying only the atomic writer and the prose disposition, and Decision 1 adds the private
 exception, the `main` branch and the structured payload, while Decision 4 adds path validation. Estimate

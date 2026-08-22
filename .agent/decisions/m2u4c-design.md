@@ -46,7 +46,7 @@ consumer revalidates). Each stays library-only for M2; promoting any of them lat
 
 ## Decision 2 — u4c splits six ways
 
-Sizing recheck, as `.agent/roadmap.md:341-343` requires at u4c's open. Full mandatory surface estimates at
+Sizing recheck, as `.agent/archive/m2.md`'s M2 header requires at u4c's open. Full mandatory surface estimates at
 **244–365 production and 3,070–4,540 test lines**. Against recorded actuals — u4a `99 + 1,163` at
 `impl=59%` / `main=93%`, u4b `776 + 3,725` at `impl=92%` / `main=81%`, u3b2 `411 + 3,225` at `impl=90%` —
 u4c is ~2.5× u4a's production and ~2.6× its tests. Under the current authorship split the two halves add in
