@@ -32,8 +32,10 @@ The response must contain both fields. Additional top-level fields fail closed. 
 output. It rejects duplicate object keys, decimal/exponent and non-finite numbers, signed-64-bit
 overflow,
 invalid Unicode, and oversized or deep containers. Encode domain decimals as strings. Cement excludes
-stderr from stored errors, because stderr can contain secrets. Exit failure, timeout, malformed JSON,
-or an oversized result becomes an inert `fallback_failed` request.
+stderr from stored errors, because stderr can contain secrets. Through `handle`, exit failure,
+timeout, malformed JSON, or an oversized result becomes an inert `fallback_failed` request. Through
+`System.propose`, the same failures raise `CandidateSourceError`. That call then writes no request
+row, no proposal, and no event.
 
 On Linux with `/proc`, Cement launches the adapter beneath a private child-subreaper. The supervisor
 enforces the primary timeout and the stdout/stderr limits. It terminates the adapter. It discovers and
@@ -51,7 +53,8 @@ request fields as untrusted prompt content. Keep system instructions and provide
 the request. The command inherits the current environment by default, so it can access deliberately
 configured credentials. The Python API can instead pass an exact environment mapping.
 
-Cement can invoke the adapter again after a failed request or an expired generation lease. Provider
+Through `handle`, Cement can invoke the adapter again after a failed request or an expired generation
+lease. `System.propose` invokes the adapter one time for each call, and it never retries. Provider
 calls must create no external effects. `request_id` is partition-local and available for provider-side
 idempotency and tracing. Adapters that use a global idempotency namespace must key on
 `(partition, request_id)`.

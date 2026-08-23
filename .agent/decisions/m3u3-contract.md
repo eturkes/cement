@@ -57,7 +57,11 @@ def propose(
 - P05. Both names are exported from `cement_runtime` only through `System`; `__init__.py` gains no
   new symbol. `Candidate` is already exported.
 - P06. Both methods are added beside `handle`. The `handle` bytes stay identical to `1182130a2b3a`
-  (12,866 B by AST slice without the trailing newline), as they have been since `3b7769b`.
+  (12,866 B), as they have been since `3b7769b`. CONVENTION, and it is worth exactly four bytes: the
+  whole-line span from `node.lineno` to `node.end_lineno`, keeping the leading indentation, with
+  trailing newlines stripped. A column-offset slice (`ast.get_source_segment`) drops the four-space
+  indent and measures 12,862 B / `c27e71b0b4c7` on the identical unchanged source, so "AST slice"
+  alone names two different claims and a correct `handle` can appear to fail.
 
 ## 3. The two submission paths - the unit's headline predicates
 
@@ -66,7 +70,8 @@ def propose(
   changes.
 - D02. The request row is written DIRECTLY as `status='pending'` with `proposal_id` set,
   `lease_owner IS NULL`, `lease_until_us IS NULL`, `attempts=1`. The schema v2 CHECK constraint
-  already admits exactly this shape. No `generating` state is ever reserved, so no lease exists to
+  ADMITS this shape; it does not enforce it, and it also accepts a `pending` row with `attempts > 1`,
+  so `attempts == 1` is pinned by test and never inferred from the schema. No `generating` state is ever reserved, so no lease exists to
   expire, take over, or fence.
 - D03. The event is `proposal.created`. Its payload and subject match what `handle`'s proposal write
   emits today, MINUS any request identity - see section 8.
@@ -111,14 +116,23 @@ def propose(
 
 ## 6. Purity and containment obligations - each pinned independently
 
-- D15. A failed submission leaves the ledger byte-identical. Four INDEPENDENT pins, never one
+- D15. A failed submission causes ZERO ledger mutation of its own. Four INDEPENDENT pins, never one
   aggregate assertion: `requests` and `proposals` row counts, the event count and the event sequence
   counter, the ledger file's sha256, and the full `tuple(connection.iterdump())` text.
-- D16. Zero `commit()` calls occur on any failure path, measured through a `sqlite3.Connection`
-  subclass injected as the connect `factory`, with a write-transaction positive control proving the
-  spy live. This mirrors M3.2b's B35.
+  DOMAIN, and the wording is load-bearing: the source runs outside every Cement transaction and may
+  itself write to the same ledger, which the revision-race fixture does deliberately through
+  `revise_operation`. Byte identity therefore compares the ledger AFTER any such injected commit
+  against the ledger after the rejected submission returns - never call entry against call exit.
+- D16. Zero `commit()` calls occur on every failure that arises BEFORE commit, measured through a
+  `sqlite3.Connection` subclass injected as the connect `factory`, with a write-transaction positive
+  control proving the spy live. This mirrors M3.2b's B35. A `commit()` that itself raises is one
+  invocation and no reading forbids it; the obligation is that no failure reaches commit.
 - D17. Neither method reads the clock except through `self._now`, and neither consults the artifact,
   example, function-receipt or membership tables. Submission records a proposal; it does not resolve.
+  FORCING INSTRUMENT, required because row, file, dump and commit pins all pass while a forbidden
+  table is read: a `sqlite3.Connection` subclass recording every executed statement, asserted to
+  name none of the forbidden tables on either path, with the recorded list non-empty as its own
+  positive control. One `self._now` call inside the write transaction serves all three rows.
 
 ## 7. Error classification - exact texts RULED
 
@@ -133,6 +147,10 @@ states.
 | operation revision changed across generation | `StateError` | `operation revision changed before proposal submission` |
 | operation absent from the partition | `NotFoundError` | `operation is not registered in this partition` |
 | rejected `partition`, `operation`, or `input_value` | `ValidationError` | the existing `_name` and canonicalization texts, unchanged |
+| `candidate` is not a `Candidate` (DIRECT) | `ValidationError` | `candidate must be a Candidate` |
+| `candidate.provenance` is not a mapping (DIRECT) | `ValidationError` | `candidate provenance must be a mapping` |
+| `candidate.provenance` is not a JSON object (DIRECT) | `ValidationError` | `candidate provenance must be a JSON object` |
+| `candidate.output` or provenance fails canonicalization (DIRECT) | `ValidationError` | the existing canonicalization texts, unchanged |
 
 - D18. Both source-failure rows raise `from None`. The adapter's class, message, cause, context and
   traceback frames must not reach the caller, the message, the repr, or any event. Both spikes
@@ -165,9 +183,9 @@ v2 no proposal can exist without a request row. M3.3 therefore generates one int
 
 - D26. Decisive gate: `PYTHONDONTWRITEBYTECODE=1 uv run -q python -m unittest discover -s tests -t .`
   It must reach 635 + N tests with zero failures, N = the tests M3.3 adds.
-- D27. `test_b20_read_site_census_has_no_mutations` asserts EXACT counts at
-  `tests/test_read_capability_battery.py:869-872`: 17 read sites, 15 write sites, 12 reached helpers,
-  and `violations == []`. M3.3's new transaction sites break the first two. The counts are a
+- D27. `test_b20_read_site_census_has_no_mutations` asserts EXACT counts: 17 read sites, 15 write
+  sites, 12 reached helpers, and `violations == []`. The test is cited by NAME, because a line anchor
+  into a file this unit edits is stale on arrival. M3.3's new transaction sites break the first two. The counts are a
   TRIPWIRE that forces deliberate acknowledgement of every new site, not an invariant that the totals
   never grow; `violations == []` is the load-bearing assertion.
 - D28. M3.3 UPDATES those counts to the numbers its ruled design actually produces, in the same
@@ -220,9 +238,11 @@ the unit that will know which fields it needs.
   outside any transaction (D11), and the exact error each raises.
 - D33. No shipped sentence may call submission cheap, safe-to-retry, deduplicated, or request-free in
   the sense of D25. `resolve`'s cost precedent applies: state the price, do not imply one.
-- D34. README, `docs/architecture.md` and `docs/threat-model.md` are checked for sentences the new
-  surface falsifies. A sentence that becomes false is corrected in this unit even when the code is
-  correct; M3.2b found six consecutive units whose only defects were claim defects.
+- D34. README, `docs/architecture.md`, `docs/threat-model.md` AND `docs/adapter-protocol.md` are
+  checked for sentences the new surface falsifies. A sentence that becomes false is corrected in this
+  unit even when the code is correct; M3.2b found six consecutive units whose only defects were claim
+  defects. `adapter-protocol.md` is the doc that owns adapter FAILURE behaviour, so it is the one the
+  new raising path falsifies, and omitting it from this list was itself a defect.
 
 ## 12. Verdict table - MAIN-final
 
@@ -299,5 +319,34 @@ slice (`ast.get_source_segment`) drops the four-space indent and measures 12,862
 
 ## 13. Review dispositions and differential result
 
-PENDING. Records the contract attack, the oracle's probe agreement, the differential result, the
-post-implementation review with one MAIN disposition per finding, and any history correction.
+PARTIAL at S2. The contract attack is disposed below. The oracle's probe agreement, the differential
+and the post-implementation review land at the battery and closure sessions.
+
+CONTRACT ATTACK, `rev-m3u3-1`, 18 lenses. Dispositions, MAIN-final. Row detail in
+`m3u3-attack.json`, MAIN column `main_disposition`.
+
+| id | severity | disposition | landed |
+|---|---|---|---|
+| A03 | blocking | UPHELD. `events.sequence` is AUTOINCREMENT, so every success mutates `sqlite_sequence` and a literal reading of D01 is unsatisfiable. Confirmed independently by the verdict table's D01 row, so the council rule accepts it outright. | section 12 V-D01; the suite compares declared SCHEMA tables only |
+| A07 | blocking | UPHELD. D07 ordered DIRECT candidate validation while section 7 published no class or text for any of its failures. | four rows added to the section 7 table; `test_a_rejected_candidate_reports_its_own_validation_text` |
+| X02 | blocking | UPHELD, and the sharpest finding of the wave. D15/D16 were unconditional, yet the source runs outside every Cement transaction and the revision-race fixture's own source commits through `revise_operation`. | D15 restated as zero submission-attributable mutation with its comparison window named; D16 scoped to failures before commit |
+| A05 | material | UPHELD. Confirmed independently by the verdict table's D12 row. This pair is what changed MAIN's shipped code. | section 12 V-D12 |
+| A04 | material | UPHELD. Confirmed independently by the verdict table's D07 row. | three adjacent-edge probes plus two for `propose`'s source slot |
+| A06 | material | UPHELD against the contract: D15 and D16 named instruments and D17 named none. | D17 now carries a statement-recording `Connection` subclass with its own positive control |
+| X04 | material | UPHELD against the contract: D06's single-writer obligation was structural with only behavioural probes, which duplicated writers satisfy. | `test_both_methods_route_through_one_persistence_seam` spies the seam itself, not the footprint |
+| A11 | material | UPHELD. `docs/adapter-protocol.md` promised an inert `fallback_failed` request and possible re-invocation, both false through `propose`. | both sentences qualified by route; D34's list corrected |
+| A08 | material | UPHELD in part. The eight named seams are API-level; `cli.py` also serializes the identifier, and authorized ledger access exposes it by design. | section 12 V-D23 states the list is named high-level seams, never an exhaustive count |
+| A09 | material | UPHELD. D27 cited `tests/test_read_capability_battery.py:869-872`, which is the violation branch; the assertions sat at 875-878 and this unit moved them again. | D27 cites the test by NAME; a line anchor into a file the unit edits is stale on arrival |
+| X01 | material | UPHELD. The v2 CHECK ADMITS the required shape; it does not enforce it, and a `pending` row with `attempts > 1` also satisfies it. D02's "already admits exactly this shape" overstated. | D02 reads as a permission, and `attempts == 1` is pinned by test rather than inferred from the schema |
+| A02, X03 | material | DOWNGRADED to minor, and the reviewer's own reproduction is the reason. Both claimed P06's fingerprint is STALE, measured with `ast.get_source_segment`. MAIN re-derived: `1182130a2b3a` / 12,866 B reproduces EXACTLY under the whole-line span convention, and is byte-identical at `3b7769b` and at HEAD. The defect is an unstated convention worth four bytes of indentation, never a stale number. | P06 states its convention; the test states it again in its docstring |
+
+TWO LENSES, DISJOINT YIELD, as on u3b1. The diff-blind verdict table and the contract attack agreed
+on D01, D07 and the direct-path revision binding - three convergences the council rule accepts
+without a MAIN probe - while each also reached findings the other did not: the attack alone caught
+the missing candidate error taxonomy, the falsified adapter doc and the unconditional purity claims;
+the verdict table alone caught the `__context__` retention that `from None` inside a handler does not
+clear, and the seven-versus-eight seam count per path.
+
+ONE REVIEWER CLAIM WAS ITSELF WRONG, which is why a finding's substance and its reproduction are
+graded separately: A02/X03 reported a stale measurement that reproduces exactly under the convention
+the contract meant. MAIN measured both conventions before acting.
