@@ -10,344 +10,344 @@
       "label": "hit type",
       "source_line": 62,
       "asserts": "type(hit).__name__ == 'FunctionResolution'",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b04"],
+      "evidence": "The cited test resolves a promoted hit and asserts exact type identity with FunctionResolution. This is stronger than comparing the runtime type name."
     },
     {
       "id": "S02",
       "label": "hit passed",
       "source_line": 63,
       "asserts": "hit.verification.passed == True",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b05"],
+      "evidence": "The cited test resolves a promoted hit and asserts verification.passed is true, directly carrying this hit-state check."
     },
     {
       "id": "S03",
       "label": "hit matched",
       "source_line": 64,
       "asserts": "hit.match.matched == True",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b05"],
+      "evidence": "The cited test resolves a promoted hit and asserts match.matched is true, directly carrying this hit-state check."
     },
     {
       "id": "S04",
       "label": "hit output",
       "source_line": 65,
       "asserts": "hit.match.output == 0",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b05"],
+      "evidence": "The cited test promotes a known source output and asserts that the resolved match returns that exact output. Its concrete value differs, but it pins the same promoted-output forwarding claim."
     },
     {
       "id": "S05",
       "label": "hit artifact_hash is 64hex",
       "source_line": 66,
       "asserts": "len(hit.match.artifact_hash or '') == 64",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b05"],
+      "evidence": "The cited test asserts that the hit artifact_hash equals the promoted artifact digest and matches the full 64-lowercase-hex pattern. This is stronger than checking length alone."
     },
     {
       "id": "S06",
       "label": "hit document present",
       "source_line": 67,
       "asserts": "hit.verification.document is not None == True",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b05"],
+      "evidence": "The cited test resolves a promoted hit and asserts verification.document is present, directly carrying this check."
     },
     {
       "id": "S07",
       "label": "miss passed",
       "source_line": 70,
       "asserts": "miss.verification.passed == True",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b06"],
+      "evidence": "The cited test resolves an absent input against a verified promoted set and asserts verification.passed is true."
     },
     {
       "id": "S08",
       "label": "miss match",
       "source_line": 71,
       "asserts": "miss.match == FunctionMatch(matched=False)",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b06"],
+      "evidence": "The cited test asserts an exact FunctionMatch result whose matched field is false for a verified miss."
     },
     {
       "id": "S09",
       "label": "miss output",
       "source_line": 72,
       "asserts": "miss.match.output == None",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b06"],
+      "evidence": "The cited test resolves a verified miss and asserts match.output is None, directly carrying this check."
     },
     {
       "id": "S10",
       "label": "miss artifact_hash",
       "source_line": 73,
       "asserts": "miss.match.artifact_hash == None",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b06"],
+      "evidence": "The cited test resolves a verified miss and asserts match.artifact_hash is None, directly carrying this check."
     },
     {
       "id": "S11",
       "label": "evaluate calls after hit",
       "source_line": 89,
       "asserts": "len(seen) == 1",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b12"],
+      "evidence": "The cited spy test asserts exactly one evaluate call for a hit. That pins the first cumulative call count at one."
     },
     {
       "id": "S12",
       "label": "evaluate calls after miss",
       "source_line": 91,
       "asserts": "len(seen) == 2",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b12"],
+      "evidence": "The cited spy test asserts exactly one evaluate call for each of the hit and miss states. Their cumulative count is therefore two."
     },
     {
       "id": "S13",
       "label": "evaluate calls after failed verdict",
       "source_line": 95,
       "asserts": "len(seen) == 2",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b12"],
+      "evidence": "The cited spy test asserts zero evaluate calls for a failed verdict after separately pinning one call each for hit and miss. Thus the prior cumulative count remains two."
     },
     {
       "id": "S14",
       "label": "unverified passed",
       "source_line": 96,
       "asserts": "unverified.verification.passed == False",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b07"],
+      "evidence": "The cited test creates a real failed verdict and asserts verification.passed is false, directly carrying this check."
     },
     {
       "id": "S15",
       "label": "unverified match",
       "source_line": 97,
       "asserts": "unverified.match == None",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b07"],
+      "evidence": "The cited test creates a real failed verdict and asserts match is None, directly carrying this check."
     },
     {
       "id": "S16",
       "label": "unverified document",
       "source_line": 98,
       "asserts": "unverified.verification.document is None == True",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b07"],
+      "evidence": "The cited test creates a real failed verdict and asserts verification.document is None, directly carrying this check."
     },
     {
       "id": "S17",
       "label": "ledger sha256 + iterdump stable",
       "source_line": 99,
       "asserts": "ledger_state(system, database) == digest_before",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b18"],
+      "evidence": "The cited test snapshots both the ledger SHA-256 and full SQLite iterdump, then asserts byte-identical state across hit, miss, and failed verdict calls."
     },
     {
       "id": "S18",
       "label": "events digest unchanged",
       "source_line": 100,
       "asserts": "hashlib.sha256(repr(system.events(partition)).encode()).hexdigest() == events_before",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b20"],
+      "evidence": "The cited test asserts byte-identical serialized events and an unchanged event sequence counter across hit, miss, and failed verdict calls. This carries the smoke digest check and adds a discarded-emission guard."
     },
     {
       "id": "S19",
       "label": "clockless hit",
       "source_line": 111,
       "asserts": "clockless.resolve(partition, operation, 0).match.matched == True",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b19", "tests.test_resolve_battery.ResolveBatteryTests.test_b05"],
+      "evidence": "The first cited test resolves a promoted hit with a clock that raises on access and asserts equality with the baseline resolution. The second asserts that this promoted-input state is a matched hit."
     },
     {
       "id": "S20",
       "label": "clockless miss",
       "source_line": 112,
       "asserts": "clockless.resolve(partition, operation, 99).match == FunctionMatch(matched=False)",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b19", "tests.test_resolve_battery.ResolveBatteryTests.test_b06"],
+      "evidence": "The first cited test resolves a miss with a clock that raises on access and asserts equality with the baseline resolution. The second asserts that the absent-input state returns a FunctionMatch with matched false."
     },
     {
       "id": "S21",
       "label": "clockless failed verdict",
       "source_line": 117,
       "asserts": "clockless.resolve(partition, operation, 0, expected_function_hash='0' * 64).match == None",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b19", "tests.test_resolve_battery.ResolveBatteryTests.test_b29"],
+      "evidence": "The first cited test proves that a failed verdict resolves unchanged while clock access raises. The second passes a valid but wrong expected_function_hash and asserts a failed verdict whose match is None."
     },
     {
       "id": "S22",
       "label": "sourceless miss",
       "source_line": 131,
       "asserts": "sourceless.resolve(partition, operation, 99).match.matched == False",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b24", "tests.test_resolve_battery.ResolveBatteryTests.test_b06"],
+      "evidence": "The first cited test resolves a miss while CandidateSource.propose raises and asserts that it was never called. The second asserts the resulting verified-miss shape, including matched false."
     },
     {
       "id": "S23",
       "label": "last check ran inside the transaction",
       "source_line": 143,
       "asserts": "observed == [True]",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b26"],
+      "evidence": "The cited test samples connection.in_transaction while the sixth verification check runs and asserts the observed state is exactly [True]."
     },
     {
       "id": "S24",
       "label": "failed passed",
       "source_line": 157,
       "asserts": "failed.verification.passed == False",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b07"],
+      "evidence": "The cited test creates a real failed verdict and asserts verification.passed is false, directly carrying this check."
     },
     {
       "id": "S25",
       "label": "failed match is None",
       "source_line": 158,
       "asserts": "failed.match is None == True",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b07"],
+      "evidence": "The cited test creates a real failed verdict and asserts match is None, directly carrying this check."
     },
     {
       "id": "S26",
       "label": "failed document is None",
       "source_line": 159,
       "asserts": "failed.verification.document is None == True",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b07"],
+      "evidence": "The cited test creates a real failed verdict and asserts verification.document is None, directly carrying this check."
     },
     {
       "id": "S27",
       "label": "failed check vector",
       "source_line": 160,
       "asserts": "tuple((c.passed for c in failed.verification.checks)) == (True, True, True, True, True, False)",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_system.SystemTests.test_verify_function_p6_nonempty_legacy_three_member_set_without_receipt_fails_only_p6", "tests.test_resolve_battery.ResolveBatteryTests.test_b08"],
+      "evidence": "The first cited test asserts that a real missing-receipt verification has the exact pass vector (True, True, True, True, True, False). The second asserts that resolve returns the verify_function result by object identity, so the vector is preserved."
     },
     {
       "id": "S28",
       "label": "failed check keys",
       "source_line": 165,
       "asserts": "tuple((c.key for c in failed.verification.checks)) == ('duplicate-input-digests', 'abi-canonicalizer-uniform', 'sealed-passing-reports', 'current-promotion-receipts', 'function-hash-matches-snapshot', 'persisted-function-receipt')",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_system.SystemTests.test_verify_function_p6_nonempty_legacy_three_member_set_without_receipt_fails_only_p6", "tests.test_resolve_battery.ResolveBatteryTests.test_b08"],
+      "evidence": "The first cited test asserts the exact six keys and order on a real failed verification whose sixth check is false. The second asserts that resolve preserves a real verify_function result by identity and exposes those ordered keys."
     },
     {
       "id": "S29",
       "label": "hit: match is None iff not passed",
       "source_line": 180,
       "asserts": "(resolution.match is None) == (not resolution.verification.passed) == True",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b11"],
+      "evidence": "The cited test evaluates the biconditional for a real hit and asserts that match is None exactly when verification.passed is false."
     },
     {
       "id": "S30",
       "label": "miss: match is None iff not passed",
       "source_line": 180,
       "asserts": "(resolution.match is None) == (not resolution.verification.passed) == True",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b11"],
+      "evidence": "The cited test evaluates the biconditional for a real miss and asserts that match is None exactly when verification.passed is false."
     },
     {
       "id": "S31",
       "label": "failed: match is None iff not passed",
       "source_line": 180,
       "asserts": "(resolution.match is None) == (not resolution.verification.passed) == True",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b11"],
+      "evidence": "The cited test evaluates the biconditional for a real failed verdict and asserts that match is None exactly when verification.passed is false."
     },
     {
       "id": "S32",
       "label": "transaction calls",
       "source_line": 197,
       "asserts": "calls == [{'write': False}]",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b25"],
+      "evidence": "The cited spy test asserts that a resolve call reaching the ledger makes exactly one Store.transaction call, with write=False."
     },
     {
       "id": "S33",
       "label": "bad partition -> ValidationError",
       "source_line": 227,
       "asserts": "expected in str(exc) == True",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b15"],
+      "evidence": "The cited table test passes an invalid partition, asserts ValidationError, and asserts the exact partition message. This is stronger than the smoke substring check."
     },
     {
       "id": "S34",
       "label": "bad operation -> ValidationError",
       "source_line": 227,
       "asserts": "expected in str(exc) == True",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b15"],
+      "evidence": "The cited table test passes an invalid operation, asserts ValidationError, and asserts the exact operation message. This is stronger than the smoke substring check."
     },
     {
       "id": "S35",
       "label": "bad expected hash -> ValidationError",
       "source_line": 227,
       "asserts": "expected in str(exc) == True",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b15"],
+      "evidence": "The cited table test passes a malformed expected_function_hash, asserts ValidationError, and asserts the exact digest-shape message."
     },
     {
       "id": "S36",
       "label": "bad input -> ValidationError",
       "source_line": 227,
       "asserts": "expected in str(exc) == True",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b15"],
+      "evidence": "The cited table test passes a non-JSON object, asserts ValidationError, and asserts its exact canonicalization message."
     },
     {
       "id": "S37",
       "label": "bad partition + bad input -> ValidationError",
       "source_line": 227,
       "asserts": "expected in str(exc) == True",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b16"],
+      "evidence": "The cited precedence test passes an invalid partition together with an invalid input and asserts the exact partition ValidationError message."
     },
     {
       "id": "S38",
       "label": "bad operation + bad hash -> ValidationError",
       "source_line": 227,
       "asserts": "expected in str(exc) == True",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b16"],
+      "evidence": "The cited precedence test passes an invalid operation together with an invalid expected hash and asserts the exact operation ValidationError message."
     },
     {
       "id": "S39",
       "label": "unregistered operation",
       "source_line": 236,
       "asserts": "str(exc) == 'operation is not registered in this partition'",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b28"],
+      "evidence": "The cited test resolves an unregistered operation, asserts NotFoundError, and asserts the exact contracted message."
     },
     {
       "id": "S40",
       "label": "missing ledger",
       "source_line": 246,
       "asserts": "str(exc) == 'ledger file is missing or unreadable'",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b28"],
+      "evidence": "The cited test deletes the ledger, asserts IntegrityError, and asserts the exact missing-or-unreadable message."
     },
     {
       "id": "S41",
       "label": "missing ledger not recreated",
       "source_line": 249,
       "asserts": "missing.exists() == False",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b23"],
+      "evidence": "The cited test checks that the ledger path is absent before resolve raises and remains absent afterward, directly pinning non-recreation."
     },
     {
       "id": "S42",
       "label": "mismatch passed",
       "source_line": 255,
       "asserts": "mismatch.verification.passed == False",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b29"],
+      "evidence": "The cited test supplies a valid but wrong expected_function_hash and asserts that the resulting verification.passed is false."
     },
     {
       "id": "S43",
       "label": "mismatch match",
       "source_line": 256,
       "asserts": "mismatch.match == None",
-      "covered_by": "unknown",
-      "evidence": "unknown"
+      "covered_by": ["tests.test_resolve_battery.ResolveBatteryTests.test_b29"],
+      "evidence": "The cited test supplies a valid but wrong expected_function_hash and asserts that the resulting match is None."
     }
   ]
 }
