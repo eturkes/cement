@@ -467,3 +467,15 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   returning a FALSE check rather than raising. Acceptance: `command grep -c '\[0-9a-f\]{64}'
   src/cement_runtime/system.py` reports 1, every replaced site keeps its exact current message and
   raise-versus-verdict behaviour, and the full suite is green.
+
+- `pri=4` `size=M` — every wave ships a fresh copy of the same structural validator. `m3u2a-matrix-validate.py`,
+  `m3u2b-wave2-validate.py` (286 lines) and `m3u3-wave1-validate.py` share one engine - `_rows` id-set
+  enforcement, per-field `unknown` counting with a MAIN-owned exemption, an anchor regex, a prose-length
+  floor, enum checks, `KIND`/`UNKNOWN-CELLS` output, and rc 1 while any cell is unfilled - and differ only
+  in the id lists, field tuples, enums and seeded row subjects. Nine more units are planned, so the copy
+  cost recurs. Extract `.agent/decisions/wave_validate.py` carrying the engine plus `--emit-seed`, and let
+  each unit ship a small schema module that declares its kinds. Do this BETWEEN units, never mid-wave: a
+  teammate grading against a moving validator cannot tell a real defect from a refactor. Acceptance: each
+  existing per-unit validator is replaced by a schema declaration; every committed wave artifact grades to
+  the SAME rc and the SAME `UNKNOWN-CELLS` count as its current validator produces today, proved by running
+  both over each artifact; the all-unknown seed still exits 1 and a fully-filled control still exits 0.
