@@ -223,12 +223,38 @@ Measured gaps driving the arc:
     both returning the proposal ID. Arity makes both illegal states unrepresentable. BOTH spikes
     recommended it, including the one built to defend the XOR signature, so the council rule accepted
     it without a third spike - the first time an alternative's own advocate ruled against it.
-    S2 ENTRY STATE. Implement against the contract, in the primary tree. `wt/spike-m3u3-split` is
-    RETAINED at `6d21efc3` as the reference measurement: a working prototype of the ruled design,
-    `system.py` +214/-67 and `errors.py` +1/-1 from `d43583e`, full gate 635/635 in 202.030 s. It is
-    evidence, not shippable code - it bought that green run with an `operations()` reuse the contract
-    rejects at D13, so MAIN reimplements with a scoped revision read and updates B20's counts openly.
-    Retire that branch at unit close.
+    S2 DONE, implementation session, `main=` 100% 239K/240K, `mate=` 62% 148K/240K (`orc-m3u3-1`,
+    live). Shipped at `4b96e4d` + `719b48a`. Suite 635 -> 668. Gate green, 206.045 s.
+    `wt/spike-m3u3-split` is RETIRED as a design input: it collapsed `handle` onto the shared seam,
+    which P06 forbids, and its `operations()` reuse is rejected at D13. Both avoided.
+    SHIPPED: `submit_proposal` + `propose` + `_persist_proposal` + `_submission_revision` +
+    `_canonical_candidate` in `system.py`; `CandidateSourceError`'s docstring; census 17 -> 18 read
+    sites, 16 write sites, each new site asserted BY METHOD NAME; `tests/test_submission.py` (33);
+    `.agent/decisions/m3u3-smoke.py`, tracked, 40/40 against a real ledger.
+    ONE DIVERGENCE INDICTED MAIN'S OWN CODE before commit, found independently by the diff-blind
+    verdict table (D12) and the contract attack (A05): MAIN had given both paths a revision pre-read
+    plus a seam re-read, so a concurrent `revise_operation` raised "operation revision changed before
+    proposal submission" for a DIRECT submission that captured no revision and had no generation
+    window to protect. The seam now takes `expected_revision: int | None`; `submit_proposal` passes
+    None and opens exactly ONE transaction, `propose` keeps the two-read guard. That pair is the
+    whole return on dispatching the verdict table BEFORE implementing.
+    WAVE 2, all three seeded by a MAIN-committed validator + all-`unknown` skeleton
+    (`m3u3-wave2-validate.py`, kinds `verdicts`/`attack`/`probes`, graded both ways at seed).
+    `test-m3u3-1` 46 loci -> 30+ live divergences, report landed. `rev-m3u3-1` 18 lenses -> 3
+    blocking + 10 material, all disposed in contract section 13. `orc-m3u3-1` implementing +
+    answering the 30-probe differential corpus; its worktree is RETAINED for S3.
+    SEEDING, fifth datapoint, and a NEW failure mode with its fix measured: `orc-m3u3-1` sat at
+    UNKNOWN-CELLS 32 across four polls while it built its implementation first, exactly as its brief
+    ordered. One flush directive re-ordering the work - answer probes against whatever is green,
+    `unreachable` + a note is a FILLED cell - moved it to 19 within one poll. Seeding the deliverable
+    does not help when the BRIEF sequences the ungraded half first; order the graded artifact first
+    and let the implementation catch up.
+    S3 ENTRY STATE, battery session. Harvest `orc-m3u3-1`'s corpus + `test-m3u3-1`'s full table
+    (`git checkout wt/<name> -- <path>`, never `merge --squash`: the worktrees are based
+    PRE-implementation at `d1829a7`, so a squash reverts `main`). Then: the diff-blind obligation
+    battery graded by a committed grader, the differential against the oracle, and a mutation sweep
+    over the added predicates - D30 needs all three published with exact commands, which the attack
+    correctly reported as not yet mechanical.
   - M3.4 tier=kernel tags=oracle depends=M3.3 - freeze request-free proposal/read/review/report/event
     public seams behind one internal binding adapter, schema still v2.
   - M3.5a tier=kernel tags=- depends=M3.2b,M3.4 - add `resolve` and `proposal submit` CLI channels with
