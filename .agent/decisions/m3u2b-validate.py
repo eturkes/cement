@@ -6,7 +6,14 @@ Usage: uv run python .agent/decisions/m3u2b-validate.py <artifact.json>
 The artifact's top-level ``kind`` selects the schema:
 
   "compose-matrix"  the composition spike's probe matrix
-  "bench"           the resolver-cost baseline measurements
+  "bench"           the component-cost baseline measurements
+  "resolve-bench"   the end-to-end `System.resolve` measurements
+
+A "resolve-bench" artifact must also carry one `provenance` block PER POINT and every
+point's block must be identical, because the published exponents are a fit across the
+three points. The grader prints the derived exponents and overheads, so section 8 of
+`.agent/decisions/m3u2b-contract.md` re-derives from committed state with one command
+instead of resting on arithmetic no reader can replay.
 
 Exit 0 = structurally valid AND nothing left ``unknown``. Exit 1 = structural
 defect or an unfilled cell. An expectation MISMATCH never fails the run: the
@@ -20,6 +27,7 @@ count is the flush metric, and each filled cell lowers it.
 from __future__ import annotations
 
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -73,6 +81,26 @@ BENCH_CELLS = (
     "note",
 )
 BENCH_ENV = ("python_version", "sqlite_version", "host_cpu", "repeats", "commit")
+RESOLVE_CELLS = (
+    "entries",
+    "document_bytes",
+    "fixture_build_seconds",
+    "resolve_cold_hit_ms",
+    "resolve_warm_miss_ms",
+    "resolve_warm_failed_ms",
+    "rss_before_kib",
+    "peak_rss_kib",
+)
+RESOLVE_PROVENANCE = (
+    "unit",
+    "commit",
+    "source_dirty",
+    "python_version",
+    "sqlite_version",
+    "host_cpu",
+    "platform",
+    "repeats",
+)
 
 
 def fail(message: str) -> None:
@@ -163,6 +191,84 @@ def check_bench(payload: dict) -> tuple[int, int]:
     return unknown, mismatches
 
 
+def check_resolve_bench(payload: dict) -> tuple[int, int]:
+    points = payload.get("points")
+    if not isinstance(points, dict):
+        fail("resolve-bench requires a `points` object")
+    missing = sorted(set(BENCH_POINTS) - set(points))
+    if missing:
+        fail(f"missing measurement point(s): {', '.join(missing)}")
+    unknown = 0
+    mismatches = 0
+    provenances: dict[str, dict] = {}
+    for point_id, expected_entries in BENCH_POINTS.items():
+        entry = points[point_id]
+        if not isinstance(entry, dict):
+            fail(f"{point_id} must hold an object")
+        for cell in RESOLVE_CELLS:
+            if cell not in entry:
+                fail(f"{point_id} is missing cell `{cell}`")
+            value = entry[cell]
+            if value == UNKNOWN:
+                unknown += 1
+                continue
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                fail(f"{point_id}.{cell} must be a number or `unknown`, not {value!r}")
+            if value < 0:
+                fail(f"{point_id}.{cell} must not be negative")
+        provenance = entry.get("provenance")
+        if not isinstance(provenance, dict):
+            fail(f"{point_id} requires its own `provenance` object")
+        for key in RESOLVE_PROVENANCE:
+            if key not in provenance:
+                fail(f"{point_id}.provenance is missing `{key}`")
+            if provenance[key] == UNKNOWN:
+                unknown += 1
+        if provenance.get("source_dirty"):
+            fail(f"{point_id} was measured against a dirty source tree; re-measure from a clean checkout")
+        provenances[point_id] = provenance
+        measured = entry["entries"]
+        if measured != UNKNOWN and measured != expected_entries:
+            mismatches += 1
+            print(f"MISMATCH {point_id}: expected {expected_entries} entries, measured {measured}")
+    distinct = {json.dumps(value, sort_keys=True) for value in provenances.values()}
+    if len(distinct) != 1:
+        fail(
+            "points do not share one provenance, so they cannot form one scaling curve: "
+            + "; ".join(f"{point_id}={json.dumps(value, sort_keys=True)}" for point_id, value in provenances.items())
+        )
+    if unknown == 0:
+        _report_scaling(points)
+    return unknown, mismatches
+
+
+def _report_scaling(points: dict) -> None:
+    """Print section 8's published derivations so a reader replays them, never retypes them."""
+
+    low, high = points["n1000"], points["n50000"]
+    ratio = math.log(high["entries"] / low["entries"])
+    print(
+        "DERIVED time-exponent(1,000->50,000): "
+        f"{math.log(high['resolve_cold_hit_ms'] / low['resolve_cold_hit_ms']) / ratio:.6f}"
+    )
+    print(
+        "DERIVED raw-rss-exponent(1,000->50,000): "
+        f"{math.log(high['peak_rss_kib'] / low['peak_rss_kib']) / ratio:.6f}"
+    )
+    incremental = [point["peak_rss_kib"] - point["rss_before_kib"] for point in (low, high)]
+    print(
+        "DERIVED incremental-rss-exponent(1,000->50,000): "
+        f"{math.log(incremental[1] / incremental[0]) / ratio:.6f}"
+    )
+    for point_id in BENCH_POINTS:
+        point = points[point_id]
+        print(
+            f"DERIVED {point_id}: cold_hit_ms={point['resolve_cold_hit_ms']:.6f} "
+            f"warm_miss_ms={point['resolve_warm_miss_ms']:.6f} "
+            f"incremental_rss_kib={point['peak_rss_kib'] - point['rss_before_kib']}"
+        )
+
+
 def main(argv: list[str]) -> int:
     if len(argv) != 2:
         print(__doc__)
@@ -176,8 +282,11 @@ def main(argv: list[str]) -> int:
     elif kind == "bench":
         unknown, mismatches = check_bench(payload)
         total = len(BENCH_POINTS) * len(BENCH_CELLS) + len(BENCH_ENV)
+    elif kind == "resolve-bench":
+        unknown, mismatches = check_resolve_bench(payload)
+        total = len(BENCH_POINTS) * (len(RESOLVE_CELLS) + len(RESOLVE_PROVENANCE))
     else:
-        fail(f"kind {kind!r} must be 'compose-matrix' or 'bench'")
+        fail(f"kind {kind!r} must be 'compose-matrix', 'bench' or 'resolve-bench'")
     print(f"KIND: {kind}")
     print(f"CELLS: {total}")
     print(f"UNKNOWN-CELLS: {unknown}")

@@ -3,9 +3,16 @@
 
 Usage:
   uv run python .agent/decisions/m3u2b-resolve-benchmark.py N REPEATS \
-      [--out .agent/decisions/m3u2b-resolve-bench.json]
+      [--out .agent/decisions/m3u2b-resolve-bench.json] [--reset]
 
 N is 1, 1000 or 50000. REPEATS must be odd so the median is an observed sample.
+
+Every point records its OWN `provenance` block - commit, source-tree cleanliness over the
+bytes that produce the number, interpreter, SQLite, CPU, platform and repeat count - and the
+harness REFUSES to merge a point into a file whose other points carry different provenance.
+Without that refusal points measured on different builds or machines silently form one
+scaling curve, and no reader of the artifact can detect it. Start a fresh curve with
+`--reset`, then measure every point on the same build.
 
 Why this file exists beside `m3u2b-benchmark.py`: that harness times
 `verify_function` and standalone `evaluate` and never calls `resolve`, so it is a
@@ -31,7 +38,9 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import platform
 import resource
+import sqlite3
 import statistics
 import subprocess
 import sys
@@ -40,9 +49,12 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[1]
 COMPONENT = HERE / "m3u2b-benchmark.py"
 DEFAULT_OUT = HERE / "m3u2b-resolve-bench.json"
 POINTS = {1: "n1", 1_000: "n1000", 50_000: "n50000"}
+# The bytes that decide the number: the measured package plus both harnesses.
+SOURCE_PATHS = ("src", ".agent/decisions/m3u2b-resolve-benchmark.py", ".agent/decisions/m3u2b-benchmark.py")
 
 _spec = importlib.util.spec_from_file_location("m3u2b_component", COMPONENT)
 component = importlib.util.module_from_spec(_spec)
@@ -54,6 +66,72 @@ OPERATION = component.OPERATION
 sys.path.insert(0, str(HERE.parents[1] / "src"))
 
 from cement_runtime import System  # noqa: E402
+
+
+def _git(*arguments: str) -> str:
+    completed = subprocess.run(
+        ["git", "-C", str(ROOT), *arguments],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(f"git {' '.join(arguments)} exited {completed.returncode}")
+    return completed.stdout.strip()
+
+
+def _host_cpu() -> str:
+    try:
+        for line in Path("/proc/cpuinfo").read_text(encoding="utf-8").splitlines():
+            if line.startswith("model name"):
+                return line.split(":", 1)[1].strip()
+    except OSError:
+        pass
+    return platform.processor() or platform.machine()
+
+
+def _provenance(repeats: int) -> dict[str, object]:
+    """Identity every point must share before its numbers may form one curve."""
+
+    return {
+        "unit": "M3.2b",
+        "commit": _git("rev-parse", "HEAD"),
+        "source_dirty": bool(_git("status", "--porcelain", "--", *SOURCE_PATHS)),
+        "python_version": platform.python_version(),
+        "sqlite_version": sqlite3.sqlite_version,
+        "host_cpu": _host_cpu(),
+        "platform": platform.platform(),
+        "repeats": repeats,
+    }
+
+
+def _existing(out: Path, reset: bool) -> dict:
+    payload = {"kind": "resolve-bench", "points": {}}
+    if out.exists() and not reset:
+        recorded = json.loads(out.read_text(encoding="utf-8"))
+        if recorded.get("kind") == "resolve-bench":
+            payload = recorded
+    return payload
+
+
+def _refuse_mismatched_merge(points: dict, point: str, provenance: dict[str, object]) -> None:
+    for other_id, other in points.items():
+        if other_id == point:
+            continue
+        recorded = other.get("provenance")
+        if recorded == provenance:
+            continue
+        differing = sorted(
+            key
+            for key in set(provenance) | set(recorded or {})
+            if (recorded or {}).get(key) != provenance.get(key)
+        )
+        raise SystemExit(
+            f"refusing to merge {point} into a curve measured under different provenance: "
+            f"{other_id} differs on {', '.join(differing)}. Re-measure every point on this "
+            f"build, starting with --reset."
+        )
 
 
 def _worker(database: str, entries: int) -> dict[str, int]:
@@ -139,8 +217,12 @@ def main(argv: list[str]) -> int:
     parser.add_argument("entries", type=int, choices=tuple(POINTS))
     parser.add_argument("repeats", type=_odd)
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    parser.add_argument("--reset", action="store_true", help="start a fresh curve, discarding existing points")
     args = parser.parse_args(argv)
     point = POINTS[args.entries]
+    provenance = _provenance(args.repeats)
+    # Refuse BEFORE the fixture build: at the 50,000 cap this decision is worth ~13 minutes.
+    _refuse_mismatched_merge(_existing(args.out, args.reset)["points"], point, provenance)
 
     with tempfile.TemporaryDirectory() as directory:
         database = Path(directory) / "resolve-bench.db"
@@ -158,14 +240,11 @@ def main(argv: list[str]) -> int:
         for key in ("hit_ns", "miss_ns", "failed_ns", "rss_before_kib", "peak_rss_kib")
     }
 
-    payload = {"kind": "resolve-bench", "points": {}}
-    if args.out.exists():
-        existing = json.loads(args.out.read_text(encoding="utf-8"))
-        if existing.get("kind") == "resolve-bench":
-            payload = existing
+    payload = _existing(args.out, args.reset)
+    _refuse_mismatched_merge(payload["points"], point, provenance)
     payload["points"][point] = {
         "entries": args.entries,
-        "repeats": args.repeats,
+        "provenance": provenance,
         "fixture_build_seconds": build_seconds,
         "document_bytes": runs[0]["document_bytes"],
         "resolve_cold_hit_ms": medians["hit_ns"] / 1_000_000,
