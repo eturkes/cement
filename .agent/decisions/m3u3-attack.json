@@ -1,0 +1,167 @@
+{
+  "kind": "attack",
+  "rows": [
+    {
+      "id": "A01",
+      "lens": "section 1 Scope: is every named out-of-scope surface actually untouched by what section 2-9 mandate?",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "acceptance_check": "unknown",
+      "main_disposition": "unknown"
+    },
+    {
+      "id": "A02",
+      "lens": "section 2 frozen shape: are P01-P06 satisfiable together, and is the handle byte claim checkable as written?",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "acceptance_check": "unknown",
+      "main_disposition": "unknown"
+    },
+    {
+      "id": "A03",
+      "lens": "section 3 two paths: is the success footprint complete, and does after generated-ID normalization have one meaning?",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "acceptance_check": "unknown",
+      "main_disposition": "unknown"
+    },
+    {
+      "id": "A04",
+      "lens": "section 4 precedence: does D07's order have a probe per ADJACENT edge, or only spanning pairs?",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "acceptance_check": "unknown",
+      "main_disposition": "unknown"
+    },
+    {
+      "id": "A05",
+      "lens": "section 5 source invocation: is the read-then-re-read window specified tightly enough to be implementable one way?",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "acceptance_check": "unknown",
+      "main_disposition": "unknown"
+    },
+    {
+      "id": "A06",
+      "lens": "section 6 purity: does each of D15-D17 have its own instrument, or is one obligation discharged by a proxy?",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "acceptance_check": "unknown",
+      "main_disposition": "unknown"
+    },
+    {
+      "id": "A07",
+      "lens": "section 7 error taxonomy: is every reachable failure of both methods listed with an exact text?",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "acceptance_check": "unknown",
+      "main_disposition": "unknown"
+    },
+    {
+      "id": "A08",
+      "lens": "section 8 private request row: is the eight-seam list complete and each entry true at HEAD?",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "acceptance_check": "unknown",
+      "main_disposition": "unknown"
+    },
+    {
+      "id": "A09",
+      "lens": "section 9 gate identity: are the cited census line numbers and counts accurate at HEAD?",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "acceptance_check": "unknown",
+      "main_disposition": "unknown"
+    },
+    {
+      "id": "A10",
+      "lens": "section 10 fork ruling: do the four measured grounds support TWO METHODS, or does any overreach?",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "acceptance_check": "unknown",
+      "main_disposition": "unknown"
+    },
+    {
+      "id": "A11",
+      "lens": "section 11 normative claims: are D31-D34 checkable, and is the cited errors.py:28 docstring text exact?",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "acceptance_check": "unknown",
+      "main_disposition": "unknown"
+    },
+    {
+      "id": "X01",
+      "lens": "biconditional asserted where the design admits only one-way implication",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "acceptance_check": "unknown",
+      "main_disposition": "unknown"
+    },
+    {
+      "id": "X02",
+      "lens": "a claim that is unconditional in the prose but holds only under a particular fixture or configuration",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "acceptance_check": "unknown",
+      "main_disposition": "unknown"
+    },
+    {
+      "id": "X03",
+      "lens": "a stale structural inventory: any count, line anchor, byte length or SHA the contract states as fact",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "acceptance_check": "unknown",
+      "main_disposition": "unknown"
+    },
+    {
+      "id": "X04",
+      "lens": "an obligation with no forcing probe, so no committed test could detect its deletion",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "acceptance_check": "unknown",
+      "main_disposition": "unknown"
+    },
+    {
+      "id": "X05",
+      "lens": "guarantee-vs-claim gap on private, transitional, identical, indistinguishable or unchanged",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "acceptance_check": "unknown",
+      "main_disposition": "unknown"
+    },
+    {
+      "id": "X06",
+      "lens": "CLAUDE.md Authoring conformance of the contract itself and of the prose M3.3 will ship",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "acceptance_check": "unknown",
+      "main_disposition": "unknown"
+    },
+    {
+      "id": "X07",
+      "lens": "a hazard the contract declares injection-only or unreachable that is real behaviour of a default System",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "acceptance_check": "unknown",
+      "main_disposition": "unknown"
+    }
+  ]
+}

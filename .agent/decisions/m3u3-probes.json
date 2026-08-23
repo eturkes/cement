@@ -1,0 +1,217 @@
+{
+  "kind": "probes",
+  "implementation": "unknown",
+  "worktree_commit": "unknown",
+  "rows": [
+    {
+      "id": "Q01",
+      "probe": "direct submission of a caller-supplied candidate: returned type, value shape and id prefix",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q02",
+      "probe": "direct submission durable footprint: per-table row-count delta across every table in the schema",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q03",
+      "probe": "direct submission event: kind, subject_type, subject_id and the exact payload keys",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q04",
+      "probe": "direct request row shape: status, proposal_id, lease_owner, lease_until_us, attempts, operation_revision",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q05",
+      "probe": "direct submission while a configured candidate_source raises: source invocation count and the result",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q06",
+      "probe": "direct proposals row: output and provenance text plus digests, status, and the status_sequence binding",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q07",
+      "probe": "source-backed submission: returned type, and the footprint compared with Q02 after id normalization",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q08",
+      "probe": "source-backed submission: source invocation count and every field of the CandidateRequest handed over",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q09",
+      "probe": "connection.in_transaction observed on every Cement-held connection while the source executes",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q10",
+      "probe": "the source raises CandidateSourceError: public class, message, __cause__, __context__ and frames",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q11",
+      "probe": "the source raises an arbitrary Exception carrying a planted secret: same observations, secret absent",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q12",
+      "probe": "propose with candidate_source None: class, message and source invocation count",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q13",
+      "probe": "the source returns a non-Candidate or a malformed provenance: class and exact message",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q14",
+      "probe": "the operation revision changes between generation and the write: class, message and durable footprint",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q15",
+      "probe": "a bad partition together with a bad input_value: which error is reported",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q16",
+      "probe": "a bad operation together with a bad input_value: which error is reported",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q17",
+      "probe": "a bad partition together with an unregistered operation: which error, and transaction count",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q18",
+      "probe": "a rejected call: transaction count and source invocation count, each with a positive control",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q19",
+      "probe": "submit_proposal called without the candidate keyword: exact TypeError text",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q20",
+      "probe": "source= passed to submit_proposal and to propose: exact TypeError text for each",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q21",
+      "probe": "unregistered operation on the source path: class, message, and whether the source ran",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q22",
+      "probe": "a failed submission: ledger sha256, full iterdump, row counts and the event sequence counter",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q23",
+      "probe": "commit() call count on every failure path through a Connection-subclass factory, with a positive control",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q24",
+      "probe": "clock reads during a successful submission: self._now call count and any other clock consulted",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q25",
+      "probe": "every SELECT executed during a successful submission, by table",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q26",
+      "probe": "the submitted proposal seen through get_proposal, proposal, proposals and function_report",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q27",
+      "probe": "review accepting a submitted proposal, then compile and promote, end to end",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q28",
+      "probe": "byte-identical content submitted twice: proposal ids, request rows, events and any conflict",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q29",
+      "probe": "handle on the same System after a submission: result and durable footprint against the baseline",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "Q30",
+      "probe": "read-site census: read-transaction sites, write-transaction sites, reached helpers and violations",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    }
+  ]
+}

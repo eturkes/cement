@@ -1,0 +1,419 @@
+{
+  "kind": "verdicts",
+  "rows": [
+    {
+      "id": "P01",
+      "locus": "two methods, candidate keyword-only and REQUIRED on submit_proposal",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "P02",
+      "locus": "both return the proposal ID as a bare str, no new model",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "P03",
+      "locus": "submit_proposal NEVER invokes a source, even when one is configured and raising",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "P04",
+      "locus": "propose invokes self.candidate_source and nothing else; no per-call source argument",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "P05",
+      "locus": "neither name is exported from __init__.py; reachable only through System",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "P06",
+      "locus": "handle's bytes stay identical to 1182130a2b3a, 12,866 B by AST slice",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D01",
+      "locus": "success footprint: exactly one requests row, one proposals row, one events row, nothing else",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D02",
+      "locus": "the request row is written directly as pending with proposal_id set and no lease",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D03",
+      "locus": "the event is proposal.created; payload and subject match handle's write MINUS request identity",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D04",
+      "locus": "no caller-supplied identifier; byte-identical content submitted twice writes two of everything",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D05",
+      "locus": "propose invokes the source exactly once on success and exactly zero times on every raising path",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D06",
+      "locus": "one private persistence seam writes the request row, the proposal row and the event for both paths",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D07",
+      "locus": "validation order: partition, operation, input_value canonicalization, then candidate",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D08",
+      "locus": "a bad partition together with a bad input_value reports the PARTITION error",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D09",
+      "locus": "a rejected call performs zero transactions and zero source invocations, measured with live spies",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D10",
+      "locus": "omitted candidate and passing source= both raise Python's own TypeError; no shipped validator",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D11",
+      "locus": "the source runs outside every open transaction; no connection reports in_transaction",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D12",
+      "locus": "the operation revision is read before invocation and re-read inside the write transaction",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D13",
+      "locus": "the revision re-read uses a scoped query; reusing System.operations() is rejected",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D14",
+      "locus": "propose hands the source a CandidateRequest carrying the generated internal request ID",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D15",
+      "locus": "a failed submission leaves the ledger byte-identical under four independent pins",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D16",
+      "locus": "zero commit() calls on any failure path, measured through a connect-factory spy",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D17",
+      "locus": "neither method reads the clock except through self._now nor consults artifact/example/function tables",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D18",
+      "locus": "both source-failure rows raise from None; no class, message, cause, context or frame reaches the caller",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D19",
+      "locus": "the two source-failure rows are indistinguishable to the caller",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D20",
+      "locus": "failure raises; it never returns a value and never writes request.fallback_failed or a failed row",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D21",
+      "locus": "NotFoundError for an unregistered operation is raised BEFORE the source is invoked",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D22",
+      "locus": "neither the return value nor the proposal.created event publishes the request identifier",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D23",
+      "locus": "the contract publishes the eight live seams that still expose the identifier rather than claiming privacy",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D24",
+      "locus": "private in M3.3 means a storage role the new API neither accepts nor returns",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D25",
+      "locus": "no shipped sentence may state or imply that M3.3 removed request identity",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D26",
+      "locus": "decisive gate reaches 635 + N tests with zero failures",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D27",
+      "locus": "the read-site census counts are a TRIPWIRE; violations == [] is the load-bearing assertion",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D28",
+      "locus": "M3.3 updates the census counts in the same commit that adds the sites, recording each site by method",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D29",
+      "locus": "violations == [] and the reached-helper discipline stay untouched",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D30",
+      "locus": "closure is mechanical: full gate, battery grader, mutation sweep over the added predicates",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D31",
+      "locus": "CandidateSourceError's docstring is rewritten away from supervised fallback",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D32",
+      "locus": "both docstrings state what is persisted, that no idempotency exists, the adapter execution, and each error",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D33",
+      "locus": "no shipped sentence calls submission cheap, safe-to-retry, deduplicated or request-free",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "D34",
+      "locus": "README, docs/architecture.md and docs/threat-model.md are checked for sentences the new surface falsifies",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "T01",
+      "locus": "error text table row: source raises CandidateSourceError -> CandidateSourceError('candidate source failed')",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "T02",
+      "locus": "error text table row: source raises any other Exception -> the identical class and message",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "T03",
+      "locus": "error text table row: propose with no configured source -> StateError('candidate source is not configured')",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "T04",
+      "locus": "error text table row: revision changed -> StateError('operation revision changed before proposal submission')",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "T05",
+      "locus": "error text table row: operation absent -> NotFoundError('operation is not registered in this partition')",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    },
+    {
+      "id": "T06",
+      "locus": "error text table row: rejected partition, operation or input_value -> the existing unchanged ValidationError texts",
+      "divergence": "unknown",
+      "distinguishing_probe": "unknown",
+      "proposed": "unknown",
+      "main_verdict": "unknown",
+      "contract_action": "unknown"
+    }
+  ]
+}
