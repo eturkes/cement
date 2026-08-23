@@ -48,6 +48,8 @@ ALLOWED_SURVIVORS = (
     "set_authorizer",
     "def authorize(",
     "read_only_by_authorizer",
+    # M3.2a's read capability: SQLite's authorizer is the write-denying mechanism.
+    "_read_authorizer",
 )
 
 

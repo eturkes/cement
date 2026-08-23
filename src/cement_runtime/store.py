@@ -422,6 +422,103 @@ def _expected_schema() -> dict[tuple[str, str], str]:
     return _EXPECTED_SCHEMA
 
 
+class _ReadOnlyViolation(CementError):
+    """A write reached the read-only ledger capability."""
+
+
+_READ_AUTHORIZED_ACTIONS = frozenset(
+    {
+        sqlite3.SQLITE_SELECT,
+        sqlite3.SQLITE_READ,
+        sqlite3.SQLITE_FUNCTION,
+        sqlite3.SQLITE_RECURSIVE,
+    }
+)
+# ROLLBACK is absent deliberately: the Store owns the snapshot and ends it itself, so
+# a caller cannot cut the single-snapshot lifetime short.
+_READ_AUTHORIZED_TRANSACTIONS = frozenset({"BEGIN"})
+# Pragmas are allowlisted by NAME, never by argument shape. "No argument means a
+# read" is a heuristic that admits bare writers such as PRAGMA optimize, while it
+# denies introspection pragmas that carry their subject as an argument.
+_READ_ONLY_PRAGMA_READS = frozenset(
+    {
+        "application_id",
+        "busy_timeout",
+        "foreign_keys",
+        "synchronous",
+        "temp_store",
+        "trusted_schema",
+        "user_version",
+    }
+)
+_READ_ONLY_PRAGMA_QUERIES = frozenset(
+    {
+        "collation_list",
+        "database_list",
+        "foreign_key_check",
+        "foreign_key_list",
+        "function_list",
+        "index_info",
+        "index_list",
+        "index_xinfo",
+        "integrity_check",
+        "quick_check",
+        "table_info",
+        "table_list",
+        "table_xinfo",
+    }
+)
+_READ_CAPABILITY_DENIALS = frozenset({sqlite3.SQLITE_AUTH, sqlite3.SQLITE_READONLY})
+
+
+def _read_authorizer(
+    action: int,
+    argument: str | None,
+    value: str | None,
+    database: str | None,
+    trigger: str | None,
+) -> int:
+    # Deny by default. ``mode=ro`` protects the main database file alone, so TEMP
+    # tables, ATTACH and ``PRAGMA foreign_keys = OFF`` stay writable without this.
+    del database, trigger
+    if action in _READ_AUTHORIZED_ACTIONS:
+        return sqlite3.SQLITE_OK
+    if action == sqlite3.SQLITE_PRAGMA:
+        name = (argument or "").lower()
+        if name in _READ_ONLY_PRAGMA_QUERIES:
+            return sqlite3.SQLITE_OK
+        if name in _READ_ONLY_PRAGMA_READS and value is None:
+            return sqlite3.SQLITE_OK
+        return sqlite3.SQLITE_DENY
+    if action == sqlite3.SQLITE_TRANSACTION:
+        if (argument or "").upper() in _READ_AUTHORIZED_TRANSACTIONS:
+            return sqlite3.SQLITE_OK
+        return sqlite3.SQLITE_DENY
+    if action == sqlite3.SQLITE_SAVEPOINT:
+        return sqlite3.SQLITE_OK
+    return sqlite3.SQLITE_DENY
+
+
+def _release(connection: sqlite3.Connection, *, enforced: bool) -> None:
+    # The allowlist denies ROLLBACK, so the Store lifts enforcement to end its own
+    # snapshot. No caller SQL runs here, and the connection closes immediately after.
+    if enforced:
+        connection.set_authorizer(None)
+    connection.rollback()
+
+
+def _transaction_error(exc: sqlite3.DatabaseError, *, write: bool) -> CementError:
+    # Classify by SQLite result code; message text is not a stable contract.
+    if not write:
+        if exc.sqlite_errorcode in _READ_CAPABILITY_DENIALS:
+            return _ReadOnlyViolation("read-only ledger transaction refused a write")
+        if exc.sqlite_errorcode == sqlite3.SQLITE_CANTOPEN:
+            return IntegrityError("ledger file is missing or unreadable")
+    if isinstance(exc, sqlite3.OperationalError):
+        return StateError("database is busy or unavailable")
+    return IntegrityError("database operation failed an integrity check")
+
+
 def _validate_ledger(connection: sqlite3.Connection) -> None:
     problems = connection.execute("PRAGMA integrity_check").fetchall()
     if [row[0] for row in problems] != ["ok"]:
@@ -485,12 +582,24 @@ class Store:
         except sqlite3.DatabaseError as exc:
             raise IntegrityError("database could not be validated as a Cement ledger") from exc
 
-    def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(
-            self.path,
-            timeout=10.0,
-            isolation_level=None,
-        )
+    def _connect(self, *, read_only: bool = False) -> sqlite3.Connection:
+        if read_only:
+            # as_uri() percent-encodes every component; raw concatenation resolves a
+            # name holding '?', '#' or '%' to a different file. mode=ro also refuses
+            # to create a missing ledger, which set_authorizer cannot prevent: it
+            # installs only after the connection exists.
+            connection = sqlite3.connect(
+                f"{self.path.absolute().as_uri()}?mode=ro",
+                timeout=10.0,
+                isolation_level=None,
+                uri=True,
+            )
+        else:
+            connection = sqlite3.connect(
+                self.path,
+                timeout=10.0,
+                isolation_level=None,
+            )
         try:
             connection.row_factory = sqlite3.Row
             connection.execute("PRAGMA foreign_keys = ON")
@@ -505,6 +614,9 @@ class Store:
                     connection.setconfig(defensive, True)
                 if trusted is not None:
                     connection.setconfig(trusted, False)
+            if read_only:
+                # Last: the setup pragmas above are writes the allowlist denies.
+                connection.set_authorizer(_read_authorizer)
         except Exception:
             connection.close()
             raise
@@ -551,21 +663,24 @@ class Store:
     def transaction(self, *, write: bool = False) -> Iterator[sqlite3.Connection]:
         connection: sqlite3.Connection | None = None
         try:
-            connection = self._connect()
+            connection = self._connect(read_only=not write)
             connection.execute("BEGIN IMMEDIATE" if write else "BEGIN")
             try:
                 yield connection
             except Exception:
-                connection.rollback()
+                _release(connection, enforced=not write)
                 raise
             else:
-                connection.commit()
+                # The read capability owns one snapshot and ends it by rollback, so
+                # no read block reaches a commit even where the allowlist would.
+                if write:
+                    connection.commit()
+                else:
+                    _release(connection, enforced=True)
         except CementError:
             raise
-        except sqlite3.OperationalError as exc:
-            raise StateError("database is busy or unavailable") from exc
         except sqlite3.DatabaseError as exc:
-            raise IntegrityError("database operation failed an integrity check") from exc
+            raise _transaction_error(exc, write=write) from exc
         finally:
             if connection is not None:
                 connection.close()

@@ -92,6 +92,22 @@ _FUNCTION_CHECK_KEYS = (
 )
 
 
+
+def _force_reverse_scans(connection, *, enforced: bool) -> None:
+    """Force reverse scan order on a connection the read capability guards.
+
+    ``reverse_unordered_selects`` perturbs the planner and touches no ledger byte,
+    but it is still a pragma WRITE, so the read allowlist denies it. Lifting
+    enforcement around the injection keeps a test-only entry out of that allowlist
+    and marks the fabrication at the point where it happens.
+    """
+    connection.set_authorizer(None)
+    connection.execute("PRAGMA reverse_unordered_selects = ON")
+    if enforced:
+        connection.set_authorizer(store_module._read_authorizer)
+
+
+
 class Clock:
     def __init__(self, now_us: int = 1_000_000) -> None:
         self.now_us = now_us
@@ -3978,8 +3994,8 @@ class SystemTests(unittest.TestCase):
                 raise AssertionError("race release timed out")
             return rows
 
-        def traced_writer_connect():
-            connection = original_connect()
+        def traced_writer_connect(*, read_only=False):
+            connection = original_connect(read_only=read_only)
 
             def trace(statement: str) -> None:
                 if statement.strip().upper() == "COMMIT":
@@ -4215,8 +4231,8 @@ class SystemTests(unittest.TestCase):
                 now_us=now_us,
             )
 
-        def observed_writer_connect():
-            connection = original_writer_connect()
+        def observed_writer_connect(*, read_only=False):
+            connection = original_writer_connect(read_only=read_only)
 
             def trace(statement: str) -> None:
                 if statement.strip().upper() == "BEGIN IMMEDIATE":
@@ -4804,9 +4820,9 @@ class SystemTests(unittest.TestCase):
 
         original_connect = self.system.store._connect
 
-        def reverse_unordered_connect():
-            connection = original_connect()
-            connection.execute("PRAGMA reverse_unordered_selects = ON")
+        def reverse_unordered_connect(*, read_only=False):
+            connection = original_connect(read_only=read_only)
+            _force_reverse_scans(connection, enforced=read_only)
             return connection
 
         with mock.patch.object(
@@ -9179,13 +9195,13 @@ class SystemTests(unittest.TestCase):
         @contextmanager
         def first_transaction(*, write=False):
             with first_original(write=write) as connection:
-                connection.execute("PRAGMA reverse_unordered_selects = ON")
+                _force_reverse_scans(connection, enforced=not write)
                 yield connection
 
         @contextmanager
         def second_transaction(*, write=False):
             with second_original(write=write) as connection:
-                connection.execute("PRAGMA reverse_unordered_selects = ON")
+                _force_reverse_scans(connection, enforced=not write)
                 yield connection
 
         before = self._database_dump()
@@ -10648,7 +10664,7 @@ class SystemTests(unittest.TestCase):
         @contextmanager
         def reverse_transaction(*, write: bool):
             with original_transaction(write=write) as connection:
-                connection.execute("PRAGMA reverse_unordered_selects = ON")
+                _force_reverse_scans(connection, enforced=not write)
                 yield connection
 
         with mock.patch.object(
