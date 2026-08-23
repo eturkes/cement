@@ -119,9 +119,9 @@ Measured gaps driving the arc:
     validator authoring, a 3-teammate wave-1 dispatch, four rounds of steering, one spike-report
     harvest, MAIN's own reachability census, MAIN's rerun of the decisive harness stage, and the
     acceptance contract. Implementation had not started. So the priced answer is structural, not a
-    percentage surcharge: AN ORACLE UNIT DOES NOT FIT ONE WINDOW. It takes two sessions, split at the
-    contract, which is exactly route 2. Budget M3.2b, M3.3 and M3.4 the same way and stop trying to
-    close one in a single session.
+    percentage surcharge: AN ORACLE UNIT DOES NOT FIT ONE WINDOW, and the split belongs at the contract,
+    which is exactly route 2. This wave-1 reading put the total at two sessions; the binding figure is
+    M3.2b's measured FOUR below.
     Reliability datapoint, priced the hard way: 1 of 3 wave-1 teammates delivered. `spike-m3u2a-full`
     died twice and produced 0/32 probes; `map-m3u2a` climbed to 91% (218K) while its report never grew
     past its skeleton across four flush directives. MAIN absorbed both losses by deriving the census
@@ -155,12 +155,11 @@ Measured gaps driving the arc:
     1 behavioral divergence (W13 `VACUUM`, ruled MAIN's way on parity measurement - both capabilities
     raise the identical class and message, so the open transaction refuses it before the authorizer is
     consulted), 17 message-text differences, graded by `m3u2a-differential.py`.
-    ORACLE CALIBRATION - MEASURED AND CLOSED, binding on M3.2b, M3.3 and M3.4. An oracle unit takes THREE
-    MAIN sessions, split at the contract and again at the battery: s1 = wave 1 + acceptance contract
-    (31 -> 75%), s2 = implementation (0 -> 80%), s3 = battery (0 -> 93%). The base implementation was
-    46 production lines, so static span predicts none of it - the window goes to the BATTERY'S
-    COORDINATION. Budget the three remaining oracle units the same way and stop trying to close one in
-    fewer sessions.
+    ORACLE CALIBRATION, this unit's measurement, SUPERSEDED by M3.2b's four-session correction below -
+    read that one. Three MAIN sessions here: s1 = wave 1 + acceptance contract (31 -> 75%), s2 =
+    implementation (0 -> 80%), s3 = battery (0 -> 93%). Three only because this unit's review landed
+    inside s3. The base implementation was 46 production lines, so static span predicts none of it -
+    the window goes to the BATTERY'S COORDINATION.
     RELIABILITY, third datapoint, now with a control. Skeleton-first is the whole variable. The `test`
     re-dispatch carried a stub-commit mandate - every intended test name committed first with a failing
     body, then one commit per filled test - and delivered 52 commits, 48 tests, 22/22 obligations, zero
@@ -209,11 +208,12 @@ Measured gaps driving the arc:
     Seeding the deliverable is necessary; seeding the row SUBJECTS is what makes a generative
     deliverable resumable. `prod-m3u2b-1` then filled 43 crosswalk rows at 33% of its window and
     self-reported its own boundary slip, which MAIN confirmed reversed before harvest.
-  - M3.3 tier=kernel tags=oracle depends=M3.1 - request-free direct and source-backed submission over
-    unchanged schema v2. Also owns `src/cement_runtime/errors.py`: `CandidateSourceError` stays public,
-    its supervised-fallback docstring is rewritten, and both it and an arbitrary `Exception` normalize to
-    exact public text with no durable row or event, so a broken source leaks nothing. Runs parallel with
-    M3.2b.
+  - M3.3 OPEN tier=kernel tags=oracle depends=M3.1 - request-free direct and source-backed submission
+    over unchanged schema v2. Also owns `src/cement_runtime/errors.py`: `CandidateSourceError` stays
+    public, its supervised-fallback docstring is rewritten, and both it and an arbitrary `Exception`
+    normalize to exact public text with no durable row or event, so a broken source leaks nothing.
+    Budget FOUR MAIN sessions per the corrected oracle estimator: contract, implementation, battery,
+    closure.
   - M3.4 tier=kernel tags=oracle depends=M3.3 - freeze request-free proposal/read/review/report/event
     public seams behind one internal binding adapter, schema still v2.
   - M3.5a tier=kernel tags=- depends=M3.2b,M3.4 - add `resolve` and `proposal submit` CLI channels with
