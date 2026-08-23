@@ -1,106 +1,576 @@
 {
   "kind": "spike",
-  "alternative": "unknown",
-  "api_signature": "unknown",
-  "worktree_commit": "unknown",
+  "alternative": "split",
+  "api_signature": "System.submit_proposal(partition: str, operation: str, input_value: object, *, candidate: Candidate) -> str; System.propose(partition: str, operation: str, input_value: object) -> str",
+  "worktree_commit": "84ba132d7e0d5c521a3b279fdf6ad5c44571e756",
   "rows": [
     {
       "id": "P01",
       "probe": "direct submission of a caller-supplied candidate: result value, and every durable row and event written",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "result_type": "str",
+        "result_prefix": "prop_",
+        "result_equals_proposal_id": true,
+        "changed_table_deltas": {
+          "events": 1,
+          "proposals": 1,
+          "requests": 1
+        },
+        "request_row": {
+          "id_prefix": "req_",
+          "partition": "p",
+          "operation": "op",
+          "operation_revision": 1,
+          "input_json": "{\"x\":1}",
+          "input_hash": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22",
+          "status": "pending",
+          "proposal_id_equals_result": true,
+          "attempts": 1,
+          "nullable_fields_are_null": true,
+          "created_at_us": 100,
+          "updated_at_us": 100
+        },
+        "proposal_row": {
+          "partition": "p",
+          "request_id_matches_request": true,
+          "proposed_output_json": "{\"y\":2}",
+          "proposed_output_hash": "9a51a7767c3d6fbab05a874b052aa49174a280702a278208810f9cd1a9ef3afa",
+          "provenance_json": "{\"model\":\"manual\"}",
+          "provenance_hash": "cd309ecbb885f9b82ceab923ff3f73db8a1324a4124ca133e0b4909e7214f2d3",
+          "status": "pending",
+          "review_fields_are_null": true,
+          "created_at_us": 100,
+          "status_sequence": 2
+        },
+        "event_row": {
+          "sequence": 2,
+          "kind": "proposal.created",
+          "subject_type": "proposal",
+          "subject_id_equals_result": true,
+          "payload": {},
+          "created_at_us": 100
+        }
+      },
+      "note": "Return the proposal ID as str: it is the minimal review handle, gives both methods one stable type, and does not expose the private request ID."
     },
     {
       "id": "P02",
       "probe": "source-backed submission: the source runs exactly once, and the durable footprint against P01",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "direct_source_calls": 0,
+        "durable_footprint": {
+          "changed_table_deltas": {
+            "events": 1,
+            "proposals": 1,
+            "requests": 1
+          },
+          "event": {
+            "created_at_us": 100,
+            "kind": "proposal.created",
+            "partition": "p",
+            "payload": {},
+            "sequence": 2,
+            "subject_matches": true,
+            "subject_type": "proposal"
+          },
+          "proposal": {
+            "created_at_us": 100,
+            "id_prefix": "prop_",
+            "partition": "p",
+            "proposed_output_hash": "9a51a7767c3d6fbab05a874b052aa49174a280702a278208810f9cd1a9ef3afa",
+            "proposed_output_json": "{\"y\":2}",
+            "provenance_hash": "e6215ea61b73dc54f183b0c610ccae801cfab958389b86490232d52aef6a8596",
+            "provenance_json": "{\"model\":\"same\"}",
+            "request_id_matches": true,
+            "review_fields_are_null": true,
+            "status": "pending",
+            "status_sequence": 2
+          },
+          "request": {
+            "attempts": 1,
+            "created_at_us": 100,
+            "id_prefix": "req_",
+            "input_hash": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22",
+            "input_json": "{\"x\":1}",
+            "nullable_fields_are_null": true,
+            "operation": "op",
+            "operation_revision": 1,
+            "partition": "p",
+            "proposal_id_matches": true,
+            "status": "pending",
+            "updated_at_us": 100
+          }
+        },
+        "durable_footprint_equal_to_direct": true,
+        "result_matches_proposal": true,
+        "result_type": "str",
+        "source_calls": 1,
+        "source_request": {
+          "input": {
+            "x": 1
+          },
+          "operation": "op",
+          "operation_revision": 1,
+          "partition": "p",
+          "request_id_prefix": "req_"
+        },
+        "source_request_class": "CandidateRequest",
+        "source_request_id_matches_private_row": true
+      },
+      "note": "The configured source runs once; after ID normalization, its request, proposal, and event footprint is identical to direct submission."
     },
     {
       "id": "P03",
       "probe": "the source runs OUTSIDE every open transaction: connection.in_transaction observed during propose",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "commit_spy_positive_control": 1,
+        "connection_class": "SpyConnection",
+        "factory_positive_direct_in_transaction": true,
+        "factory_positive_in_transaction_values": [
+          true
+        ],
+        "source_any_connection_in_transaction": false,
+        "source_calls": 1,
+        "source_in_transaction_values": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "source_observed_connections": 4,
+        "write_commits_after_source_return": 1
+      },
+      "note": "The factory spy detects True in its positive control, while every retained Cement connection reports False during source execution."
     },
     {
       "id": "P04",
       "probe": "the source raises CandidateSourceError: exact public class and message, zero durable rows, zero events",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "cause_is_none": true,
+        "changed_table_deltas": {},
+        "commit_spy_positive_control": 1,
+        "commit_spy_positive_in_transaction": true,
+        "commits_during_failed_submission": 0,
+        "context_is_none": true,
+        "dump_sha256_equal": true,
+        "file_sha256_equal": true,
+        "iterdump_equal": true,
+        "public_class": "CandidateSourceError",
+        "public_message": "candidate source failed",
+        "secret_in_public_message": false,
+        "secret_in_repr": false,
+        "secret_in_traceback": false,
+        "source_calls": 1
+      },
+      "note": "CandidateSourceError becomes one detail-free public error; the precheck leaves bytes, dump, rows, events, and commit count unchanged."
     },
     {
       "id": "P05",
       "probe": "the source raises an arbitrary Exception: identical public text to P04, nothing internal leaked",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "arbitrary_exception": {
+          "cause_is_none": true,
+          "changed_table_deltas": {},
+          "commit_spy_positive_control": 1,
+          "commit_spy_positive_in_transaction": true,
+          "commits_during_failed_submission": 0,
+          "context_is_none": true,
+          "file_sha256_equal": true,
+          "iterdump_equal": true,
+          "public_class": "CandidateSourceError",
+          "public_message": "candidate source failed",
+          "secret_in_public_message": false,
+          "secret_in_repr": false,
+          "secret_in_traceback": false,
+          "source_calls": 1
+        },
+        "candidate_source_error": {
+          "cause_is_none": true,
+          "changed_table_deltas": {},
+          "commit_spy_positive_control": 1,
+          "commit_spy_positive_in_transaction": true,
+          "commits_during_failed_submission": 0,
+          "context_is_none": true,
+          "file_sha256_equal": true,
+          "iterdump_equal": true,
+          "public_class": "CandidateSourceError",
+          "public_message": "candidate source failed",
+          "secret_in_public_message": false,
+          "secret_in_repr": false,
+          "secret_in_traceback": false,
+          "source_calls": 1
+        },
+        "public_surface_identical": true
+      },
+      "note": "RuntimeError and CandidateSourceError produce byte-for-byte identical public class and text, with no secret, commit, row, event, or dump delta."
     },
     {
       "id": "P06",
       "probe": "source-backed submission with no candidate_source configured: exact class and message",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "cause_is_none": true,
+        "changed_table_deltas": {},
+        "context_is_none": true,
+        "file_sha256_equal": true,
+        "iterdump_equal": true,
+        "public_class": "StateError",
+        "public_message": "candidate source is not configured",
+        "store_transaction_calls": 0,
+        "transaction_spy_positive_control": 1
+      },
+      "note": "Missing configuration raises StateError before the transaction seam; its exact text is stable and the ledger remains byte-identical."
     },
     {
       "id": "P07",
       "probe": "direct submission while a candidate_source IS configured: the source must not be invoked",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "changed_table_deltas": {
+          "events": 1,
+          "proposals": 1,
+          "requests": 1
+        },
+        "proposed_output_json": "{\"from\":\"direct\"}",
+        "provenance_json": "{\"path\":\"caller\"}",
+        "result_matches_proposal": true,
+        "result_type": "str",
+        "source_calls_during_direct_submission": 0,
+        "source_counter_positive_control": 1
+      },
+      "note": "The source counter is live but remains zero; direct submission persists only the caller candidate even when a source is configured."
     },
     {
       "id": "P08",
       "probe": "both candidate and source supplied, and neither supplied: exact class and message, or the signature that makes it unreachable",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "unreachable",
+      "observation": {
+        "both_direct_class": "TypeError",
+        "both_direct_message": "System.submit_proposal() got an unexpected keyword argument 'source'",
+        "candidate_on_source_path_class": "TypeError",
+        "candidate_on_source_path_message": "System.propose() got an unexpected keyword argument 'candidate'",
+        "neither_direct_class": "TypeError",
+        "neither_direct_message": "System.submit_proposal() missing 1 required keyword-only argument: 'candidate'",
+        "propose_has_candidate_parameter": false,
+        "propose_has_source_parameter": false,
+        "propose_signature": "(partition: 'str', operation: 'str', input_value: 'object') -> 'str'",
+        "submit_candidate_kind": "KEYWORD_ONLY",
+        "submit_candidate_required": true,
+        "submit_has_source_parameter": false,
+        "submit_signature": "(partition: 'str', operation: 'str', input_value: 'object', *, candidate: 'Candidate') -> 'str'"
+      },
+      "note": "Method identity and arity remove XOR states: submit_proposal requires candidate and rejects source, while propose accepts neither keyword."
     },
     {
       "id": "P09",
       "probe": "the operation revision changes between candidate generation and the proposal write",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "candidate_request_revision": 1,
+        "changed_table_deltas": {
+          "events": 1
+        },
+        "event_kinds": [
+          "operation.registered",
+          "operation.revised"
+        ],
+        "proposal_created_events": 0,
+        "proposal_rows": 0,
+        "public_class": "StateError",
+        "public_message": "operation revision changed before proposal submission",
+        "request_rows": 0,
+        "revision_at_write_check": 2,
+        "revision_returned_inside_source": 2,
+        "source_calls": 1
+      },
+      "note": "The optimistic recheck rejects a revision-1 candidate at revision 2; only the deliberate revision event persists, with no proposal plumbing."
     },
     {
       "id": "P10",
       "probe": "unregistered operation: class, message, and whether the source ran before the check",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "changed_table_deltas": {},
+        "file_sha256_equal": true,
+        "iterdump_equal": true,
+        "public_class": "NotFoundError",
+        "public_message": "operation is not registered in this partition",
+        "source_calls_before_error": 0,
+        "source_counter_positive_control": 1,
+        "store_transaction_calls": 1
+      },
+      "note": "One operation-read transaction precedes source execution; a missing operation raises exact NotFoundError text and leaves the ledger unchanged."
     },
     {
       "id": "P11",
       "probe": "the identical input submitted twice: proposal count, and proof that no request_id idempotency survives",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "distinct_proposal_ids": 2,
+        "distinct_request_ids": 2,
+        "input_hash_values": [
+          "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+        ],
+        "input_json_values": [
+          "{\"x\":1}"
+        ],
+        "proposal_created_events": 2,
+        "proposal_rows": 2,
+        "propose_has_request_id_parameter": false,
+        "request_rows": 2,
+        "results_equal_proposal_ids": true,
+        "source_calls": 2,
+        "source_request_ids_equal_private_rows": true,
+        "submission_results_distinct": true,
+        "submit_has_request_id_parameter": false
+      },
+      "note": "Two identical calls invoke the source twice and create two fresh request IDs, proposal IDs, and events; neither method accepts an idempotency key."
     },
     {
       "id": "P12",
       "probe": "argument validation precedence: a bad partition together with a bad input, and that no ledger read happened",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "bad_input_alone_class": "ValidationError",
+        "bad_input_alone_message": "value of type 'object' is not JSON",
+        "changed_table_deltas": {},
+        "direct_class": "ValidationError",
+        "direct_message": "partition must be 1-128 ASCII letters, digits, '.', '_', ':', '/', or '-'",
+        "file_sha256_equal": true,
+        "iterdump_equal": true,
+        "source_backed_class": "ValidationError",
+        "source_backed_message": "partition must be 1-128 ASCII letters, digits, '.', '_', ':', '/', or '-'",
+        "source_calls_for_source_backed_rejection": 0,
+        "source_counter_positive_control": 1,
+        "store_transaction_calls_for_two_rejections": 0,
+        "transaction_spy_positive_control": 1
+      },
+      "note": "Both methods reject the invalid partition before canonicalizing the independently-invalid input, opening a transaction, or invoking the source."
     },
     {
       "id": "P13",
       "probe": "the private request row this alternative writes: status, columns, and every public method that could surface it",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "events_contain_request_id": false,
+        "public_method_count": 32,
+        "request_column_count": 18,
+        "request_columns": [
+          "id",
+          "partition",
+          "operation",
+          "operation_revision",
+          "input_json",
+          "input_hash",
+          "status",
+          "output_json",
+          "source_kind",
+          "artifact_id",
+          "proposal_id",
+          "example_id",
+          "error_code",
+          "lease_owner",
+          "lease_until_us",
+          "attempts",
+          "created_at_us",
+          "updated_at_us"
+        ],
+        "request_id_source_candidates": [
+          "function_report",
+          "get_proposal",
+          "handle",
+          "proposal",
+          "proposals",
+          "propose",
+          "request_status",
+          "review",
+          "submit_proposal"
+        ],
+        "request_row": {
+          "attempts": 1,
+          "id_prefix": "req_",
+          "input_hash": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22",
+          "input_json": "{\"x\":1}",
+          "lease_owner": null,
+          "lease_until_us": null,
+          "null_columns": [
+            "artifact_id",
+            "error_code",
+            "example_id",
+            "lease_owner",
+            "lease_until_us",
+            "output_json",
+            "source_kind"
+          ],
+          "operation": "op",
+          "operation_revision": 1,
+          "partition": "p",
+          "proposal_id_matches_result": true,
+          "status_after_review": "rejected",
+          "status_at_submission": "pending"
+        },
+        "source_calls_after_all_pre_review_reads": 1,
+        "submission_result_equals_request_id": false,
+        "submission_result_type": "str",
+        "surface_details": {
+          "function_report": {
+            "class": "PendingProposalGap",
+            "request_id_matches": true
+          },
+          "get_proposal": {
+            "class": "ProposalView",
+            "request_id_matches": true
+          },
+          "handle": {
+            "class": "ReviewRequired",
+            "request_id_matches": true
+          },
+          "proposal": {
+            "class": "dict",
+            "request_id_matches": true
+          },
+          "proposals": {
+            "class": "list",
+            "request_id_matches": true
+          },
+          "propose": {
+            "channel": "CandidateSource.propose(CandidateRequest)",
+            "class": "CandidateRequest",
+            "request_id_matches": true
+          },
+          "request_status": {
+            "class": "ReviewRequired",
+            "request_id_matches": true
+          },
+          "review": {
+            "class": "Rejected",
+            "request_id_matches": true
+          }
+        },
+        "surfacing_methods": [
+          "function_report",
+          "get_proposal",
+          "handle",
+          "proposal",
+          "proposals",
+          "propose",
+          "request_status",
+          "review"
+        ]
+      },
+      "note": "The lease-free pending row is not truly private under schema-v2 compatibility: eight public methods or protocol calls expose its request ID."
     },
     {
       "id": "P14",
       "probe": "call-site ergonomics: the exact signature, and the rewrite each of run_demo.py's 7 handle calls needs",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "direct_submit_calls_in_demo": 0,
+        "handle_calls_found": 7,
+        "legacy_handle_calls_after_rewrite": 0,
+        "original_sites": [
+          {
+            "binding": "outcome_a_01",
+            "line": 178,
+            "request_id": "a-note-01"
+          },
+          {
+            "binding": "outcome_a_02",
+            "line": 194,
+            "request_id": "a-note-02"
+          },
+          {
+            "binding": "resolved_a",
+            "line": 228,
+            "request_id": "a-note-03"
+          },
+          {
+            "binding": "outcome_b_01",
+            "line": 248,
+            "request_id": "b-intake-01"
+          },
+          {
+            "binding": "outcome_b_02",
+            "line": 263,
+            "request_id": "b-intake-02"
+          },
+          {
+            "binding": "resolved_b",
+            "line": 292,
+            "request_id": "b-intake-recur"
+          },
+          {
+            "binding": "outcome_c_01",
+            "line": 312,
+            "request_id": "c-lab-01"
+          }
+        ],
+        "propose_signature": "(self, partition: 'str', operation: 'str', input_value: 'object') -> 'str'",
+        "read_only_rewrites": 2,
+        "request_id_arguments_after_rewrite": 0,
+        "rewrites": [
+          {
+            "after": "proposal_a_01 = system.propose(PARTITION, OPERATION, a_signature_01); review(..., proposal_a_01, ...)",
+            "before": "outcome_a_01 = system.handle(PARTITION, OPERATION, a_signature_01, request_id=...)",
+            "original_line": 178,
+            "path": "source-backed submission",
+            "request_id_removed": "a-note-01"
+          },
+          {
+            "after": "proposal_a_02 = system.propose(PARTITION, OPERATION, a_signature_02); review(..., proposal_a_02, ...)",
+            "before": "outcome_a_02 = system.handle(PARTITION, OPERATION, a_signature_02, request_id=...)",
+            "original_line": 194,
+            "path": "source-backed submission",
+            "request_id_removed": "a-note-02"
+          },
+          {
+            "after": "resolution_a = system.resolve(PARTITION, OPERATION, a_signature_03); require verification.passed and match.matched; use match.output",
+            "before": "resolved_a = system.handle(PARTITION, OPERATION, a_signature_03, request_id=...)",
+            "original_line": 228,
+            "path": "read-only resolution after checkpoint",
+            "request_id_removed": "a-note-03"
+          },
+          {
+            "after": "proposal_b_01 = system.propose(PARTITION, OPERATION, b_signature_01); review(..., proposal_b_01, ...)",
+            "before": "outcome_b_01 = system.handle(PARTITION, OPERATION, b_signature_01, request_id=...)",
+            "original_line": 248,
+            "path": "source-backed submission",
+            "request_id_removed": "b-intake-01"
+          },
+          {
+            "after": "proposal_b_02 = system.propose(PARTITION, OPERATION, b_signature_02); review(..., proposal_b_02, ...)",
+            "before": "outcome_b_02 = system.handle(PARTITION, OPERATION, b_signature_02, request_id=...)",
+            "original_line": 263,
+            "path": "source-backed submission",
+            "request_id_removed": "b-intake-02"
+          },
+          {
+            "after": "resolution_b = system.resolve(PARTITION, OPERATION, b_signature_01); require verification.passed and match.matched; use match.output",
+            "before": "resolved_b = system.handle(PARTITION, OPERATION, b_signature_01, request_id=...)",
+            "original_line": 292,
+            "path": "read-only resolution after checkpoint",
+            "request_id_removed": "b-intake-recur"
+          },
+          {
+            "after": "proposal_c_01 = system.propose(PARTITION, OPERATION, c_signature_01); review(..., proposal_c_01, ...)",
+            "before": "outcome_c_01 = system.handle(PARTITION, OPERATION, c_signature_01, request_id=...)",
+            "original_line": 312,
+            "path": "source-backed submission",
+            "request_id_removed": "c-lab-01"
+          }
+        ],
+        "source_backed_rewrites": 5,
+        "submit_signature": "(self, partition: 'str', operation: 'str', input_value: 'object', *, candidate: 'Candidate') -> 'str'",
+        "supporting_function_checkpoints_added": 2,
+        "transformed_demo_output_lines": 61,
+        "transformed_demo_result": "All checks passed."
+      },
+      "note": "The seven-call rewrite is explicit and executable: five misses become propose, two known hits become resolve, and two function checkpoints support those hits."
     }
   ]
 }

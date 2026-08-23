@@ -1,106 +1,458 @@
 {
   "kind": "spike",
-  "alternative": "unknown",
-  "api_signature": "unknown",
-  "worktree_commit": "unknown",
+  "alternative": "xor",
+  "api_signature": "System.submit_proposal(self, partition: str, operation: str, input_value: object, *, candidate: Candidate | None = None, source: CandidateSource | None = None) -> str",
+  "worktree_commit": "3dfcce10e93a2bc5e4ddbbe43b431df57b450b96",
   "rows": [
     {
       "id": "P01",
       "probe": "direct submission of a caller-supplied candidate: result value, and every durable row and event written",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "result_class": "str",
+        "result_value": "prop_de0f36c575f8464795645eb0220686d3",
+        "result_has_prop_prefix": true,
+        "row_count_delta": {
+          "events": 1,
+          "proposals": 1,
+          "requests": 1
+        },
+        "request_status": "pending",
+        "request_operation_revision": 1,
+        "request_attempts": 1,
+        "request_lease_owner": null,
+        "request_lease_until_us": null,
+        "proposal_status": "pending",
+        "proposal_output_json": "{\"echo\":\"alpha\"}",
+        "proposal_provenance_json": "{\"model\":\"direct\"}",
+        "event_count": 1,
+        "event_kind": "proposal.created",
+        "event_subject_type": "proposal",
+        "event_payload": {},
+        "schema_metadata_keys": [
+          "schema-v2"
+        ]
+      },
+      "note": "Return the proposal-id string: it is request-free, gives the caller the review handle, and avoids freezing a richer result before M3.4."
     },
     {
       "id": "P02",
       "probe": "source-backed submission: the source runs exactly once, and the durable footprint against P01",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "source_calls": 1,
+        "request_class": "CandidateRequest",
+        "request_revision": 1,
+        "request_id_has_req_prefix": true,
+        "result_class": "str",
+        "result_has_prop_prefix": true,
+        "row_count_delta": {
+          "events": 1,
+          "proposals": 1,
+          "requests": 1
+        },
+        "proposal_status": "pending",
+        "proposed_output_json": "{\"echo\":{\"text\":\"beta\"}}",
+        "provenance_json": "{\"model\":\"per-call\"}",
+        "event_kinds": [
+          "proposal.created"
+        ],
+        "matches_p01_footprint": true
+      },
+      "note": "A per-call source runs once and then enters the same one-request, one-proposal, one-event persistence path as a direct candidate."
     },
     {
       "id": "P03",
       "probe": "the source runs OUTSIDE every open transaction: connection.in_transaction observed during propose",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "source_calls": 1,
+        "during_source": {
+          "open_connection_count": 0,
+          "in_transaction": []
+        },
+        "transaction_spy_positive_control": {
+          "open_connection_count": 1,
+          "in_transaction": true
+        },
+        "tracked_connection_count": 3,
+        "write_commit_calls": 1
+      },
+      "note": "The same injected connection spy observed an active transaction in its positive control and zero open connections during source invocation."
     },
     {
       "id": "P04",
       "probe": "the source raises CandidateSourceError: exact public class and message, zero durable rows, zero events",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "source_calls": 1,
+        "public_class": "CandidateSourceError",
+        "public_message": "candidate source failed",
+        "public_repr": "CandidateSourceError('candidate source failed')",
+        "cause": null,
+        "context": null,
+        "failure_dump_equal": true,
+        "failure_events_equal": true,
+        "failure_row_counts": {
+          "proposals": 0,
+          "requests": 0
+        },
+        "dump_positive_control_changed": true,
+        "event_positive_control_before_count": 1,
+        "event_positive_control_delta": 1
+      },
+      "note": "A source-raised CandidateSourceError is replaced by one stable public class and text; full-ledger and event snapshots remain identical."
     },
     {
       "id": "P05",
       "probe": "the source raises an arbitrary Exception: identical public text to P04, nothing internal leaked",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "source_calls": 1,
+        "public_class": "CandidateSourceError",
+        "public_message": "candidate source failed",
+        "public_repr": "CandidateSourceError('candidate source failed')",
+        "cause": null,
+        "context": null,
+        "failure_dump_equal": true,
+        "failure_events_equal": true,
+        "failure_row_counts": {
+          "proposals": 0,
+          "requests": 0
+        },
+        "dump_positive_control_changed": true,
+        "event_positive_control_before_count": 1,
+        "event_positive_control_delta": 1,
+        "internal_text_absent_from_public_observation": true
+      },
+      "note": "An arbitrary RuntimeError produces the exact P04 class and text, with no cause, context, durable mutation, event, or internal string exposure."
     },
     {
       "id": "P06",
       "probe": "source-backed submission with no candidate_source configured: exact class and message",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "differs",
+      "observation": {
+        "configured_candidate_source": null,
+        "per_call_source_calls": 1,
+        "raised_class": null,
+        "raised_message": null,
+        "result_class": "str",
+        "result_has_prop_prefix": true,
+        "row_counts": {
+          "proposals": 1,
+          "requests": 1
+        }
+      },
+      "note": "This signature accepts the source per call, so source-backed submission succeeds without System configuration; there is no missing-config error."
     },
     {
       "id": "P07",
       "probe": "direct submission while a candidate_source IS configured: the source must not be invoked",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "configured_source_is_same_object": true,
+        "per_call_source_is_configured_source": false,
+        "configured_calls_after_direct": 0,
+        "configured_calls_after_per_call_source": 0,
+        "supplied_calls_after_per_call_source": 1,
+        "configured_calls_after_legacy_handle_positive_control": 1,
+        "legacy_positive_control_class": "ReviewRequired",
+        "direct_result_has_prop_prefix": true,
+        "source_result_has_prop_prefix": true,
+        "result_ids_distinct": true
+      },
+      "note": "Direct candidates ignore System configuration, and a distinct per-call source is authoritative; legacy handle proves the configured counter is live."
     },
     {
       "id": "P08",
       "probe": "both candidate and source supplied, and neither supplied: exact class and message, or the signature that makes it unreachable",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "signature": "(self, partition: 'str', operation: 'str', input_value: 'object', *, candidate: 'Candidate | None' = None, source: 'CandidateSource | None' = None) -> 'str'",
+        "both": {
+          "class": "ValidationError",
+          "message": "exactly one of candidate or source must be supplied",
+          "source_calls": 0,
+          "ledger_calls": 0
+        },
+        "neither": {
+          "class": "ValidationError",
+          "message": "exactly one of candidate or source must be supplied",
+          "configured_source_calls": 0,
+          "ledger_calls": 0
+        },
+        "same_class_and_message": true,
+        "configured_source_fallback": false,
+        "xor_precedes_bad_partition_and_bad_input": true,
+        "failures_dump_equal": true,
+        "failures_events_equal": true,
+        "positive_control_dump_changed": true,
+        "positive_control_event_delta": 1
+      },
+      "note": "The XOR is a runtime contract, not an overload illusion: both invalid states are reachable, identical, side-effect-free, and checked before all argument or ledger work."
     },
     {
       "id": "P09",
       "probe": "the operation revision changes between candidate generation and the proposal write",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "first_class": "StateError",
+        "first_message": "operation revision changed during candidate generation",
+        "source_calls_after_first": 1,
+        "after_first": {
+          "revision": 2,
+          "requests": 0,
+          "proposals": 0
+        },
+        "first_event_kinds": [
+          "operation.revised"
+        ],
+        "first_revision_event_invalidated_generators": 0,
+        "retry_result_has_prop_prefix": true,
+        "source_calls_after_retry": 2,
+        "source_request_revisions": [
+          1,
+          2
+        ],
+        "source_request_ids_distinct": true,
+        "after_retry": {
+          "requests": 1,
+          "proposals": 1
+        },
+        "event_kinds_after_retry": [
+          "operation.revised",
+          "proposal.created"
+        ]
+      },
+      "note": "A post-generation revision recheck rejects the obsolete candidate without plumbing rows; an ordinary second call snapshots revision 2 and succeeds."
     },
     {
       "id": "P10",
       "probe": "unregistered operation: class, message, and whether the source ran before the check",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "public_class": "NotFoundError",
+        "public_message": "operation is not registered in this partition",
+        "source_calls_before_error": 0,
+        "source_calls_after_registered_positive_control": 1,
+        "failure_dump_equal": true,
+        "failure_events_equal": true,
+        "failure_row_counts": {
+          "proposals": 0,
+          "requests": 0
+        },
+        "positive_control_result_has_prop_prefix": true
+      },
+      "note": "Operation lookup precedes invocation, so an unknown operation returns the existing exact NotFoundError without spending a source call or writing state."
     },
     {
       "id": "P11",
       "probe": "the identical input submitted twice: proposal count, and proof that no request_id idempotency survives",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "submit_calls": 2,
+        "proposal_count": 2,
+        "request_count": 2,
+        "result_ids_distinct": true,
+        "request_ids_distinct": true,
+        "input_json_equal": true,
+        "input_hash_equal": true,
+        "proposal_content_equal": true,
+        "request_id_parameter_present": false,
+        "event_kinds": [
+          "proposal.created",
+          "proposal.created"
+        ]
+      },
+      "note": "Identical submissions deliberately create two proposal attempts; the public signature has no request_id and therefore grants no idempotency contract."
     },
     {
       "id": "P12",
       "probe": "argument validation precedence: a bad partition together with a bad input, and that no ledger read happened",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "combined_class": "ValidationError",
+        "combined_message": "partition must be 1-128 ASCII letters, digits, '.', '_', ':', '/', or '-'",
+        "bad_input_alone_class": "ValidationError",
+        "bad_input_alone_message": "cement-json-v1 supports integers; encode decimals as strings",
+        "positive_control": {
+          "canonicalize_calls": 1,
+          "ledger_calls": 1
+        },
+        "bad_input_alone_counts": {
+          "canonicalize_calls": 1,
+          "ledger_calls": 0
+        },
+        "combined_counts": {
+          "canonicalize_calls": 0,
+          "ledger_calls": 0
+        },
+        "ledger_dump_equal": true,
+        "events_equal": true
+      },
+      "note": "Partition validation wins before input canonicalization; live spies show zero canonicalizer calls and zero ledger reads for the combined invalid call."
     },
     {
       "id": "P13",
       "probe": "the private request row this alternative writes: status, columns, and every public method that could surface it",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "differs",
+      "observation": {
+        "request_status": "pending",
+        "column_count": 18,
+        "columns": [
+          "id",
+          "partition",
+          "operation",
+          "operation_revision",
+          "input_json",
+          "input_hash",
+          "status",
+          "output_json",
+          "source_kind",
+          "artifact_id",
+          "proposal_id",
+          "example_id",
+          "error_code",
+          "lease_owner",
+          "lease_until_us",
+          "attempts",
+          "created_at_us",
+          "updated_at_us"
+        ],
+        "non_null_columns": [
+          "attempts",
+          "created_at_us",
+          "id",
+          "input_hash",
+          "input_json",
+          "operation",
+          "operation_revision",
+          "partition",
+          "proposal_id",
+          "status",
+          "updated_at_us"
+        ],
+        "null_columns": [
+          "artifact_id",
+          "error_code",
+          "example_id",
+          "lease_owner",
+          "lease_until_us",
+          "output_json",
+          "source_kind"
+        ],
+        "attempts": 1,
+        "lease_owner": null,
+        "lease_until_us": null,
+        "foreign_key_check_failures": 0,
+        "submit_result_contains_request_id": false,
+        "proposal_created_event_contains_request_id": false,
+        "surfaced_method_count": 7,
+        "surfaced_methods": [
+          "function_report",
+          "get_proposal",
+          "handle",
+          "proposal",
+          "proposals",
+          "request_status",
+          "review"
+        ],
+        "all_surface_values_equal_private_id": true,
+        "surface_result_classes": {
+          "function_report": "FunctionReport",
+          "get_proposal": "ProposalView",
+          "handle": "ReviewRequired",
+          "proposal": "dict",
+          "proposals": "list",
+          "request_status": "ReviewRequired",
+          "review": "Resolved"
+        }
+      },
+      "note": "The submit result and event hide the request ID, but the row is not yet truly private: seven unchanged public methods expose the same generated ID."
     },
     {
       "id": "P14",
       "probe": "call-site ergonomics: the exact signature, and the rewrite each of run_demo.py's 7 handle calls needs",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "ok",
+      "observation": {
+        "signature": "(self, partition: 'str', operation: 'str', input_value: 'object', *, candidate: 'Candidate | None' = None, source: 'CandidateSource | None' = None) -> 'str'",
+        "return_annotation": "str",
+        "handle_call_count": 7,
+        "source_submit_rewrite_count": 5,
+        "resolve_rewrite_count": 2,
+        "request_id_keywords_removed": 7,
+        "source_result_followup_rewrite_count": 5,
+        "resolve_result_followup_rewrite_count": 2,
+        "system_candidate_source_configuration_needed_by_new_calls": false,
+        "all_replacements_parse": true,
+        "all_replacements_bind": true,
+        "rewrites": [
+          {
+            "line": 178,
+            "old_target": "outcome_a_01",
+            "input": "a_signature_01",
+            "old_request_id": "'a-note-01'",
+            "channel": "source",
+            "replacement": "proposal_a_01 = system.submit_proposal(PARTITION, OPERATION, a_signature_01, source=source)",
+            "followup": "outcome_a_01.proposal_id -> proposal_a_01; delete the ReviewRequired assertion"
+          },
+          {
+            "line": 194,
+            "old_target": "outcome_a_02",
+            "input": "a_signature_02",
+            "old_request_id": "'a-note-02'",
+            "channel": "source",
+            "replacement": "proposal_a_02 = system.submit_proposal(PARTITION, OPERATION, a_signature_02, source=source)",
+            "followup": "outcome_a_02.proposal_id -> proposal_a_02; delete the ReviewRequired assertion"
+          },
+          {
+            "line": 228,
+            "old_target": "resolved_a",
+            "input": "a_signature_03",
+            "old_request_id": "'a-note-03'",
+            "channel": "resolve",
+            "replacement": "resolved_a = system.resolve(PARTITION, OPERATION, a_signature_03)",
+            "followup": "resolved_a.output -> resolved_a.match.output; replace Resolved/source assertions with verification.passed and match.matched"
+          },
+          {
+            "line": 248,
+            "old_target": "outcome_b_01",
+            "input": "b_signature_01",
+            "old_request_id": "'b-intake-01'",
+            "channel": "source",
+            "replacement": "proposal_b_01 = system.submit_proposal(PARTITION, OPERATION, b_signature_01, source=source)",
+            "followup": "outcome_b_01.proposal_id -> proposal_b_01; delete the ReviewRequired assertion"
+          },
+          {
+            "line": 263,
+            "old_target": "outcome_b_02",
+            "input": "b_signature_02",
+            "old_request_id": "'b-intake-02'",
+            "channel": "source",
+            "replacement": "proposal_b_02 = system.submit_proposal(PARTITION, OPERATION, b_signature_02, source=source)",
+            "followup": "outcome_b_02.proposal_id -> proposal_b_02; delete the ReviewRequired assertion"
+          },
+          {
+            "line": 292,
+            "old_target": "resolved_b",
+            "input": "b_signature_01",
+            "old_request_id": "'b-intake-recur'",
+            "channel": "resolve",
+            "replacement": "resolved_b = system.resolve(PARTITION, OPERATION, b_signature_01)",
+            "followup": "resolved_b.output -> resolved_b.match.output; replace Resolved/source assertions with verification.passed and match.matched"
+          },
+          {
+            "line": 312,
+            "old_target": "outcome_c_01",
+            "input": "c_signature_01",
+            "old_request_id": "'c-lab-01'",
+            "channel": "source",
+            "replacement": "proposal_c_01 = system.submit_proposal(PARTITION, OPERATION, c_signature_01, source=source)",
+            "followup": "outcome_c_01.proposal_id -> proposal_c_01; delete the ReviewRequired assertion"
+          }
+        ]
+      },
+      "note": "The seven demo calls become five explicit source submissions and two pure resolves; every caller request ID disappears, but each result shape needs follow-up edits."
     }
   ]
 }
