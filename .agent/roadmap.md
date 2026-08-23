@@ -177,6 +177,60 @@ Measured gaps driving the arc:
     that contract as its entry state and implements. MAIN 30% -> 86% (72K -> 205K).
     SESSION 2 CLOSED with the implementation landed and the contract corrected; the battery is
     session 3, exactly as the M3.2a protocol predicts. MAIN 5% -> 92%.
+    SESSION 3 CLOSED with the battery, the differential and the review landed; FOUR review
+    findings stay OPEN, so the unit is NOT DONE and session 4 closes it. MAIN 38% -> 92%,
+    `mate=` 68% 163K/240K (`test-m3u2b-2`). Three teammates, 3/3 delivered against
+    MAIN-committed seeds - the fourth consecutive datapoint that the seed is the variable.
+    Shipped: `tests/test_resolve_battery.py`, 34 diff-blind tests, one per obligation B01-B34,
+    graded by `m3u2b-battery-validate.py` (`--emit-stub` = the seed's single source of truth);
+    `m3u2b-mutants.py`, 23 mutants over three files; `m3u2b-main-driver.py` +
+    `m3u2b-main.json` + `m3u2b-differential.py`. Suite 600 -> 634.
+    SECTION 12 CLOSES: `m3u2b-divergences.json` `UNKNOWN-CELLS: 0`, 16 rows. The predecessor
+    filled 0 of 96; the variable was SUBJECT seeding, not the validator - MAIN seeded each
+    row's `section` anchor plus an ungraded `locus`, and the successor filled all 16.
+    SECTION 13 CLOSES ON THE DIFFERENTIAL: 26 probes compared, 0 behavioral divergences,
+    0 text differences, 0 missing keys, exit 0. MAIN credited it by re-derivation, never by
+    report - the driver replays `m3u2b-main.json` byte-identically (sha256 `55a3f586...`).
+    Zero TEXT differences because every pinned message comes from a library validator both
+    implementations delegate to; M3.2a's 17 came from a translation layer authored twice.
+    YIELD - three instruments, three distributions. The battery returned 2 reds, both claim
+    defects: B31 (the shipped docstring cited the component baseline that section 8/A09
+    forbids citing as resolver cost) and B29 (section 7 listed `revision drift` unqualified;
+    MEASURED, `revise_operation` retires every stranded artifact so the supported route gives
+    a VERIFIED MISS with `entries=0`, and only a fabricated direct `UPDATE` gives a failed
+    verdict). `rev2-m3u2b` returned 12 findings, 4 cleared. The differential returned zero.
+    Sixth consecutive unit whose findings are overwhelmingly claim defects in MAIN's own text.
+    MUTATION SWEEP is what closure rests on, and it earned its cost: 23 mutants, 22 killed by
+    the battery alone, `battery_gaps=0`, ONE SURVIVOR - deleting `not verification.passed or`
+    passed all 633 tests. `rev2-m3u2b` (V12) found it independently before MAIN's sweep ran.
+    Cause is structural: `verify_function` sets `document=None` whenever `passed` is False, so
+    every REAL output binds both gate terms and no real-ledger probe separates them. Closed by
+    B34, the mirror of B14's fabricated probe.
+    OPEN AT SESSION CLOSE - four findings, all with acceptance checks, red tests on branch
+    `wt/rev2-m3u2b` (`tests/test_m3u2b_review.py`, deliberately NOT on main: 2 of its 5 pass,
+    and a red test in the shipped suite breaks the gate). Session 4's work list:
+    - V07 major: `m3u2b-resolve-bench.json` records only kind+points - no commit, environment
+      or repeat identity - and the harness silently MERGES existing points, so points from
+      different builds can form a validator-looking scaling artifact. The numbers re-derive;
+      the artifact cannot substantiate cross-point comparability. Fix = provenance per point
+      plus a refusal to merge across provenance, then re-measure (~10 min wall at the cap).
+    - V10 major: section 5's no-commit obligation has no independent pin. B18 compares ledger
+      sha256 and full iterdump, and a successful NO-OP commit moves neither. M3.2a's authorizer
+      denies COMMIT, but section 6/A03's own reasoning says the pin covers what the authorizer
+      cannot. Fix = a B35 spy obligation.
+    - V11 major, EVIDENCE CORRECTED BY MAIN: the reviewer reported `.scratch/m3u2b-smoke.py`
+      "untracked, absent". It is untracked (true) and PRESENT on this workstation (false) - it
+      read its own worktree's empty `.scratch/`, the exact error the memory rule against
+      asserting absence of machine-local state names. Substance holds: roadmap, contract §12
+      and `b5916a9` make durable 38-check claims from a script no clone can run. Fix = move
+      every such claim onto the committed battery, which now supersedes all 38 checks.
+    - V08 minor: `b5916a9`'s subject cause ("resolving an input cost two snapshots") is false
+      per the accepted A01 - `verify_function` then `evaluate` was already one snapshot. The
+      correction needs a durable home; git history cannot be rewritten.
+    Also session 4: contract sections 12-13 flip from PENDING to their results, and the
+    reviewer's `test_resolution_docstring_scopes_none_biconditional` regex is MAIN-REJECTED as
+    over-specified - it pins RST markup (`verify_function (?:returns|produces)` cannot match
+    ``` ``verify_function`` produces ```), not the claim, which the docstring now carries.
     Shipped at `b5916a9`: `System.resolve` + `FunctionResolution` + export, +56/-1 production lines
     across three files against the spike's +34/-1 estimate (delta = docstrings). Suite 600 -> 600.
     MAIN's own 38-check real-ledger smoke probe is green on shipped bytes and covers all three
