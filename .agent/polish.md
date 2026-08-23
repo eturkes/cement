@@ -428,3 +428,25 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   read back per WRITER rather than per column; every event producer and branch pins its payload keys;
   both the retained and the candidate 1,001-member sentinels are pinned; and invalid-identity probes
   assert zero clock calls and zero ID allocations, not only an unchanged dump.
+
+## M3.2a deferrals
+
+- `pri=3` `size=S` — `VACUUM` inside either capability reports `StateError("database is busy or
+  unavailable")` -> exit 4, the ONE class where retry is the intended recovery, for a condition retry can
+  never clear. Measured identical on both paths: SQLite refuses `VACUUM` inside the open transaction
+  before the authorizer is consulted, so this is the transaction's refusal, not the read capability's, and
+  M3.2a's V03 ruled it out of scope rather than translate it on message text (`str(exc) == "cannot VACUUM
+  from within a transaction"`, which the oracle branch `wt/orc-m3u2a` `ff59177` did). Pinned today only as
+  a PARITY assertion (obligation B11), which locks the current shared behavior without making it truthful.
+  Acceptance: both paths report a class whose retry semantics match the condition, with one probe per
+  path asserting the class and message, no classification input other than `sqlite_errorcode` plus
+  statement provenance the Store already owns, and the parity assertion updated rather than deleted.
+
+- `pri=4` `size=S` — two `_connect` setup operations are same-value redundant, so only a call spy can
+  detect their deletion: `PRAGMA busy_timeout = 10000` duplicates `sqlite3.connect(timeout=10.0)`, and
+  `setconfig(SQLITE_DBCONFIG_TRUSTED_SCHEMA, False)` duplicates the preceding `PRAGMA trusted_schema =
+  OFF` (`rev-m3u2a` C04, both ablations measured with zero corpus mismatches). M3.2a keeps both and pins
+  them with a spy (obligation B6) rather than editing pre-existing setup outside its span. Acceptance:
+  each redundant pair keeps exactly one setter, the survivor is forced by a readback rather than a spy,
+  the `hasattr(connection, "setconfig")` guard is re-examined against the declared `requires-python`, and
+  the suite is green with B6 updated to match.

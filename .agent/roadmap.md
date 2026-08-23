@@ -78,7 +78,7 @@ Measured gaps driving the arc:
   it; under this milestone's own fail-closed no-migration contract nobody does, so it would uniquely pay
   two disposable transient test families plus two mid-milestone rewrites for zero operator value.
 
-  Units - 13, 1 DONE + 12 OPEN, executing as 7 waves. `depends` shows the DAG; same-wave units name the same
+  Units - 13, 2 DONE + 11 OPEN, executing as 7 waves. `depends` shows the DAG; same-wave units name the same
   predecessor. Tier default `kernel`; `oracle` is kept only where an independent implementation can
   actually diverge, so deletion, forwarding and byte-preserving relocation carry none.
 
@@ -128,93 +128,50 @@ Measured gaps driving the arc:
     itself, which cost less than a successor would have. Two lessons bind the next wave: a teammate
     whose deliverable count is flat across two polls is already failing, and a mechanically-derivable
     fact (an AST census, a count, a span) is cheaper for MAIN to compute than to delegate and verify.
-  - M3.2a OPEN tier=kernel tags=oracle depends=none - Store-owned enforced-read capability: existing-only
-    `file:` URI with `mode=ro`, `PRAGMA query_only`, write-denying authorizer, one rolled-back
-    transaction. Oracle-calibration unit per the ruling above. Measured static span = 46 production
-    lines, both methods in `store.py`: `_connect` L488-511 and `transaction` L550-571. Blast radius =
-    32 `.transaction(` call sites in `system.py` (57 `write=True` / 90 other, repo-wide), 113 in
-    `test_system.py`. Base span sits far under M3.1's, which is what leaves room for the battery.
-    WAVE 1 + CONTRACT DONE; implementation is the next session's entry state. Acceptance contract =
-    `.agent/decisions/m3u2a-contract.md`. Evidence, all tracked and rerunnable: `m3u2a-min-matrix.json`
-    (32/32, 0 mismatches), `m3u2a-min-spike.md`, `m3u2a-min-spike.py` (1,141-line harness,
-    `--stage readonly --matrix <path>`), `m3u2a-matrix-validate.py`. MAIN reran the decisive stage from
-    committed state: 32/32, 0 outcome disagreements against the spike's matrix.
-    Rulings: three mechanisms (Store-owned rolled-back transaction + deny-by-default read-allowlisted
-    authorizer + percent-encoded existing-only `file:` URI `mode=ro`), each with a distinct forcing
-    probe and a distinct leave-one-out failure. `PRAGMA query_only` REJECTED - no probe forces it, so no
-    test could pin it, so it would ship as an undetectably-deletable line. Raw path-to-URI concatenation
-    FORBIDDEN: planted decoys proved `?`, `#` and `%` names open a DIFFERENT ledger, while space,
-    newline and non-ASCII happened to resolve correctly, so a single happy-path test certifies nothing.
-    Two measured defects justify the unit: a write inside a `write=False` block currently COMMITS and
-    persists (ledger sha256 moved), and a read against a deleted ledger CREATES a 0-byte file that a
-    later `Store()` initializes as a fresh empty ledger, laundering deletion into first-run init.
-    Reachability census (MAIN-derived, `ast` over `system.py`): all 17 read sites and all 12 helpers
-    they hand the connection to are SELECT-only, zero commits, and no non-literal SQL exists in the
-    file - so enforcement breaks no shipped call site and the violation is developer-only, which is what
-    licenses the private non-retryable `_ReadOnlyViolation(CementError)` at CLI exit 2.
-    Open at implementation: re-measure setup cost interleaved (spike artifact and report disagree,
-    1.361x vs 1.024x, neither quotable); map Sections B/C (existing read-only test pins, `sqlite3.connect`
-    sites outside `_connect`) were never delivered and are cheap to derive during implementation.
+  - M3.2a DONE tier=kernel tags=oracle depends=none - Store-owned enforced-read capability.
+    `main=` 93% 223K/240K (session 3; sessions 1-2 closed at 75% and 80%),
+    `mate=` 65% 155K/240K. Contract, MAIN-final verdict table, review dispositions and the differential:
+    `.agent/decisions/m3u2a-contract.md`.
+    Shipped in `store.py` behind an unchanged public seam: three mechanisms (Store-owned rolled-back
+    transaction; deny-by-default authorizer allowlisting pragmas by NAME in a readable-bare set and an
+    introspection set; percent-encoded existing-only `file:` URI `mode=ro`), and classification by
+    `sqlite_errorcode` alone - `SQLITE_AUTH`/`SQLITE_READONLY` -> private `_ReadOnlyViolation` -> exit 2,
+    `SQLITE_CANTOPEN` -> `IntegrityError("ledger file is missing or unreadable")` -> exit 5, every other
+    failure keeping its baseline mapping with `write=True` unchanged. `PRAGMA query_only` and the
+    `SQLITE_SAVEPOINT` grant are both REJECTED on the mutation criterion: no probe forces either, so
+    neither could ship with a test able to detect its deletion. Both headline defects are closed against
+    a real ledger - a `write=False` INSERT no longer commits (ledger sha `090d735f101f17f4` unchanged)
+    and a read against a deleted ledger no longer creates a 0-byte file. Suite 551 -> 600.
+    CLOSURE IS MECHANICAL, never a green suite. Battery = 49 diff-blind tests over 22 numbered
+    obligations (`tests/test_read_capability_battery.py`, coverage graded by `m3u2a-battery-validate.py`)
+    plus the census test; `m3u2a-mutants.py` runs 19 mutants over every enforcement predicate and reports
+    19 killed / 0 survivors against a green control. Cost re-measured and the old discrepancy withdrawn:
+    the enforced open costs no more than the plain open (four runs 0.961-0.980x, two probe harnesses
+    0.995x/1.002x, `m3u2a-connect-benchmark.py`).
+    Two defects in MAIN's landed code that the 32-probe corpus could not reach, both found in the battery
+    wave: `_transaction_error` read `exc.sqlite_errorcode` unguarded, so a `DatabaseError` constructed in
+    Python escaped as `AttributeError` instead of the contracted `IntegrityError` (the oracle's
+    independent implementation had used `getattr` - the differential paying for itself); and no test
+    forced the `SQLITE_READONLY` denial member, because the layered-guarantee probe asserts the RAW error
+    inside the block and never the translation. Differential over the oracle's own 32-seam driver:
+    1 behavioral divergence (W13 `VACUUM`, ruled MAIN's way on parity measurement - both capabilities
+    raise the identical class and message, so the open transaction refuses it before the authorizer is
+    consulted), 17 message-text differences, graded by `m3u2a-differential.py`.
+    ORACLE CALIBRATION - MEASURED AND CLOSED, binding on M3.2b, M3.3 and M3.4. An oracle unit takes THREE
+    MAIN sessions, split at the contract and again at the battery: s1 = wave 1 + acceptance contract
+    (31 -> 75%), s2 = implementation (0 -> 80%), s3 = battery (0 -> 93%). The base implementation was
+    46 production lines, so static span predicts none of it - the window goes to the BATTERY'S
+    COORDINATION. Budget the three remaining oracle units the same way and stop trying to close one in
+    fewer sessions.
+    RELIABILITY, third datapoint, now with a control. Skeleton-first is the whole variable. The `test`
+    re-dispatch carried a stub-commit mandate - every intended test name committed first with a failing
+    body, then one commit per filled test - and delivered 52 commits, 48 tests, 22/22 obligations, zero
+    unfilled report cells, at 65% of its window. The mutation-campaign teammate got the same mandate in
+    prose but no stub artifact to seed, produced nothing across three polls and one explicit flush
+    directive, and was stopped; MAIN then ran the 19-mutant sweep itself for a fraction of the
+    coordination cost. Confirms the standing split: delegate judgment and bulk reading, compute
+    mechanical facts directly.
 
-    SESSION 2 LANDED THE IMPLEMENTATION - `d4a3158`, gate 549 -> 551 green. Three mechanisms shipped in
-    `store.py` behind an unchanged public seam; classification is by `sqlite_errorcode`, never message
-    text (`SQLITE_AUTH`/`SQLITE_READONLY` -> private `_ReadOnlyViolation` -> exit 2; `SQLITE_CANTOPEN` ->
-    `IntegrityError("ledger file is missing or unreadable")` -> exit 5; every other failure keeps its
-    baseline mapping, so `write=True` is unchanged). Both section-1a defects are closed against a real
-    ledger. Section 3a is now IN THE GATE as `tests/test_read_capability_census.py`, MAIN-derived and
-    reproducing the contract's numbers exactly: 17 read sites, 15 write, 12 helpers, 0 mutating.
-    Two production holes came from `test-m3u2a`'s phase-1 table BEFORE any test existed, both real:
-    the allowlist admitted ROLLBACK, letting a caller end the Store's snapshot and defeat the section 5
-    lifetime guarantee; and `arg2 is None` graded pragmas by SHAPE, which fails BOTH ways - it admits
-    bare writers (`PRAGMA optimize` writes `sqlite_stat1`) and denies argument-carrying reads
-    (`PRAGMA table_info(...)`, which broke a committed test). Pragmas now allowlist by NAME across a
-    readable-bare set and an introspection set.
-    Rulings issued against that table, each on measurement: missing AND unreadable ledgers share one
-    class, because both raise `SQLITE_CANTOPEN` with identical text and splitting them needs a
-    TOCTOU-shaped pre-connect stat that would assign exit 4 "retry" to a condition retry cannot fix;
-    W13 `VACUUM` keeps `StateError` because `write=True` raises the IDENTICAL class and message, so it is
-    refused by the open TRANSACTION both paths hold rather than by the capability - translating it would
-    need a blanket `SQLITE_ERROR` catch that relabels malformed reads and real corruption as caller
-    writes.
-
-    ENTRY STATE FOR SESSION 3, which closes the unit. Implementation is committed and green; what remains
-    is the BATTERY, and contract section 7 is explicit that a green pre-existing suite is never closure
-    here. In order: (1) merge the diff-blind red suite from `wt/test-m3u2a` (`git merge --squash`), whose
-    baseline reds are its credential, and re-verify every exact-string pin against a live run before it
-    drives anything; (2) harvest `wt/orc-m3u2a` - its `store.py` is committed at `70c6378` and its
-    `.agent/decisions/m3u2a-store-probes.py` driver is written to be COPIED INTO THE PRIMARY TREE AND
-    RERUN against MAIN's implementation, which is the `diff` cross-check; (3) harvest
-    `.scratch/agents/rev-m3u2a.md`; (4) amend the contract - section 7's 548 is stale (551 now), section 5's
-    "`_validate_ledger` still runs on the read path" is false as written (it runs once in `_initialize`
-    at `store.py:540`, never per transaction; the true property is that it stays authorizer-compatible),
-    section 3 carries a DUPLICATED "Forbidden resolutions" paragraph, and section 3's classification claim
-    needs scoping to writes the capability itself refuses.
-
-    ORACLE CALIBRATION, MEASURED - this is the number M3.2b, M3.3 and M3.4 are sized against, and it
-    supersedes the two-session estimate above. AN ORACLE UNIT TAKES THREE SESSIONS, split at the contract
-    and again at the battery. Session 1 = wave 1 + acceptance contract, MAIN 31% -> 75% (~105K), zero
-    implementation. Session 2 = implementation, MAIN 0 -> 80% (192K) buying: surface read, a 3-teammate
-    wave-2 dispatch, MAIN's own design probes settling three contract-undetermined points, the
-    implementation itself, two rounds of test repair over six sites, three full gate runs at ~170s each,
-    the phase-1 harvest plus twelve batch rulings, the census promotion, and the commit. Session 3 = the
-    battery. The base implementation was only 46 production lines, so span never predicted this: what
-    consumed the window was the BATTERY'S COORDINATION, not the code. Budget M3.2b, M3.3 and M3.4 as
-    three sessions each and stop trying to close one in two.
-    Reliability, second datapoint, and the split in it is the finding. Every teammate deliverable that a
-    brief made SKELETON-FIRST landed; every deliverable without that mandate died unflushed. Landed:
-    `test-m3u2a`'s phase-1 verdict table (12 proven divergences, 2 of them live holes in MAIN's code) and
-    `orc-m3u2a`'s branch `wt/orc-m3u2a` (`70c6378` implementation, `5e014bd` probe driver, `64802ab` a
-    refinement MAIN committed at close off a non-empty worktree status). Lost: `test-m3u2a`'s phase-2 red
-    suite, which never reached disk - its worktree is CLEAN at `ddc4a2a` after two explicit commit
-    directives - and `rev-m3u2a`'s findings, whose report sat at 8,507 B with 120 unfilled cells across
-    four polls. The difference is not diligence: phase 1 and the review both mandated a seeded on-disk
-    skeleton, while the CODE deliverable mandated only a marker and a validator, so it accumulated
-    entirely in context. Session 3's `test` re-dispatch must require an immediate commit of a stub file
-    carrying every intended test NAME with a bare `self.fail("unwritten")` body, then one commit per
-    filled test.
-    Measure progress by UNFILLED CELL COUNT, never report line count: a teammate filling a seeded skeleton
-    in place holds line count exactly flat while working normally, and it read as a stall twice here and
-    was wrong both times.
   - M3.2b tier=kernel tags=oracle depends=M3.2a - one-snapshot P1-P6 verification plus `evaluate` behind
     a pure `resolve`; failed verification, verified miss and verified hit stay distinct; publish durable
     1/1,000/50,000 measurements.
