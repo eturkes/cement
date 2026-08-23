@@ -1,0 +1,106 @@
+{
+  "kind": "spike",
+  "alternative": "unknown",
+  "api_signature": "unknown",
+  "worktree_commit": "unknown",
+  "rows": [
+    {
+      "id": "P01",
+      "probe": "direct submission of a caller-supplied candidate: result value, and every durable row and event written",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P02",
+      "probe": "source-backed submission: the source runs exactly once, and the durable footprint against P01",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P03",
+      "probe": "the source runs OUTSIDE every open transaction: connection.in_transaction observed during propose",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P04",
+      "probe": "the source raises CandidateSourceError: exact public class and message, zero durable rows, zero events",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P05",
+      "probe": "the source raises an arbitrary Exception: identical public text to P04, nothing internal leaked",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P06",
+      "probe": "source-backed submission with no candidate_source configured: exact class and message",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P07",
+      "probe": "direct submission while a candidate_source IS configured: the source must not be invoked",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P08",
+      "probe": "both candidate and source supplied, and neither supplied: exact class and message, or the signature that makes it unreachable",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P09",
+      "probe": "the operation revision changes between candidate generation and the proposal write",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P10",
+      "probe": "unregistered operation: class, message, and whether the source ran before the check",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P11",
+      "probe": "the identical input submitted twice: proposal count, and proof that no request_id idempotency survives",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P12",
+      "probe": "argument validation precedence: a bad partition together with a bad input, and that no ledger read happened",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P13",
+      "probe": "the private request row this alternative writes: status, columns, and every public method that could surface it",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P14",
+      "probe": "call-site ergonomics: the exact signature, and the rewrite each of run_demo.py's 7 handle calls needs",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    }
+  ]
+}

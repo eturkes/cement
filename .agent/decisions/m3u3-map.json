@@ -1,0 +1,320 @@
+{
+  "kind": "map",
+  "rows": [
+    {
+      "id": "H01",
+      "anchor": "unknown",
+      "subject": "argument validation: retry_failed boolean, partition/operation names, request_id, canonicalize, and their order",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "H02",
+      "anchor": "unknown",
+      "subject": "request-row idempotency lookup and ConflictError when a request_id is rebound to different content",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "H03",
+      "anchor": "unknown",
+      "subject": "stale-revision short circuit through _request_revision_is_current",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "H04",
+      "anchor": "unknown",
+      "subject": "expired-lease takeover of a `generating` request",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "H05",
+      "anchor": "unknown",
+      "subject": "retry_failed re-arm of a `failed` request",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "H06",
+      "anchor": "unknown",
+      "subject": "operation registration lookup and NotFoundError",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "H07",
+      "anchor": "unknown",
+      "subject": "promoted-artifact exact lookup at the current operation revision",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "H08",
+      "anchor": "unknown",
+      "subject": "ambiguity quarantine: suspend every duplicate and emit artifact.ambiguity_quarantined",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "H09",
+      "anchor": "unknown",
+      "subject": "_validate_promoted integrity check and artifact.integrity_quarantined quarantine",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "H10",
+      "anchor": "unknown",
+      "subject": "hit path: INSERT a `resolved` request row and emit request.resolved_by_artifact",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "H11",
+      "anchor": "unknown",
+      "subject": "miss path: INSERT a `generating` request row holding a lease",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "H12",
+      "anchor": "unknown",
+      "subject": "absent candidate_source becomes _fail_generation('candidate_source_unavailable')",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "H13",
+      "anchor": "unknown",
+      "subject": "source invocation outside every transaction, with CandidateSourceError and bare Exception both normalized to candidate_source_error",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "H14",
+      "anchor": "unknown",
+      "subject": "post-generation re-read: terminal status, stale revision, lease-owner fencing",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "H15",
+      "anchor": "unknown",
+      "subject": "proposal write: proposal.created event, INSERT proposals, UPDATE request to `pending`, return ReviewRequired",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "H16",
+      "anchor": "unknown",
+      "subject": "_fail_generation: UPDATE request `failed`, emit request.fallback_failed, return FallbackFailed",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "H17",
+      "anchor": "unknown",
+      "subject": "_outcome status projection including artifact re-validation, _assess_examples, and IntegrityError on an unknown status",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "C01",
+      "anchor": "unknown",
+      "subject": "System.request_status",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "C02",
+      "anchor": "unknown",
+      "subject": "System.get_proposal and the ProposalView model",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "C03",
+      "anchor": "unknown",
+      "subject": "System.proposal",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "C04",
+      "anchor": "unknown",
+      "subject": "System.proposals and its join onto requests",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "C05",
+      "anchor": "unknown",
+      "subject": "System.review and the resolved/rejected request transition it writes",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "C06",
+      "anchor": "unknown",
+      "subject": "System.function_report and PendingProposalGap",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "C07",
+      "anchor": "unknown",
+      "subject": "cli.py request/handle command surface and its exit mapping",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "C08",
+      "anchor": "unknown",
+      "subject": "models.py Outcome union members and which of them M3.3 still returns",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "C09",
+      "anchor": "unknown",
+      "subject": "__init__.py exports naming request-lifecycle types",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "S01",
+      "anchor": "unknown",
+      "subject": "CandidateSource protocol and the CandidateRequest.request_id field it hands the adapter",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "S02",
+      "anchor": "unknown",
+      "subject": "CandidateSourceError's public contract and the supervised-fallback docstring M3.3 rewrites",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "S03",
+      "anchor": "unknown",
+      "subject": "the exact public message text a failed source produces under M3.3, and the document that publishes it",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "S04",
+      "anchor": "unknown",
+      "subject": "proof obligation: a failing source leaves no durable row and no event",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "S05",
+      "anchor": "unknown",
+      "subject": "_command_supervisor.py and example_adapter.py coupling that M3.7 relocates and M3.3 must not break",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "A01",
+      "anchor": "unknown",
+      "subject": "M3.1's API-removal pattern: what let a deletion unit land in one implementation session",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "A02",
+      "anchor": "unknown",
+      "subject": "history of the proposals table and its (partition, request_id) foreign key",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "A03",
+      "anchor": "unknown",
+      "subject": "M3.2b's `resolve` as the closest analog for adding a public System method: estimate against measured production lines",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "A04",
+      "anchor": "unknown",
+      "subject": "the roadmap's byte-identical-`handle` claim across 3b7769b, 6f4f260, 71c5eab, 83198e1, re-verified at HEAD",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    }
+  ]
+}

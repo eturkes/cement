@@ -78,7 +78,7 @@ Measured gaps driving the arc:
   it; under this milestone's own fail-closed no-migration contract nobody does, so it would uniquely pay
   two disposable transient test families plus two mid-milestone rewrites for zero operator value.
 
-  Units - 13, 2 DONE + 11 OPEN, executing as 7 waves. `depends` shows the DAG; same-wave units name the same
+  Units - 13, 3 DONE + 10 remaining, executing as 7 waves. `depends` shows the DAG; same-wave units name the same
   predecessor. Tier default `kernel`; `oracle` is kept only where an independent implementation can
   actually diverge, so deletion, forwarding and byte-preserving relocation carry none.
 
