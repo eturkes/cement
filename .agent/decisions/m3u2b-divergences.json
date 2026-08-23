@@ -1,0 +1,168 @@
+{
+  "kind": "divergences",
+  "unit": "M3.2b",
+  "author": "test-m3u2b",
+  "contract": ".agent/decisions/m3u2b-contract.md",
+  "rows": [
+    {
+      "id": "D01",
+      "section": "unknown",
+      "probe": "unknown",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "why_ambiguous": "unknown",
+      "recommendation": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "D02",
+      "section": "unknown",
+      "probe": "unknown",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "why_ambiguous": "unknown",
+      "recommendation": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "D03",
+      "section": "unknown",
+      "probe": "unknown",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "why_ambiguous": "unknown",
+      "recommendation": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "D04",
+      "section": "unknown",
+      "probe": "unknown",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "why_ambiguous": "unknown",
+      "recommendation": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "D05",
+      "section": "unknown",
+      "probe": "unknown",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "why_ambiguous": "unknown",
+      "recommendation": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "D06",
+      "section": "unknown",
+      "probe": "unknown",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "why_ambiguous": "unknown",
+      "recommendation": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "D07",
+      "section": "unknown",
+      "probe": "unknown",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "why_ambiguous": "unknown",
+      "recommendation": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "D08",
+      "section": "unknown",
+      "probe": "unknown",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "why_ambiguous": "unknown",
+      "recommendation": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "D09",
+      "section": "unknown",
+      "probe": "unknown",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "why_ambiguous": "unknown",
+      "recommendation": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "D10",
+      "section": "unknown",
+      "probe": "unknown",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "why_ambiguous": "unknown",
+      "recommendation": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "D11",
+      "section": "unknown",
+      "probe": "unknown",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "why_ambiguous": "unknown",
+      "recommendation": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "D12",
+      "section": "unknown",
+      "probe": "unknown",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "why_ambiguous": "unknown",
+      "recommendation": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "D13",
+      "section": "unknown",
+      "probe": "unknown",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "why_ambiguous": "unknown",
+      "recommendation": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "D14",
+      "section": "unknown",
+      "probe": "unknown",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "why_ambiguous": "unknown",
+      "recommendation": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "D15",
+      "section": "unknown",
+      "probe": "unknown",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "why_ambiguous": "unknown",
+      "recommendation": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "D16",
+      "section": "unknown",
+      "probe": "unknown",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "why_ambiguous": "unknown",
+      "recommendation": "unknown",
+      "main_verdict": "unknown"
+    }
+  ]
+}

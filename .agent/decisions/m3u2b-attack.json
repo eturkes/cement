@@ -1,0 +1,116 @@
+{
+  "kind": "attack",
+  "unit": "M3.2b",
+  "author": "rev-m3u2b",
+  "contract": ".agent/decisions/m3u2b-contract.md",
+  "rows": [
+    {
+      "id": "A01",
+      "lens": "unknown",
+      "anchor": "unknown",
+      "claim_as_written": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A02",
+      "lens": "unknown",
+      "anchor": "unknown",
+      "claim_as_written": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A03",
+      "lens": "unknown",
+      "anchor": "unknown",
+      "claim_as_written": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A04",
+      "lens": "unknown",
+      "anchor": "unknown",
+      "claim_as_written": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A05",
+      "lens": "unknown",
+      "anchor": "unknown",
+      "claim_as_written": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A06",
+      "lens": "unknown",
+      "anchor": "unknown",
+      "claim_as_written": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A07",
+      "lens": "unknown",
+      "anchor": "unknown",
+      "claim_as_written": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A08",
+      "lens": "unknown",
+      "anchor": "unknown",
+      "claim_as_written": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A09",
+      "lens": "unknown",
+      "anchor": "unknown",
+      "claim_as_written": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A10",
+      "lens": "unknown",
+      "anchor": "unknown",
+      "claim_as_written": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A11",
+      "lens": "unknown",
+      "anchor": "unknown",
+      "claim_as_written": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A12",
+      "lens": "unknown",
+      "anchor": "unknown",
+      "claim_as_written": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": "unknown"
+    }
+  ]
+}

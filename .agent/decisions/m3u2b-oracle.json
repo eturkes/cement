@@ -1,0 +1,140 @@
+{
+  "kind": "oracle",
+  "unit": "M3.2b",
+  "author": "orc-m3u2b",
+  "impl_path": "unknown",
+  "driver_path": "unknown",
+  "commit": "unknown",
+  "probes": {
+    "R01_hit": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "promoted input: passed, matched, output, artifact_hash, document present"
+    },
+    "R02_miss": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "absent input: passed True, matched False, output None, artifact_hash None"
+    },
+    "R03_failed_suspended": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "a suspended member: passed False, match None, document None"
+    },
+    "R04_expected_hash_mismatch": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "a wrong expected_function_hash: passed False, match None"
+    },
+    "R05_no_promoted_set": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "registered operation with nothing promoted: passed, entries, match"
+    },
+    "R06_over_capacity": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "FUNCTION_MAX_ENTRIES patched below the real count: passed False, entries real, match None, no row enumeration"
+    },
+    "R07_biconditional": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "across every probed state: match is None iff passed is False, both directions"
+    },
+    "R08_invalid_partition": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "exact class and message for a rejected partition"
+    },
+    "R09_invalid_operation": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "exact class and message for a rejected operation"
+    },
+    "R10_invalid_expected_hash": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "exact class and message for a non-64-hex expected hash"
+    },
+    "R11_uncanonicalizable_input": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "exact class and message for an input canonicalize refuses"
+    },
+    "R12_precedence_partition_before_input": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "bad partition AND bad input: which one is reported"
+    },
+    "R13_precedence_operation_before_expected_hash": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "bad operation AND bad expected hash: which one is reported"
+    },
+    "R14_unregistered_operation": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "valid arguments, operation absent from the partition: class and message"
+    },
+    "R15_oversize_input": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "input above DEFAULT_MAX_BYTES: class, message, and that no ledger read happened"
+    },
+    "R16_missing_ledger": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "deleted ledger: class, message, and the path still absent afterwards"
+    },
+    "R17_malformed_stored_revision": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "corrupt stored operation scalar: class and message"
+    },
+    "R18_revoked_member": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "a revoked member produces a failed verdict, never an exception"
+    },
+    "R19_ledger_bytes_stable": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "ledger sha256 AND full iterdump text identical across hit, miss, failed"
+    },
+    "R20_clock_never_read": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "a System whose _now raises answers all three states unchanged"
+    },
+    "R21_events_unchanged": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "events() byte-identical and the event sequence counter unmoved"
+    },
+    "R22_source_never_invoked": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "a source whose propose raises resolves a miss without calling it"
+    },
+    "R23_one_snapshot": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "exactly one Store.transaction call, write=False, in_transaction True throughout"
+    },
+    "R24_evaluate_call_counts": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "evaluate call count per state: failed 0, miss 1, hit 1"
+    },
+    "R25_document_outside_snapshot": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "the returned document evaluated after the snapshot equals evaluating inside it"
+    },
+    "R26_canonical_equivalent_input": {
+      "outcome": "unknown",
+      "observation": "unknown",
+      "note": "a key-reordered equal input resolves to the same hit"
+    }
+  }
+}
