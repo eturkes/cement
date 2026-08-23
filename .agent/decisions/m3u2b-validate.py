@@ -8,6 +8,8 @@ The artifact's top-level ``kind`` selects the schema:
   "compose-matrix"  the composition spike's probe matrix
   "bench"           the component-cost baseline measurements
   "resolve-bench"   the end-to-end `System.resolve` measurements
+  "smoke-crosswalk" each check of MAIN's machine-local smoke probe -> the committed test
+                    that now carries it
 
 A "resolve-bench" artifact must also carry one `provenance` block PER POINT and every
 point's block must be identical, because the published exponents are a fit across the
@@ -26,6 +28,7 @@ count is the flush metric, and each filled cell lowers it.
 
 from __future__ import annotations
 
+import ast
 import json
 import math
 import sys
@@ -242,6 +245,57 @@ def check_resolve_bench(payload: dict) -> tuple[int, int]:
     return unknown, mismatches
 
 
+UNCOVERED = "UNCOVERED"
+
+
+def _tracked_test_ids(root: Path) -> set[str]:
+    """Every `tests.<module>.<Class>.<method>` id, read from source without importing."""
+
+    ids: set[str] = set()
+    for path in sorted((root / "tests").glob("test_*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in tree.body:
+            if not isinstance(node, ast.ClassDef):
+                continue
+            for item in node.body:
+                if isinstance(item, ast.FunctionDef) and item.name.startswith("test"):
+                    ids.add(f"tests.{path.stem}.{node.name}.{item.name}")
+    return ids
+
+
+def check_crosswalk(payload: dict) -> tuple[int, int]:
+    rows = payload.get("rows")
+    if not isinstance(rows, list) or not rows:
+        fail("smoke-crosswalk requires a non-empty `rows` list")
+    known = _tracked_test_ids(Path(__file__).resolve().parents[2])
+    if not known:
+        fail("no committed test ids were found; the crosswalk cannot be graded")
+    unknown = 0
+    uncovered = 0
+    for row in rows:
+        if not isinstance(row, dict):
+            fail("every row must hold an object")
+        identifier = row.get("id")
+        for key in ("id", "label", "source_line", "asserts", "covered_by", "evidence"):
+            if key not in row:
+                fail(f"{identifier} is missing `{key}`")
+        evidence = row["evidence"]
+        covered = row["covered_by"]
+        if covered == UNKNOWN or not isinstance(evidence, str) or evidence.strip() in ("", UNKNOWN):
+            unknown += 1
+            continue
+        if covered == UNCOVERED:
+            uncovered += 1
+            print(f"UNCOVERED {identifier}: {row['label']} -- {evidence}")
+            continue
+        if not isinstance(covered, list) or not covered:
+            fail(f"{identifier}.covered_by must be a non-empty list of test ids, `{UNCOVERED}`, or `{UNKNOWN}`")
+        absent = [item for item in covered if item not in known]
+        if absent:
+            fail(f"{identifier} names test id(s) that no committed test file defines: {absent}")
+    return unknown, uncovered
+
+
 def _report_scaling(points: dict) -> None:
     """Print section 8's published derivations so a reader replays them, never retypes them."""
 
@@ -285,12 +339,15 @@ def main(argv: list[str]) -> int:
     elif kind == "resolve-bench":
         unknown, mismatches = check_resolve_bench(payload)
         total = len(BENCH_POINTS) * (len(RESOLVE_CELLS) + len(RESOLVE_PROVENANCE))
+    elif kind == "smoke-crosswalk":
+        unknown, mismatches = check_crosswalk(payload)
+        total = len(payload["rows"])
     else:
-        fail(f"kind {kind!r} must be 'compose-matrix', 'bench' or 'resolve-bench'")
+        fail(f"kind {kind!r} must be 'compose-matrix', 'bench', 'resolve-bench' or 'smoke-crosswalk'")
     print(f"KIND: {kind}")
     print(f"CELLS: {total}")
     print(f"UNKNOWN-CELLS: {unknown}")
-    print(f"MISMATCHES: {mismatches}")
+    print(f"{'UNCOVERED' if kind == 'smoke-crosswalk' else 'MISMATCHES'}: {mismatches}")
     return 0 if unknown == 0 else 1
 
 

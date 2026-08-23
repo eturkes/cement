@@ -1,0 +1,353 @@
+{
+  "kind": "smoke-crosswalk",
+  "unit": "M3.2b",
+  "source": ".scratch/m3u2b-smoke.py",
+  "source_status": "untracked, machine-local; gitignored => no clone reruns it",
+  "recorded_result": "all 43 checks passed, exit 0",
+  "rows": [
+    {
+      "id": "S01",
+      "label": "hit type",
+      "source_line": 62,
+      "asserts": "type(hit).__name__ == 'FunctionResolution'",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S02",
+      "label": "hit passed",
+      "source_line": 63,
+      "asserts": "hit.verification.passed == True",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S03",
+      "label": "hit matched",
+      "source_line": 64,
+      "asserts": "hit.match.matched == True",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S04",
+      "label": "hit output",
+      "source_line": 65,
+      "asserts": "hit.match.output == 0",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S05",
+      "label": "hit artifact_hash is 64hex",
+      "source_line": 66,
+      "asserts": "len(hit.match.artifact_hash or '') == 64",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S06",
+      "label": "hit document present",
+      "source_line": 67,
+      "asserts": "hit.verification.document is not None == True",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S07",
+      "label": "miss passed",
+      "source_line": 70,
+      "asserts": "miss.verification.passed == True",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S08",
+      "label": "miss match",
+      "source_line": 71,
+      "asserts": "miss.match == FunctionMatch(matched=False)",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S09",
+      "label": "miss output",
+      "source_line": 72,
+      "asserts": "miss.match.output == None",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S10",
+      "label": "miss artifact_hash",
+      "source_line": 73,
+      "asserts": "miss.match.artifact_hash == None",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S11",
+      "label": "evaluate calls after hit",
+      "source_line": 89,
+      "asserts": "len(seen) == 1",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S12",
+      "label": "evaluate calls after miss",
+      "source_line": 91,
+      "asserts": "len(seen) == 2",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S13",
+      "label": "evaluate calls after failed verdict",
+      "source_line": 95,
+      "asserts": "len(seen) == 2",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S14",
+      "label": "unverified passed",
+      "source_line": 96,
+      "asserts": "unverified.verification.passed == False",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S15",
+      "label": "unverified match",
+      "source_line": 97,
+      "asserts": "unverified.match == None",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S16",
+      "label": "unverified document",
+      "source_line": 98,
+      "asserts": "unverified.verification.document is None == True",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S17",
+      "label": "ledger sha256 + iterdump stable",
+      "source_line": 99,
+      "asserts": "ledger_state(system, database) == digest_before",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S18",
+      "label": "events digest unchanged",
+      "source_line": 100,
+      "asserts": "hashlib.sha256(repr(system.events(partition)).encode()).hexdigest() == events_before",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S19",
+      "label": "clockless hit",
+      "source_line": 111,
+      "asserts": "clockless.resolve(partition, operation, 0).match.matched == True",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S20",
+      "label": "clockless miss",
+      "source_line": 112,
+      "asserts": "clockless.resolve(partition, operation, 99).match == FunctionMatch(matched=False)",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S21",
+      "label": "clockless failed verdict",
+      "source_line": 117,
+      "asserts": "clockless.resolve(partition, operation, 0, expected_function_hash='0' * 64).match == None",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S22",
+      "label": "sourceless miss",
+      "source_line": 131,
+      "asserts": "sourceless.resolve(partition, operation, 99).match.matched == False",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S23",
+      "label": "last check ran inside the transaction",
+      "source_line": 143,
+      "asserts": "observed == [True]",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S24",
+      "label": "failed passed",
+      "source_line": 157,
+      "asserts": "failed.verification.passed == False",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S25",
+      "label": "failed match is None",
+      "source_line": 158,
+      "asserts": "failed.match is None == True",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S26",
+      "label": "failed document is None",
+      "source_line": 159,
+      "asserts": "failed.verification.document is None == True",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S27",
+      "label": "failed check vector",
+      "source_line": 160,
+      "asserts": "tuple((c.passed for c in failed.verification.checks)) == (True, True, True, True, True, False)",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S28",
+      "label": "failed check keys",
+      "source_line": 165,
+      "asserts": "tuple((c.key for c in failed.verification.checks)) == ('duplicate-input-digests', 'abi-canonicalizer-uniform', 'sealed-passing-reports', 'current-promotion-receipts', 'function-hash-matches-snapshot', 'persisted-function-receipt')",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S29",
+      "label": "hit: match is None iff not passed",
+      "source_line": 180,
+      "asserts": "(resolution.match is None) == (not resolution.verification.passed) == True",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S30",
+      "label": "miss: match is None iff not passed",
+      "source_line": 180,
+      "asserts": "(resolution.match is None) == (not resolution.verification.passed) == True",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S31",
+      "label": "failed: match is None iff not passed",
+      "source_line": 180,
+      "asserts": "(resolution.match is None) == (not resolution.verification.passed) == True",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S32",
+      "label": "transaction calls",
+      "source_line": 197,
+      "asserts": "calls == [{'write': False}]",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S33",
+      "label": "bad partition -> ValidationError",
+      "source_line": 227,
+      "asserts": "expected in str(exc) == True",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S34",
+      "label": "bad operation -> ValidationError",
+      "source_line": 227,
+      "asserts": "expected in str(exc) == True",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S35",
+      "label": "bad expected hash -> ValidationError",
+      "source_line": 227,
+      "asserts": "expected in str(exc) == True",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S36",
+      "label": "bad input -> ValidationError",
+      "source_line": 227,
+      "asserts": "expected in str(exc) == True",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S37",
+      "label": "bad partition + bad input -> ValidationError",
+      "source_line": 227,
+      "asserts": "expected in str(exc) == True",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S38",
+      "label": "bad operation + bad hash -> ValidationError",
+      "source_line": 227,
+      "asserts": "expected in str(exc) == True",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S39",
+      "label": "unregistered operation",
+      "source_line": 236,
+      "asserts": "str(exc) == 'operation is not registered in this partition'",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S40",
+      "label": "missing ledger",
+      "source_line": 246,
+      "asserts": "str(exc) == 'ledger file is missing or unreadable'",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S41",
+      "label": "missing ledger not recreated",
+      "source_line": 249,
+      "asserts": "missing.exists() == False",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S42",
+      "label": "mismatch passed",
+      "source_line": 255,
+      "asserts": "mismatch.verification.passed == False",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    },
+    {
+      "id": "S43",
+      "label": "mismatch match",
+      "source_line": 256,
+      "asserts": "mismatch.match == None",
+      "covered_by": "unknown",
+      "evidence": "unknown"
+    }
+  ]
+}
