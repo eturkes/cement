@@ -52,6 +52,7 @@ from .json_value import (
     parse_json,
 )
 from .models import (
+    Candidate,
     CandidateRequest,
     CompilePolicy,
     CompileResult,
@@ -568,6 +569,207 @@ class System:
                 now_us=now,
             )
         return revision
+
+    # -- explicit proposal submission ---------------------------------------
+
+    @staticmethod
+    def _canonical_candidate(candidate: Candidate) -> tuple[CanonicalJSON, CanonicalJSON]:
+        if type(candidate) is not Candidate:
+            raise ValidationError("candidate must be a Candidate")
+        proposed = canonicalize(candidate.output)
+        try:
+            mapping = dict(candidate.provenance)
+        except (TypeError, ValueError):
+            raise ValidationError("candidate provenance must be a mapping") from None
+        provenance = canonicalize(mapping, max_bytes=65_536)
+        if type(provenance.value) is not dict:
+            raise ValidationError("candidate provenance must be a JSON object")
+        return proposed, provenance
+
+    def _submission_revision(self, partition: str, operation: str) -> int:
+        with self.store.transaction() as connection:
+            registered = connection.execute(
+                "SELECT revision FROM operations WHERE partition = ? AND name = ?",
+                (partition, operation),
+            ).fetchone()
+        if registered is None:
+            raise NotFoundError("operation is not registered in this partition")
+        return int(registered["revision"])
+
+    def _persist_proposal(
+        self,
+        *,
+        partition: str,
+        operation: str,
+        expected_revision: int | None,
+        request_id: str,
+        input_json: CanonicalJSON,
+        proposed: CanonicalJSON,
+        provenance: CanonicalJSON,
+    ) -> str:
+        # The proposal binds to the revision current under the write lock. Only a
+        # caller that captured a revision earlier — the source path, across
+        # generation — holds an expectation the seam can find stale.
+        with self.store.transaction(write=True) as connection:
+            registered = connection.execute(
+                "SELECT revision FROM operations WHERE partition = ? AND name = ?",
+                (partition, operation),
+            ).fetchone()
+            if registered is None:
+                raise NotFoundError("operation is not registered in this partition")
+            revision = int(registered["revision"])
+            if expected_revision is not None and revision != expected_revision:
+                raise StateError("operation revision changed before proposal submission")
+            proposal_id = _new_id("prop")
+            created = self._now()
+            connection.execute(
+                """
+                INSERT INTO requests(
+                    id, partition, operation, operation_revision, input_json, input_hash,
+                    status, proposal_id, created_at_us, updated_at_us
+                ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+                """,
+                (
+                    request_id,
+                    partition,
+                    operation,
+                    revision,
+                    input_json.text,
+                    input_json.digest,
+                    proposal_id,
+                    created,
+                    created,
+                ),
+            )
+            status_sequence = _event(
+                connection,
+                partition=partition,
+                kind="proposal.created",
+                subject_type="proposal",
+                subject_id=proposal_id,
+                payload={},
+                now_us=created,
+            )
+            connection.execute(
+                """
+                INSERT INTO proposals(
+                    id, partition, request_id, proposed_output_json, proposed_output_hash,
+                    provenance_json, provenance_hash, status, created_at_us, status_sequence
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+                """,
+                (
+                    proposal_id,
+                    partition,
+                    request_id,
+                    proposed.text,
+                    proposed.digest,
+                    provenance.text,
+                    provenance.digest,
+                    created,
+                    status_sequence,
+                ),
+            )
+        return proposal_id
+
+    def submit_proposal(
+        self,
+        partition: str,
+        operation: str,
+        input_value: object,
+        *,
+        candidate: Candidate,
+    ) -> str:
+        """Submit a candidate that the caller generated, as a pending proposal.
+
+        The call writes one request row, one proposal row, and one
+        ``proposal.created`` event. It never invokes the configured candidate
+        source.
+
+        Cement gives no idempotency. Each call writes a new proposal. Two calls
+        with identical content write two proposals and return two different
+        identifiers.
+
+        Return the identifier of the new proposal.
+
+        Raise ``ValidationError`` for a rejected partition, operation, input
+        value, or candidate. Raise ``NotFoundError`` when the partition holds no
+        such operation. Raise ``StateError`` when the operation revision changes
+        before the write.
+        """
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        input_json = canonicalize(input_value)
+        proposed, provenance = self._canonical_candidate(candidate)
+        return self._persist_proposal(
+            partition=partition,
+            operation=operation,
+            expected_revision=None,
+            request_id=_new_id("req"),
+            input_json=input_json,
+            proposed=proposed,
+            provenance=provenance,
+        )
+
+    def propose(
+        self,
+        partition: str,
+        operation: str,
+        input_value: object,
+    ) -> str:
+        """Ask the configured candidate source for a candidate, then submit it.
+
+        The call writes one request row, one proposal row, and one
+        ``proposal.created`` event. The source runs outside every transaction,
+        because the source executes adapter code that the caller supplies.
+
+        Cement gives no idempotency. Each call writes a new proposal. Two calls
+        with identical content write two proposals and return two different
+        identifiers.
+
+        Return the identifier of the new proposal.
+
+        Raise ``ValidationError`` for a rejected partition, operation, or input
+        value. Raise ``StateError`` when no candidate source is configured. Raise
+        ``NotFoundError`` when the partition holds no such operation. Raise
+        ``CandidateSourceError`` when the source fails; that error carries no
+        detail from the source. Raise ``StateError`` when the operation revision
+        changes during generation.
+        """
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        input_json = canonicalize(input_value)
+        source = self.candidate_source
+        if source is None:
+            raise StateError("candidate source is not configured")
+        revision = self._submission_revision(partition, operation)
+        request_id = _new_id("req")
+        try:
+            candidate = source.propose(
+                CandidateRequest(
+                    partition=partition,
+                    operation=operation,
+                    operation_revision=revision,
+                    request_id=request_id,
+                    input=input_json.value,
+                )
+            )
+            generated = self._canonical_candidate(candidate)
+        except Exception:
+            generated = None
+        # Raising outside the handler leaves __context__ itself empty, so no
+        # adapter frame, class, or message survives into the caller's traceback.
+        if generated is None:
+            raise CandidateSourceError("candidate source failed") from None
+        proposed, provenance = generated
+        return self._persist_proposal(
+            partition=partition,
+            operation=operation,
+            expected_revision=revision,
+            request_id=request_id,
+            input_json=input_json,
+            proposed=proposed,
+            provenance=provenance,
+        )
 
     # -- routing + supervised fallback --------------------------------------
 

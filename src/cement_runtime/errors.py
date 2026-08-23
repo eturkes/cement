@@ -26,4 +26,9 @@ class IntegrityError(CementError):
 
 
 class CandidateSourceError(CementError):
-    """The supervised fallback source failed before creating a proposal."""
+    """The candidate source failed to produce a usable candidate.
+
+    A source adapter raises this error to declare its own failure.
+    ``System.propose`` also raises it when the source fails. It carries no detail
+    from the source.
+    """

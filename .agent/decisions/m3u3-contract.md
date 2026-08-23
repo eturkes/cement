@@ -226,9 +226,76 @@ the unit that will know which fields it needs.
 
 ## 12. Verdict table - MAIN-final
 
-PENDING. The diff-blind `test` teammate enumerates divergent readings of this contract; MAIN rules
-each one here before implementation, and the ruled table becomes both the probe corpus and this
-document's clarifications.
+Row-by-row rulings live in `m3u3-verdicts.json`, MAIN-owned columns `main_verdict` and
+`contract_action`. This section carries only the rulings that bind CODE, ruled at implementation
+time from the first 36 filled rows. The remaining rows are ruled at battery close.
+
+ONE RULING CHANGED THE SHIPPED CODE.
+
+- V-D12. The pre-read/re-read revision guard belongs to `propose` ALONE. MAIN's first implementation
+  gave both paths `_submission_revision` then a seam re-read, for symmetry. That is a defect: a
+  direct caller captures no revision, so a `revise_operation` landing between the two reads produced
+  `StateError("operation revision changed before proposal submission")` for a submission with no
+  generation window to protect - a failure mode the caller cannot have earned. SHIPPED: the seam
+  takes `expected_revision: int | None`, reads the current revision under the write lock, and
+  compares only when the caller supplied an expectation. `submit_proposal` passes `None` and opens
+  exactly ONE transaction; `propose` passes its pre-read revision and keeps the two-read guard.
+  Section 5's D12 is hereby scoped to the source path. Pins:
+  `test_a_revised_operation_still_accepts_a_direct_submission` and the transaction-count control in
+  `test_a_rejected_call_opens_no_transaction_and_invokes_no_source`.
+
+RULINGS THAT CONFIRMED THE SHIPPED READING, each already pinned.
+
+- V-D18. `raise ... from None` INSIDE an `except` block leaves `__context__` populated with the
+  adapter's exception, so reading A of D18 fails its own prohibition. The seam raises OUTSIDE the
+  handler, where `__context__` is genuinely `None`, and keeps `from None` so both readings hold.
+- V-D06. "ONE private persistence seam" is structural, not behavioural: three shared row-level
+  helpers produce an identical footprint. `_persist_proposal` contains all three writes and is the
+  only writer, pinned by call-graph spy rather than by footprint alone.
+- V-D07. The four-item order is a total order needing one probe per ADJACENT edge. D08's
+  partition-versus-input pair SPANS two edges and pins neither interior one. Three adjacent probes
+  ship, plus two for `propose`'s configured-source slot.
+- V-D11. Reading B: no Cement-held connection may be IN A TRANSACTION while the source runs. Idle
+  open connections are permitted; the shipped pin observes every connection Cement opens and carries
+  a positive control.
+- V-D17. The clock source is mandatory and the call count is not, but one `self._now` inside the
+  write transaction, shared by all three rows, is what ships - the M3.1 ruling that a clock read
+  ahead of the authoritative plan can commit a row older than its own build.
+- V-P03/V-P04. `submit_proposal` neither reads nor validates `self.candidate_source`. `propose`
+  snapshots the attribute once, so its `None` check and its single invocation bind the same object.
+- V-D13. Row scope is mandatory, column projection is not. `SELECT revision` ships because it is the
+  only consumed value.
+
+CONTRACT CORRECTIONS, no code effect.
+
+- V-D01. The footprint quantifies over Cement's declared SCHEMA tables. `events.sequence` is
+  AUTOINCREMENT, so every success necessarily mutates `sqlite_sequence`; a reading covering every
+  SQLite table is unsatisfiable.
+- V-D09. "A rejected call" means a call rejected by ARGUMENT VALIDATION. Read wider it contradicts
+  D12's read transaction, D21's lookup, and any failure after one source invocation.
+- V-D16. Zero commits is scoped to failures occurring BEFORE commit. A `commit()` that itself raises
+  is one invocation and no reading can forbid it.
+- V-D19. Indistinguishability is scoped to observations THROUGH the raised Cement exception - class,
+  message, repr, cause, context, frames. The caller owns the adapter and can always instrument it.
+- V-D22. "Publishes" is channel-local: the return value and the event. D23's `get_proposal` route is
+  transitive discovery and is not a violation.
+- V-D23. Eight NAMED high-level seams in the union, not an exhaustive security count and not eight
+  per path - the DIRECT path never constructs a `CandidateRequest`. Authorized ledger access exposes
+  every storage identifier by design.
+- V-D26. 635 + N DISCOVERED tests, zero failures, zero errors, and zero skips among the tests M3.3
+  adds. A skipped test increments the count and still prints OK.
+- V-P02/V-P05. `type(result) is str`, not a `str` subclass. Neither name appears in `__all__` nor as
+  a module attribute; both are reachable only as `System` methods.
+
+HISTORY CORRECTION. `m3u3-map.json` row S01 states that M3.3 removes `CandidateRequest.request_id`.
+That is STALE and contradicts D14, which retains the field as transitional until M3.5b. This
+contract governs; the map row is superseded, not followed.
+
+MEASUREMENT. P06 is verified mechanically, and the contract's own numbers reproduce exactly under
+one stated convention: the whole-line span from `node.lineno` to `node.end_lineno` with trailing
+newlines stripped gives 12,866 B / `1182130a2b3a`, byte-identical to `3b7769b`. A column-offset AST
+slice (`ast.get_source_segment`) drops the four-space indent and measures 12,862 B / `c27e71b0b4c7`;
+"AST slice" alone is ambiguous by exactly those four bytes, so the pin states its convention.
 
 ## 13. Review dispositions and differential result
 

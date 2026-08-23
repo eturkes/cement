@@ -872,8 +872,14 @@ class ReadCapabilityBatteryTests(unittest.TestCase):
                         continue
                     scan(node.body, {item.optional_vars.id}, (method_name,))
 
-        self.assertEqual(len(read_sites), 17)
-        self.assertEqual(len(write_sites), 15)
+        # The totals are a tripwire: every new transaction site is acknowledged
+        # here by name in the commit that adds it. M3.3 added exactly two.
+        self.assertEqual(
+            [name for name, _ in read_sites].count("_submission_revision"), 1
+        )
+        self.assertEqual([name for name, _ in write_sites].count("_persist_proposal"), 1)
+        self.assertEqual(len(read_sites), 18)
+        self.assertEqual(len(write_sites), 16)
         self.assertEqual(len(reached_helpers), 12)
         self.assertEqual(violations, [])
 
