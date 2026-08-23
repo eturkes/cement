@@ -200,12 +200,21 @@ Measured gaps driving the arc:
     battery. The base implementation was only 46 production lines, so span never predicted this: what
     consumed the window was the BATTERY'S COORDINATION, not the code. Budget M3.2b, M3.3 and M3.4 as
     three sessions each and stop trying to close one in two.
-    Reliability, second datapoint and much better than the first: 3 of 3 wave-2 teammates produced, at
-    35-43% each after the implementation landed. The change that bought it was a brief naming the
-    deliverable total, the batch size, a skeleton-first write, and the validator command - and measuring
-    progress by UNFILLED CELL COUNT rather than report line count, since a teammate filling a seeded
-    skeleton in place holds its line count flat while working normally. Line count read as a stall twice
-    and was wrong both times.
+    Reliability, second datapoint, and the split in it is the finding. Every teammate deliverable that a
+    brief made SKELETON-FIRST landed; every deliverable without that mandate died unflushed. Landed:
+    `test-m3u2a`'s phase-1 verdict table (12 proven divergences, 2 of them live holes in MAIN's code) and
+    `orc-m3u2a`'s branch `wt/orc-m3u2a` (`70c6378` implementation, `5e014bd` probe driver, `64802ab` a
+    refinement MAIN committed at close off a non-empty worktree status). Lost: `test-m3u2a`'s phase-2 red
+    suite, which never reached disk - its worktree is CLEAN at `ddc4a2a` after two explicit commit
+    directives - and `rev-m3u2a`'s findings, whose report sat at 8,507 B with 120 unfilled cells across
+    four polls. The difference is not diligence: phase 1 and the review both mandated a seeded on-disk
+    skeleton, while the CODE deliverable mandated only a marker and a validator, so it accumulated
+    entirely in context. Session 3's `test` re-dispatch must require an immediate commit of a stub file
+    carrying every intended test NAME with a bare `self.fail("unwritten")` body, then one commit per
+    filled test.
+    Measure progress by UNFILLED CELL COUNT, never report line count: a teammate filling a seeded skeleton
+    in place holds line count exactly flat while working normally, and it read as a stall twice here and
+    was wrong both times.
   - M3.2b tier=kernel tags=oracle depends=M3.2a - one-snapshot P1-P6 verification plus `evaluate` behind
     a pure `resolve`; failed verification, verified miss and verified hit stay distinct; publish durable
     1/1,000/50,000 measurements.
