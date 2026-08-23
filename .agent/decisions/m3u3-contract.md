@@ -4,7 +4,8 @@ Every downstream artifact decides against this document: the diff-blind red suit
 oracle, the differential probes, both reviewers, and MAIN's own implementation. A disagreement with
 the code is a defect in one of them, never a difference of opinion.
 
-Sections 12 and 13 are PENDING until the verdict table and the review dispositions exist.
+Section 12 is COMPLETE: all 58 verdict rows are ruled. Section 13 is PARTIAL - the contract attack is
+disposed; the oracle differential and the post-implementation review land at S3 and S4.
 
 ## 1. Scope
 
@@ -25,6 +26,19 @@ cuts to 3. The CLI is untouched; M3.5a adds its channels. `CommandCandidateSourc
 demo keeps calling `handle`; M3.5b and the M3 example unit rewrite it.
 
 Deleting anything is out of scope. M3.3 adds beside.
+
+FREEZE PINS, because "unchanged" and "byte-stable" above are obligations and not prose. The
+unit-entry baseline is `f9b9755`; a byte claim measured against any earlier commit is meaningless,
+and `cli.py` compared to an M2-era tip shows a false DIFF that is entirely M2.4 work.
+
+- B01. `SCHEMA_VERSION == 2`, `SCHEMA` is 14,580 bytes with sha256
+  `5be3d79fe1e21aca524f3937c8ce78521bcc7203bfe20b7352ef4b6dff468a77`, and `SCHEMA_FINGERPRINT`
+  equals that digest. Version equality alone admits a whitespace DDL edit, so byte identity carries
+  the obligation.
+- B02. `src/cement_runtime/cli.py`, `src/cement_runtime/_command_supervisor.py` and
+  `src/cement_runtime/example_adapter.py` are byte-identical to `f9b9755` at unit close. The
+  remaining legacy methods and `Outcome` members are pinned behaviourally, not by byte, because
+  M3.3 may not refactor their code but never claimed their files frozen.
 
 ## 2. Frozen public shape - RULED
 
@@ -52,16 +66,24 @@ def propose(
   `ProposalView`: both of those carry `request_id`, which section 8 forbids this API from publishing.
 - P03. `submit_proposal` NEVER invokes a source. A configured `self.candidate_source` whose `propose`
   raises must not affect it.
-- P04. `propose` invokes `self.candidate_source` and nothing else. There is no per-call source
-  argument; section 10 rules why.
+- P04. `self.candidate_source` is `propose`'s ONLY candidate authority. "Nothing else" scopes to
+  GENERATION: no per-call source argument, no fallback source, no second attribute read. Argument
+  validation, the revision read, `self._now` and persistence are the call's own work and are
+  required on every successful call. Section 10 rules why no per-call source exists.
 - P05. Both names are exported from `cement_runtime` only through `System`; `__init__.py` gains no
   new symbol. `Candidate` is already exported.
 - P06. Both methods are added beside `handle`. The `handle` bytes stay identical to `1182130a2b3a`
-  (12,866 B), as they have been since `3b7769b`. CONVENTION, and it is worth exactly four bytes: the
-  whole-line span from `node.lineno` to `node.end_lineno`, keeping the leading indentation, with
-  trailing newlines stripped. A column-offset slice (`ast.get_source_segment`) drops the four-space
-  indent and measures 12,862 B / `c27e71b0b4c7` on the identical unchanged source, so "AST slice"
-  alone names two different claims and a correct `handle` can appear to fail.
+  (12,866 B), as they have been since `3b7769b`. CONVENTION IS PART OF THE PIN. THREE slicing
+  conventions measure the same unchanged source and produce three different answers, so "AST slice"
+  alone names three claims and a correct `handle` can appear to fail under two of them:
+
+  | convention | bytes | sha256 prefix |
+  |---|---|---|
+  | whole-line span `lineno`..`end_lineno`, trailing newlines STRIPPED - THE PIN | 12,866 | `1182130a2b3a` |
+  | whole-line span, trailing newline KEPT | 12,867 | `cd60036faf5c` |
+  | `ast.get_source_segment`, which drops the four-space indent | 12,862 | `c27e71b0b4c7` |
+
+  The pin is row one. Any measurement of P06 states which row it used.
 
 ## 3. The two submission paths - the unit's headline predicates
 
@@ -75,9 +97,21 @@ def propose(
   expire, take over, or fence.
 - D03. The event is `proposal.created`. Its payload and subject match what `handle`'s proposal write
   emits today, MINUS any request identity - see section 8.
-- D04. Neither method accepts a caller-supplied identifier of any kind. Submitting byte-identical
-  content twice produces two request rows, two proposal rows, two events and two distinct proposal
-  IDs. Cement offers NO idempotency, and no returned value may be mistaken for an idempotency token.
+- D42. THE PROPOSAL ROW SHAPE, normative, because D01 counted the row without specifying it. The
+  seam writes `id` (a fresh `prop_`-prefixed ID), `partition`, `request_id` bound to the request row
+  written in the same transaction, `proposed_output_json`/`proposed_output_hash` from canonicalizing
+  the candidate output, `provenance_json`/`provenance_hash` from canonicalizing the provenance
+  mapping, `status='pending'`, `created_at_us` equal to the request row's and the event's, and
+  `status_sequence` equal to the `proposal.created` event's own `sequence`. Every remaining column
+  takes its schema-v2 default, so the review fields are NULL and the row is indistinguishable from a
+  `handle`-created pending proposal except through its request row.
+- D04. Cement alone mints ROW IDENTITY. Neither signature accepts a caller-supplied request ID,
+  proposal ID, or idempotency key. SCOPE, because "identifier of any kind" is false read literally:
+  `partition` and `operation` are caller-supplied identifiers by design, and `input_value`, the
+  candidate output and the provenance may all carry domain identifiers Cement stores verbatim. The
+  ban covers ledger row identity and deduplication keys only. Submitting byte-identical content
+  twice produces two request rows, two proposal rows, two events and two distinct proposal IDs.
+  Cement offers NO idempotency; treat the returned proposal ID as a handle to one new row.
 - D05. `propose` invokes the source EXACTLY ONCE per successful call, and exactly zero times on every
   path that raises before invocation.
 - D06. Both paths route through ONE private persistence seam. The seam is the single writer of the
@@ -91,7 +125,8 @@ def propose(
   path.
 - D08. A bad `partition` together with a bad `input_value` reports the PARTITION error. Both spikes
   measured this on both alternatives; it matches `resolve`'s ruled precedence in
-  `m3u2b-contract.md` section 4.
+  `m3u2b-contract.md` section 4. SAMPLE ONLY: that pair SPANS two edges of D07's order and pins
+  neither interior one, so D07's three adjacent probes carry the obligation and D08 rides along.
 - D09. A rejected call performs ZERO transactions and ZERO source invocations. The obligation is
   measured with live spies proved on a positive control, never by a bare zero count.
 - D10. Omitting `candidate` on `submit_proposal` raises Python's own missing-keyword-only
@@ -101,11 +136,19 @@ def propose(
 
 ## 5. Source-invocation obligations
 
-- D11. The source runs OUTSIDE every open transaction. No Cement-held connection reports
-  `in_transaction is True` while `CandidateSource.propose` executes. This preserves today's boundary
-  at `system.py:758`.
-- D12. The operation revision is read BEFORE invocation and RE-READ inside the write transaction. If
-  it changed, the call raises and writes nothing.
+- D11. The source runs OUTSIDE every transaction THE SUBMISSION CALL HOLDS. Every connection the
+  call itself opens reports `in_transaction is False` while `CandidateSource.propose` executes, and
+  the pin observes exactly those connections with a positive control. SCOPE: a source that reenters
+  the same `System` and opens its own transaction makes a Cement-held connection report
+  `in_transaction is True`, which no library can prevent and which the caller chose. The obligation
+  is that submission never holds the lock across adapter code. This preserves today's boundary at
+  `system.py:758`.
+- D12. SOURCE PATH ONLY. `propose` reads the operation revision BEFORE invocation and RE-READ inside
+  the write transaction; if it changed across generation, the call raises and writes nothing. The
+  guard protects a GENERATION WINDOW, so it has no direct-path meaning: `submit_proposal` captures
+  no revision, validates the operation once inside its single write transaction, and binds whatever
+  revision is current under that lock. Imposing the two-read guard on the direct path manufactures a
+  failure its caller cannot have earned. Section 12 V-D12 records the code change this ruling forced.
 - D13. The revision re-read uses a SCOPED query for the one operation by partition and name. Reusing
   `System.operations()` is REJECTED: it materializes and parses every operation in the partition to
   hide one static read site, which inverts the purpose of the census in section 9.
@@ -113,6 +156,20 @@ def propose(
   The field stays in the protocol for M3.3 and is TRANSITIONAL; M3.5b removes it together with the
   request lifecycle. `_command_supervisor.py` forwards opaque bytes and `example_adapter.py` reads
   only `input`, so neither changes.
+- D35. PRECEDENCE, four steps, total: arguments, then `candidate_source is None`, then the operation
+  lookup, then invocation. Missing configuration therefore costs ZERO transactions even when the
+  operation is also unregistered - the split spike measured that, and reading the ledger first would
+  buy a `NotFoundError` the caller cannot act on while unconfigured.
+- D36. `propose` SNAPSHOTS `self.candidate_source` into one local before the `None` check, so the
+  check and the single invocation bind the same object. Reassignment during the call cannot split
+  them, and no second attribute read exists to invoke a different source.
+- D37. Unusable non-`None` configuration is CONTAINED, not pre-validated. A missing `propose`
+  attribute, a non-callable `propose`, and a descriptor that raises all normalize to
+  `CandidateSourceError`, exactly like a raised or malformed source result. No `callable()`
+  pre-flight ships: it is unsound under descriptors and `__getattr__`, it duplicates the failure the
+  invocation itself produces, and testing a descriptor means EXECUTING it - which is the case whose
+  exception can carry a secret. Only `None` gets its own published error, because only `None` is
+  unambiguously "not configured" rather than "configured wrong". Footprint stays zero.
 
 ## 6. Purity and containment obligations - each pinned independently
 
@@ -134,15 +191,22 @@ def propose(
   name none of the forbidden tables on either path, with the recorded list non-empty as its own
   positive control. One `self._now` call inside the write transaction serves all three rows.
 
-## 7. Error classification - exact texts RULED
+## 7. Error classification - submission-domain texts RULED
 
 Every text below is published HERE, not merely asserted in a test. A test pins what this section
 states.
+
+DOMAIN. This table is the SUBMISSION-DOMAIN taxonomy, not an exhaustive public error list. Both
+methods additionally inherit, unchanged and unrespecified by M3.3, the clock and `Store` failures
+already reachable through `self._now` and `store.transaction` - `StateError` and `IntegrityError`
+with their existing texts. Claiming completeness while those stay unlisted is the only error here;
+adding them to M3.3's scope is not.
 
 | condition | class | exact message |
 |---|---|---|
 | source raises `CandidateSourceError` | `CandidateSourceError` | `candidate source failed` |
 | source raises any other `Exception` | `CandidateSourceError` | `candidate source failed` |
+| source RETURNS an unusable candidate | `CandidateSourceError` | `candidate source failed` |
 | `propose` with `self.candidate_source is None` | `StateError` | `candidate source is not configured` |
 | operation revision changed across generation | `StateError` | `operation revision changed before proposal submission` |
 | operation absent from the partition | `NotFoundError` | `operation is not registered in this partition` |
@@ -152,6 +216,16 @@ states.
 | `candidate.provenance` is not a JSON object (DIRECT) | `ValidationError` | `candidate provenance must be a JSON object` |
 | `candidate.output` or provenance fails canonicalization (DIRECT) | `ValidationError` | the existing canonicalization texts, unchanged |
 
+- D38. THE RETURN ROW. Candidate validation on the SOURCE path runs inside the same containment
+  boundary as invocation, outside every transaction. A non-`Candidate` return, an unusable
+  `output`, a non-mapping provenance, and a provenance mapping whose iteration raises are all
+  adapter failures. Containment must not depend on whether the adapter raised or returned - a
+  mapping whose `items` raises with a secret is the case that settles it. The DIRECT path keeps the
+  `ValidationError` rows below, because there the candidate is the CALLER'S argument.
+- D39. THE `BaseException` BOUNDARY. The catch is exactly `Exception`. `KeyboardInterrupt`,
+  `SystemExit`, `GeneratorExit` and cancellation propagate UNCHANGED, because swallowing process
+  control costs more than the containment it would buy. Footprint on that path is still zero;
+  nothing is written before the persistence seam.
 - D18. Both source-failure rows raise `from None`. The adapter's class, message, cause, context and
   traceback frames must not reach the caller, the message, the repr, or any event. Both spikes
   measured a planted secret absent from all of them.
@@ -160,7 +234,9 @@ states.
 - D20. Failure raises. It never returns a value, and it never writes the `request.fallback_failed`
   event or a `failed` request row - those belong to `handle`, which keeps them.
 - D21. `NotFoundError` for an unregistered operation is raised BEFORE the source is invoked, measured
-  with a live counter.
+  with a live counter. It does NOT precede the missing-configuration check: with
+  `candidate_source is None` AND an unregistered operation, `propose` raises the D35/T03 `StateError`
+  having opened zero transactions.
 
 ## 8. The private request row - TRANSITIONAL, never opaque
 
@@ -169,20 +245,30 @@ The `proposals` table carries `UNIQUE (partition, request_id)` and
 v2 no proposal can exist without a request row. M3.3 therefore generates one internally.
 
 - D22. Neither return value nor the `proposal.created` event publishes that identifier.
-- D23. M3.3 MUST NOT claim the identifier is private, hidden or opaque. EIGHT live seams still expose
-  it, and the contract publishes the list rather than the claim: `CandidateRequest.request_id` handed
+- D23. M3.3 states WHERE the identifier stays visible, and publishes the list in place of a privacy
+  claim. EIGHT live seams expose it: `CandidateRequest.request_id` handed
   to the source, `handle`, `request_status`, `get_proposal`, `proposal`, `proposals`,
   `function_report` (through `PendingProposalGap`), and `review`. The returned proposal ID makes
   `get_proposal` an immediate discovery path.
 - D24. "Private" in M3.3 means one thing only: a STORAGE ROLE that the new API neither accepts nor
   returns. M3.4 owns removing the projections; only then may opacity be claimed.
-- D25. Prose obligation. No shipped sentence may state or imply that M3.3 removed request identity.
-  Section 11 carries the wording.
+- D25. Prose obligation, stated positively. Every shipped sentence touching request identity says
+  that schema v2 RETAINS the row and that the existing request and proposal readers still show its
+  ID. A method-scoped absence claim - "the two signatures neither accept nor return it" - ships only
+  inside that pairing. Section 11 carries the wording.
+- D40. ONE canonical snapshot serves the whole call. `CandidateRequest.input` receives the
+  canonicalizer's DETACHED structure, and persistence reuses the `text` and `digest` computed before
+  invocation. An adapter that mutates `request.input` therefore changes neither the stored bytes nor
+  the caller's object, and the stored input can never be adapter-influenced data. The remaining
+  fields carry the normalized partition and operation, the pre-invocation revision, and the
+  generated internal request ID.
 
 ## 9. Gate identity and battery obligations
 
 - D26. Decisive gate: `PYTHONDONTWRITEBYTECODE=1 uv run -q python -m unittest discover -s tests -t .`
-  It must reach 635 + N tests with zero failures, N = the tests M3.3 adds.
+  It must reach 635 + N tests with zero failures, N = the tests M3.3 adds. Zero errors and zero
+  SKIPS among the added tests, because a skipped test increments the count and still prints OK.
+  MEASURED at implementation close: 668 tests (N = 33), 0 failures, 0 errors, 206.045 s.
 - D27. `test_b20_read_site_census_has_no_mutations` asserts EXACT counts: 17 read sites, 15 write
   sites, 12 reached helpers, and `violations == []`. The test is cited by NAME, because a line anchor
   into a file this unit edits is stale on arrival. M3.3's new transaction sites break the first two. The counts are a
@@ -236,19 +322,31 @@ the unit that will know which fields it needs.
 - D32. Both new methods carry docstrings that state, in the project's human-facing register: what is
   persisted, that no idempotency exists (D04), that `propose` executes caller-supplied adapter code
   outside any transaction (D11), and the exact error each raises.
-- D33. No shipped sentence may call submission cheap, safe-to-retry, deduplicated, or request-free in
-  the sense of D25. `resolve`'s cost precedent applies: state the price, do not imply one.
+- D33. Shipped prose states submission's PRICE explicitly: three rows in one transaction, no
+  idempotency, and one adapter invocation on the source path. `resolve`'s cost precedent applies -
+  state the price. The mechanical check is a scan of README, `docs/` and `src/` for `cheap`,
+  `safe-to-retry`, `deduplicated` and `request-free`, which returns zero; the last is avoided because
+  D14 retains a real request row, so the phrase is overbroad even though the roadmap uses it as the
+  unit's name.
 - D34. README, `docs/architecture.md`, `docs/threat-model.md` AND `docs/adapter-protocol.md` are
   checked for sentences the new surface falsifies. A sentence that becomes false is corrected in this
   unit even when the code is correct; M3.2b found six consecutive units whose only defects were claim
   defects. `adapter-protocol.md` is the doc that owns adapter FAILURE behaviour, so it is the one the
   new raising path falsifies, and omitting it from this list was itself a defect.
+- D41. POSITIVE PUBLICATION, and it is a separate obligation from D34. Section 1 puts "the normative
+  prose that publishes the new surface" in scope. Docstrings do not discharge that, and neither does
+  stale-claim cleanup: a reader must be able to learn from human-facing prose alone that both methods
+  exist, what each one's authority is, what the call returns, what three rows it costs, that it
+  carries no idempotency, that source failure is contained, and that the request row is retained. The
+  test is mechanical - search README and the normative docs for both method names.
 
 ## 12. Verdict table - MAIN-final
 
 Row-by-row rulings live in `m3u3-verdicts.json`, MAIN-owned columns `main_verdict` and
-`contract_action`. This section carries only the rulings that bind CODE, ruled at implementation
-time from the first 36 filled rows. The remaining rows are ruled at battery close.
+`contract_action`. All 58 rows are ruled: 46 seeded plus 12 extension rows the diff-blind lens added.
+`m3u3-rule-verdicts.py` is the idempotent patcher that fills those two columns from a clean copy of
+the teammate's table, so the wave stays re-derivable; `--check` reports whether the committed table
+matches the rulings. This section carries only what does not fit a table cell.
 
 ONE RULING CHANGED THE SHIPPED CODE.
 
@@ -311,19 +409,83 @@ HISTORY CORRECTION. `m3u3-map.json` row S01 states that M3.3 removes `CandidateR
 That is STALE and contradicts D14, which retains the field as transitional until M3.5b. This
 contract governs; the map row is superseded, not followed.
 
-MEASUREMENT. P06 is verified mechanically, and the contract's own numbers reproduce exactly under
-one stated convention: the whole-line span from `node.lineno` to `node.end_lineno` with trailing
-newlines stripped gives 12,866 B / `1182130a2b3a`, byte-identical to `3b7769b`. A column-offset AST
-slice (`ast.get_source_segment`) drops the four-space indent and measures 12,862 B / `c27e71b0b4c7`;
-"AST slice" alone is ambiguous by exactly those four bytes, so the pin states its convention.
+MEASUREMENT. P06 is verified mechanically and reproduces exactly under all three conventions P06 now
+tabulates - 12,866 / 12,867 / 12,862 bytes, byte-identical at `3b7769b` and at HEAD. Two lenses
+reached the third figure independently before MAIN re-derived every one, which is the whole reason
+the pin ships a table instead of a number.
+
+EXTENSION ROWS. The diff-blind lens added twelve loci the seed never carried, and they moved the
+contract more than the seeded forty-six did. Eight new obligations landed from them: B01/B02 (X05,
+X06) freeze the schema and the byte-stable files with a NAMED baseline; D35/D36/D37 (X03, P04, X09)
+publish the four-step precedence, the source snapshot, and the containment boundary; D38/D39 (X02,
+X10) publish the malformed-RETURN row and the `BaseException` boundary; D40 (X04) publishes the
+single canonical snapshot; D41 (X11) separates positive publication from stale-claim cleanup. Section
+7's heading is qualified to the submission DOMAIN (X08), because the table omitted reachable clock
+and `Store` failures while claiming to be exact.
+
+TWO ROWS ARE WORTH RE-READING BEFORE M3.4 REOPENS THIS SURFACE.
+
+- V-X09. This is the one place the shipped code deliberately REJECTS a teammate recommendation. The
+  row proposes validating `propose` callable before the operation read and publishing a distinct
+  `StateError` for unusable configuration. Shipped instead: only `None` gets a published error;
+  every other unusable configuration is contained as `CandidateSourceError`. Grounds, in order of
+  weight - testing a descriptor means EXECUTING it, so the pre-flight IS the invocation and can
+  itself raise with a secret; `callable()` is unsound under `__getattr__` and descriptor protocols,
+  so the check can pass and the call still fail; and a second configuration-error channel would let
+  a caller distinguish adapter shapes that D19 keeps indistinguishable. Do not relitigate without
+  new evidence on those three points.
+- V-X11. A REAL OPEN GAP at implementation close, found by no other lens. README matched only the
+  adapter snippet's `def propose(self, request)`; neither `architecture.md` nor `threat-model.md`
+  named either method. The unit had shipped a public API that no human-facing surface published.
+  Fixed at S2 close, and D41 now states the obligation positively so a docstring cannot discharge it
+  again.
+
+CARRIED INTO S3, both ruled and neither discharged. D30: the obligation grader has no published
+command and the mutation corpus is unenumerated, so closure is not yet mechanical. X12: the seam is
+structurally atomic - one write transaction containing all three INSERTs - but that is an argument,
+not a measurement, and D15 can currently pass on pre-write failures alone. The battery ships the
+rollback matrix that injects after each interior write.
 
 ## 13. Review dispositions and differential result
 
-PARTIAL at S2. The contract attack is disposed below. The oracle's probe agreement, the differential
-and the post-implementation review land at the battery and closure sessions.
+PARTIAL at S2. The contract attack is disposed below, and the oracle's 30-probe corpus is harvested
+and ruled. The full differential over that corpus and the post-implementation review land at S3 and
+S4.
 
-CONTRACT ATTACK, `rev-m3u3-1`, 18 lenses. Dispositions, MAIN-final. Row detail in
-`m3u3-attack.json`, MAIN column `main_disposition`.
+ORACLE, `orc-m3u3-1`, 30 probes, corpus at `m3u3-probes.json`, implementation on `wt/orc-m3u3-1`,
+worktree RETAINED for S3. It built the identical contract without seeing MAIN's code and was
+instructed NOT to match MAIN's rulings, because divergence is the instrument.
+
+AGREEMENT, each an independent second measurement of a MAIN claim: Q09 held four Cement-created
+connections open and observed `in_transaction is False` on every one during source execution (D11);
+Q10/Q11 measured `__cause__ is None`, `__context__ is None`, and no source frame (D18); Q22
+preserved the ledger sha256, the full 53-statement dump, every row count and the event sequence
+(D15); Q23 measured zero `commit()` calls across EIGHT failure families against a positive control
+of one (D16); Q25 recorded exactly two `SELECT` statements, both scoped reads of `operations` (D13);
+Q27 drove submission through review, compile, verify, promote and an artifact-backed `handle`; Q29
+showed unchanged `handle` still adding exactly one request, proposal and event afterwards (P06,
+behaviourally). The oracle also reached the `m3u3-map.json` S01 conflict independently and retained
+`request_id` per D14 - a third lens on that row.
+
+TWO DIVERGENCES, both ruled.
+
+- DIRECT TRANSACTION COUNT. The oracle gives BOTH paths a scoped read transaction plus a write
+  transaction with a revision re-read: two transactions on the direct path where MAIN opens one.
+  MAIN's ruling stands (V-D12), and the oracle is the exhibit: carrying an entry-captured revision
+  into a direct submission reproduces exactly the `StateError` that a caller with no generation
+  window cannot have earned. Two lenses independently identified the ambiguity - verdict row D12 and
+  attack row A05 - and the oracle independently BUILT the branch they warned about. Divergence
+  found the defect, and agreement would have hidden it.
+- CLOCK PLACEMENT. The oracle reads `_now` BEFORE the write transaction, to avoid holding the write
+  lock while caller-supplied clock code runs. MAIN reads it INSIDE. This is a real trade and the
+  oracle's ground is sound, but M3.1 already ruled it: a clock read taken ahead of the authoritative
+  plan can commit a row older than its own build, and one timestamp shared by all three rows (D17,
+  Y05) is what the row shape requires. MAIN's placement stands; the lock-hold cost is bounded by
+  `self._now`, which is Cement's own seam and not adapter code.
+
+CONTRACT ATTACK, `rev-m3u3-1`, 24 lenses: 18 seeded plus 6 the reviewer added. Dispositions,
+MAIN-final. Row detail in `m3u3-attack.json`, MAIN column `main_disposition`, filled by the
+idempotent patcher `m3u3-rule-attack.py`.
 
 | id | severity | disposition | landed |
 |---|---|---|---|
@@ -338,7 +500,20 @@ CONTRACT ATTACK, `rev-m3u3-1`, 18 lenses. Dispositions, MAIN-final. Row detail i
 | A08 | material | UPHELD in part. The eight named seams are API-level; `cli.py` also serializes the identifier, and authorized ledger access exposes it by design. | section 12 V-D23 states the list is named high-level seams, never an exhaustive count |
 | A09 | material | UPHELD. D27 cited `tests/test_read_capability_battery.py:869-872`, which is the violation branch; the assertions sat at 875-878 and this unit moved them again. | D27 cites the test by NAME; a line anchor into a file the unit edits is stale on arrival |
 | X01 | material | UPHELD. The v2 CHECK ADMITS the required shape; it does not enforce it, and a `pending` row with `attempts > 1` also satisfies it. D02's "already admits exactly this shape" overstated. | D02 reads as a permission, and `attempts == 1` is pinned by test rather than inferred from the schema |
-| A02, X03 | material | DOWNGRADED to minor, and the reviewer's own reproduction is the reason. Both claimed P06's fingerprint is STALE, measured with `ast.get_source_segment`. MAIN re-derived: `1182130a2b3a` / 12,866 B reproduces EXACTLY under the whole-line span convention, and is byte-identical at `3b7769b` and at HEAD. The defect is an unstated convention worth four bytes of indentation, never a stale number. | P06 states its convention; the test states it again in its docstring |
+| X03 | material | UPHELD, and narrowed by the reviewer itself: swept for stale counts, byte lengths and SHAs, the inventory yields exactly ONE stale anchor, D27's. Same defect as A09 from a different lens; every other stated figure reproduces. | D27 cites the test by NAME |
+| A02 | cleared | CLEARED, and the clearing is the useful result. The reviewer reproduced P06 under the line-start slice with the trailing newline removed and got the contract's exact figure - independently identifying the convention that makes the claim checkable. MAIN measured both: 12,866 B / `1182130a2b3a` whole-line span against 12,862 B / `c27e71b0b4c7` from `ast.get_source_segment`, same unchanged source, four bytes of indentation apart. | P06 states the convention; the test states it again in its docstring |
+
+| Y01 | blocking | UPHELD. `propose` with `candidate_source is None` AND an absent operation was unruled, and the two orders differ observably: zero transactions against one read. Confirmed independently by the verdict table's X03 row. | D35 publishes the four-step precedence; D21 carries the cross-reference |
+| Y02 | blocking | UPHELD, and broader than A07. The accepted candidate domain, the provenance byte limit, and the ownership split between DIRECT `ValidationError` and SOURCE-BACKED containment were all undefined. Confirmed independently by the verdict table's X01 and X02 rows. | section 7 gains four candidate rows plus the malformed-RETURN row; D38 rules the ownership split |
+| Y03 | blocking | UPHELD. D01 counted the proposals row and specified nothing about it, so a conforming writer could omit the provenance hash, the status, or the event binding and still pass every count. | D42 states the row shape, including `status_sequence` bound to the event's own `sequence` |
+| X07 | material | UPHELD. "Invokes `self.candidate_source` and nothing else" is false on every successful call, which also reads the clock, the ledger, and the operation revision. | P04 scopes "nothing else" to GENERATION authority |
+| Y04 | material | UPHELD. "Caller-supplied identifier of any kind" bans `partition` and `operation`, which are caller-supplied identifiers the signature requires. | D04 scopes the ban to ledger row identity and deduplication keys |
+| Y06 | material | UPHELD. A source that reenters the same `System` opens a Cement-held connection that reports `in_transaction is True`, which D11 forbade unconditionally and no library can prevent. | D11 scopes the quantifier to transactions the SUBMISSION CALL holds |
+| Y05 | material | UPHELD against the contract, already satisfied by the code. D17 named the clock seam and not its cardinality, so two conforming writers could give the three rows different timestamps. | D17 states one `self._now` inside the write transaction serving all three rows; section 12 V-D17 carries the M3.1 grounds |
+| X05 | material | UPHELD as a claim-soundness defect. Confirmed independently by the verdict table's D19 row - the council rule accepts it. Cement cannot hide adapter behaviour from a caller who owns the adapter. | section 12 V-D19 scopes indistinguishability to observations through the raised Cement exception |
+| X06 | minor | UPHELD IN PART, with the boundary ruled. Negative-form obligations are the real defect: D23, D25 and D33 told the reader what may not be written, which is the pink-elephant shape the project bans, and they govern SHIPPED prose. All three are now positive. REJECTED on provenance: measurements, SHAs, baselines and named conventions are this document's PAYLOAD, and the Authoring rule's ban targets dates, discovery narration and origin stories. A decision record that drops its measurements stops being checkable. | D23, D25 and D33 restated positively; measurements retained |
+| A01 | cleared | ACCEPTED as cleared, and B01/B02 now make it checkable rather than argued. The verdict table's X05 and X06 rows found the same gap from the other side: scope said "unchanged" and "byte-stable" without a pin or a baseline. | section 1 gains B01 and B02 with the `f9b9755` baseline named |
+| A10 | cleared | ACCEPTED as cleared. The fork ruling separates measured API hazards from implementability evidence, and section 10 already states that `split`'s green gate is not correctness. | no change |
 
 TWO LENSES, DISJOINT YIELD, as on u3b1. The diff-blind verdict table and the contract attack agreed
 on D01, D07 and the direct-path revision binding - three convergences the council rule accepts
@@ -347,6 +522,10 @@ the missing candidate error taxonomy, the falsified adapter doc and the uncondit
 the verdict table alone caught the `__context__` retention that `from None` inside a handler does not
 clear, and the seven-versus-eight seam count per path.
 
-ONE REVIEWER CLAIM WAS ITSELF WRONG, which is why a finding's substance and its reproduction are
-graded separately: A02/X03 reported a stale measurement that reproduces exactly under the convention
-the contract meant. MAIN measured both conventions before acting.
+SUBSTANCE AND REPRODUCTION ARE GRADED SEPARATELY, and P06 is why the rule exists. `handle`'s byte
+count has TWO defensible measurements four bytes apart on identical unchanged source: 12,866 B /
+`1182130a2b3a` from the whole-line span, 12,862 B / `c27e71b0b4c7` from `ast.get_source_segment`,
+which drops the four-space indent. A lens that picks the second convention reports a correct `handle`
+as stale. The reviewer picked the first, cleared A02, and named the convention in its own words -
+so MAIN re-derived both before acting, and the pin now carries the convention rather than the number
+alone. Grade a finding by whether its reproduction is stated, never by whether its number differs.

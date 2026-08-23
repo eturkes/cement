@@ -54,6 +54,14 @@ promoter and the promotion time, so those values never change the `function_hash
 The function format is bounded at 64 MiB, 50,000 entries, one million items, and depth 67. Per-value
 limits of 1 MiB, 100,000 items, and depth 64 still apply, so a rich set can fail before 50,000 entries.
 
+Steps 1 to 3 describe `handle`, the request lifecycle. Two methods enter the same pipeline at step 3
+alone. `System.submit_proposal` stores a caller-supplied candidate. `System.propose` calls the
+configured candidate source one time, outside every transaction, and stores the result. Both methods
+write one request row, one proposal row, and one `proposal.created` event in one transaction. They
+return the new proposal identifier. Neither method resolves an artifact, reserves an idempotent
+request, or takes a generation lease. Review at step 4 receives their proposals unchanged. The
+request row stays internal to this route, and schema v2 keeps it for the existing readers.
+
 The LLM proposes instance behavior. It never chooses scope, confirms examples, runs verification, or
 activates artifacts.
 

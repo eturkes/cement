@@ -4,416 +4,524 @@
     {
       "id": "P01",
       "locus": "two methods, candidate keyword-only and REQUIRED on submit_proposal",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "no defensible alternative: section 2 gives both exact signatures, and P01 expressly fixes method count, keyword kind, and requiredness",
+      "distinguishing_probe": "n/a",
+      "proposed": "Implement both signatures verbatim; let Python argument binding own omitted-candidate and unexpected-keyword failures.",
+      "main_verdict": "CONFIRMED. Both signatures ship verbatim; `candidate` is keyword-only and required, and argument binding owns omission and unexpected keywords. No body-level validator exists.",
+      "contract_action": "none"
     },
     {
       "id": "P02",
       "locus": "both return the proposal ID as a bare str, no new model",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A requires type(result) is the built-in str; reading B accepts any str subclass because isinstance(result, str) holds. Both can be described as a bare str while exposing different runtime types.",
+      "distinguishing_probe": "Register one operation, submit one valid direct candidate, and run one valid source-backed call. Observe type(result) is str, result == the inserted proposals.id, and no dataclass or str subclass escapes.",
+      "proposed": "The words 'bare str' plus the rejection of a model mandate the exact built-in str carrying the proposal ID; pin type(result) is str for both methods.",
+      "main_verdict": "CONFIRMED. `type(result) is str`, not a subclass, for both methods. No new model.",
+      "contract_action": "none - section 12 V-P02 already carries it"
     },
     {
       "id": "P03",
       "locus": "submit_proposal NEVER invokes a source, even when one is configured and raising",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A forbids only calling candidate_source.propose; reading B treats 'must not affect it' as forbidding even retrieval or validation of the configured source on the direct path. A hostile descriptor separates them.",
+      "distinguishing_probe": "Construct System with a source whose propose property is initially callable, then arm that property to count and raise on attribute retrieval. Call submit_proposal with a valid operation and Candidate; observe success plus zero retrievals versus an access-triggered failure.",
+      "proposed": "The contract mandates zero source calls. Because it also says the configured source must not affect direct submission, recommend that submit_proposal neither read nor validate self.candidate_source after construction.",
+      "main_verdict": "CONFIRMED. `submit_proposal` never reads `self.candidate_source`. A configured source that raises on every call cannot affect it, because the attribute is never touched.",
+      "contract_action": "none - section 12 V-P03"
     },
     {
       "id": "P04",
       "locus": "propose invokes self.candidate_source and nothing else; no per-call source argument",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A snapshots self.candidate_source once and invokes that object; reading B checks one value for None and later re-reads the attribute, so reassignment or a stateful descriptor can select another source. The contract does not state snapshot semantics.",
+      "distinguishing_probe": "Use a System subclass whose armed candidate_source getter returns source A on its first read and source B on its second. Call propose for a valid operation; record getter count and which source received the sole CandidateRequest.",
+      "proposed": "The contract requires the configured System source and no per-call authority. It is silent on reassignment races; recommend one local snapshot whose None check and exactly-one invocation bind the same object.",
+      "main_verdict": "CONFIRMED and EXTENDED by X09. `propose` snapshots the attribute into one local, so the `None` check and the single invocation bind the same object. Reassignment mid-call cannot split them. Unusable non-`None` configuration is contained, not pre-validated.",
+      "contract_action": "section 5 publishes the snapshot rule and X09's containment boundary"
     },
     {
       "id": "P05",
       "locus": "neither name is exported from __init__.py; reachable only through System",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A means only that submit_proposal and propose are absent from __all__; reading B means cement_runtime has no top-level attributes with those names at all. A module alias can satisfy A while violating 'only through System'.",
+      "distinguishing_probe": "Import cement_runtime, then observe both name in cement_runtime.__all__ and hasattr(cement_runtime, name) for submit_proposal and propose; separately observe callable attributes on System. Reading B requires false, false, and true respectively.",
+      "proposed": "'Only through System' and '__init__.py gains no new symbol' mandate no module attributes and no __all__ entries for either method name; expose them solely as System methods.",
+      "main_verdict": "CONFIRMED. Neither name is in `__all__` nor a module attribute; both are reachable only as `System` methods.",
+      "contract_action": "none - section 12 V-P05"
     },
     {
       "id": "P06",
       "locus": "handle's bytes stay identical to 1182130a2b3a, 12,866 B by AST slice",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "no defensible alternative: the contract names the AST-delimited function, excludes its terminal newline, and supplies both a byte count and SHA-256 prefix",
+      "distinguishing_probe": "n/a",
+      "proposed": "Slice System.handle through ast.FunctionDef end_lineno, remove its one terminal LF, and require 12,866 bytes with SHA-256 prefix 1182130a2b3a; do not edit the function.",
+      "main_verdict": "CONFIRMED, with the convention named. `handle` is byte-identical across the unit. The figure reproduces only under the whole-line span from `lineno` to `end_lineno` with trailing newlines stripped: 12,866 B / `1182130a2b3a`. `ast.get_source_segment` drops the four-space indent and gives 12,862 B / `c27e71b0b4c7`. 'AST slice' alone is ambiguous by exactly those four bytes.",
+      "contract_action": "section 12 MEASUREMENT states the convention with both figures"
     },
     {
       "id": "D01",
       "locus": "success footprint: exactly one requests row, one proposals row, one events row, nothing else",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A quantifies only Cement's declared schema tables; reading B quantifies every SQLite table, including sqlite_sequence. Because events.sequence is AUTOINCREMENT, every success necessarily mutates sqlite_sequence and makes reading B impossible.",
+      "distinguishing_probe": "Snapshot every name returned by SELECT name FROM sqlite_schema WHERE type='table', including sqlite_sequence, before and after one valid direct submission. Compare row deltas: three Cement tables change, while sqlite_sequence also advances for events.",
+      "proposed": "The feasible reading is exactly three Cement-owned table deltas, with SQLite-maintained sequence state excluded. Clarify that domain; still compare every declared SCHEMA table so an accidental application-table write fails.",
+      "main_verdict": "SCOPED. The footprint quantifies over Cement's DECLARED SCHEMA tables. `events.sequence` is AUTOINCREMENT, so every success necessarily mutates `sqlite_sequence`; a reading covering every SQLite table is unsatisfiable and would fail against correct code.",
+      "contract_action": "section 12 V-D01"
     },
     {
       "id": "D02",
       "locus": "the request row is written directly as pending with proposal_id set and no lease",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A permits omitting attempts from the INSERT and relying on its schema default of 1; reading B requires the INSERT statement to supply attempts=1 explicitly. The persisted row is identical, but SQL tracing distinguishes them.",
+      "distinguishing_probe": "Trace SQL for one valid direct call and inspect the inserted request row. Observe whether attempts appears in the INSERT column list while the final row still has status pending, proposal_id set, both lease columns NULL, and attempts 1.",
+      "proposed": "The contract mandates the persisted row shape and forbids any generating state; it does not mandate spelling a defaulted column in SQL. Recommend accepting either INSERT form while pinning no generating INSERT or UPDATE occurs.",
+      "main_verdict": "CONFIRMED. The request row is written directly as `pending` with `proposal_id` set. No lease column is written and no generating state exists. Spelling a defaulted column in SQL was never mandated; the persisted row shape is.",
+      "contract_action": "none"
     },
     {
       "id": "D03",
       "locus": "the event is proposal.created; payload and subject match handle's write MINUS request identity",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A subtracts only the payload request_id key from handle's current event, yielding payload {}; reading B also treats partition or sequence correlation as request identity and changes more fields. The phrase 'any request identity' does not enumerate the retained event columns.",
+      "distinguishing_probe": "Capture handle's baseline proposal.created event and a new submission event for equivalent content. Normalize generated IDs and compare kind, partition, subject_type, subject_id, payload, created_at_us, and sequence; observe whether only payload.request_id was removed.",
+      "proposed": "The baseline has request identity only in payload.request_id. Mandate kind proposal.created, subject_type proposal, subject_id equal to the returned proposal ID, payload {}, and the ordinary partition/time/sequence columns unchanged in meaning.",
+      "main_verdict": "CONFIRMED. kind `proposal.created`, subject_type `proposal`, subject_id equal to the returned proposal ID, payload `{}`. Request identity is absent, which is the one delta from `handle`'s write.",
+      "contract_action": "none"
     },
     {
       "id": "D04",
       "locus": "no caller-supplied identifier; byte-identical content submitted twice writes two of everything",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A guarantees distinct IDs under the unmodified UUID generator; reading B treats the unconditional 'produces ... distinct proposal IDs' as requiring collision recovery when the internal generator repeats. Ordinary duplicate-content probes cannot separate them.",
+      "distinguishing_probe": "Patch _new_id so two valid duplicate submissions receive distinct request IDs but the same proposed prop ID. Observe whether the second call regenerates and succeeds with a distinct proposal ID or raises a uniqueness/integrity failure.",
+      "proposed": "The contract unconditionally mandates two successful rows, events, and distinct proposal IDs for ordinary duplicate submissions. It is silent on injected generator collisions; recommend qualifying the domain to the runtime UUID generator rather than adding retry semantics here.",
+      "main_verdict": "CONFIRMED. No caller-supplied identifier exists on either signature. Byte-identical content submitted twice writes two requests, two proposals, two events, and returns two distinct IDs.",
+      "contract_action": "none"
     },
     {
       "id": "D05",
       "locus": "propose invokes the source exactly once on success and exactly zero times on every raising path",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A constrains successful calls only and permits an internal retry after a source exception; reading B combines section 7's 'source raises' rows with D05 and requires exactly one invocation on every call that reaches the source, including failures.",
+      "distinguishing_probe": "Use a source that increments a counter, raises RuntimeError with a secret on call one, and would return a valid Candidate on call two. Call propose and observe CandidateSourceError with count 1 versus a retried success with count 2.",
+      "proposed": "Section 7 makes the first raised source exception the call's public failure, so the contract as a whole mandates one invocation whenever invocation begins. Add that sentence to D05; retain zero calls for all pre-invocation failures.",
+      "main_verdict": "CONFIRMED. Exactly one invocation on success. Zero on every failure that precedes invocation. The persistence seam never re-invokes, so a revision-race failure after generation still counts one.",
+      "contract_action": "none"
     },
     {
       "id": "D06",
       "locus": "one private persistence seam writes the request row, the proposal row and the event for both paths",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A requires one private helper that contains all three writes and is called by both public methods; reading B accepts three shared row-level helpers or duplicated public-method SQL because the runtime footprint remains identical. Behavioural probes alone cannot distinguish them.",
+      "distinguishing_probe": "Parse system.py, locate every requests INSERT, proposals INSERT, and proposal.created _event call added by M3.3, then walk callers. Reading A has one private method owning all three sites and both public methods reaching that one method.",
+      "proposed": "The structural words 'ONE private persistence seam' and 'single writer' mandate reading A. Pin the AST call graph as well as differential behaviour; a composition of separate writers does not satisfy this obligation.",
+      "main_verdict": "CONFIRMED as STRUCTURAL, not behavioural. `_persist_proposal` contains all three writes and is the sole writer for both paths. Three shared row-level helpers would produce an identical footprint, so the pin is a call-graph spy, not a footprint comparison.",
+      "contract_action": "none - section 12 V-D06"
     },
     {
       "id": "D07",
       "locus": "validation order: partition, operation, input_value canonicalization, then candidate",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A treats the four-item list as a total order that needs one probe per adjacent edge; reading B treats D08's partition-versus-input spanning pair as sufficient, leaving operation versus input and input versus candidate free to swap.",
+      "distinguishing_probe": "Make three DIRECT fixtures: bad partition + bad operation; bad operation + non-JSON input; non-JSON input + malformed candidate. Assert the first listed validator wins each pair, with zero transaction and source counts. Repeat the first two applicable edges through propose.",
+      "proposed": "The words 'in this order' mandate every adjacent edge: partition before operation, operation before input canonicalization, and input before direct-candidate validation. Add all three pairwise probes rather than relying on D08.",
+      "main_verdict": "CONFIRMED as a TOTAL order needing one probe per ADJACENT edge: partition before operation, operation before input canonicalization, input before candidate canonicalization.",
+      "contract_action": "none - section 12 V-D07"
     },
     {
       "id": "D08",
       "locus": "a bad partition together with a bad input_value reports the PARTITION error",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "no defensible alternative: D08 names both invalid arguments, the winning error, and its resolve precedent, while D07 applies that order to both public methods",
+      "distinguishing_probe": "n/a",
+      "proposed": "For both submit_proposal and propose, combine an invalid partition with a value of type object; require the existing partition ValidationError before canonicalization, transaction entry, or source invocation.",
+      "main_verdict": "CONFIRMED but NOT load-bearing. The partition/input pair SPANS two edges and pins neither interior one. It is a sample of D07, which carries the obligation.",
+      "contract_action": "section 4 records that D07's adjacent-edge probes subsume D08"
     },
     {
       "id": "D09",
       "locus": "a rejected call performs zero transactions and zero source invocations, measured with live spies",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A limits 'rejected call' to argument-validation rejection in section 4; reading B covers every call that raises. Reading B conflicts with D12's operation-read transaction, D21's lookup, and source failures that occur after one invocation.",
+      "distinguishing_probe": "Run live transaction and source spies over three fixtures: bad partition, unregistered operation, and a raising source. Reading A expects (0,0), (1,0), and (at least 1,1); reading B incorrectly expects zeroes for all.",
+      "proposed": "Context and the rest of the contract mandate reading A. Rewrite D09 as 'a call rejected by argument validation' and retain positive controls for both transaction and source counters.",
+      "main_verdict": "SCOPED to a call rejected by ARGUMENT VALIDATION. Read wider it contradicts D12's read transaction, D21's operation lookup, and every failure that follows one source invocation.",
+      "contract_action": "section 12 V-D09"
     },
     {
       "id": "D10",
       "locus": "omitted candidate and passing source= both raise Python's own TypeError; no shipped validator",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A freezes the exact CPython text observed by the test environment; reading B requires only native signature binding, whose wording may vary across supported Python versions. The contract explicitly permits a test to pin text but does not publish that text.",
+      "distinguishing_probe": "Under each supported Python minor, call submit_proposal without candidate and pass source= to both methods before constructing a ledger fixture. Record type, exact str(exc), traceback origin, and zero method-body spy calls; compare wording across interpreters.",
+      "proposed": "The shipped obligation is native TypeError from the exact signatures, with no method-body validator. A repository test may pin the current gate interpreter's text, but that text is not a cross-version public Cement message.",
+      "main_verdict": "CONFIRMED. Omitted `candidate` and an unexpected `source=` both raise Python's own `TypeError`. No shipped validator produces those; the exact signatures do.",
+      "contract_action": "none"
     },
     {
       "id": "D11",
       "locus": "the source runs outside every open transaction; no connection reports in_transaction",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A requires zero Cement connections to remain open during source execution; reading B permits idle open connections but requires in_transaction false on each. Split measured four open idle connections, while XOR measured zero, and both were accepted.",
+      "distinguishing_probe": "Inject a connection factory that retains every live connection and proves in_transaction true during a positive-control write. During a blocking source call, record both live-connection count and each in_transaction value; an idle retained connection separates A from B.",
+      "proposed": "The second sentence and accepted split measurement mandate reading B: no Cement-held connection may be in a transaction. Recommend closing unused connections anyway, but do not silently strengthen this into a zero-open-connection contract.",
+      "main_verdict": "CONFIRMED, reading B: no Cement-held connection may be IN A TRANSACTION while the source runs. Idle open connections are permitted. `propose` invokes the source between two closed transactions, so the pin observes every connection Cement opens and carries a positive control.",
+      "contract_action": "none - section 12 V-D11"
     },
     {
       "id": "D12",
       "locus": "the operation revision is read before invocation and re-read inside the write transaction",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A applies the two-read race guard only to propose, because only that path invokes a source with a captured revision; reading B makes submit_proposal perform the same pre-read and re-read through D06's shared seam. The direct candidate carries no captured revision.",
+      "distinguishing_probe": "Trace transactions and scoped operation SELECTs for one valid direct call and one valid source-backed call. Reading A yields one operation read inside the direct write but a pre-invocation read plus an in-write re-read for propose; reading B yields two for both.",
+      "proposed": "Section 5 mandates the two-read guard for propose only. Recommend that submit_proposal validate the operation once inside its atomic write transaction; the shared persistence seam receives the direct path's revision from that locked read.",
+      "main_verdict": "CHANGED THE SHIPPED CODE. The pre-read/re-read guard belongs to `propose` ALONE. MAIN's first implementation gave both paths a pre-read plus a seam re-read for symmetry; a direct caller captures no revision, so a concurrent `revise_operation` raised `StateError` for a submission with no generation window to protect. SHIPPED: `expected_revision: int | None`; `submit_proposal` passes `None` and opens exactly ONE transaction.",
+      "contract_action": "section 5 D12 scoped to the source path; section 12 V-D12 carries the full record"
     },
     {
       "id": "D13",
       "locus": "the revision re-read uses a scoped query; reusing System.operations() is rejected",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A scopes only the selected row by partition and name, so SELECT * is allowed; reading B also scopes the projected columns and permits only SELECT revision. Both avoid materializing the partition's other operations.",
+      "distinguishing_probe": "Register two operations in one partition, trace SQL during propose, and inspect the in-write re-read. Compare SELECT * FROM operations WHERE partition=? AND name=? with SELECT revision using the same predicates; also fail any unscoped operations() call.",
+      "proposed": "The contract mandates row scope, not a column projection. Either query satisfies D13, but recommend SELECT revision because that is the only consumed value and best matches the stated census purpose.",
+      "main_verdict": "CONFIRMED. Row scope is mandatory; column projection is not. `SELECT revision` ships because it is the only consumed value. Reusing `System.operations()` stays rejected: it returns the whole partition.",
+      "contract_action": "none - section 12 V-D13"
     },
     {
       "id": "D14",
       "locus": "propose hands the source a CandidateRequest carrying the generated internal request ID",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "The acceptance contract mandates retaining CandidateRequest.request_id for M3.3, while m3u3-map.json S01 says M3.3 must remove that field. A competent implementer following the map produces a different protocol object from one following the controlling contract.",
+      "distinguishing_probe": "Use a recording source, call propose once, fetch the inserted request row by the returned proposal, and inspect dataclasses.fields(CandidateRequest). Require a request_id field whose value equals the generated internal requests.id.",
+      "proposed": "The contract is authoritative and explicitly marks the field transitional until M3.5b. Retain and populate request_id in M3.3; MAIN should record m3u3-map.json S01 as stale rather than following it.",
+      "main_verdict": "CONFIRMED. `CandidateRequest.request_id` is retained and populated with the generated internal ID, transitional until M3.5b. `m3u3-map.json` S01 says M3.3 removes it; that row is STALE and superseded, not followed.",
+      "contract_action": "section 12 HISTORY CORRECTION"
     },
     {
       "id": "D15",
       "locus": "a failed submission leaves the ledger byte-identical under four independent pins",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A compares an isolated failure's before/after ledger, excluding mutations deliberately committed by another actor; reading B applies byte identity across the revision-race fixture. B is impossible because the concurrent operation.revised event legitimately changes the file and dump.",
+      "distinguishing_probe": "Block the source, snapshot the ledger, revise the operation, snapshot again, then release the source and snapshot after propose raises. The first-to-final comparison changes; the post-revision-to-final comparison must preserve request/proposal counts, proposal.created count and sequence, file SHA-256, and full iterdump.",
+      "proposed": "D15 must mean zero submission-attributable mutation. For isolated failures compare call entry to exit; for injected concurrent mutation compare immediately after the injector commits to after the rejected submission completes. Keep all four assertion groups independent.",
+      "main_verdict": "SCOPED to zero SUBMISSION-ATTRIBUTABLE mutation. The revision-race fixture's own source commits an operation revision, so an unconditional 'ledger byte-identical' reading is false for a correct implementation. Isolated failures compare call entry to exit; injected concurrent mutation compares against the post-injection state.",
+      "contract_action": "section 6 restates D15 in the attributable form"
     },
     {
       "id": "D16",
       "locus": "zero commit() calls on any failure path, measured through a connect-factory spy",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A covers failures raised before Store.transaction reaches its commit branch; reading B includes commit itself failing. B is unsatisfiable: a Connection subclass whose commit() increments then raises creates a failed call with one commit invocation.",
+      "distinguishing_probe": "Inject a Connection subclass whose commit counter increments and whose submission-write commit raises sqlite3.OperationalError. Compare that fixture with validation, missing-source, source-error, and revision-race failures; the injected commit failure raises after count 1 while pre-commit failures stay at 0.",
+      "proposed": "Limit the zero-call obligation to every ruled failure that occurs before commit, or restate it as zero successful submission commits on any failure. Do not claim zero commit() invocations when commit is the failing operation.",
+      "main_verdict": "SCOPED to failures occurring BEFORE commit. A `commit()` that itself raises is one invocation and no reading can forbid it. Equivalent restatement: zero SUCCESSFUL submission commits on any failure path.",
+      "contract_action": "section 12 V-D16"
     },
     {
       "id": "D17",
       "locus": "neither method reads the clock except through self._now nor consults artifact/example/function tables",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A permits any number of self._now calls and therefore different request, proposal, and event timestamps; reading B treats the shared identical persistence seam as one completed-time snapshot for all three rows. D17 fixes the clock source but not call count.",
+      "distinguishing_probe": "Use a clock that returns a distinct increasing value on every call. Submit once through each method, record self._now count and every created_at_us/updated_at_us value, and trace SELECT table names to detect artifact, example, receipt, or membership reads.",
+      "proposed": "As written, only the clock source and forbidden tables are mandatory. Recommend one self._now call after a candidate is available, passed into the shared seam for all submission timestamps; pin the call count if identical timestamps are intended.",
+      "main_verdict": "CONFIRMED. The clock source is mandatory; the call count is not. One `self._now()` inside the write transaction, shared by all three rows, is what ships - the M3.1 ruling that a clock read ahead of the authoritative plan can commit a row older than its own build.",
+      "contract_action": "none - section 12 V-D17"
     },
     {
       "id": "D18",
       "locus": "both source-failure rows raise from None; no class, message, cause, context or frame reaches the caller",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A assumes raise CandidateSourceError(...) from None inside the except block clears context; reading B inspects __context__ directly. Python suppresses display in A but still retains the adapter exception object, class, message, and traceback through __context__.",
+      "distinguishing_probe": "Raise a secret-bearing custom exception inside a source frame. Catch the public CandidateSourceError and inspect __cause__, __context__, __suppress_context__, repr, str, and every frame reachable from both the public traceback and chained exceptions. Require no adapter object or frame reachable.",
+      "proposed": "The explicit context prohibition mandates reading B. Catch and discard the adapter exception, exit the except block, then raise CandidateSourceError('candidate source failed') from None so both __cause__ and __context__ are None.",
+      "main_verdict": "CONFIRMED, reading B, with the mechanism named. `raise ... from None` INSIDE an `except` block leaves `__context__` populated with the adapter's exception, so reading A fails its own prohibition. The seam discards the exception, EXITS the handler, and raises there, where `__context__` is genuinely `None`. It keeps `from None` so both readings hold.",
+      "contract_action": "none - section 12 V-D18"
     },
     {
       "id": "D19",
       "locus": "the two source-failure rows are indistinguishable to the caller",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A limits indistinguishability to the public exception projection enumerated by D18; reading B includes every caller observation. B is impossible because the caller supplies the adapter and can set a flag, vary timing, or retain the exact exception before raising it.",
+      "distinguishing_probe": "Use one caller-owned source that records which branch it took before raising CandidateSourceError or RuntimeError. Compare public exception class/text/chain/frames and separately inspect the source's retained flag. Public projections can match while the caller-owned flag distinguishes branches.",
+      "proposed": "Constrain D19 to observations through the raised Cement exception: class, message, repr, cause, context, and traceback. The contract cannot hide facts already known through caller-owned adapter state or timing.",
+      "main_verdict": "SCOPED to observations THROUGH the raised Cement exception: class, message, repr, cause, context, frames. The caller owns the adapter and can always instrument it directly; no library can hide that.",
+      "contract_action": "section 12 V-D19"
     },
     {
       "id": "D20",
       "locus": "failure raises; it never returns a value and never writes request.fallback_failed or a failed row",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "no defensible alternative: section 7 explicitly replaces handle's returned and persisted fallback state with exception semantics, and section 6 independently forbids a durable failure footprint",
+      "distinguishing_probe": "n/a",
+      "proposed": "For every ruled submission failure, assert that the call raises, returns no sentinel or Outcome, writes no failed request, and emits no request.fallback_failed event; leave handle's legacy behavior unchanged.",
+      "main_verdict": "CONFIRMED. Every ruled failure raises. No sentinel, no `Outcome`, no `failed` request row, no `request.fallback_failed` event. Those belong to `handle`, which keeps them.",
+      "contract_action": "none"
     },
     {
       "id": "D21",
       "locus": "NotFoundError for an unregistered operation is raised BEFORE the source is invoked",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "no defensible alternative: the condition, exact precedence, error class and source-call observation are all explicit, and D12 independently requires the pre-invocation operation read",
+      "distinguishing_probe": "n/a",
+      "proposed": "Call propose with valid arguments and an unregistered operation using a live source counter; require the exact T05 NotFoundError, one scoped read transaction, zero source calls, and no ledger mutation.",
+      "main_verdict": "CONFIRMED, and ORDERED by X03. `NotFoundError` precedes invocation, after one scoped read transaction. It does NOT precede the missing-configuration check: with `candidate_source is None` and an unregistered operation, `propose` raises `StateError` having opened zero transactions.",
+      "contract_action": "section 5 publishes the four-step precedence (X03)"
     },
     {
       "id": "D22",
       "locus": "neither the return value nor the proposal.created event publishes the request identifier",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A forbids inline publication in those two values only; reading B forbids transitive discovery from the returned proposal ID. D23 explicitly says get_proposal is an immediate discovery path, so B would contradict the next obligation.",
+      "distinguishing_probe": "Submit once, inspect the bare returned string and every event field recursively, then call get_proposal with that string. Reading A permits the final ProposalView.request_id discovery while requiring no request ID in the return or event itself.",
+      "proposed": "The contract mandates reading A: return only proposal_id and emit payload {} with no request ID. State explicitly that 'publishes' is channel-local, because the unchanged read API still exposes the binding transitively.",
+      "main_verdict": "CONFIRMED, reading A, CHANNEL-LOCAL. 'Publishes' covers the return value and the event: return only `proposal_id`, emit payload `{}`. D23's `get_proposal` route is transitive discovery through an authorized reader and is not a violation.",
+      "contract_action": "section 12 V-D22"
     },
     {
       "id": "D23",
       "locus": "the contract publishes the eight live seams that still expose the identifier rather than claiming privacy",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A counts the union of eight named high-level API/protocol seams; reading B claims an exhaustive count of every live route. B omits direct database access and System.store, and it also fails per-path because DIRECT does not invoke CandidateRequest, leaving seven named seams.",
+      "distinguishing_probe": "Create one DIRECT and one SOURCE-BACKED proposal. Exercise each named seam against both rows, then query the row through system.store.transaction() and a separate sqlite3 connection. Record per-path exposure counts and additional raw-storage routes.",
+      "proposed": "Treat the list as eight named high-level seams in the union, not an exhaustive security count and not eight per submission path. Add that qualifier and mention that authorized ledger access exposes every storage identifier by design.",
+      "main_verdict": "SCOPED. Eight NAMED high-level seams in the union - not an exhaustive security count, and not eight per path. The DIRECT path never constructs a `CandidateRequest`. Authorized ledger access exposes every storage identifier by design.",
+      "contract_action": "section 12 V-D23"
     },
     {
       "id": "D24",
       "locus": "private in M3.3 means a storage role the new API neither accepts nor returns",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A defines 'new API' as the two public method signatures and their return values; reading B includes the callback boundary to caller-supplied CandidateSource code, where D14 deliberately hands over the request ID. Only A is consistent with D14.",
+      "distinguishing_probe": "Inspect both signatures and results, then use a recording source. Confirm neither method accepts request_id and neither result equals it, while CandidateRequest.request_id still reaches the adapter and equals the persisted requests.id.",
+      "proposed": "The contract mandates reading A. Describe the ID as internal plumbing absent from the two method signatures/results, not as private from adapters, existing readers, reviewers, or authorized storage access.",
+      "main_verdict": "CONFIRMED, reading A. 'Private' names a STORAGE ROLE the two signatures neither accept nor return. It is not privacy from adapters, from existing readers, or from the ledger.",
+      "contract_action": "none"
     },
     {
       "id": "D25",
       "locus": "no shipped sentence may state or imply that M3.3 removed request identity",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A permits precisely scoped prose such as 'submit_proposal accepts no request ID'; reading B bans any request-ID-free wording because a reader could infer system-wide removal. The prohibition on implication has no explicit audience or textual domain.",
+      "distinguishing_probe": "Present the shipped sentence 'The submission methods neither accept nor return a request ID; schema-v2 still stores and existing readers expose one.' Reading A accepts its bounded claim, while a lexical reading B rejects it merely for containing the first clause.",
+      "proposed": "Permit method-scoped absence claims only when the same passage states that schema-v2 retains the row and existing surfaces expose its ID. Ban unqualified claims that Cement or M3.3 removed, hid, or made request identity opaque.",
+      "main_verdict": "CONFIRMED. A method-scoped absence claim is permitted only when the same passage states that schema v2 retains the row and existing surfaces expose its ID. README and architecture.md now carry exactly that pairing. Unqualified removal claims stay banned.",
+      "contract_action": "section 11; the executable prose battery is D30/S3 work"
     },
     {
       "id": "D26",
       "locus": "decisive gate reaches 635 + N tests with zero failures",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A accepts unittest's exit 0 and zero failures/errors even when an M3.3 test is skipped; reading B treats 'reaches' as requiring every added test to execute. A deliberately skipped test increments the reported count and still prints OK.",
+      "distinguishing_probe": "Add one @unittest.skip M3.3 test to a 635-test baseline and run the exact decisive command. Observe 'Ran 636 tests' and exit 0 with OK (skipped=1); compare that with a requirement that N added tests have zero skips.",
+      "proposed": "Require 635 + N discovered tests, zero failures and errors, and zero skips among M3.3-added tests. Existing unrelated skips, if any, need their own baseline rather than silently satisfying a new obligation.",
+      "main_verdict": "SCOPED and MEASURED. 635 + N DISCOVERED tests, zero failures, zero errors, and zero skips AMONG THE TESTS M3.3 ADDS - a skipped test increments the count and still prints OK. Measured 668 tests, 0 failures, 0 errors, 206.045 s.",
+      "contract_action": "section 12 V-D26"
     },
     {
       "id": "D27",
       "locus": "the read-site census counts are a TRIPWIRE; violations == [] is the load-bearing assertion",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A retains exact updated count assertions as tripwires plus violations == []; reading B treats 'load-bearing' as permission to loosen or delete the count assertions so long as violations stays empty. D28's mandatory count update rules out B.",
+      "distinguishing_probe": "Mutate each exact len(read_sites), len(write_sites), and len(reached_helpers) assertion into a lower bound or remove it, then add one capability site that the scanner considers valid. Reading A's battery must fail; a violations-only battery passes.",
+      "proposed": "Keep all three exact count assertions and violations == []. The count tripwires force acknowledgement of capability growth; violations enforces read-only SQL and simple connection binding. Neither substitutes for the other.",
+      "main_verdict": "CONFIRMED. The three exact count assertions are tripwires that force acknowledgement of capability growth. `violations == []` is the load-bearing read-only assertion. Both stay.",
+      "contract_action": "none"
     },
     {
       "id": "D28",
       "locus": "M3.3 updates the census counts in the same commit that adds the sites, recording each site by method",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A changes only the three integer totals because read_sites already stores method names transiently; reading B adds an asserted inventory of the new method names. Without B, moving a site between methods while preserving totals satisfies every count.",
+      "distinguishing_probe": "Keep read/write/helper totals constant but move the new read transaction from propose to an unrelated method, then run the census. A count-only update passes; an asserted new-site inventory containing the intended method name fails.",
+      "proposed": "The phrase 'records each new site by method name' mandates an explicit asserted inventory, not merely a local tuple discarded after counting. Pin each M3.3 transaction site by method and capability while allowing line movement.",
+      "main_verdict": "CONFIRMED with the reading STRENGTHENED. Updated totals alone do not 'record each site by method name' - an interior site move preserves every count. SHIPPED: 17 -> 18 read sites, 16 write sites, PLUS by-method-name assertions naming `_submission_revision` and `_persist_proposal`, so relocation no longer passes.",
+      "contract_action": "none - the shipped battery satisfies the strengthened reading"
     },
     {
       "id": "D29",
       "locus": "violations == [] and the reached-helper discipline stay untouched",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "no defensible alternative: D27 says M3.3 breaks only the first two totals, while D29 expressly preserves both the empty violation result and the helper-forwarding scanner discipline",
+      "distinguishing_probe": "n/a",
+      "proposed": "Retain the scanner and violations == [] assertion, keep reached_helpers at its baseline 12 unless the ruled design truly adds one, and bind every new transaction with a simple local connection name.",
+      "main_verdict": "CONFIRMED. The scanner and `violations == []` are untouched. `reached_helpers` stays at its baseline 12: the ruled design adds no helper the scanner reaches.",
+      "contract_action": "none"
     },
     {
       "id": "D30",
       "locus": "closure is mechanical: full gate, battery grader, mutation sweep over the added predicates",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A treats any ad hoc reviewer-run mutation exercise as sufficient; reading B requires a committed reproducible command, enumerated predicates or mutants, and an all-killed result. The contract names neither the grader command nor the mutation corpus, so closure is not yet mechanical.",
+      "distinguishing_probe": "From a clean checkout, ask an independent runner to execute only commands named in the contract. It can run the unittest gate but cannot identify a battery-grader invocation, mutation targets, expected mutant count, or required kill report.",
+      "proposed": "Before closure, publish exact commands for the obligation grader and mutation sweep, enumerate the added predicates or generated mutants, and require every non-equivalent mutant killed. Until then D30 cannot force deletion detection.",
+      "main_verdict": "OPEN, deferred to S3. Closure is not yet mechanical: the obligation grader has no published command and the mutation corpus is unenumerated. The attack reported this correctly.",
+      "contract_action": "S3 battery must publish the grader command, the enumerated predicate/mutant set, and a committed red per mutant, before the unit closes"
     },
     {
       "id": "D31",
       "locus": "CandidateSourceError's docstring is rewritten away from supervised fallback",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A rewrites only the public meaning while legacy handle may still catch the class internally; reading B interprets 'belongs to explicit submission' as requiring every fallback use of the class to disappear. B conflicts with P06's byte-identical handle.",
+      "distinguishing_probe": "Inspect CandidateSourceError.__doc__ and System.handle source after M3.3. Reading A permits handle's unchanged except CandidateSourceError while requiring the docstring to mention proposal submission and contain no 'fallback' or 'supervised' wording.",
+      "proposed": "The contract mandates reading A. Recommend the concise docstring 'A candidate source failed during explicit proposal submission.' Preserve the class, inheritance, export, and unchanged legacy catch site.",
+      "main_verdict": "CONFIRMED, reading A. The docstring is rewritten off supervised fallback. Class, name, module, and inheritance are preserved.",
+      "contract_action": "none"
     },
     {
       "id": "D32",
       "locus": "both docstrings state what is persisted, that no idempotency exists, the adapter execution, and each error",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A requires each docstring to repeat every listed fact, including prose about the other method; reading B requires collective coverage with method-relevant facts. 'The exact error each raises' is also ambiguous between every reachable exception and only section 7's named domain errors.",
+      "distinguishing_probe": "Inspect both method docstrings and map each required claim and each section-7 error row to the method that can exhibit it. Then induce validation, not-found, missing-source, source-failure, and revision-race errors and compare documented class/message coverage.",
+      "proposed": "Use reading B: each docstring states its three-row atomic footprint and no-idempotency cost; submit_proposal states that it bypasses sources, while propose states outside-transaction adapter execution. Enumerate every contract-published error relevant to that method.",
+      "main_verdict": "CONFIRMED, reading B. Both docstrings state the three-row footprint and the no-idempotency cost. `submit_proposal` states that it never invokes the source; `propose` states adapter execution outside every transaction. Each lists the exact errors it raises.",
+      "contract_action": "none"
     },
     {
       "id": "D33",
       "locus": "no shipped sentence calls submission cheap, safe-to-retry, deduplicated or request-free",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A is a lexical ban on those four strings; reading B bans the false guarantees while permitting precise scoped language such as 'the methods accept no request ID.' D25's qualified wording makes B more coherent than a token ban.",
+      "distinguishing_probe": "Scan shipped prose for the four terms, then review a sentence that says 'The methods accept no request ID, but each call creates a distinct request row and proposal.' A lexical test rejects it only if it uses 'request-free'; a semantic test accepts the explicit cost.",
+      "proposed": "Ban cheap, safe-to-retry, and deduplicated as submission guarantees. Avoid 'request-free' because it is predictably overbroad; use the explicit signature fact plus the one-request/one-proposal/one-event price.",
+      "main_verdict": "CONFIRMED and REFINED. `cheap`, `safe-to-retry`, and `deduplicated` are banned as submission guarantees. `request-free` is also avoided in shipped prose - it is predictably overbroad, because D14 retains a real request row. The unit's roadmap name keeps the phrase; no shipped file uses it. Scan of README, docs/, and src/ returns zero hits for all four.",
+      "contract_action": "section 11 carries the ban and the scan"
     },
     {
       "id": "D34",
       "locus": "README, docs/architecture.md and docs/threat-model.md are checked for sentences the new surface falsifies",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A accepts an undocumented manual review with no changed sentence; reading B requires forcing tests or an asserted sentence inventory. Nothing in D34 identifies expected corrections, so deleting all M3.3 prose edits could leave the decisive code suite green.",
+      "distinguishing_probe": "Implement the methods while leaving all three files byte-identical, then run every command named by sections 9 and 11. If no test asserts the revised claims or required method documentation, reading A passes despite universal request/lease prose remaining misleading.",
+      "proposed": "Record the exact stale claims and add an executable prose battery that requires method-scoped submission wording and rejects unqualified idempotent-request, lease-recovery, or safe-retry claims. A manual 'checked' assertion is not a forcing gate.",
+      "main_verdict": "PARTIAL at S2, now DISCHARGED for prose. `docs/adapter-protocol.md` carried the only two sentences the new surface falsified; both are route-qualified. X11 found the harder half: README and architecture.md named NEITHER method. Both now publish the surface, and threat-model.md's request-ID idempotency obligation is route-scoped.",
+      "contract_action": "D34's file list gains docs/adapter-protocol.md; the executable prose battery is S3 work"
     },
     {
       "id": "T01",
       "locus": "error text table row: source raises CandidateSourceError -> CandidateSourceError('candidate source failed')",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A may re-raise the adapter's existing CandidateSourceError when its text already matches; reading B always creates a fresh exact CandidateSourceError. Reuse exposes adapter exception identity and traceback even when class and message look correct.",
+      "distinguishing_probe": "Have the source retain and raise a CandidateSourceError('candidate source failed'). Catch the public error and compare object identity, type, traceback frames, cause, and context with the retained source object; reading B requires a distinct exact-type exception with no chain.",
+      "proposed": "D18 and D19 mandate a fresh exact CandidateSourceError with text 'candidate source failed', raised outside the handler from None. Never re-raise or reuse the adapter-owned exception object.",
+      "main_verdict": "CONFIRMED. A fresh `CandidateSourceError('candidate source failed')`, raised outside the handler with `from None`. The source's own instance is never re-raised, so its message and frames cannot survive.",
+      "contract_action": "none"
     },
     {
       "id": "T02",
       "locus": "error text table row: source raises any other Exception -> the identical class and message",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "no defensible alternative: the table says any other Exception and D19 requires the same observable public projection as T01; BaseException subclasses are outside the named domain",
+      "distinguishing_probe": "n/a",
+      "proposed": "Normalize every non-CandidateSourceError Exception, including other CementError subclasses and ExceptionGroup, to a fresh exact CandidateSourceError('candidate source failed') with no cause, context, secret, or adapter frame.",
+      "main_verdict": "CONFIRMED. Every non-`CandidateSourceError` `Exception` normalizes to the identical fresh error and text, including other `CementError` subclasses and `ExceptionGroup`. `except Exception` is the exact catch; X10 rules the `BaseException` boundary above it.",
+      "contract_action": "none"
     },
     {
       "id": "T03",
       "locus": "error text table row: propose with no configured source -> StateError('candidate source is not configured')",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "no defensible alternative: the condition uses identity with None and publishes both the exact class and exact message; unusable non-None objects are a separate unruled condition",
+      "distinguishing_probe": "n/a",
+      "proposed": "When candidate_source is exactly None after argument validation, raise exact StateError('candidate source is not configured') with no source call or submission write; rule its precedence against operation absence separately.",
+      "main_verdict": "CONFIRMED. `candidate_source is None` after argument validation raises exact `StateError('candidate source is not configured')` with zero source calls and ZERO transactions - the check precedes the revision read (X03).",
+      "contract_action": "none"
     },
     {
       "id": "T04",
       "locus": "error text table row: revision changed -> StateError('operation revision changed before proposal submission')",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "no defensible alternative: D12 defines the two compared revisions, and the table fixes the resulting class and complete message",
+      "distinguishing_probe": "n/a",
+      "proposed": "If the scoped in-write revision differs from CandidateRequest.operation_revision, raise exact StateError('operation revision changed before proposal submission') and commit no submission-owned row or event.",
+      "main_verdict": "CONFIRMED for `propose`. The in-write scoped revision is compared against the captured `CandidateRequest.operation_revision`. `submit_proposal` passes no expectation, so this row is unreachable from the direct path by design (V-D12).",
+      "contract_action": "section 7 notes the row is source-path only"
     },
     {
       "id": "T05",
       "locus": "error text table row: operation absent -> NotFoundError('operation is not registered in this partition')",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "no defensible alternative: the table repeats handle's existing lookup condition, class, and exact message, while D21 fixes source non-invocation",
+      "distinguishing_probe": "n/a",
+      "proposed": "With otherwise valid method arguments and the applicable source configured, require exact NotFoundError('operation is not registered in this partition'), zero source calls, and zero submission writes on both paths.",
+      "main_verdict": "CONFIRMED for both methods. `NotFoundError('operation is not registered in this partition')`. `propose` raises it from the pre-read; `submit_proposal` raises it from inside its single write transaction, which is why its footprint is still zero.",
+      "contract_action": "none"
     },
     {
       "id": "T06",
       "locus": "error text table row: rejected partition, operation or input_value -> the existing unchanged ValidationError texts",
-      "divergence": "unknown",
-      "distinguishing_probe": "unknown",
-      "proposed": "unknown",
-      "main_verdict": "unknown",
-      "contract_action": "unknown"
+      "divergence": "Reading A pins every existing _name and canonicalize message reachable from these arguments; reading B pins one representative text per argument. A mutation to float, overflow, depth, item-count, key, Unicode, size, or unsupported-type text survives B.",
+      "distinguishing_probe": "Run both methods through invalid partition and operation names plus input fixtures for float, int overflow, excessive depth/items/bytes, non-string key, lone surrogate, and unsupported object. Compare type and exact str(exc) with baseline _name/canonicalize outputs.",
+      "proposed": "'Existing ... texts, unchanged' mandates reading A for every reachable validator branch, not one sample. Generate the expected matrix from baseline helpers, and add precedence probes separately so message coverage cannot mask ordering defects.",
+      "main_verdict": "CONFIRMED, reading A, for EVERY reachable validator branch rather than one sample. The existing `_name` and canonicalization texts are unchanged; the expected matrix is generated from the baseline helpers, not transcribed.",
+      "contract_action": "none"
+    },
+    {
+      "id": "X01",
+      "locus": "DIRECT candidate argument validation has no class, exact text, accepted runtime shape, or provenance rule",
+      "divergence": "Reading A requires type(candidate) is Candidate and converts every bad candidate field into a stable ValidationError; reading B duck-types any object with output/provenance and can leak AttributeError, TypeError, or ValueError. D07 orders 'candidate' but defines no validator.",
+      "distinguishing_probe": "After valid names and a non-JSON/input precedence control, call submit_proposal with None, a duck object, a Candidate subclass, invalid output values, non-mapping provenance, malformed mapping iteration, non-object provenance, and oversized provenance. Record exact class/text and zero transactions.",
+      "proposed": "Rule this boundary explicitly. Recommend exact Candidate instances, stable ValidationError for a wrong candidate container, existing canonicalization texts for caller-owned output, and one published provenance-object error; every rejection must precede ledger access.",
+      "main_verdict": "CONFIRMED, reading A, and it is what ships. `_canonical_candidate` requires `type(candidate) is Candidate`, converts a non-mapping provenance into `ValidationError('candidate provenance must be a mapping')` via a guarded `dict()` catching `(TypeError, ValueError)`, and requires a JSON object. Caller-owned output keeps the existing canonicalization texts. Every rejection precedes ledger access.",
+      "contract_action": "section 7 gained four candidate rows; section 4 places candidate validation last"
+    },
+    {
+      "id": "X02",
+      "locus": "SOURCE-BACKED return validation is absent from the error table: non-Candidate, invalid output, and malformed provenance",
+      "divergence": "Reading A treats an invalid returned candidate as adapter failure and normalizes it to CandidateSourceError('candidate source failed'); reading B exposes ValidationError or raw AttributeError/TypeError because the source returned rather than raised. Q13 already expects a differential answer.",
+      "distinguishing_probe": "Use sources that return None, a duck object, Candidate(output=1.5,...), provenance that is a list, a mapping whose items raises with a secret, a non-object JSON value, and an oversized object. Observe class/text/chain, source count 1, and all D15 pins.",
+      "proposed": "The containment intent and baseline handle behavior favor reading A: validate the returned Candidate outside a transaction and normalize every malformed adapter result like a raised adapter Exception. Publish this as a seventh error-table condition.",
+      "main_verdict": "CONFIRMED, reading A, and it is what ships. `_canonical_candidate` runs INSIDE `propose`'s `try`, so a malformed RETURNED candidate normalizes to `CandidateSourceError('candidate source failed')` exactly like a raised adapter exception. Containment must not depend on whether the adapter raised or returned; a mapping whose `items` raises with a secret is the case that settles it. Validation runs outside every transaction.",
+      "contract_action": "section 7 gains the malformed-return condition as a published row"
+    },
+    {
+      "id": "X03",
+      "locus": "propose precedence when candidate_source is None and the operation is also unregistered",
+      "divergence": "Reading A checks missing configuration after argument validation but before any ledger read, producing T03; reading B performs the operation lookup first and produces T05. D21 does not settle the pair because no source can be invoked, while split P06 measured reading A's zero transactions.",
+      "distinguishing_probe": "Create System with candidate_source=None, pass valid names/input for an unregistered operation, and use a live transaction spy. Observe StateError with zero transactions versus NotFoundError after one scoped read; add invalid-input controls to preserve D07 precedence.",
+      "proposed": "The contract is silent. Recommend reading A to retain split P06's measured zero-transaction missing-config path: arguments first, candidate_source-is-None second, operation lookup third, invocation fourth.",
+      "main_verdict": "CONFIRMED, reading A, and it is what ships. Order: arguments, `candidate_source is None`, operation lookup, invocation. Missing configuration therefore costs ZERO transactions, which is what the split spike measured. Reading B would trade that for a `NotFoundError` the caller cannot act on while unconfigured.",
+      "contract_action": "section 5 publishes the four-step precedence"
+    },
+    {
+      "id": "X04",
+      "locus": "CandidateRequest's full field binding and detachment beyond the D14 request_id pin",
+      "divergence": "Reading A passes the canonicalizer's detached input plus validated partition, operation, captured revision, and generated request ID; reading B passes the caller's original mutable input while persisting a separately canonicalized snapshot. Both satisfy D14's request_id sentence but adapters observe different data.",
+      "distinguishing_probe": "Submit a nested mutable input through a recording source that mutates CandidateRequest.input before returning. Assert every CandidateRequest field, that request.input is not caller-owned, and that both the persisted input_json/hash and caller object remain the pre-adapter canonical value.",
+      "proposed": "Preserve the existing CandidateRequest contract in full: normalized partition/operation, pre-invocation revision, generated internal request ID, and detached canonical input. Persistence must reuse the same canonical snapshot rather than adapter-mutated data.",
+      "main_verdict": "CONFIRMED, reading A, and it is what ships. `CandidateRequest.input` receives `input_json.value`, the canonicalizer's detached structure. Persistence reuses `input_json.text` and `.digest`, computed before invocation, so an adapter that mutates `request.input` changes neither the stored bytes nor the caller's object.",
+      "contract_action": "section 8 records the detachment and the single-snapshot reuse"
+    },
+    {
+      "id": "X05",
+      "locus": "scope freezes SCHEMA_VERSION and every schema byte, but no seeded verdict row pins either",
+      "divergence": "Reading A treats SCHEMA_VERSION == 2 as sufficient compatibility; reading B also requires SCHEMA, SCHEMA_FINGERPRINT, tables, indexes, and triggers to remain byte-identical. Section 1 explicitly says both version and schema bytes stay unchanged, so A is incomplete.",
+      "distinguishing_probe": "Compare store.py SCHEMA_VERSION, SCHEMA byte length, SHA-256, SCHEMA_FINGERPRINT, and a freshly initialized sqlite_schema projection with the unit-entry baseline. A whitespace-only DDL edit separates version-only checking from byte identity.",
+      "proposed": "Mandate reading B. Retain SCHEMA_VERSION 2 and the existing 14,580-byte SCHEMA digest 5be3d79fe1e21aca524f3937c8ce78521bcc7203bfe20b7352ef4b6dff468a77; reuse the pending request shape without DDL edits.",
+      "main_verdict": "CONFIRMED, reading B, and MEASURED clean. `SCHEMA_VERSION == 2`; `SCHEMA` is 14,580 bytes with SHA-256 `5be3d79fe1e21aca524f3937c8ce78521bcc7203bfe20b7352ef4b6dff468a77`; `SCHEMA_FINGERPRINT` equals that digest. Version-only checking would pass a whitespace DDL edit, so byte identity is the obligation.",
+      "contract_action": "section 1 gains the schema pin with its three figures"
+    },
+    {
+      "id": "X06",
+      "locus": "section 1 freezes CLI and adapter runtime bytes and preserves seven legacy System/model surfaces without a seeded residue row",
+      "divergence": "Reading A requires only that old calls still pass behavioral tests; reading B additionally enforces byte stability where section 1 says 'untouched' or 'byte-stable'. A harmless refactor passes A but violates the explicit ownership boundary.",
+      "distinguishing_probe": "Hash CLI, _command_supervisor.py, and example_adapter.py; AST-slice CommandCandidateSource and the named legacy methods/models; then run representative handle, request/proposal readers, review, function_report, and Outcome-shape regressions against M3.3-created and legacy rows.",
+      "proposed": "Use byte checks for the files/functions explicitly called byte-stable or untouched, and behavioral/ABI checks for the remaining legacy methods and Outcome members. M3.3 may add beside them but must not refactor their owned code.",
+      "main_verdict": "CONFIRMED, reading B, and MEASURED clean against the unit-entry baseline `f9b9755`: `cli.py`, `_command_supervisor.py`, and `example_adapter.py` are byte-identical at HEAD. The row's own probe is sound but needs the baseline stated - measured against an M2-era commit, `cli.py` shows a false DIFF that is entirely M2.4 work.",
+      "contract_action": "section 1 gains the byte pin AND names f9b9755 as the baseline"
+    },
+    {
+      "id": "X07",
+      "locus": "docs/adapter-protocol.md becomes conditionally false but D34's normative file list omits it",
+      "divergence": "Reading A leaves the document describing every command failure as a stored fallback_failed request with lease retry; reading B splits legacy handle from explicit propose, where the same CommandCandidateSource failure raises and writes nothing. The shared adapter makes A false for a shipped path.",
+      "distinguishing_probe": "Use CommandCandidateSource once through handle and once through propose with a failing command, then compare outcomes and footprints against the document's fallback_failed, retry, lease, and request-idempotency sentences. Search the updated prose for method qualifiers.",
+      "proposed": "Add docs/adapter-protocol.md to D34. Preserve the transitional request_id envelope, but state that handle stores legacy fallback state while propose normalizes failure to CandidateSourceError and creates no request row, event, or retry identity.",
+      "main_verdict": "ACCEPTED, and already fixed at 719b48a. `docs/adapter-protocol.md` held the only two sentences the shipped surface falsified. Both are now route-qualified: `handle` stores legacy `fallback_failed` state, `propose` raises `CandidateSourceError` and writes no request row, no proposal, and no event, and never retries.",
+      "contract_action": "D34's normative file list gains docs/adapter-protocol.md"
+    },
+    {
+      "id": "X08",
+      "locus": "section 7 does not classify reachable clock and Store transaction failures of either new method",
+      "divergence": "Reading A presents section 7 as an exhaustive public error taxonomy; reading B treats it as domain errors only and silently inherits _now and Store's existing StateError/IntegrityError texts. The heading and D32's 'exact error each raises' support A, but the table omits these paths.",
+      "distinguishing_probe": "Inject invalid clock returns and Connection factories that fail open, BEGIN, scoped SELECT, INSERT, and commit with OperationalError or integrity errors. Record public class/text/cause and footprint for both methods; compare every result with the six-row table.",
+      "proposed": "Either qualify section 7 as submission-domain errors plus inherited infrastructure errors, or add the existing clock and Store mappings explicitly. Do not claim completeness while reachable StateError and IntegrityError messages remain unlisted.",
+      "main_verdict": "ACCEPTED as a COMPLETENESS defect in the contract, with no code effect. Section 7 is a submission-DOMAIN taxonomy. Reachable clock and Store failures inherit their existing `StateError`/`IntegrityError` texts and were never respecified. Claiming exhaustiveness while those are unlisted is the error.",
+      "contract_action": "section 7's heading is qualified: submission-domain errors plus inherited infrastructure errors"
+    },
+    {
+      "id": "X09",
+      "locus": "a non-None candidate_source can become non-callable or raise while its propose attribute is retrieved after System construction",
+      "divergence": "Reading A treats every failure at the configured invocation boundary as normalized CandidateSourceError; reading B applies T01/T02 only after a callable source method starts and leaks AttributeError, TypeError, or descriptor exceptions from an invalid mutable configuration.",
+      "distinguishing_probe": "After construction, assign candidate_source to False, an object without propose, a non-callable propose value, and an armed propose descriptor that raises with a secret. Call propose with a registered operation and inspect class/text/chain, calls, transactions, and D15 pins.",
+      "proposed": "The contract must rule mutable misconfiguration. Recommend snapshotting once, treating None as T03, validating callable propose before the operation read, and publishing one stable StateError for unusable configuration; descriptor execution that raises should be contained as source failure.",
+      "main_verdict": "RULED, and the shipped behaviour DIVERGES from the row's recommendation deliberately. Shipped: snapshot once, `None` -> T03 `StateError`, and every other unusable configuration - missing `propose`, non-callable `propose`, a descriptor that raises - contained as `CandidateSourceError`. A pre-flight `callable()` check is unsound under descriptors and `__getattr__`, duplicates the failure the invocation itself produces, and would EXECUTE the descriptor to test it. A descriptor can carry secrets, so containment must cover it. Footprint stays zero: one read transaction, no rows.",
+      "contract_action": "section 5 publishes the containment boundary for non-None unusable configuration"
+    },
+    {
+      "id": "X10",
+      "locus": "source-raised BaseException subclasses are outside T01/T02 and have no propagation or footprint contract",
+      "divergence": "Reading A catches BaseException and converts KeyboardInterrupt, SystemExit, GeneratorExit, or cancellation into CandidateSourceError; reading B catches exactly Exception, allowing process-control exceptions to propagate unchanged. The table's capitalized Exception excludes A's wider catch.",
+      "distinguishing_probe": "Use sources that raise KeyboardInterrupt, SystemExit, GeneratorExit, and a custom BaseException after one counted call. Observe whether each escapes unchanged or is normalized, and independently require zero request/proposal/event and commit deltas.",
+      "proposed": "Recommend reading B: normalize CandidateSourceError and Exception only, propagate BaseException subclasses unchanged, and preserve zero submission footprint. Publish this boundary so cancellation is not accidentally swallowed.",
+      "main_verdict": "CONFIRMED, reading B, and it is what ships. `except Exception` is exact: `KeyboardInterrupt`, `SystemExit`, `GeneratorExit`, and cancellation propagate unchanged, because swallowing process control is worse than any containment gain. Footprint is still zero - nothing is written before the seam.",
+      "contract_action": "section 7 publishes the BaseException boundary above T02"
+    },
+    {
+      "id": "X11",
+      "locus": "section 1 requires normative prose to publish the new surface, while D32/D34 permit docstrings plus only stale-claim cleanup",
+      "divergence": "Reading A considers method docstrings sufficient publication and may leave README and architecture without either method name; reading B requires positive human-facing documentation of both paths, their signatures, cost, errors, and request-row caveat.",
+      "distinguishing_probe": "Search README.md and normative docs for submit_proposal and System.propose, then verify that a reader can determine direct versus configured-source authority, return type, three-row price, no idempotency, source containment, and retained request identity without reading code.",
+      "proposed": "Mandate reading B. Add a concise Library API example and architecture/threat text that positively names both methods and their cost; stale-claim removal alone does not publish a new public surface.",
+      "main_verdict": "ACCEPTED, and it was a REAL OPEN GAP. Before this ruling, README.md matched only the adapter snippet's `def propose(self, request)`, and neither `docs/architecture.md` nor `docs/threat-model.md` named either method. Stale-claim cleanup does not publish a new public surface. FIXED: README gains an 'Explicit proposal submission' subsection with both signatures, the three-row cost, the no-idempotency statement, the error list, and the D25-compliant request-row caveat; architecture.md states that both methods enter the pipeline at step 3 alone; threat-model.md route-scopes its request-ID idempotency obligation.",
+      "contract_action": "D34 is discharged for prose; the executable prose battery stays S3 work"
+    },
+    {
+      "id": "X12",
+      "locus": "atomic rollback is not forced at each interior persistence write failure",
+      "divergence": "Reading A discharges D15 using only failures before the write seam, such as validation or source errors; reading B injects failure after each of the request, event, and proposal writes. A seam can partially persist on an interior defect while passing A.",
+      "distinguishing_probe": "For each write ordinal in the shared seam, inject a sqlite failure immediately after that statement but before commit. Assert the public error taxonomy plus request/proposal counts, event count/sequence, file SHA-256, iterdump, zero successful commits, and a live success control.",
+      "proposed": "D01, D06, D15, and D16 together mandate reading B. Add one rollback matrix covering every interior write boundary; all three records must be one atomic transaction, not merely co-located on the happy path.",
+      "main_verdict": "CONFIRMED, reading B, as the OBLIGATION; discharge is OPEN. The seam is structurally atomic - one `transaction(write=True)` block containing all three INSERTs - so any interior raise rolls back by construction. That is an argument, not a measurement. D15 can currently pass on pre-write failures alone, which is exactly the hole the row names.",
+      "contract_action": "S3 battery must ship the rollback matrix: inject after each of the request, event, and proposal writes, and assert taxonomy, counts, file digest, and zero successful commits"
     }
   ]
 }

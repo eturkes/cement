@@ -75,7 +75,9 @@
 - An exported bundle is intentionally sealed from later ledger state. If a revocation, a policy
   revision, or an evidence change must take effect, deploy a newly verified export.
 - Treat results as plans. Re-run live policy and authorization immediately before an effect. Use the
-  request ID as an idempotency key. Stop for reconciliation after uncertain effect commit state.
+  `handle` request ID as an idempotency key. Stop for reconciliation after uncertain effect commit
+  state. `submit_proposal` and `propose` give no idempotency. Each call writes a new proposal. Do not
+  repeat those calls to recover.
 - Keep provider wrappers pure. Model calls can repeat after timeout or lease recovery.
 - Monitor promoted scopes. When policy or expected behavior changes, challenge them. Revise the
   operation instead of overwriting contradictory history.

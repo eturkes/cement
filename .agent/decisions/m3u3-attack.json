@@ -4,164 +4,218 @@
     {
       "id": "A01",
       "lens": "section 1 Scope: is every named out-of-scope surface actually untouched by what section 2-9 mandate?",
-      "finding": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "acceptance_check": "unknown",
-      "main_disposition": "unknown"
+      "finding": "no defect: scope ownership is satisfiable; every mandate touching a named legacy surface requires byte stability or consumes its unchanged behavior.",
+      "evidence": ".agent/decisions/m3u3-contract.md:15-27 names only the two System methods, their seam, errors.py, the census, and prose as edits; P06, D13, D14, and D34 constrain the legacy surfaces rather than requiring edits.",
+      "severity": "cleared",
+      "acceptance_check": "Grade the implementation diff: every changed production/test/doc path must be one named at contract lines 15-18 or forced by P06/D28/D31-D34; all other named scope surfaces remain byte-identical.",
+      "main_disposition": "CLEARED, and now CHECKABLE. Scope ownership is satisfiable, but section 1 said 'unchanged' and 'byte-stable' with no pin and no baseline. Verdict rows X05/X06 found the same gap from the other side. LANDED: B01 pins the schema bytes and fingerprint; B02 pins the three byte-stable files against the named unit-entry baseline `f9b9755`."
     },
     {
       "id": "A02",
       "lens": "section 2 frozen shape: are P01-P06 satisfiable together, and is the handle byte claim checkable as written?",
-      "finding": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "acceptance_check": "unknown",
-      "main_disposition": "unknown"
+      "finding": "no defect: P01-P06 are jointly satisfiable, and P06\u2019s handle fingerprint is exact under its stated line-start AST slice with the trailing newline removed.",
+      "evidence": "For system.py handle at AST lines 574-844: node span=12,862/c27e71b0b4c7; adding the four-space line indentation and excluding newline=12,866/1182130a2b3a; full lines=12,867/cd60036faf5c. HEAD and 3b7769b match the declared middle variant.",
+      "severity": "cleared",
+      "acceptance_check": "A committed extractor must slice from the FunctionDef start line\u2019s byte 0 through end_col_offset, exclude the trailing newline, and assert 12,866 B / SHA-256 prefix 1182130a2b3a at HEAD and 3b7769b.",
+      "main_disposition": "CLEARED, and the clearing is itself the useful result. The reviewer reproduced P06 under the LINE-START slice with the trailing newline removed and got the contract's exact figure, independently identifying the convention that makes the claim checkable. MAIN measured both: `1182130a2b3a` / 12,866 B whole-line span, `c27e71b0b4c7` / 12,862 B from `ast.get_source_segment`, which drops the four-space indent. Same unchanged source, two numbers, four bytes apart. LANDED: P06 states the convention so no future lens has to rediscover it."
     },
     {
       "id": "A03",
       "lens": "section 3 two paths: is the success footprint complete, and does after generated-ID normalization have one meaning?",
-      "finding": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "acceptance_check": "unknown",
-      "main_disposition": "unknown"
+      "finding": "D01 is impossible literally: inserting the required AUTOINCREMENT event also mutates sqlite_sequence, contradicting \u201cNo other table changes\u201d; generated-ID normalization is also undefined.",
+      "evidence": "src/cement_runtime/store.py:240-248 declares events.sequence INTEGER PRIMARY KEY AUTOINCREMENT. A live :memory: SCHEMA probe changed sqlite_sequence from [] to [(\"events\", 1)] after one proposal.created insert. D01 at contract lines 64-66 excludes that table.",
+      "severity": "blocking",
+      "acceptance_check": "D01 must define the normalized fields and say \u201cno other application-table changes\u201d while requiring sqlite_sequence(events) to advance once; the success oracle must snapshot every table and assert that exact delta for both paths.",
+      "main_disposition": "UPHELD, blocking. `events.sequence` is AUTOINCREMENT, so every success mutates `sqlite_sequence` and D01 read literally is unsatisfiable by correct code. Verdict row D01 confirms independently, so the council rule accepts without a MAIN probe. LANDED: section 12 V-D01 scopes the footprint to Cement's declared SCHEMA tables."
     },
     {
       "id": "A04",
       "lens": "section 4 precedence: does D07's order have a probe per ADJACENT edge, or only spanning pairs?",
-      "finding": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "acceptance_check": "unknown",
-      "main_disposition": "unknown"
+      "finding": "D07 declares four-stage precedence, but D08/P12 force only the non-adjacent partition\u2192input edge; partition\u2192operation, operation\u2192input, and input\u2192candidate can regress undetected.",
+      "evidence": ".agent/decisions/m3u3-contract.md:84-92 states the full order but names only bad partition + bad input. Both spike reports contain only P12 for precedence; split P12 observed that pair and no adjacent-edge pair.",
+      "severity": "material",
+      "acceptance_check": "Add three two-fault probes, each with single-fault positive controls: bad partition+operation, bad operation+input, and bad input+candidate. Each must pin the earlier exact error plus zero transactions and source calls.",
+      "main_disposition": "UPHELD. D07 declares a four-stage total order; D08's partition/input pair spans two edges and pins neither interior one, so three of four edges could regress undetected. Verdict row D07 confirms independently. LANDED: three adjacent-edge probes plus two for `propose`'s configured-source slot; D08 is recorded as a sample."
     },
     {
       "id": "A05",
       "lens": "section 5 source invocation: is the read-then-re-read window specified tightly enough to be implementable one way?",
-      "finding": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "acceptance_check": "unknown",
-      "main_disposition": "unknown"
+      "finding": "D12 rules the SOURCE-BACKED revision window but never rules DIRECT revision binding; submit_proposal may bind the revision at entry or only inside the write transaction, producing raise-versus-persist divergence during a concurrent revision.",
+      "evidence": ".agent/decisions/m3u3-contract.md:99-107 places D12 under \u201cSource-invocation obligations\u201d and defines its two reads around invocation. No direct-path clause names a revision snapshot; D07 only requires validation before ledger access.",
+      "severity": "material",
+      "acceptance_check": "State whether DIRECT binds entry revision or write-transaction revision, then add a barrier probe that revises the operation between the selected boundary and persistence and pins either the ruled StateError/no rows or success at the new revision.",
+      "main_disposition": "UPHELD, and THIS PAIR CHANGED THE SHIPPED CODE. D12 ruled the source-path revision window and left DIRECT binding unruled. MAIN's first implementation gave both paths a pre-read plus a seam re-read, which raised `StateError` for a direct submission with no generation window to protect. Verdict row D12 reached the same conclusion independently. LANDED: `expected_revision: int | None`; D12 scoped to the source path; section 12 V-D12."
     },
     {
       "id": "A06",
       "lens": "section 6 purity: does each of D15-D17 have its own instrument, or is one obligation discharged by a proxy?",
-      "finding": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "acceptance_check": "unknown",
-      "main_disposition": "unknown"
+      "finding": "D17 has no forcing instrument: row/file/dump and commit spies can all pass while implementation reads the forbidden artifact/example/function-receipt/membership tables or calls another clock source.",
+      "evidence": ".agent/decisions/m3u3-contract.md:114-122 specifies independent instruments for D15 and D16, then states D17 without one. Neither spike report contains a clock, SQL trace, or SQLite authorizer observation.",
+      "severity": "material",
+      "acceptance_check": "Add a live positive-controlled SQL trace/authorizer assertion that rejects reads of every D17 table on both success and failure paths, plus a patched forbidden-clock sentinel proving both methods obtain time only through self._now.",
+      "main_disposition": "UPHELD against the contract. D15 and D16 each named an instrument and D17 named none, so row, file, dump and commit pins could all pass while the code read a forbidden table or another clock. LANDED: D17 carries a statement-recording `Connection` subclass with a non-empty recorded list as its own positive control."
     },
     {
       "id": "A07",
       "lens": "section 7 error taxonomy: is every reachable failure of both methods listed with an exact text?",
-      "finding": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "acceptance_check": "unknown",
-      "main_disposition": "unknown"
+      "finding": "Section 7 omits every DIRECT candidate-validation failure even though D07 mandates candidate validation; wrong candidate shape, non-JSON output, and invalid or oversized provenance therefore have no ruled class, text, or precedence.",
+      "evidence": ".agent/decisions/m3u3-contract.md:84-86 orders DIRECT candidate validation, but the section-7 table lists only source/config/revision/operation/input failures. models.py:51-57 permits arbitrary output/provenance values; json_value.py:70-107 supplies multiple reachable ValidationError texts.",
+      "severity": "blocking",
+      "acceptance_check": "Add a candidate-error table and probes for wrong runtime type, invalid output JSON, non-mapping provenance, invalid provenance JSON, and 65,537-byte provenance; pin exact class/text, adjacent precedence, and zero ledger/source activity.",
+      "main_disposition": "UPHELD, blocking. D07 ordered DIRECT candidate validation while section 7 published no class, text, or accepted shape for any of its failures. LANDED: four candidate rows in the section 7 table, covering the wrong container, non-mapping provenance, non-object provenance, and canonicalization failure."
     },
     {
       "id": "A08",
       "lens": "section 8 private request row: is the eight-seam list complete and each entry true at HEAD?",
-      "finding": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "acceptance_check": "unknown",
-      "main_disposition": "unknown"
+      "finding": "The exact \u201cEIGHT live seams\u201d inventory has no layer definition and is incomplete as a caller-visible inventory: existing CLI proposal show/list/review, request polling, and function-report channels also serialize the plumbing request ID.",
+      "evidence": "src/cement_runtime/cli.py:112-130 defines proposal/request commands; lines 500-522 and 593 dispatch to the listed methods; lines 278-283 serialize returned dicts/dataclasses. system.py:1193 includes request_id in show/list records, so at least two immediate CLI channels expose it.",
+      "severity": "material",
+      "acceptance_check": "Define the counted layer (primitive System/protocol seams versus all public channels), then generate the inventory from call/return sites; a live CLI probe using the returned proposal ID must be listed and must demonstrate every request_id-bearing output.",
+      "main_disposition": "UPHELD IN PART. The eight seams are API-level and true as named; `cli.py` also serializes the identifier, and authorized ledger access exposes it by design. REJECTED as a completeness defect: the list was never an exhaustive security count. LANDED: section 12 V-D23 states the scope."
     },
     {
       "id": "A09",
       "lens": "section 9 gate identity: are the cited census line numbers and counts accurate at HEAD?",
-      "finding": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "acceptance_check": "unknown",
-      "main_disposition": "unknown"
+      "finding": "D27 cites stale census lines: 869-872 are the simple-binding violation branch, while the four claimed assertions are at 875-878.",
+      "evidence": "Numbered HEAD read: tests/test_read_capability_battery.py:869-872 contains violations.append/.../continue; lines 875-878 assert 17, 15, 12, and []. The exact B20 unittest ran 1 test in 0.074s and passed.",
+      "severity": "material",
+      "acceptance_check": "Replace the stale anchor with tests/test_read_capability_battery.py:875-878 or, preferably, the stable test_b20_read_site_census_has_no_mutations symbol; rerun that exact unittest and require OK.",
+      "main_disposition": "UPHELD. D27 cited lines 869-872, the violation branch; the four census assertions sat at 875-878, and this unit moved them again. LANDED: D27 cites the test by NAME, because a line anchor into a file the unit edits is stale on arrival."
     },
     {
       "id": "A10",
       "lens": "section 10 fork ruling: do the four measured grounds support TWO METHODS, or does any overreach?",
-      "finding": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "acceptance_check": "unknown",
-      "main_disposition": "unknown"
+      "finding": "no defect: the ruling separates measured API hazards from implementability evidence and does not treat the green-count asymmetry as correctness.",
+      "evidence": "split P08 records required keyword-only candidate and no source parameter; XOR P07 records configured=0, supplied=1, legacy configured positive-control=1. .agent/memory.md:139 records the XOR advocate recommendation; contract lines 201-204 explicitly qualify gate evidence as non-correctness.",
+      "severity": "cleared",
+      "acceptance_check": "Re-run split P08 and XOR P07/P08; require the recorded signatures, 0/1/1 source counters, both XOR invalid states, and retain the section-10 sentence that excludes gate color as correctness evidence.",
+      "main_disposition": "CLEARED. Section 10 separates measured API hazards from implementability evidence and already states that `split`'s green gate is not correctness. No change."
     },
     {
       "id": "A11",
       "lens": "section 11 normative claims: are D31-D34 checkable, and is the cited errors.py:28 docstring text exact?",
-      "finding": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "acceptance_check": "unknown",
-      "main_disposition": "unknown"
+      "finding": "D34 omits docs/adapter-protocol.md, whose generic failure/retry prose becomes false for propose: source failure now raises with no fallback_failed row, lease, or Cement retry.",
+      "evidence": "docs/adapter-protocol.md:36 says adapter failure \u201cbecomes an inert fallback_failed request\u201d; line 54 says Cement can invoke again after a failed request or expired lease. Contract D20 says the new path writes neither, while D34 at lines 223-225 scans only README, architecture, and threat model. errors.py:28-29 otherwise matches D31 exactly.",
+      "severity": "material",
+      "acceptance_check": "Add docs/adapter-protocol.md to D34 and update it to distinguish legacy handle from explicit propose; a doc lint must reject unqualified fallback_failed, lease, or Cement-retry claims for source submission.",
+      "main_disposition": "UPHELD. `docs/adapter-protocol.md` promised an inert `fallback_failed` request and possible re-invocation for the same `CommandCandidateSource` that `propose` must expose as an exception with zero rows. Verdict row X07 confirms independently. LANDED: both sentences qualified by route; D34's file list corrected."
     },
     {
       "id": "X01",
       "lens": "biconditional asserted where the design admits only one-way implication",
-      "finding": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "acceptance_check": "unknown",
-      "main_disposition": "unknown"
+      "finding": "D02 turns compatibility into a biconditional: the schema CHECK admits the required attempts=1 row, but it does not enforce exactly that shape and also accepts pending rows with attempts>1.",
+      "evidence": "store.py:57 constrains attempts >= 1; lines 60-67 constrain pending nullable fields but not attempts=1. A live schema-v2 :memory: insert of a pending row with proposal_id set, NULL leases, and attempts=2 succeeded and selected back unchanged.",
+      "severity": "material",
+      "acceptance_check": "Replace \u201cadmits exactly this shape\u201d with \u201cadmits this shape\u201d; separately pin attempts=1 in both writer-row probes. A negative schema probe with attempts=2 must continue to succeed, proving the guarantee belongs to code, not CHECK.",
+      "main_disposition": "UPHELD. The v2 CHECK ADMITS the required row shape; it does not enforce it, and a `pending` row with `attempts > 1` satisfies it too. D02's original wording turned a one-way implication into a biconditional. LANDED: D02 reads as a permission, and `attempts == 1` is pinned by test rather than inferred from the schema."
     },
     {
       "id": "X02",
       "lens": "a claim that is unconditional in the prose but holds only under a particular fixture or configuration",
-      "finding": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "acceptance_check": "unknown",
-      "main_disposition": "unknown"
+      "finding": "D15/D16 are unconditional but hold only for an inert source fixture: source code runs outside Cement transactions and may itself commit to the same ledger, as the required revision-race probe does.",
+      "evidence": "split spike P09 records changed_table_deltas={\"events\":1} and event_kinds=[\"operation.registered\",\"operation.revised\"] before the ruled StateError. Contract D15 says every failed submission is byte-identical and D16 says zero commit() calls on any failure path.",
+      "severity": "blocking",
+      "acceptance_check": "Qualify D15/D16 to submission-owned connections/mutations and exclude independently committed source or concurrent effects; tag connection provenance in spies. Keep P09 expecting its deliberate revision event while requiring zero proposal-plumbing writes.",
+      "main_disposition": "UPHELD, blocking, and the sharpest finding of the wave. D15/D16 were unconditional, yet the source runs outside every Cement transaction and may commit to the same ledger - which the required revision-race fixture does deliberately through `revise_operation`. A correct implementation fails the literal reading. LANDED: D15 restated as zero submission-attributable mutation with its comparison window named; D16 scoped to failures before commit."
     },
     {
       "id": "X03",
       "lens": "a stale structural inventory: any count, line anchor, byte length or SHA the contract states as fact",
-      "finding": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "acceptance_check": "unknown",
-      "main_disposition": "unknown"
+      "finding": "The structural inventory has one reproducible stale anchor: D27 points to 869-872, three lines before its four census assertions.",
+      "evidence": "Numbered HEAD shows tests/test_read_capability_battery.py:869-872 is violations.append/.../continue; assertions are 875-878. The exact B20 unittest passes 17/15/12/[]. P06 was separately recomputed accurate at 12,866 B / 1182130a2b3a under its stated slice.",
+      "severity": "material",
+      "acceptance_check": "Resolve the B20 test symbol from AST and emit the four assertion lines; the contract anchor must match that generated result (currently 875-878), while the handle fact checker must remain green.",
+      "main_disposition": "UPHELD, and correctly narrowed by the reviewer itself: swept for stale counts, byte lengths and SHAs, the structural inventory yields exactly ONE stale anchor - D27's 869-872, three lines before its four census assertions. Every other stated figure reproduces. Same defect as A09, reached by a different lens. LANDED: D27 cites the test by NAME."
     },
     {
       "id": "X04",
       "lens": "an obligation with no forcing probe, so no committed test could detect its deletion",
-      "finding": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "acceptance_check": "unknown",
-      "main_disposition": "unknown"
+      "finding": "D06\u2019s ONE-seam/single-writer obligation has no forcing probe; duplicated but behaviorally equal SQL writers can satisfy every footprint and differential assertion.",
+      "evidence": "Contract lines 78-80 state the structural obligation. Exact rg across both spike JSON files for _persist|persistence seam|single writer|helper call|AST returned rc=1; positive-control P02 lookup returned rc=0. P01/P02 record outputs only.",
+      "severity": "material",
+      "acceptance_check": "Add an AST/source-structure gate that identifies one private writer containing all three mutations and no public writer SQL, plus a patched-helper spy proving submit_proposal and propose each call that seam exactly once.",
+      "main_disposition": "UPHELD against the contract. D06's ONE-seam/single-writer obligation is structural, and every probe against it was behavioural - duplicated but equal SQL writers satisfy every footprint and differential assertion. Verdict row D06 reaches the same conclusion. LANDED: the pin spies the seam's call graph, not the footprint."
     },
     {
       "id": "X05",
       "lens": "guarantee-vs-claim gap on private, transitional, identical, indistinguishable or unchanged",
-      "finding": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "acceptance_check": "unknown",
-      "main_disposition": "unknown"
+      "finding": "D19\u2019s caller-level indistinguishability is stronger than Cement can guarantee: the caller owns the adapter and can observe its state, timing, logs, or external effects even when Cement normalizes its exception surface.",
+      "evidence": "Contract lines 137-141 pin only class/message/cause/context/traceback/event observations; both spike P05 rows record public_surface_identical, not timing or adapter state. P03/D32 explicitly describe adapter code as caller-supplied.",
+      "severity": "material",
+      "acceptance_check": "Rewrite D19 to enumerate Cement-controlled observables only: raised class/text/repr/cause/context/traceback shape and ledger/event state. The differential probe must compare that exact tuple and disclaim adapter/external side channels.",
+      "main_disposition": "UPHELD as a claim-soundness defect. D19's caller-level indistinguishability is stronger than any library can guarantee: the caller owns the adapter and can observe its state, timing, logs, and external effects. Verdict row D19 confirms independently, so the council rule accepts. LANDED: section 12 V-D19 scopes it to observations through the raised Cement exception."
     },
     {
       "id": "X06",
       "lens": "CLAUDE.md Authoring conformance of the contract itself and of the prose M3.3 will ship",
-      "finding": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "acceptance_check": "unknown",
-      "main_disposition": "unknown"
+      "finding": "The contract violates the project\u2019s agent-authoring rule by retaining provenance and negative future prompts instead of stating the enforceable target directly.",
+      "evidence": "CLAUDE.md Authoring requires dense symbol-forward text, omitted provenance, and positive desired actions. Contract lines 60, 119, 183-203, and 225 retain commit/spike/history narration; P03, D23, D25, and D33 use NEVER/MUST NOT/No-shipped-sentence framing.",
+      "severity": "minor",
+      "acceptance_check": "A consistency pass must remove non-load-bearing origin/history clauses and rewrite future obligations as positive measurable states, while retaining only measurements needed by a gate or fork ruling.",
+      "main_disposition": "UPHELD IN PART, with the boundary ruled. ACCEPTED on negative form: D23, D25 and D33 told the reader what may not be written, which is the pink-elephant shape the project bans, and they govern SHIPPED prose - the worst place for it. All three are now positive. REJECTED on provenance: measurements, SHAs, baselines and named conventions are this document's PAYLOAD, and the Authoring rule targets dates, discovery narration and origin stories. A decision record stripped of its measurements stops being checkable, and the same CLAUDE.md funds measurements as commit-body payload."
     },
     {
       "id": "X07",
       "lens": "a hazard the contract declares injection-only or unreachable that is real behaviour of a default System",
-      "finding": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "acceptance_check": "unknown",
-      "main_disposition": "unknown"
+      "finding": "P04 literally makes normal propose impossible: \u201cinvokes self.candidate_source and nothing else\u201d contradicts required validation, revision reads, clock access, and persistence on every default successful call.",
+      "evidence": "Contract P04 at lines 55-57 says \u201cand nothing else\u201d; D07 requires three validators, D12-D13 require two ledger reads, D17 permits self._now, and D01 requires three durable rows. No injection is needed for those additional calls.",
+      "severity": "material",
+      "acceptance_check": "Replace P04 with \u201cself.candidate_source is the only candidate source that propose invokes\u201d; a call spy must prove one configured-source invocation and zero alternate source calls while allowing the ruled validators/ledger seam.",
+      "main_disposition": "UPHELD. 'Invokes `self.candidate_source` and nothing else' is false on every successful call, each of which also validates arguments, reads the operation revision, reads the clock, and writes three rows. LANDED: P04 scopes 'nothing else' to GENERATION authority - no per-call source, no fallback source, no second attribute read."
+    },
+    {
+      "id": "Y01",
+      "lens": "combined-failure precedence between missing source configuration and an absent operation",
+      "finding": "The contract does not rule propose() when candidate_source is None and the operation is absent: configuration-first yields StateError with zero transactions; lookup-first yields NotFoundError with one read transaction.",
+      "evidence": "Split P06 measured None+registered as StateError and store_transaction_calls=0. Split P10 measured configured+absent as NotFoundError and store_transaction_calls=1. D07, D12, D21, and the error table do not order the combined case.",
+      "severity": "blocking",
+      "acceptance_check": "Add the combined row to the precedence table and a positive-controlled probe that pins the winning exact error, transaction count, and zero source calls; either ruling must be explicit before implementation.",
+      "main_disposition": "UPHELD, blocking. `propose` with `candidate_source is None` AND an absent operation was unruled, and the two orders differ observably: zero transactions against one read. Verdict row X03 confirms independently. LANDED: D35 publishes the four-step precedence - arguments, configuration, lookup, invocation - and D21 carries the cross-reference."
+    },
+    {
+      "id": "Y02",
+      "lens": "accepted Candidate domain, canonicalization limits, and direct-versus-source validation ownership",
+      "finding": "The contract says \u201ccandidate validation\u201d but defines no accepted runtime shape, output JSON limit, provenance mapping requirement, provenance byte limit, or error ownership for malformed direct and source-returned candidates.",
+      "evidence": "models.py:51-57 types output as object and provenance as Mapping. Existing handle at system.py:768-771 canonicalizes output at the default limit, copies provenance to dict, caps it at 65,536 B, and requires an object. Exact rg for those bounds/rules in the contract returned rc=1; candidate control returned rc=0.",
+      "severity": "blocking",
+      "acceptance_check": "Publish the candidate normalization contract for both paths and add adjacent accept/reject probes for each bound, non-Candidate returns, non-mapping provenance, and invalid JSON; pin exact class/text and zero writes.",
+      "main_disposition": "UPHELD, blocking, and broader than A07. The accepted candidate runtime shape, the provenance byte limit, and the ownership split between DIRECT `ValidationError` and SOURCE-BACKED containment were all undefined. Verdict rows X01 and X02 confirm both halves independently. LANDED: four candidate rows plus the malformed-RETURN row in section 7; D38 rules the ownership split and names the secret-carrying `items` case that settles it."
+    },
+    {
+      "id": "Y03",
+      "lens": "complete normative shape of the newly inserted proposals row and its event binding",
+      "finding": "D01 specifies only that one proposals row exists; no clause requires canonical output/provenance texts and hashes, pending status, NULL review fields, created_at_us, status_sequence=event.sequence, or prop_/req_ ID formats.",
+      "evidence": "Split P01 measured every omitted field, including result_prefix=prop_, request id_prefix=req_, pending status, NULL review fields, equal timestamp 100, and status_sequence=event sequence 2. Exact field-token search in the contract returned rc=1; \u201cproposal row\u201d control returned rc=0.",
+      "severity": "blocking",
+      "acceptance_check": "Add a column-by-column proposal/event/request success table, including ID formats and timestamp/sequence equalities; direct and source probes must assert every column after only explicitly listed normalization.",
+      "main_disposition": "UPHELD, blocking. D01 counted the proposals row and specified nothing about it, so a conforming writer could omit the provenance hash, the pending status, or the event binding and still pass every count. LANDED: D42 states the row shape, including `status_sequence` bound to the `proposal.created` event's own `sequence` and NULL review fields by schema default."
+    },
+    {
+      "id": "Y04",
+      "lens": "literal scope of D04\u2019s ban on caller-supplied identifiers of any kind",
+      "finding": "D04 is false literally and admits divergent validators: both required parameters are identifiers, while input, output, and provenance may legitimately contain domain identifiers; only row/idempotency identity is meant to be forbidden.",
+      "evidence": "P01 requires caller-supplied partition and operation strings. models.py:51-57 permits arbitrary JSON-bearing Candidate content. D04 says \u201cidentifier of any kind\u201d but its next sentence discusses request/proposal attempt identity.",
+      "severity": "material",
+      "acceptance_check": "Replace the phrase with an exact ban on caller-controlled request, proposal, or idempotency identifiers; a probe containing ordinary domain \u201cid\u201d fields in input/output/provenance must persist successfully while the signature exposes no row-ID parameter.",
+      "main_disposition": "UPHELD. 'Caller-supplied identifier of any kind' bans `partition` and `operation`, which the signature requires, and would ban domain identifiers inside the input and the provenance that Cement stores verbatim. LANDED: D04 scopes the ban to ledger row identity and deduplication keys."
+    },
+    {
+      "id": "Y05",
+      "lens": "clock-call cardinality and one-timestamp binding across the three inserted rows",
+      "finding": "D17 names the allowed clock seam but not its call count or timestamp relation; one conforming writer may snapshot once while another calls self._now repeatedly and gives request, proposal, and event different times.",
+      "evidence": "Exact contract search for _now/clock count or created_at_us/updated_at_us returned rc=1; self._now control returned rc=0 at D17. Split P01/P02 measured all request/proposal/event times equal to 100, but did not report call cardinality.",
+      "severity": "material",
+      "acceptance_check": "Rule one self._now snapshot per successful persistence attempt and bind request.created_at_us=request.updated_at_us=proposal.created_at_us=event.created_at_us; a sequential-clock spy must report one call and exact equality for both paths.",
+      "main_disposition": "UPHELD against the contract, already satisfied by the code. D17 named the clock seam and not its cardinality, so two conforming writers could give the request, proposal and event different timestamps. LANDED: D17 states one `self._now` inside the write transaction serving all three rows; section 12 V-D17 carries the M3.1 grounds - a clock read ahead of the authoritative plan can commit a row older than its own build."
+    },
+    {
+      "id": "Y06",
+      "lens": "quantifier scope of \u201cevery Cement-held connection\u201d during source execution",
+      "finding": "D11 is false under ordinary reentrancy/concurrency: the submission releases its own transaction, but source code can open another System.store transaction while it executes, making a Cement-held connection report in_transaction=True.",
+      "evidence": "A live default-System probe used handle with a source that opened system.store.transaction() in a worker during propose; it printed source_other_connection_in_transaction=True and completed as ReviewRequired. No monkeypatch or injected connection factory was used.",
+      "severity": "material",
+      "acceptance_check": "Scope D11 to connections opened by the submission call before source dispatch. Tag call-owned connections in the spy; require all tagged connections closed/not in transaction, while a positive concurrent-control connection may remain in_transaction=True.",
+      "main_disposition": "UPHELD. A source that reenters the same `System` opens a Cement-held connection reporting `in_transaction is True`, which D11 forbade unconditionally and which no library can prevent. LANDED: D11 scopes the quantifier to transactions the SUBMISSION CALL holds, which is the property that actually matters - submission never holds the lock across adapter code."
     }
   ]
 }

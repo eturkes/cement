@@ -190,6 +190,43 @@ Put every fact that can change the answer into the JSON input, including identit
 permissions, time, external-state revision, and policy revision. Cement cannot compile hidden context
 safely.
 
+### Explicit proposal submission
+
+`System.submit_proposal` and `System.propose` write one pending proposal directly. Use them when you
+already hold a candidate, or when you want exactly one candidate without the request lifecycle.
+
+```python
+proposal_id = system.submit_proposal(
+    "tenant-42",
+    "support.reply",
+    {"question": "Where is my invoice?"},
+    candidate=Candidate(
+        output={"kind": "reply", "text": "candidate"},
+        provenance={"model": "provider/model", "prompt_revision": "sha256:..."},
+    ),
+)
+
+proposal_id = system.propose("tenant-42", "support.reply", {"question": "Where is my invoice?"})
+```
+
+`submit_proposal` takes the candidate from the caller. It never invokes the configured candidate
+source. `propose` invokes the configured source one time, and it never retries. The source runs
+outside every transaction. Both methods return the new proposal identifier as a string.
+
+Each call writes one request row, one proposal row, and one `proposal.created` event. Cement writes
+the three records in one transaction. Cement gives no idempotency here. Two identical calls write two
+proposals and return two different identifiers.
+
+`submit_proposal` raises `ValidationError` for a rejected partition, operation, input value, or
+candidate. `propose` raises `StateError` when no candidate source is configured. It raises
+`CandidateSourceError` when the source fails or returns an unusable candidate. That error carries no
+detail from the source. Both methods raise `NotFoundError` when the partition holds no such
+operation. Both raise `StateError` when the operation revision changes before the write.
+
+The request row stays internal to this route. The two signatures neither accept nor return its
+identifier. Schema v2 keeps the row, and the existing request and proposal readers still show that
+identifier.
+
 ## Request outcomes
 
 `handle` and `request` return explicit states:
