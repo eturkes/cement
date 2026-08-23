@@ -1359,6 +1359,44 @@ class ResolveBatteryTests(unittest.TestCase):
             expected_function_hash=None,
         )
 
+    def test_b34(self) -> None:
+        """
+        B34: the `not verification.passed` term of the gate is pinned INDEPENDENTLY of the
+        `or document is None` term: a FABRICATED verification carrying passed False WITH a real
+        document reaches resolve and still returns match None (FABRICATED, mock-reachable only)
+
+        Added by MAIN after the mutation sweep: deleting `not verification.passed or` survived
+        all 633 tests. B14 forces the document term and every real verify_function output binds
+        the two, so only this mirror probe can force the passed term.
+        """
+
+        from unittest import mock
+
+        from cement_runtime import FunctionVerification, System
+
+        system, _, _, _ = self._make_system()
+        self._promote_values(
+            system,
+            ({"n": 11}, {"n": 12}, {"n": 13}),
+            prefix="passed-term",
+        )
+        verified = system.verify_function("tenant_a", "echo_1")
+        self.assertTrue(verified.passed)
+        self.assertIsNotNone(verified.document)
+
+        fabricated = FunctionVerification(
+            passed=False,
+            entries=verified.entries,
+            document=verified.document,
+            function_hash=verified.function_hash,
+            checks=verified.checks,
+        )
+        with mock.patch.object(System, "verify_function", return_value=fabricated):
+            resolution = system.resolve("tenant_a", "echo_1", {"n": 12})
+
+        self.assertFalse(resolution.verification.passed)
+        self.assertIsNone(resolution.match)
+
 
 if __name__ == "__main__":
     unittest.main()

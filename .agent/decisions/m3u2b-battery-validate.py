@@ -174,6 +174,11 @@ OBLIGATIONS: dict[str, str] = {
         "a canonically equivalent input resolves identically: the same object with reversed key "
         "insertion order gives the same matched output and the same artifact_hash"
     ),
+    "B34": (
+        "the gate's `not verification.passed` term is pinned INDEPENDENTLY of its `or document is "
+        "None` term: a FABRICATED verification carrying passed False WITH a real document returns "
+        "match None. Every real verify_function output binds the two, so nothing else forces it"
+    ),
     "B33": (
         "scope isolation survives the forward to verify_function: collider partitions and operations "
         "(tenant_a vs tenantXa, echo_1 vs echoX1, plus a case variant) never answer each other, and "
