@@ -214,6 +214,21 @@ Measured gaps driving the arc:
     normalize to exact public text with no durable row or event, so a broken source leaks nothing.
     Budget FOUR MAIN sessions per the corrected oracle estimator: contract, implementation, battery,
     closure.
+    S1 DONE, contract session, `main=` 84% 201K/240K against the estimator's 86%, `mate=` 68%
+    164K/240K (`spike-m3u3-split`). Wave 1 = `map-m3u3` + two spikes, all three seeded by a
+    MAIN-committed validator and all three delivering `UNKNOWN-CELLS: 0`: 35 map rows, 14 probes each.
+    Acceptance contract `.agent/decisions/m3u3-contract.md`, 13 sections, 34 obligations, sections 12
+    and 13 PENDING.
+    FORK RULED, two methods: `submit_proposal(..., *, candidate) -> str` and `propose(...) -> str`,
+    both returning the proposal ID. Arity makes both illegal states unrepresentable. BOTH spikes
+    recommended it, including the one built to defend the XOR signature, so the council rule accepted
+    it without a third spike - the first time an alternative's own advocate ruled against it.
+    S2 ENTRY STATE. Implement against the contract, in the primary tree. `wt/spike-m3u3-split` is
+    RETAINED at `6d21efc3` as the reference measurement: a working prototype of the ruled design,
+    `system.py` +214/-67 and `errors.py` +1/-1 from `d43583e`, full gate 635/635 in 202.030 s. It is
+    evidence, not shippable code - it bought that green run with an `operations()` reuse the contract
+    rejects at D13, so MAIN reimplements with a scoped revision read and updates B20's counts openly.
+    Retire that branch at unit close.
   - M3.4 tier=kernel tags=oracle depends=M3.3 - freeze request-free proposal/read/review/report/event
     public seams behind one internal binding adapter, schema still v2.
   - M3.5a tier=kernel tags=- depends=M3.2b,M3.4 - add `resolve` and `proposal submit` CLI channels with
