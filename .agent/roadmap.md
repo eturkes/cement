@@ -155,6 +155,57 @@ Measured gaps driving the arc:
     Open at implementation: re-measure setup cost interleaved (spike artifact and report disagree,
     1.361x vs 1.024x, neither quotable); map Sections B/C (existing read-only test pins, `sqlite3.connect`
     sites outside `_connect`) were never delivered and are cheap to derive during implementation.
+
+    SESSION 2 LANDED THE IMPLEMENTATION - `d4a3158`, gate 549 -> 551 green. Three mechanisms shipped in
+    `store.py` behind an unchanged public seam; classification is by `sqlite_errorcode`, never message
+    text (`SQLITE_AUTH`/`SQLITE_READONLY` -> private `_ReadOnlyViolation` -> exit 2; `SQLITE_CANTOPEN` ->
+    `IntegrityError("ledger file is missing or unreadable")` -> exit 5; every other failure keeps its
+    baseline mapping, so `write=True` is unchanged). Both section-1a defects are closed against a real
+    ledger. Section 3a is now IN THE GATE as `tests/test_read_capability_census.py`, MAIN-derived and
+    reproducing the contract's numbers exactly: 17 read sites, 15 write, 12 helpers, 0 mutating.
+    Two production holes came from `test-m3u2a`'s phase-1 table BEFORE any test existed, both real:
+    the allowlist admitted ROLLBACK, letting a caller end the Store's snapshot and defeat the section 5
+    lifetime guarantee; and `arg2 is None` graded pragmas by SHAPE, which fails BOTH ways - it admits
+    bare writers (`PRAGMA optimize` writes `sqlite_stat1`) and denies argument-carrying reads
+    (`PRAGMA table_info(...)`, which broke a committed test). Pragmas now allowlist by NAME across a
+    readable-bare set and an introspection set.
+    Rulings issued against that table, each on measurement: missing AND unreadable ledgers share one
+    class, because both raise `SQLITE_CANTOPEN` with identical text and splitting them needs a
+    TOCTOU-shaped pre-connect stat that would assign exit 4 "retry" to a condition retry cannot fix;
+    W13 `VACUUM` keeps `StateError` because `write=True` raises the IDENTICAL class and message, so it is
+    refused by the open TRANSACTION both paths hold rather than by the capability - translating it would
+    need a blanket `SQLITE_ERROR` catch that relabels malformed reads and real corruption as caller
+    writes.
+
+    ENTRY STATE FOR SESSION 3, which closes the unit. Implementation is committed and green; what remains
+    is the BATTERY, and contract section 7 is explicit that a green pre-existing suite is never closure
+    here. In order: (1) merge the diff-blind red suite from `wt/test-m3u2a` (`git merge --squash`), whose
+    baseline reds are its credential, and re-verify every exact-string pin against a live run before it
+    drives anything; (2) harvest `wt/orc-m3u2a` - its `store.py` is committed at `70c6378` and its
+    `.agent/decisions/m3u2a-store-probes.py` driver is written to be COPIED INTO THE PRIMARY TREE AND
+    RERUN against MAIN's implementation, which is the `diff` cross-check; (3) harvest
+    `.scratch/agents/rev-m3u2a.md`; (4) amend the contract - section 7's 548 is stale (551 now), section 5's
+    "`_validate_ledger` still runs on the read path" is false as written (it runs once in `_initialize`
+    at `store.py:540`, never per transaction; the true property is that it stays authorizer-compatible),
+    section 3 carries a DUPLICATED "Forbidden resolutions" paragraph, and section 3's classification claim
+    needs scoping to writes the capability itself refuses.
+
+    ORACLE CALIBRATION, MEASURED - this is the number M3.2b, M3.3 and M3.4 are sized against, and it
+    supersedes the two-session estimate above. AN ORACLE UNIT TAKES THREE SESSIONS, split at the contract
+    and again at the battery. Session 1 = wave 1 + acceptance contract, MAIN 31% -> 75% (~105K), zero
+    implementation. Session 2 = implementation, MAIN 0 -> 80% (192K) buying: surface read, a 3-teammate
+    wave-2 dispatch, MAIN's own design probes settling three contract-undetermined points, the
+    implementation itself, two rounds of test repair over six sites, three full gate runs at ~170s each,
+    the phase-1 harvest plus twelve batch rulings, the census promotion, and the commit. Session 3 = the
+    battery. The base implementation was only 46 production lines, so span never predicted this: what
+    consumed the window was the BATTERY'S COORDINATION, not the code. Budget M3.2b, M3.3 and M3.4 as
+    three sessions each and stop trying to close one in two.
+    Reliability, second datapoint and much better than the first: 3 of 3 wave-2 teammates produced, at
+    35-43% each after the implementation landed. The change that bought it was a brief naming the
+    deliverable total, the batch size, a skeleton-first write, and the validator command - and measuring
+    progress by UNFILLED CELL COUNT rather than report line count, since a teammate filling a seeded
+    skeleton in place holds its line count flat while working normally. Line count read as a stall twice
+    and was wrong both times.
   - M3.2b tier=kernel tags=oracle depends=M3.2a - one-snapshot P1-P6 verification plus `evaluate` behind
     a pure `resolve`; failed verification, verified miss and verified hit stay distinct; publish durable
     1/1,000/50,000 measurements.
