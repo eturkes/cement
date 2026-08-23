@@ -1,12 +1,14 @@
 {
   "kind": "divergences",
   "unit": "M3.2b",
-  "author": "test-m3u2b",
+  "author": "test-m3u2b-2",
   "contract": ".agent/decisions/m3u2b-contract.md",
+  "seeding": "MAIN seeded id + section + locus. locus is the row's SUBJECT and is not graded; a row may be RETARGETED to a better locus found while writing the battery, recording the replacement in why_ambiguous. The six graded fields are the deliverable.",
   "rows": [
     {
       "id": "D01",
-      "section": "unknown",
+      "section": "\u00a72",
+      "locus": "the models-layer decorator ruling: frozen+slots with NO kw_only, and what positional construction of FunctionResolution is allowed to mean for callers",
       "probe": "unknown",
       "reading_a": "unknown",
       "reading_b": "unknown",
@@ -16,7 +18,8 @@
     },
     {
       "id": "D02",
-      "section": "unknown",
+      "section": "\u00a72",
+      "locus": "EXACTLY two fields, and which candidate field a reader could still argue the mutation criterion admits",
       "probe": "unknown",
       "reading_a": "unknown",
       "reading_b": "unknown",
@@ -26,7 +29,8 @@
     },
     {
       "id": "D03",
-      "section": "unknown",
+      "section": "\u00a72",
+      "locus": "the no-cross-wiring obligation between resolve/FunctionResolution and the still-live Resolved lifecycle vocabulary",
       "probe": "unknown",
       "reading_a": "unknown",
       "reading_b": "unknown",
@@ -36,7 +40,8 @@
     },
     {
       "id": "D04",
-      "section": "unknown",
+      "section": "\u00a73",
+      "locus": "the state table's verification.document column: what 'the document' binds on a verified miss versus a verified hit",
       "probe": "unknown",
       "reading_a": "unknown",
       "reading_b": "unknown",
@@ -46,7 +51,8 @@
     },
     {
       "id": "D05",
-      "section": "unknown",
+      "section": "\u00a73",
+      "locus": "over-capacity as a failed verdict: entries carries the real count while all six checks are FALSE and nothing is enumerated",
       "probe": "unknown",
       "reading_a": "unknown",
       "reading_b": "unknown",
@@ -56,7 +62,8 @@
     },
     {
       "id": "D06",
-      "section": "unknown",
+      "section": "\u00a73",
+      "locus": "the domain qualifier on 'match is None iff passed is False' - which verifications the biconditional is claimed over",
       "probe": "unknown",
       "reading_a": "unknown",
       "reading_b": "unknown",
@@ -66,7 +73,8 @@
     },
     {
       "id": "D07",
-      "section": "unknown",
+      "section": "\u00a73",
+      "locus": "a zero-entry promoted set as a verified miss for every input, against a reading that calls it vacuous or an error",
       "probe": "unknown",
       "reading_a": "unknown",
       "reading_b": "unknown",
@@ -76,7 +84,8 @@
     },
     {
       "id": "D08",
-      "section": "unknown",
+      "section": "\u00a74",
+      "locus": "'ALL of it precedes any ledger read' - what counts as the ledger read, and whether verify_function's internal re-validation is inside or outside the claim",
       "probe": "unknown",
       "reading_a": "unknown",
       "reading_b": "unknown",
@@ -86,7 +95,8 @@
     },
     {
       "id": "D09",
-      "section": "unknown",
+      "section": "\u00a74",
+      "locus": "the 64-hex shape check: _digest versus the three pre-existing inline copies, and which message a caller is promised",
       "probe": "unknown",
       "reading_a": "unknown",
       "reading_b": "unknown",
@@ -96,7 +106,8 @@
     },
     {
       "id": "D10",
-      "section": "unknown",
+      "section": "\u00a75",
+      "locus": "'leave a transaction open' as a purity obligation - what a test can observe after resolve returns",
       "probe": "unknown",
       "reading_a": "unknown",
       "reading_b": "unknown",
@@ -106,7 +117,8 @@
     },
     {
       "id": "D11",
-      "section": "unknown",
+      "section": "\u00a75",
+      "locus": "the ID-allocation pin: a DISCARDED allocation moves neither events nor sqlite_sequence, so what exactly the uuid4 patch pins",
       "probe": "unknown",
       "reading_a": "unknown",
       "reading_b": "unknown",
@@ -116,7 +128,8 @@
     },
     {
       "id": "D12",
-      "section": "unknown",
+      "section": "\u00a76",
+      "locus": "'per resolve call THAT REACHES THE LEDGER' - the boundary between the one-snapshot count and the zero-snapshot count",
       "probe": "unknown",
       "reading_a": "unknown",
       "reading_b": "unknown",
@@ -126,7 +139,8 @@
     },
     {
       "id": "D13",
-      "section": "unknown",
+      "section": "\u00a76",
+      "locus": "'NO cross-call consistency claim' against \u00a75's byte-stability pins - what two consecutive resolves are and are not promised",
       "probe": "unknown",
       "reading_a": "unknown",
       "reading_b": "unknown",
@@ -136,7 +150,8 @@
     },
     {
       "id": "D14",
-      "section": "unknown",
+      "section": "\u00a77",
+      "locus": "the raise/failed-verdict line for structurally corrupt bound content, including which corruption is locally caught",
       "probe": "unknown",
       "reading_a": "unknown",
       "reading_b": "unknown",
@@ -146,7 +161,8 @@
     },
     {
       "id": "D15",
-      "section": "unknown",
+      "section": "\u00a77",
+      "locus": "the FABRICATED label: which probes must carry it and what a fabricated probe is allowed to be cited for",
       "probe": "unknown",
       "reading_a": "unknown",
       "reading_b": "unknown",
@@ -156,7 +172,8 @@
     },
     {
       "id": "D16",
-      "section": "unknown",
+      "section": "\u00a79",
+      "locus": "the prose obligation's forbidden vocabulary - cheap, cached, repeatable across calls, lease - and what shipped text it binds",
       "probe": "unknown",
       "reading_a": "unknown",
       "reading_b": "unknown",

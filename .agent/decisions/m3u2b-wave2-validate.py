@@ -7,6 +7,7 @@ The artifact's top-level ``kind`` selects the schema:
 
   "divergences"  the diff-blind `test` author's phase-1 divergence table
   "attack"       the reviewer's pre-implementation contract attack
+  "review"       adversarial review of LANDED code, one finding per row
   "oracle"       observations over MAIN's probe corpus, one file per implementation
 
 Exit 0 = structurally valid AND nothing left ``unknown`` outside a MAIN-owned
@@ -61,12 +62,23 @@ ATTACK_FIELDS = (
     "severity",
     "disposition",
 )
+REVIEW_IDS = [f"V{index:02d}" for index in range(1, 13)]
+REVIEW_FIELDS = (
+    "lens",
+    "anchor",
+    "finding",
+    "evidence",
+    "acceptance_check",
+    "severity",
+    "disposition",
+)
 SEVERITIES = {"blocking", "major", "minor", "note", UNKNOWN, CANCELLED}
 LENSES = {
     "correctness-vs-code",
     "claim-soundness",
     "guarantee-gap",
     "coverage-gap",
+    "mutation-survivor",
     "claude-md-conformance",
     UNKNOWN,
     CANCELLED,
@@ -191,6 +203,16 @@ def _validate_attack(payload: dict) -> tuple[int, int]:
     )
 
 
+def _validate_review(payload: dict) -> tuple[int, int]:
+    rows = _rows(payload, "rows", REVIEW_IDS)
+    return _grade_table(
+        rows,
+        REVIEW_FIELDS,
+        prose={"finding", "evidence", "acceptance_check"},
+        checks={"severity": SEVERITIES, "lens": LENSES},
+    )
+
+
 def _validate_oracle(payload: dict) -> tuple[int, int]:
     unknown = 0
     for field in ("impl_path", "driver_path", "commit"):
@@ -230,6 +252,7 @@ def _validate_oracle(payload: dict) -> tuple[int, int]:
 VALIDATORS = {
     "divergences": _validate_divergences,
     "attack": _validate_attack,
+    "review": _validate_review,
     "oracle": _validate_oracle,
 }
 

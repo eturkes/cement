@@ -1,0 +1,142 @@
+{
+  "kind": "review",
+  "unit": "M3.2b",
+  "author": "rev2-m3u2b",
+  "target": "landed M3.2b code at b5916a9 + contract corrections at 1435ab1",
+  "contract": ".agent/decisions/m3u2b-contract.md",
+  "seeding": "MAIN seeded id + lens + focus. focus is the row's SUBJECT and is not graded; a row may be RETARGETED within its seeded lens, recording the replacement in evidence. A row with no real finding is reported as severity note with the evidence that cleared it - a cleared claim is evidence.",
+  "rows": [
+    {
+      "id": "V01",
+      "lens": "correctness-vs-code",
+      "focus": "System.resolve's landed body against contract \u00a72 and \u00a74: signature, validation order, and what each landed call actually validates",
+      "anchor": "unknown",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "acceptance_check": "unknown",
+      "severity": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "V02",
+      "lens": "correctness-vs-code",
+      "focus": "the landed branch `if not verification.passed or document is None` against \u00a73's three-state table and \u00a711's ruling",
+      "anchor": "unknown",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "acceptance_check": "unknown",
+      "severity": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "V03",
+      "lens": "correctness-vs-code",
+      "focus": "FunctionResolution's landed dataclass and its export against \u00a72's frozen-shape and alphabetical-position obligations",
+      "anchor": "unknown",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "acceptance_check": "unknown",
+      "severity": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "V04",
+      "lens": "correctness-vs-code",
+      "focus": "the forward into verify_function against \u00a76's one-snapshot and \u00a77's error-classification tables, on shipped bytes",
+      "anchor": "unknown",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "acceptance_check": "unknown",
+      "severity": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "V05",
+      "lens": "guarantee-gap",
+      "focus": "what the landed docstrings on System.resolve and FunctionResolution PROMISE against what the code guarantees",
+      "anchor": "unknown",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "acceptance_check": "unknown",
+      "severity": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "V06",
+      "lens": "guarantee-gap",
+      "focus": "\u00a75's purity list against the mechanisms that actually enforce it - which obligations rest on absence of code rather than on a barrier",
+      "anchor": "unknown",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "acceptance_check": "unknown",
+      "severity": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "V07",
+      "lens": "claim-soundness",
+      "focus": "\u00a78's republished end-to-end cost table and its exponents, re-derived from the committed benchmark artifacts alone",
+      "anchor": "unknown",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "acceptance_check": "unknown",
+      "severity": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "V08",
+      "lens": "claim-soundness",
+      "focus": "\u00a713's dispositions and the b5916a9/1435ab1 commit-message claims against what the tracked artifacts actually show",
+      "anchor": "unknown",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "acceptance_check": "unknown",
+      "severity": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "V09",
+      "lens": "coverage-gap",
+      "focus": "MAIN's 38-check smoke probe versus the contract's obligation set: which obligation has no probe at all",
+      "anchor": "unknown",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "acceptance_check": "unknown",
+      "severity": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "V10",
+      "lens": "coverage-gap",
+      "focus": "the battery obligation set in m3u2b-battery-validate.py: an obligation whose deletion no listed probe could detect",
+      "anchor": "unknown",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "acceptance_check": "unknown",
+      "severity": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "V11",
+      "lens": "claude-md-conformance",
+      "focus": "project CLAUDE.md Authoring + Engineering rules over every durable file M3.2b touched",
+      "anchor": "unknown",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "acceptance_check": "unknown",
+      "severity": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "V12",
+      "lens": "mutation-survivor",
+      "focus": "a predicate resolve ADDS whose deletion the committed suite cannot detect, shipped as a red test",
+      "anchor": "unknown",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "acceptance_check": "unknown",
+      "severity": "unknown",
+      "disposition": "unknown"
+    }
+  ]
+}

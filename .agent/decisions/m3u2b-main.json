@@ -1,0 +1,141 @@
+{
+  "kind": "oracle",
+  "unit": "M3.2b",
+  "author": "diff-m3u2b",
+  "implementation": "MAIN's shipped System.resolve",
+  "impl_path": "unknown",
+  "driver_path": "unknown",
+  "commit": "unknown",
+  "probes": {
+    "R01_hit": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R02_miss": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R03_failed_suspended": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R04_expected_hash_mismatch": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R05_no_promoted_set": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R06_over_capacity": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R07_biconditional": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R08_invalid_partition": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R09_invalid_operation": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R10_invalid_expected_hash": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R11_uncanonicalizable_input": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R12_precedence_partition_before_input": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R13_precedence_operation_before_expected_hash": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R14_unregistered_operation": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R15_oversize_input": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R16_missing_ledger": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R17_malformed_stored_revision": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R18_revoked_member": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R19_ledger_bytes_stable": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R20_clock_never_read": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R21_events_unchanged": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R22_source_never_invoked": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R23_one_snapshot": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R24_evaluate_call_counts": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R25_document_outside_snapshot": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    },
+    "R26_canonical_equivalent_input": {
+      "outcome": "unknown",
+      "observation": {},
+      "note": "unknown"
+    }
+  }
+}
