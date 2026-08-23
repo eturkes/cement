@@ -84,8 +84,16 @@ a probe asserts each returned type exactly rather than by duck-typed field acces
 
 ## 3. The three states - the unit's headline predicates
 
-`resolve` returns exactly one of three shapes, and the three stay mutually distinguishable by
-`verification.passed` and `match` alone.
+`resolve` returns exactly one of three shapes FOR EVERY VERIFICATION `verify_function` PRODUCES, and
+the three stay mutually distinguishable by `verification.passed` and `match` alone.
+
+The domain qualifier on that headline sentence is CORRECTED on review (V02) and is load-bearing for
+exactly the reason A12 gave for the biconditional below. Repairing one and leaving the other left the
+exhaustiveness claim false: section 11's `or document is None` clause admits a FOURTH shape -
+`passed=True`, `document=None`, `match=None` - which is the clause's whole purpose. That shape is
+reachable only from a hand-built `FunctionVerification` or an override of public `verify_function`,
+never from the unmodified method, and B14 pins it. Any claim in this file about what `resolve`
+returns carries the same domain or it is false.
 
 | state | `verification.passed` | `match` | `verification.document` | evaluate called |
 |---|---|---|---|---|
@@ -201,7 +209,9 @@ inherited from `verify_function`, not invented here.
 | missing or unreadable ledger file | `IntegrityError` (M3.2a mapping, no file created) |
 | malformed stored operation scalar - revision, policy hash, policy JSON (`system.py:2960-2967`) | `IntegrityError` |
 | promoted-set count disagrees with the enumerated rows under one snapshot (`system.py:3051`) | `IntegrityError` |
-| suspended member, revocation, revision drift, absent current receipt, wrong expected hash, over-capacity set | failed verdict, `passed=False` |
+| suspended member, revocation, absent current receipt, wrong expected hash, over-capacity set | failed verdict, `passed=False` |
+| a FABRICATED stale promoted revision (direct `UPDATE` of `operations.revision`) | failed verdict, `passed=False` |
+| a revision bump through supported `revise_operation` | VERIFIED MISS, `passed=True`, `entries=0` |
 | structurally corrupt bound content - ABI, report binding, digest, projection (`system.py:3098-3319`) | failed verdict, `passed=False` |
 
 REACHABILITY, corrected on review (A04). The stored-operation-scalar row raises on WRONG TYPE alone

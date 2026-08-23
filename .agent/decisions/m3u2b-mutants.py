@@ -163,6 +163,13 @@ MUTANTS: tuple[Mutant, ...] = (
         "B14",
     ),
     Mutant(
+        "passed-term-deleted",
+        SYSTEM,
+        GATE,
+        "        if document is None:",
+        "B07/B11/B14",
+    ),
+    Mutant(
         "gate-conjunction",
         SYSTEM,
         GATE,
