@@ -1397,6 +1397,72 @@ class ResolveBatteryTests(unittest.TestCase):
         self.assertFalse(resolution.verification.passed)
         self.assertIsNone(resolution.match)
 
+    def test_b35(self) -> None:
+        """
+        B35: no commit is issued on any resolve path, pinned INDEPENDENTLY of ledger bytes: a
+        sqlite3.Connection subclass counting commit() records ZERO across a hit, a miss and a
+        failed verdict, while the same spy counts a write transaction's commit and the ledger
+        sha256 stays unmoved across it - the no-op commit B18 cannot see
+
+        Added by MAIN after review finding V10. Section 5 lists `commit` as its own purity
+        obligation, and B18's sha256 + iterdump pin cannot discharge it: the positive control
+        below commits and moves neither. The write-transaction control also stops the probe
+        passing vacuously, which a spy that failed to install would otherwise do.
+        """
+
+        import hashlib
+        import sqlite3
+
+        from cement_runtime import store as store_module
+
+        commits: list[str] = []
+
+        class _CountingConnection(sqlite3.Connection):
+            def commit(self) -> None:
+                commits.append("commit")
+                super().commit()
+
+        real_connect = sqlite3.connect
+
+        def spy_connect(*args, **kwargs):
+            kwargs["factory"] = _CountingConnection
+            return real_connect(*args, **kwargs)
+
+        system, database, _, _ = self._make_system()
+        self._promote_values(
+            system,
+            ({"n": 21}, {"n": 22}, {"n": 23}),
+            prefix="no-commit",
+        )
+
+        with mock.patch.object(store_module.sqlite3, "connect", spy_connect):
+            before = hashlib.sha256(database.read_bytes()).hexdigest()
+            with system.store.transaction(write=True) as connection:
+                connection.execute("SELECT 1").fetchone()
+            self.assertEqual(commits, ["commit"])
+            self.assertEqual(hashlib.sha256(database.read_bytes()).hexdigest(), before)
+
+            commits.clear()
+            states = {
+                "hit": lambda: system.resolve("tenant_a", "echo_1", {"n": 22}),
+                "miss": lambda: system.resolve("tenant_a", "echo_1", {"n": 99}),
+                "failed": lambda: system.resolve(
+                    "tenant_a",
+                    "echo_1",
+                    {"n": 22},
+                    expected_function_hash="0" * 64,
+                ),
+            }
+            resolutions = {}
+            for label, call in states.items():
+                resolutions[label] = call()
+                with self.subTest(state=label):
+                    self.assertEqual(commits, [])
+
+        self.assertTrue(resolutions["hit"].match.matched)
+        self.assertFalse(resolutions["miss"].match.matched)
+        self.assertFalse(resolutions["failed"].verification.passed)
+
 
 if __name__ == "__main__":
     unittest.main()

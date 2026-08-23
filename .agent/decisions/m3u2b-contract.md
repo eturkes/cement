@@ -164,6 +164,13 @@ Pins, one per obligation, never one composite assertion:
 - Ledger bytes: sha256 of the ledger file AND full `connection.iterdump()` text are byte-identical
   across a hit, a miss and a failed verdict. Row-count snapshots are insufficient - an injected
   `UPDATE` passes them.
+- Commit (ADDED, V10): its own spy, because the ledger-bytes pin cannot discharge it. A successful
+  NO-OP commit moves neither the file sha256 nor the iterdump text, so B18 passes through one. B35
+  counts `commit()` on a `sqlite3.Connection` subclass injected as the connect `factory`, asserts
+  zero across all three states, and first proves the instrument live on a write transaction whose
+  commit moves no ledger byte. MEASURED against the mutant this obligation exists for - `_release`
+  clearing the authorizer and committing instead of rolling back, which is a plausible "end the
+  snapshot" refactor: B18, B25 and B26 all PASS and B35 alone fails, on each of the three states.
 - Clock: a `System` whose `_now` raises resolves all three states unchanged.
 - Events: `events()` is byte-identical before and after; the event sequence counter is unchanged.
 - IDs (ADDED, A06): no stated pin detected a discarded allocation, because a wasted
@@ -189,7 +196,9 @@ Pins, one per obligation, never one composite assertion:
   `_ReadOnlyViolation` rather than silently splitting the snapshot
   (`store.py:439,493-496`, `tests/test_read_capability_battery.py:71-81`). The pin survives the
   correction because it covers what the authorizer cannot - a helper that returns before the sixth
-  check, or a future refactor that ends the block early - so it stays a battery obligation.
+  check, or a future refactor that ends the block early - so it stays a battery obligation. That
+  same gap is what section 5's commit spy (B35) closes: the authorizer grades caller SQL, never a
+  Store-owned release path that lifts enforcement before it acts.
 - Evaluation runs over the DOCUMENT VALUE. The document is a self-contained reconstruction, so
   evaluating it after the snapshot ends returns the same answer as evaluating it inside; the battery
   proves that equality rather than assuming it.

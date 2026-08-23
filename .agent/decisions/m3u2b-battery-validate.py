@@ -184,6 +184,12 @@ OBLIGATIONS: dict[str, str] = {
         "(tenant_a vs tenantXa, echo_1 vs echoX1, plus a case variant) never answer each other, and "
         "partition and operation are not swapped"
     ),
+    "B35": (
+        "no commit is issued on any resolve path, pinned INDEPENDENTLY of ledger bytes: a "
+        "sqlite3.Connection subclass counting commit() records ZERO across a hit, a miss and a "
+        "failed verdict, while the same spy counts a write transaction's commit and the ledger "
+        "sha256 stays unmoved across it - the no-op commit B18 cannot see"
+    ),
 }
 
 STUB_HEADER = '''"""M3.2b acceptance battery - one obligation at a time.
