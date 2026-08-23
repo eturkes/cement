@@ -125,9 +125,7 @@ Measured gaps driving the arc:
     Reliability datapoint, priced the hard way: 1 of 3 wave-1 teammates delivered. `spike-m3u2a-full`
     died twice and produced 0/32 probes; `map-m3u2a` climbed to 91% (218K) while its report never grew
     past its skeleton across four flush directives. MAIN absorbed both losses by deriving the census
-    itself, which cost less than a successor would have. Two lessons bind the next wave: a teammate
-    whose deliverable count is flat across two polls is already failing, and a mechanically-derivable
-    fact (an AST census, a count, a span) is cheaper for MAIN to compute than to delegate and verify.
+    itself, which cost less than a successor would have.
   - M3.2a DONE tier=kernel tags=oracle depends=none - Store-owned enforced-read capability.
     `main=` 93% 223K/240K (session 3; sessions 1-2 closed at 75% and 80%),
     `mate=` 65% 155K/240K. Contract, MAIN-final verdict table, review dispositions and the differential:
@@ -169,8 +167,7 @@ Measured gaps driving the arc:
     unfilled report cells, at 65% of its window. The mutation-campaign teammate got the same mandate in
     prose but no stub artifact to seed, produced nothing across three polls and one explicit flush
     directive, and was stopped; MAIN then ran the 19-mutant sweep itself for a fraction of the
-    coordination cost. Confirms the standing split: delegate judgment and bulk reading, compute
-    mechanical facts directly.
+    coordination cost.
 
   - M3.2b tier=kernel tags=oracle depends=M3.2a - one-snapshot P1-P6 verification plus `evaluate` behind
     a pure `resolve`; failed verification, verified miss and verified hit stay distinct; publish durable
