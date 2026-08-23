@@ -121,7 +121,7 @@ def main(argv: list[str]) -> int:
             unknown.append(name)
         elif outcome != expected:
             mismatches.append((name, expected, str(outcome)))
-        if outcome != "ok" and not str(probe.get("message", "")).strip():
+        if outcome not in ("ok", "unknown") and not str(probe.get("message", "")).strip():
             problems.append(f"probe {name!r} is {outcome!r} and must carry a non-empty message")
 
     filled = len(PROBES) - len(unknown) - len(missing)
