@@ -3375,7 +3375,7 @@ class System:
         Arguments are validated first, so a call this method rejects runs no
         check and reads no ledger. Every call that reaches the ledger runs the
         full six-check verification, so a resolve costs what ``verify_function``
-        costs. One resolve over a 50,000-entry set costs ~37.2 s and ~963 MiB,
+        costs. One resolve over a 50,000-entry set costs ~36.5 s and ~963 MiB,
         measured end to end through this method
         (``.agent/decisions/m3u2b-resolve-bench.json``). This call writes
         nothing and caches nothing. Two calls take two snapshots, so a writer

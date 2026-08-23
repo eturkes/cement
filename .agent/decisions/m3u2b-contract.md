@@ -338,39 +338,50 @@ not be cited as the resolver's price.
 
 END-TO-END, the numbers every claim about resolver cost must cite. Harness
 `.agent/decisions/m3u2b-resolve-benchmark.py` calls the shipped `System.resolve` and nothing else,
-3 repetitions, same separate-process fixture method, same environment, measured at `b5916a9`:
+3 repetitions, same separate-process fixture method, machine otherwise idle. Every point carries its
+own provenance and the harness refuses to merge points whose provenance differs, so this curve is
+one build measured three times: `23ec5717`, clean tree, CPython 3.13.14, SQLite 3.53.1,
+`Intel(R) Core(TM) i7-8650U CPU @ 1.90GHz`. Re-derivation path, which regrades the table and
+reprints the exponents below:
+`uv run python .agent/decisions/m3u2b-validate.py .agent/decisions/m3u2b-resolve-bench.json`.
 
 | entries | cold hit ms | warm miss ms | warm failed ms | peak RSS KiB | baseline RSS KiB | document bytes | fixture build s |
 |---|---|---|---|---|---|---|---|
-| 1 | 5.342079 | 2.177807 | 2.094797 | 27,280 | 26,640 | 935 | 0.019 |
-| 1,000 | 643.635097 | 643.216052 | 634.907756 | 47,664 | 28,536 | 619,100 | 8.080 |
-| 50,000 | 37,227.984277 | 40,169.974433 | 38,774.884113 | 985,568 | 28,496 | 31,128,100 | 437.082 |
+| 1 | 5.736265 | 2.301882 | 2.110633 | 27,380 | 26,760 | 935 | 0.033 |
+| 1,000 | 613.171690 | 604.683021 | 593.839974 | 47,692 | 28,848 | 619,100 | 7.287 |
+| 50,000 | 36,452.212317 | 36,967.247511 | 37,107.096461 | 985,696 | 28,644 | 31,128,100 | 405.696 |
 
-- ONE RESOLVE AT THE 50,000 CAP COSTS ~37.2 SECONDS AND ~963 MiB. The resolver's own overhead above
-  its components is ~4.7% at cap (37.23 s against the component 35.55 s), ~4.4% at 1,000, and ~30% at
-  a single entry, where fixed validation cost dominates a 4 ms verification. Full verification is
-  still the entire shape of the curve; the evaluator remains 0.00028% of it.
-- Scaling 1,000 -> 50,000 is `N^1.037` in time, re-derived end-to-end at `1.037234`.
+- ONE RESOLVE AT THE 50,000 CAP COSTS ~36.5 SECONDS AND ~963 MiB. Full verification is the entire
+  shape of the curve; the evaluator remains 0.00028% of it.
+- RESOLVER OVERHEAD IS NOT RESOLVABLE AT SCALE, and the earlier "~4.7% at cap / ~4.4% at 1,000"
+  figures are withdrawn as over-precise. The two tables are separate runs, so their difference
+  carries both runs' noise: at cap end-to-end reads +2.5% over the component baseline (36.45 s
+  against 35.55 s) and at 1,000 it reads 0.5% FASTER (613.17 ms against 616.36 ms), which no real
+  overhead can be. Only the single-entry point exceeds noise, at +39% (5.74 ms against 4.12 ms),
+  where fixed argument validation and result construction dominate a 4 ms verification. Any tighter
+  overhead claim requires both paths measured in one harness run.
+- Scaling 1,000 -> 50,000 is `N^1.044` in time, re-derived end-to-end at `1.044246`.
 - RESIDENT MEMORY, corrected (A10). The published exponent `N^1.000` is INCREMENTAL - peak RSS minus
   the process baseline - and the committed component artifact records no baseline at all, so that
   number was not re-derivable from the artifact backing it. Both figures are now published and both
-  are honest about what they measure: raw peak RSS scales `N^0.774`, incremental RSS scales
-  `N^1.000` (measured `1.000180`). The interpreter and imports are the difference, ~28 MiB flat.
-- WARM REUSE, corrected (A11). At cap the warm calls are SLOWER than the cold one (40.2 s and 38.8 s
-  against 37.2 s), so warm reuse buys nothing measurable. The original inference - that this
+  are honest about what they measure: raw peak RSS scales `N^0.774` (measured `0.774173`),
+  incremental RSS scales `N^1.004` (measured `1.003998`). The interpreter and imports are the
+  difference, ~28 MiB flat.
+- WARM REUSE, corrected (A11). At cap the warm calls are SLOWER than the cold one (36.97 s and
+  37.11 s against 36.45 s), so warm reuse buys nothing measurable. The original inference - that this
   "independently confirms no hidden cache exists" - is withdrawn: timing equivalence bounds a cache's
   benefit below run-to-run noise and cannot establish absence. Absence rests on the code, where no
   resolver path stores state between calls.
 - The full 50,000-entry set verifies successfully; `FUNCTION_MAX_ENTRIES` is a reachable working
   maximum, not an aspirational one. No bisect was needed and no point is interpolated.
-- MAIN re-derived the n1 point from committed state: cold 4.159849 ms, warm 1.830171 ms, within
-  noise of the recorded values.
 - Prose obligation: `resolve` is pure, and pure is not cheap. No shipped sentence may imply that a
   read-only path is a fast path, and the table above is the referent. A caller holding a
   cap-scale function must be told the per-call price before it designs a request path around it.
-- Method note worth preserving in any successor harness: build the fixture in a SEPARATE process.
-  A Linux child inherits the builder's `ru_maxrss` high-water across exec, which silently
-  contaminates the verification RSS measurement.
+- Method notes, both binding on any successor harness. Build the fixture in a SEPARATE process: a
+  Linux child inherits the builder's `ru_maxrss` high-water across exec, which silently contaminates
+  the verification RSS measurement. Measure on an IDLE machine: a curve taken while the same
+  workstation edited files and ran short test runs read 44.6 s at cap and 746 ms at 1,000, +22% and
+  +22% over the idle values published above, and nothing in the artifact marks it contaminated.
 
 ## 9. Normative claims - obligation without prose rewrite
 
