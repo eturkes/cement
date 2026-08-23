@@ -169,9 +169,29 @@ Measured gaps driving the arc:
     directive, and was stopped; MAIN then ran the 19-mutant sweep itself for a fraction of the
     coordination cost.
 
-  - M3.2b tier=kernel tags=oracle depends=M3.2a - one-snapshot P1-P6 verification plus `evaluate` behind
-    a pure `resolve`; failed verification, verified miss and verified hit stay distinct; publish durable
-    1/1,000/50,000 measurements.
+  - M3.2b OPEN tier=kernel tags=oracle depends=M3.2a - one-snapshot P1-P6 verification plus `evaluate`
+    behind a pure `resolve`; failed verification, verified miss and verified hit stay distinct; publish
+    durable 1/1,000/50,000 measurements.
+    SESSION 1 CLOSED at the contract, per the M3.2a oracle protocol: wave 1 + acceptance contract
+    (`.agent/decisions/m3u2b-contract.md`, sections 1-11 binding, 12-13 PENDING). Session 2 opens with
+    that contract as its entry state and implements. MAIN 30% -> 86% (72K -> 205K).
+    FORK RULED on measurement: the plan draft's prescribed "factor `verify_function` onto a supplied
+    connection" is SUPERSEDED and does not ship. It was written before M3.2a landed, and there is no
+    nesting to fix - none of the six helpers between `system.py:2952` and `system.py:3363` opens a
+    second transaction. The thin composition (`verify_function` -> `evaluate` over the returned
+    document) measures +34/-1 production lines against the draft's ~170-line estimate, and the spike's
+    fork-deciding probe showed the document evaluates identically inside and after the snapshot.
+    17/17 probes, suite 600 -> 600.
+    COST PUBLISHED, the unit's durable obligation, measured at `019d040` and re-derivable
+    (`m3u2b-benchmark.py` + `m3u2b-bench.json`, both validator-graded): one resolve at the
+    50,000-entry cap = 35,550 ms cold / 36,461 ms warm / 985,864 KiB peak RSS; 1,000 entries = 616 ms;
+    1 entry = 4.1 ms. Time `N^1.037`, memory `N^1.000`, evaluator 0.00028% of the total. Warm reuse
+    buys nothing at cap scale, which independently proves no hidden cache. `FUNCTION_MAX_ENTRIES`
+    50,000 is a reachable working maximum. MAIN re-derived n1 (4.159849 ms) from committed state.
+    WAVE-1 RELIABILITY, the control for M3.2a's finding: 3 of 3 teammates delivered, against 1 of 3 on
+    M3.2a. The variable is unchanged - every teammate got a MAIN-authored validator plus a seeded
+    all-`unknown` skeleton committed BEFORE dispatch, so its first tool call filled cells instead of
+    inventing a format, and UNKNOWN-CELLS was the poll metric. Cost to MAIN: one validator, ~90 lines.
   - M3.3 tier=kernel tags=oracle depends=M3.1 - request-free direct and source-backed submission over
     unchanged schema v2. Also owns `src/cement_runtime/errors.py`: `CandidateSourceError` stays public,
     its supervised-fallback docstring is rewritten, and both it and an arbitrary `Exception` normalize to

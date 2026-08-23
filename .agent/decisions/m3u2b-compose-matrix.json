@@ -3,121 +3,121 @@
   "unit": "M3.2b",
   "probes": {
     "C1_hit": {
-      "outcome": "unknown",
-      "note": "unknown",
-      "evidence": "unknown",
+      "outcome": "ok",
+      "note": "passed=True matched=True output={\"echo\":{\"outer\":{\"a\":1,\"b\":[2,3]},\"z\":0}} artifact_hash=f996b5ddad8ce9cce67a2f7b04f73e7269939af971ff3963ce4070e5c36f0c31",
+      "evidence": "probe_c1_hit",
       "expected": "ok",
       "means": "promoted input returns passed=True, matched=True, exact promoted output + artifact_hash"
     },
     "C2_miss": {
-      "outcome": "unknown",
-      "note": "unknown",
-      "evidence": "unknown",
+      "outcome": "ok",
+      "note": "passed=True matched=False output=None artifact_hash=None function_hash=c570ab905c97e101ed6498ebf41941303fbf33b51f9f3b726bfe5141a9432ece",
+      "evidence": "probe_c2_miss",
       "expected": "ok",
       "means": "absent input returns passed=True, matched=False, output None, artifact_hash None"
     },
     "C3_failed_verification": {
-      "outcome": "unknown",
-      "note": "unknown",
-      "evidence": "unknown",
+      "outcome": "ok",
+      "note": "passed=False match=None document=None entries=0 checks=[True, True, True, True, True, False]",
+      "evidence": "probe_c3_failed_verification",
       "expected": "ok",
       "means": "a suspended member returns passed=False, match is None, document None"
     },
     "C4_expected_hash_mismatch": {
-      "outcome": "unknown",
-      "note": "unknown",
-      "evidence": "unknown",
+      "outcome": "ok",
+      "note": "expected=0000000000000000000000000000000000000000000000000000000000000000 actual=1b0e72d9979b214e7b7578153913700b28d28594401c32b2406596def4064275 passed=False match=None document=None",
+      "evidence": "probe_c4_expected_hash_mismatch",
       "expected": "ok",
       "means": "a wrong expected_function_hash returns passed=False and match None"
     },
     "C5_empty_promoted_set": {
-      "outcome": "unknown",
-      "note": "unknown",
-      "evidence": "unknown",
+      "outcome": "ok",
+      "note": "passed=True entries=0 matched=False output=None artifact_hash=None checks=[True, True, True, True, True, True]",
+      "evidence": "probe_c5_empty_promoted_set",
       "expected": "ok",
       "means": "a scope with no promoted set reports its verdict; note records passed + entries"
     },
     "C6_one_snapshot": {
-      "outcome": "unknown",
-      "note": "unknown",
-      "evidence": "unknown",
+      "outcome": "ok",
+      "note": "transaction_calls=1 write_flags=[False] sql_statements=13 state_samples=15 in_transaction_all=True enter=True exit=True",
+      "evidence": "probe_c6_one_snapshot",
       "expected": "ok",
       "means": "exactly one read transaction opens per call; in_transaction holds across verification"
     },
     "C7_no_clock": {
-      "outcome": "unknown",
-      "note": "unknown",
-      "evidence": "unknown",
+      "outcome": "ok",
+      "note": "clock_calls=0 answers_equal=True passed=True matched=True artifact_hash=f996b5ddad8ce9cce67a2f7b04f73e7269939af971ff3963ce4070e5c36f0c31",
+      "evidence": "probe_c7_no_clock",
       "expected": "ok",
       "means": "a raising System._now leaves every resolve answer unchanged"
     },
     "C8_no_write": {
-      "outcome": "unknown",
-      "note": "unknown",
-      "evidence": "unknown",
+      "outcome": "ok",
+      "note": "hit:sha256=23a3dca0b5ea431ef687487b9f971909fcc08e90ba2581840d9304885c1eea10,dump_statements=85 | miss:sha256=23a3dca0b5ea431ef687487b9f971909fcc08e90ba2581840d9304885c1eea10,dump_statements=85 | failed:sha256=722174b754efcfb35a3f5cd547f7f7bc095fa0c679453d2ca60c5ea57d065318,dump_statements=86 | before_after_equal=True",
+      "evidence": "probe_c8_no_write",
       "expected": "ok",
       "means": "ledger sha256 + full iterdump are byte-identical across hit, miss and failed calls"
     },
     "C9_no_event_no_id": {
-      "outcome": "unknown",
-      "note": "unknown",
-      "evidence": "unknown",
+      "outcome": "ok",
+      "note": "hit:events=9,counters=(('artifacts', 1), ('events', 9), ('examples', 2), ('function_receipts', 1), ('test_reports', 1)) | miss:events=9,counters=(('artifacts', 1), ('events', 9), ('examples', 2), ('function_receipts', 1), ('test_reports', 1)) | failed:events=10,counters=(('artifacts', 1), ('events', 10), ('examples', 2), ('function_receipts', 1), ('test_reports', 1)) | before_after_equal=True",
+      "evidence": "probe_c9_no_event_no_id",
       "expected": "ok",
       "means": "events() and every id-allocating counter are unchanged across all three states"
     },
     "C10_missing_ledger": {
-      "outcome": "unknown",
-      "note": "unknown",
-      "evidence": "unknown",
+      "outcome": "error",
+      "note": "IntegrityError: ledger file is missing or unreadable; ledger_exists_after=False",
+      "evidence": "probe_c10_missing_ledger",
       "expected": "error",
       "means": "resolve against a deleted ledger raises and creates no file"
     },
     "C11_unregistered_operation": {
-      "outcome": "unknown",
-      "note": "unknown",
-      "evidence": "unknown",
+      "outcome": "error",
+      "note": "NotFoundError: operation is not registered in this partition",
+      "evidence": "probe_c11_unregistered_operation",
       "expected": "error",
       "means": "note records the exact class + message for an unknown operation"
     },
     "C12_canonical_equivalent_input": {
-      "outcome": "unknown",
-      "note": "unknown",
-      "evidence": "unknown",
+      "outcome": "ok",
+      "note": "canonical_digest=55871893e18a0ca66dd2cf10ba2ba4f886bb74c2504f1cac2f166ad67b929c13 matched=True same_match=True artifact_hash=f996b5ddad8ce9cce67a2f7b04f73e7269939af971ff3963ce4070e5c36f0c31",
+      "evidence": "probe_c12_canonical_equivalent_input",
       "expected": "ok",
       "means": "key-reordered and equal-value inputs resolve to the same hit"
     },
     "C13_evaluate_outside_snapshot": {
-      "outcome": "unknown",
-      "note": "unknown",
-      "evidence": "unknown",
+      "outcome": "ok",
+      "note": "transaction_calls=1 inside_in_transaction=True after='ProgrammingError: Cannot operate on a closed database.' same_document=True inside_equals_outside=True matched=True artifact_hash=f996b5ddad8ce9cce67a2f7b04f73e7269939af971ff3963ce4070e5c36f0c31 build_documents=2",
+      "evidence": "probe_c13_evaluate_outside_snapshot",
       "expected": "ok",
       "means": "evaluating the returned document after rollback equals evaluating inside"
     },
     "C14_document_none_gate": {
-      "outcome": "unknown",
-      "note": "unknown",
-      "evidence": "unknown",
+      "outcome": "ok",
+      "note": "passed=False document=None match=None evaluate_calls=0",
+      "evidence": "probe_c14_document_none_gate",
       "expected": "ok",
       "means": "a failed verdict never reaches evaluate; the spy records zero calls"
     },
     "C15_concurrent_writer": {
-      "outcome": "unknown",
-      "note": "unknown",
-      "evidence": "unknown",
+      "outcome": "ok",
+      "note": "writer=separate_System event_sequence=10 event_kind=artifact.suspended first_passed=True first_matched=True first_artifact_hash=f996b5ddad8ce9cce67a2f7b04f73e7269939af971ff3963ce4070e5c36f0c31 second_passed=False second_match=None second_sees_commit=True",
+      "evidence": "probe_c15_concurrent_writer",
       "expected": "ok",
       "means": "a writer committing between two resolves changes only the second answer"
     },
     "C16_factoring_forced": {
-      "outcome": "unknown",
-      "note": "unknown",
-      "evidence": "unknown",
+      "outcome": "ok",
+      "note": "searched AST call graph + repeated C6/C13/C15 real-ledger ablations; resolve_verify_calls=1 resolve_evaluate_calls=1 verify_transaction_calls=1 evaluate_forbidden_names=[] evaluate_attributes=['artifact_hash', 'digest', 'entries', 'input', 'input_hashes', 'output', 'text', 'value'] bundle_attributes=['entries', 'input_hashes'] document_fields=('value', 'text', 'function_hash', 'entries', 'input_hashes') behavioral={'one_snapshot': 'ok', 'outside_snapshot': 'ok', 'concurrent_writer': 'ok'}; no behavior found that requires a supplied connection",
+      "evidence": "probe_c16_factoring_forced",
       "expected": "unknown",
       "means": "any behaviour the thin composition cannot produce that a supplied-connection core can; outcome `ok` = none found, `differs` = one found and the note names it"
     },
     "C17_production_line_count": {
-      "outcome": "unknown",
-      "note": "unknown",
-      "evidence": "unknown",
+      "outcome": "ok",
+      "note": "base=019d040 files=3 added=34 deleted=1 net=33 detail=src/cement_runtime/__init__.py:+2/-0,src/cement_runtime/models.py:+7/-1,src/cement_runtime/system.py:+25/-0",
+      "evidence": "probe_c17_production_line_count (git diff --numstat 019d040 -- src/cement_runtime)",
       "expected": "ok",
       "means": "measured non-test lines the thin composition adds, counted from the diff"
     }

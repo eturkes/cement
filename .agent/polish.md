@@ -375,7 +375,11 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   sequence and hash, and every state change that can fail a check; first/middle/last corruption never
   returns a cached hit; a concurrent-writer test proves invalidation; 1/1,000/50,000 benchmarks show a
   material cold/warm improvement; cached and uncached results are byte-equal; no long-lived read
-  transaction blocks writers.
+  transaction blocks writers. Baseline to beat, measured at `019d040`
+  (`.agent/decisions/m3u2b-bench.json`): one call at the 50,000-entry cap = 35,550.307898 ms cold,
+  36,461.347339 ms warm, 985,864 KiB peak RSS; 1,000 entries = 616.362414 ms; 1 entry =
+  4.118654 ms. Time scales `N^1.037`, resident memory `N^1.000`, and warm reuse buys nothing at cap
+  scale, so this row's `pri` rises with the largest promoted set any caller actually ships.
 
 - `pri=3` `size=M` — explicit quarantine/repair command after a resolver failure. Pure `resolve` only
   reports, so ambiguity and integrity failure no longer quarantine. Acceptance: a separately named
