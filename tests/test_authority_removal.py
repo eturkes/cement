@@ -50,6 +50,11 @@ ALLOWED_SURVIVORS = (
     "read_only_by_authorizer",
     # M3.2a's read capability: SQLite's authorizer is the write-denying mechanism.
     "_read_authorizer",
+    '"not authorized"',  # SQLite's own denial text, asserted by the battery
+    "authorizer_is_last",
+    "authorizer is installed last",
+    "authorizer_removal",
+    "Authorizer removal",
 )
 
 

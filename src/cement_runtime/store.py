@@ -508,11 +508,14 @@ def _release(connection: sqlite3.Connection, *, enforced: bool) -> None:
 
 
 def _transaction_error(exc: sqlite3.DatabaseError, *, write: bool) -> CementError:
-    # Classify by SQLite result code; message text is not a stable contract.
+    # Classify by SQLite result code; message text is not a stable contract. The attribute is
+    # absent on a DatabaseError constructed in Python rather than raised by the engine, and
+    # reading it unguarded replaced the mapping below with an AttributeError.
+    code = getattr(exc, "sqlite_errorcode", None)
     if not write:
-        if exc.sqlite_errorcode in _READ_CAPABILITY_DENIALS:
+        if code in _READ_CAPABILITY_DENIALS:
             return _ReadOnlyViolation("read-only ledger transaction refused a write")
-        if exc.sqlite_errorcode == sqlite3.SQLITE_CANTOPEN:
+        if code == sqlite3.SQLITE_CANTOPEN:
             return IntegrityError("ledger file is missing or unreadable")
     if isinstance(exc, sqlite3.OperationalError):
         return StateError("database is busy or unavailable")
