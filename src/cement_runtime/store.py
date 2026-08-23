@@ -494,8 +494,8 @@ def _read_authorizer(
         if (argument or "").upper() in _READ_AUTHORIZED_TRANSACTIONS:
             return sqlite3.SQLITE_OK
         return sqlite3.SQLITE_DENY
-    if action == sqlite3.SQLITE_SAVEPOINT:
-        return sqlite3.SQLITE_OK
+    # SQLITE_SAVEPOINT carries no grant: both savepoint users are write=True call sites, so no
+    # read path reaches one and no probe could ever detect the grant's deletion.
     return sqlite3.SQLITE_DENY
 
 
