@@ -1,0 +1,47 @@
+{
+  "kind": "bench",
+  "unit": "M3.2b",
+  "python_version": "unknown",
+  "sqlite_version": "unknown",
+  "host_cpu": "unknown",
+  "repeats": "unknown",
+  "commit": "unknown",
+  "points": {
+    "n1": {
+      "entries": "unknown",
+      "document_bytes": "unknown",
+      "document_items": "unknown",
+      "fixture_build_seconds": "unknown",
+      "verify_cold_ms": "unknown",
+      "verify_warm_ms": "unknown",
+      "evaluate_hit_ms": "unknown",
+      "evaluate_miss_ms": "unknown",
+      "peak_rss_kib": "unknown",
+      "note": "unknown"
+    },
+    "n1000": {
+      "entries": "unknown",
+      "document_bytes": "unknown",
+      "document_items": "unknown",
+      "fixture_build_seconds": "unknown",
+      "verify_cold_ms": "unknown",
+      "verify_warm_ms": "unknown",
+      "evaluate_hit_ms": "unknown",
+      "evaluate_miss_ms": "unknown",
+      "peak_rss_kib": "unknown",
+      "note": "unknown"
+    },
+    "n50000": {
+      "entries": "unknown",
+      "document_bytes": "unknown",
+      "document_items": "unknown",
+      "fixture_build_seconds": "unknown",
+      "verify_cold_ms": "unknown",
+      "verify_warm_ms": "unknown",
+      "evaluate_hit_ms": "unknown",
+      "evaluate_miss_ms": "unknown",
+      "peak_rss_kib": "unknown",
+      "note": "unknown"
+    }
+  }
+}
