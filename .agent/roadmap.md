@@ -169,116 +169,46 @@ Measured gaps driving the arc:
     directive, and was stopped; MAIN then ran the 19-mutant sweep itself for a fraction of the
     coordination cost.
 
-  - M3.2b OPEN tier=kernel tags=oracle depends=M3.2a - one-snapshot P1-P6 verification plus `evaluate`
-    behind a pure `resolve`; failed verification, verified miss and verified hit stay distinct; publish
-    durable 1/1,000/50,000 measurements.
-    SESSION 1 CLOSED at the contract, per the M3.2a oracle protocol: wave 1 + acceptance contract
-    (`.agent/decisions/m3u2b-contract.md`, sections 1-11 binding, 12-13 PENDING). Session 2 opens with
-    that contract as its entry state and implements. MAIN 30% -> 86% (72K -> 205K).
-    SESSION 2 CLOSED with the implementation landed and the contract corrected; the battery is
-    session 3, exactly as the M3.2a protocol predicts. MAIN 5% -> 92%.
-    SESSION 3 CLOSED with the battery, the differential and the review landed; FOUR review
-    findings stay OPEN, so the unit is NOT DONE and session 4 closes it. MAIN 38% -> 92%,
-    `mate=` 68% 163K/240K (`test-m3u2b-2`). Three teammates, 3/3 delivered against
-    MAIN-committed seeds - the fourth consecutive datapoint that the seed is the variable.
-    Shipped: `tests/test_resolve_battery.py`, 34 diff-blind tests, one per obligation B01-B34,
-    graded by `m3u2b-battery-validate.py` (`--emit-stub` = the seed's single source of truth);
-    `m3u2b-mutants.py`, 23 mutants over three files; `m3u2b-main-driver.py` +
-    `m3u2b-main.json` + `m3u2b-differential.py`. Suite 600 -> 634.
-    SECTION 12 CLOSES: `m3u2b-divergences.json` `UNKNOWN-CELLS: 0`, 16 rows. The predecessor
-    filled 0 of 96; the variable was SUBJECT seeding, not the validator - MAIN seeded each
-    row's `section` anchor plus an ungraded `locus`, and the successor filled all 16.
-    SECTION 13 CLOSES ON THE DIFFERENTIAL: 26 probes compared, 0 behavioral divergences,
-    0 text differences, 0 missing keys, exit 0. MAIN credited it by re-derivation, never by
-    report - the driver replays `m3u2b-main.json` byte-identically (sha256 `55a3f586...`).
-    Zero TEXT differences because every pinned message comes from a library validator both
-    implementations delegate to; M3.2a's 17 came from a translation layer authored twice.
-    YIELD - three instruments, three distributions. The battery returned 2 reds, both claim
-    defects: B31 (the shipped docstring cited the component baseline that section 8/A09
-    forbids citing as resolver cost) and B29 (section 7 listed `revision drift` unqualified;
-    MEASURED, `revise_operation` retires every stranded artifact so the supported route gives
-    a VERIFIED MISS with `entries=0`, and only a fabricated direct `UPDATE` gives a failed
-    verdict). `rev2-m3u2b` returned 12 findings, 4 cleared. The differential returned zero.
-    Sixth consecutive unit whose findings are overwhelmingly claim defects in MAIN's own text.
-    MUTATION SWEEP is what closure rests on, and it earned its cost: 23 mutants, 22 killed by
-    the battery alone, `battery_gaps=0`, ONE SURVIVOR - deleting `not verification.passed or`
-    passed all 633 tests. `rev2-m3u2b` (V12) found it independently before MAIN's sweep ran.
-    Cause is structural: `verify_function` sets `document=None` whenever `passed` is False, so
-    every REAL output binds both gate terms and no real-ledger probe separates them. Closed by
-    B34, the mirror of B14's fabricated probe.
-    OPEN AT SESSION CLOSE - four findings, all with acceptance checks, red tests on branch
-    `wt/rev2-m3u2b` (`tests/test_m3u2b_review.py`, deliberately NOT on main: 2 of its 5 pass,
-    and a red test in the shipped suite breaks the gate). Session 4's work list:
-    - V07 major: `m3u2b-resolve-bench.json` records only kind+points - no commit, environment
-      or repeat identity - and the harness silently MERGES existing points, so points from
-      different builds can form a validator-looking scaling artifact. The numbers re-derive;
-      the artifact cannot substantiate cross-point comparability. Fix = provenance per point
-      plus a refusal to merge across provenance, then re-measure (~10 min wall at the cap).
-    - V10 major: section 5's no-commit obligation has no independent pin. B18 compares ledger
-      sha256 and full iterdump, and a successful NO-OP commit moves neither. M3.2a's authorizer
-      denies COMMIT, but section 6/A03's own reasoning says the pin covers what the authorizer
-      cannot. Fix = a B35 spy obligation.
-    - V11 major, EVIDENCE CORRECTED BY MAIN: the reviewer reported `.scratch/m3u2b-smoke.py`
-      "untracked, absent". It is untracked (true) and PRESENT on this workstation (false) - it
-      read its own worktree's empty `.scratch/`, the exact error the memory rule against
-      asserting absence of machine-local state names. Substance holds: roadmap, contract §12
-      and `b5916a9` make durable 38-check claims from a script no clone can run. Fix = move
-      every such claim onto the committed battery, which now supersedes all 38 checks.
-    - V08 minor: `b5916a9`'s subject cause ("resolving an input cost two snapshots") is false
-      per the accepted A01 - `verify_function` then `evaluate` was already one snapshot. The
-      correction needs a durable home; git history cannot be rewritten.
-    Also session 4: contract sections 12-13 flip from PENDING to their results, and the
-    reviewer's `test_resolution_docstring_scopes_none_biconditional` regex is MAIN-REJECTED as
-    over-specified - it pins RST markup (`verify_function (?:returns|produces)` cannot match
-    ``` ``verify_function`` produces ```), not the claim, which the docstring now carries.
+  - M3.2b DONE tier=kernel tags=oracle depends=M3.2a - one-snapshot P1-P6 verification plus
+    `evaluate` behind a pure `resolve`; failed verification, verified miss and verified hit stay
+    distinct; durable 1/1,000/50,000 measurements published. Contract, MAIN-final verdict table,
+    review dispositions, differential and the history correction: `.agent/decisions/m3u2b-contract.md`.
     Shipped at `b5916a9`: `System.resolve` + `FunctionResolution` + export, +56/-1 production lines
-    across three files against the spike's +34/-1 estimate (delta = docstrings). Suite 600 -> 600.
-    MAIN's own 38-check real-ledger smoke probe is green on shipped bytes and covers all three
-    states, the biconditional both ways, `evaluate` call counts 1/1/0, ledger sha256 + full iterdump
-    stability, event-digest stability, a raising `_now`, a raising `propose`, one
-    `Store.transaction(write=False)`, `in_transaction` at the sixth check, six precedence messages,
-    and both escaping error conditions.
-    CONTRACT ATTACK, the session's yield: 12 findings, 12 accepted, 3 blocking, ZERO code defects and
-    12 claim defects in MAIN's own contract - the FIFTH consecutive unit with that distribution, so
-    the pre-implementation attack is settled as the default dispatch. Three reversed MAIN's own
-    rulings: the `or document is None` mutation-criterion exception (A12, now a killable mutant plus
-    a domain qualifier on section 3's biconditional), the precedence pair set MAIN had also shipped
-    in its own smoke probe (A05, two pairs -> four adjacent-edge pairs), and the cost publication
-    (A09, the harness never called `resolve`).
-    COST REPUBLISHED end to end, the unit's durable obligation, now measuring the shipped method
-    (`m3u2b-resolve-benchmark.py` + `m3u2b-resolve-bench.json`): one resolve at the 50,000 cap =
-    37,228 ms cold hit / 40,170 ms warm miss / 985,568 KiB peak; 1,000 = 644 ms; 1 = 5.3 ms. The
-    resolver adds 4.7% over its components at cap, 4.4% at 1,000, 30% at one entry. Time `N^1.037`.
-    Two RSS exponents are now published because the old single figure was not re-derivable from its
-    own artifact: raw `N^0.774`, incremental `N^1.000`. The no-hidden-cache inference is withdrawn -
-    warm is SLOWER than cold at cap, which bounds a cache below noise rather than proving absence.
-    ORACLE delivered 26/26 probes from the contract alone (`m3u2b-oracle.json`, branch
-    `wt/orc-m3u2b`); the differential is session 3 and is now a field-by-field pass over two
-    committed JSON files keyed by the same corpus ids.
-    RELIABILITY, fourth datapoint, and the first FAILURE under seeding: 2 of 3 delivered. Both the
-    reviewer and the oracle hit `UNKNOWN-CELLS: 0`. `test-m3u2b` filled ZERO of 96 cells across three
-    polls, one flush directive and 58% of its window, and was stopped. Same seed, same validator,
-    same brief shape as the two that delivered, so seeding is necessary and not sufficient; the
-    variable this time was the task, not the scaffolding - enumerating divergences has no partial
-    unit the way filling a probe row does. Section 12 stays PENDING and session 3 re-dispatches
-    phase 1 against the unchanged seed.
+    across three files against the spike's +34/-1 estimate (delta = docstrings). Suite 600 -> 635.
+    ORACLE CALIBRATION, CORRECTED AND BINDING ON M3.3 + M3.4. An oracle unit takes FOUR MAIN
+    sessions, not M3.2a's measured three: s1 contract 30 -> 86%, s2 implementation 5 -> 92%,
+    s3 battery + differential + review 38 -> 92%, s4 finding closure + verdict table 33 -> 97%.
+    `mate=` 68% 163K/240K (`test-m3u2b-2`). The fourth session is not overrun - it is the
+    REVIEW-CLOSURE session, and M3.2a never paid it because its review landed inside s3. Budget
+    every remaining oracle unit at four and split at contract, implementation, battery, closure.
     FORK RULED on measurement: the plan draft's prescribed "factor `verify_function` onto a supplied
-    connection" is SUPERSEDED and does not ship. It was written before M3.2a landed, and there is no
-    nesting to fix - none of the six helpers between `system.py:2952` and `system.py:3363` opens a
-    second transaction. The thin composition (`verify_function` -> `evaluate` over the returned
-    document) measures +34/-1 production lines against the draft's ~170-line estimate, and the spike's
-    fork-deciding probe showed the document evaluates identically inside and after the snapshot.
-    17/17 probes, suite 600 -> 600.
-    COST PUBLISHED, the unit's durable obligation, measured at `019d040` and re-derivable
-    (`m3u2b-benchmark.py` + `m3u2b-bench.json`, both validator-graded): one resolve at the
-    50,000-entry cap = 35,550 ms cold / 36,461 ms warm / 985,864 KiB peak RSS; 1,000 entries = 616 ms;
-    1 entry = 4.1 ms. Time `N^1.037`, memory `N^1.000`, evaluator 0.00028% of the total. Warm reuse
-    buys nothing at cap scale, which independently proves no hidden cache. `FUNCTION_MAX_ENTRIES`
-    50,000 is a reachable working maximum. MAIN re-derived n1 (4.159849 ms) from committed state.
-    WAVE-1 RELIABILITY, the control for M3.2a's finding: 3 of 3 teammates delivered, against 1 of 3 on
-    M3.2a. The variable is unchanged - every teammate got a MAIN-authored validator plus a seeded
-    all-`unknown` skeleton committed BEFORE dispatch, so its first tool call filled cells instead of
-    inventing a format, and UNKNOWN-CELLS was the poll metric. Cost to MAIN: one validator, ~90 lines.
+    connection" is SUPERSEDED and does not ship. M3.2a had already landed the enforced read inside
+    `Store.transaction(write=False)`, leaving no nesting to fix; none of the six helpers between
+    `system.py:2952` and `system.py:3363` opens a second transaction, and the spike measured the
+    document evaluating identically inside and after the snapshot. 17/17 probes.
+    INSTRUMENTS, four, three distributions. Battery = 35 diff-blind tests, one per obligation
+    B01-B35, graded by `m3u2b-battery-validate.py` (`--emit-stub` = the seed's single source of
+    truth); it returned 2 reds, both claim defects. Mutation sweep = `m3u2b-mutants.py`, 23 mutants
+    over three files, 22 killed by the battery alone, `battery_gaps=0`, ONE SURVIVOR: deleting
+    `not verification.passed or` passed all 633 tests, because `verify_function` binds both gate
+    terms in every real output. Closed by B34, the mirror of B14's fabricated probe. Differential =
+    26 probes, 0 behavioral divergences, 0 text differences, exit 0, credited by MAIN's
+    re-derivation. Review = 12 findings, 4 cleared, 8 upheld, all disposed. ZERO code defects across
+    every instrument; sixth consecutive unit whose findings are claim defects in MAIN's own text.
+    CLOSURE IS MECHANICAL, never a green suite: the sweep plus the battery grader's UNFILLED 0.
+    COST PUBLISHED, the unit's durable obligation, measured end to end through the shipped method
+    and re-derivable from committed state (`m3u2b-resolve-benchmark.py` + `m3u2b-resolve-bench.json`, contract section 8). The harness now records PROVENANCE PER POINT
+    and REFUSES to merge points measured under different provenance, so the scaling fit cannot be
+    assembled from incomparable builds; `m3u2b-validate.py` grades that identity and prints the
+    exponents, and it refuses a dirty-tree measurement outright.
+    SEEDING, four datapoints and the variable now isolated. MAIN-committed validator + all-`unknown`
+    skeleton gave 3/3 on wave 1 and 3/3 on the battery wave, against M3.2a's 1/3 under a prose
+    mandate. It then gave 2/3: the teammate asked to ENUMERATE divergences filled 0 of 96 across
+    three polls and 58% of its window, while its successor - identical validator, identical brief,
+    plus a `section` anchor and an ungraded `locus` naming each row's SUBJECT - filled 16 of 16.
+    Seeding the deliverable is necessary; seeding the row SUBJECTS is what makes a generative
+    deliverable resumable. `prod-m3u2b-1` then filled 43 crosswalk rows at 33% of its window and
+    self-reported its own boundary slip, which MAIN confirmed reversed before harvest.
   - M3.3 tier=kernel tags=oracle depends=M3.1 - request-free direct and source-backed submission over
     unchanged schema v2. Also owns `src/cement_runtime/errors.py`: `CandidateSourceError` stays public,
     its supervised-fallback docstring is rewritten, and both it and an arbitrary `Exception` normalize to

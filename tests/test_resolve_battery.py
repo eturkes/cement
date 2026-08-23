@@ -1262,8 +1262,22 @@ class ResolveBatteryTests(unittest.TestCase):
         self.assertEqual(payload["kind"], "resolve-bench")
         cap = payload["points"]["n50000"]
         self.assertEqual(cap["entries"], 50_000)
-        self.assertEqual(cap["resolve_cold_hit_ms"], 37_227.984277)
-        self.assertEqual(cap["peak_rss_kib"], 985_568)
+
+        # DERIVED, never transcribed: the docstring's stated cost must be the artifact's own
+        # number at the docstring's own precision, so a re-measurement moves both or fails here.
+        seconds = re.search(r"~([0-9.]+) s\b", resolve_doc)
+        mebibytes = re.search(r"~([0-9,]+) MiB\b", resolve_doc)
+        self.assertIsNotNone(seconds)
+        self.assertIsNotNone(mebibytes)
+        assert seconds is not None and mebibytes is not None
+        self.assertEqual(
+            float(seconds.group(1)),
+            round(cap["resolve_cold_hit_ms"] / 1000, 1),
+        )
+        self.assertEqual(
+            int(mebibytes.group(1).replace(",", "")),
+            round(cap["peak_rss_kib"] / 1024),
+        )
 
     def test_b32(self) -> None:
         """
