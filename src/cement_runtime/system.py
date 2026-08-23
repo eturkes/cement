@@ -40,6 +40,7 @@ from .function import (
     FunctionDocument,
     FunctionEntry,
     build_function,
+    evaluate,
     validate_function,
 )
 from .json_value import (
@@ -67,6 +68,7 @@ from .models import (
     FunctionReceiptPage,
     FunctionReconstruction,
     FunctionReport,
+    FunctionResolution,
     FunctionSetPromotion,
     FunctionVerification,
     InProgress,
@@ -3359,6 +3361,43 @@ class System:
                 function_hash=function_hash,
                 checks=checks,
             )
+
+    def resolve(
+        self,
+        partition: str,
+        operation: str,
+        input_value: object,
+        *,
+        expected_function_hash: str | None = None,
+    ) -> FunctionResolution:
+        """Verify one promoted-set snapshot, then look the input up inside it.
+
+        Every call runs the full six-check verification, so a resolve costs what
+        ``verify_function`` costs. One 50,000-entry set costs tens of seconds and
+        hundreds of MiB (``.agent/decisions/m3u2b-bench.json``). This call writes
+        nothing and caches nothing. Two calls take two snapshots, so a writer
+        committing between them changes the second answer. A failed verdict
+        returns ``match`` ``None`` and is never a miss.
+        """
+
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        if expected_function_hash is not None:
+            _digest(expected_function_hash, "expected_function_hash")
+        input_json = canonicalize(input_value)
+
+        verification = self.verify_function(
+            partition,
+            operation,
+            expected_function_hash=expected_function_hash,
+        )
+        document = verification.document
+        if not verification.passed or document is None:
+            return FunctionResolution(verification=verification, match=None)
+        return FunctionResolution(
+            verification=verification,
+            match=evaluate(document, input_json=input_json),
+        )
 
     # -- replay verification + atomic promotion ----------------------------
 

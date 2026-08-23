@@ -454,3 +454,16 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   each redundant pair keeps exactly one setter, the survivor is forced by a readback rather than a spy,
   the `hasattr(connection, "setconfig")` guard is re-examined against the declared `requires-python`, and
   the suite is green with B6 updated to match.
+
+- `pri=5` `size=S` — `system.py` re-implements its own 64-hex validator at three sites. `_digest(value,
+  label)` (`system.py:221-225`) raises `f"{label} must be a SHA-256 hex digest"` on exactly the
+  `type(value) is not str or re.fullmatch(r"[0-9a-f]{64}", value) is None` predicate, and three later
+  sites spell that predicate out again: `verify_function`'s `expected_function_hash` guard
+  (`system.py:2932-2935`), the `scope_hash` guard (`system.py:4420`), and a `test_set_hash` branch
+  (`system.py:5137`). Only the first two also duplicate the message; the third is a projection branch that
+  wants the predicate alone. M3.2b's `resolve` routes through `_digest` and adds no fourth copy, so the
+  residue is entirely pre-existing and the dedup is off-spine. Care needed at `system.py:4420`, whose
+  `not re.fullmatch(...)` reads truthily rather than `is None`, and at `system.py:5137`, which must keep
+  returning a FALSE check rather than raising. Acceptance: `command grep -c '\[0-9a-f\]{64}'
+  src/cement_runtime/system.py` reports 1, every replaced site keeps its exact current message and
+  raise-versus-verdict behaviour, and the full suite is green.

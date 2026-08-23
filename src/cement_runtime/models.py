@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Literal, Mapping, TypeAlias, cast
 
 from .errors import ValidationError
-from .function import FunctionDocument
+from .function import FunctionDocument, FunctionMatch
 from .json_value import JSONValue
 
 
@@ -348,6 +348,20 @@ class FunctionVerification:
     document: FunctionDocument | None
     function_hash: str | None
     checks: tuple[FunctionCheck, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class FunctionResolution:
+    """One verification snapshot paired with the lookup taken inside it.
+
+    ``match`` is ``None`` exactly when ``verification.passed`` is ``False``. A
+    failed verdict carries no answer at all. A verified ``matched=False`` is a
+    proven absence inside a function that verified. Consumers must not collapse
+    the two.
+    """
+
+    verification: FunctionVerification
+    match: FunctionMatch | None
 
 
 @dataclass(frozen=True, slots=True)
