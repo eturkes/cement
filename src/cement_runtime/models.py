@@ -354,11 +354,13 @@ class FunctionVerification:
 class FunctionResolution:
     """One verification snapshot paired with the lookup taken inside it.
 
-    For every verification ``System.verify_function`` produces, ``match`` is
-    ``None`` exactly when ``verification.passed`` is ``False``. That domain
-    qualifier is load-bearing: this class binds the two fields by no invariant,
-    so a hand-built ``FunctionVerification`` can carry ``passed=True`` with no
-    document and still resolve to ``match`` ``None``. A failed verdict carries
+    For every verification the unmodified ``System.verify_function`` produces,
+    ``match`` is ``None`` exactly when ``verification.passed`` is ``False``.
+    That domain qualifier is load-bearing, and it names the implementation
+    rather than the attribute: this class binds the two fields by no invariant,
+    so an override or a hand-built ``FunctionVerification`` can carry
+    ``passed=True`` with no document and still resolve to ``match`` ``None``.
+    A failed verdict carries
     no answer at all. A verified ``matched=False`` is a proven absence inside a
     function that verified. Consumers must not collapse the two.
     """

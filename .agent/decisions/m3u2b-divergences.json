@@ -14,7 +14,7 @@
       "reading_b": "No defensible alternative: section 2 says NO kw_only and explicitly calls positional construction unambiguous and ABI-pinned.",
       "why_ambiguous": "Seeded locus is cleared; the decorator snippet, the ruled paragraph, and the ABI-test mandate all select the same construction semantics.",
       "recommendation": "Retain the explicit NO kw_only sentence and keep the signature-plus-positional-construction probe as the durable guard.",
-      "main_verdict": "unknown"
+      "main_verdict": "CLEARED, no change. Reading A is the contract and the row's own reading B concedes no alternative. B02 already pins frozen+slots, the two-field set and positional construction."
     },
     {
       "id": "D02",
@@ -25,7 +25,7 @@
       "reading_b": "The later 'ship it only with a committed probe' sentence conditionally admits a third independently populated field, although every named candidate currently fails that test.",
       "why_ambiguous": "The unconditional EXACTLY-two command is followed by conditional authorization language; a careful reader can treat the latter as either rationale or an extension rule.",
       "recommendation": "Say that the mutation criterion explains current exclusions and does not authorize widening this unit's frozen two-field shape.",
-      "main_verdict": "unknown"
+      "main_verdict": "ACCEPTED, section 2 clarified. MAIN's own wording put an unconditional EXACTLY-two command next to conditional authorization language; the mutation criterion explains why each candidate field is excluded and never licenses widening M3.2b's frozen shape."
     },
     {
       "id": "D03",
@@ -36,7 +36,7 @@
       "reading_b": "No defensible alternative: the contract requires exact returned types, rejects duck typing, and names both forbidden construction directions.",
       "why_ambiguous": "Seeded locus is cleared; 'constructs no' could be narrow alone, but the adjacent exact-type-identity requirement closes factory, alias, and subclass readings.",
       "recommendation": "Keep both exact identity assertions and forbidden-constructor spies because either half alone leaves a cross-wire mutant alive.",
-      "main_verdict": "unknown"
+      "main_verdict": "CLEARED, no change. Reading A, and the paired pin is right: exact return-type identity plus forbidden-constructor spies, because either half alone leaves a cross-wire mutant."
     },
     {
       "id": "D04",
@@ -47,7 +47,7 @@
       "reading_b": "'The document' can be read as answer-specific material: a hit may carry the matched member while a miss may carry an empty or separately projected document.",
       "why_ambiguous": "The table uses a definite article without restating 'complete promoted-set document'; section 1 implies the full value, but the local state row permits a narrower antecedent.",
       "recommendation": "Replace both table cells with 'the unchanged full FunctionDocument returned by verify_function' and pin object preservation under an override.",
-      "main_verdict": "unknown"
+      "main_verdict": "ACCEPTED, section 3 clarified. Reading A is what the code does - resolve returns verify_function's verification object unchanged, and B08 asserts that object identity - so the state table now says 'the unchanged full FunctionDocument returned by verify_function' instead of a bare definite article."
     },
     {
       "id": "D05",
@@ -58,7 +58,7 @@
       "reading_b": "'Without enumerating a single row' can forbid any scan of promoted rows, including a COUNT implementation that SQLite satisfies by visiting index or table entries.",
       "why_ambiguous": "The observable helper boundary and the storage-engine meaning of enumeration differ; the contract names the former anchor but states the latter in absolute prose.",
       "recommendation": "Define enumeration as fetching or materializing member rows, explicitly permit one scalar COUNT query, and retain the adjacent cap probe.",
-      "main_verdict": "unknown"
+      "main_verdict": "ACCEPTED, section 3 clarified. Reading A. 'Enumerate' names the observable helper boundary - fetching or materializing promoted member rows - and one scalar COUNT is permitted. The storage-engine reading would forbid the count the cap check itself needs."
     },
     {
       "id": "D06",
@@ -69,7 +69,7 @@
       "reading_b": "A dynamically overridden public verify_function still 'actually produces' its return value, so the fabricated passed-true/document-none value lies inside the stated domain and falsifies the biconditional.",
       "why_ambiguous": "Python dispatch makes 'verify_function actually produces' include overrides naturally, while the rationale cites one concrete base-method assignment as the intended domain boundary.",
       "recommendation": "Name 'outputs of the unmodified System.verify_function implementation' explicitly, and separately state resolve's weaker invariant for arbitrary override returns.",
-      "main_verdict": "unknown"
+      "main_verdict": "ACCEPTED, section 3 and the FunctionResolution docstring both tightened. Reading B is correct about Python: a dynamic override 'produces' its return value too, so the domain is now named as the UNMODIFIED System.verify_function implementation, with resolve's weaker invariant for arbitrary overrides stated separately. Same defect class as A12."
     },
     {
       "id": "D07",
@@ -80,7 +80,7 @@
       "reading_b": "Section 7 classifies an absent current receipt as a failed verdict, so a zero-member operation without an explicit empty-set receipt can be unverified rather than a miss.",
       "why_ambiguous": "Section 3 makes the zero-entry result unconditional, while section 7 names absent current receipt without limiting that failure to non-empty promoted sets.",
       "recommendation": "State whether zero entries waive the receipt check; if they do, qualify section 7's absent-receipt row as applying only when members exist.",
-      "main_verdict": "unknown"
+      "main_verdict": "ACCEPTED, section 7 qualified. MEASURED: B13 registers an operation, promotes nothing, never persists a receipt, and resolve returns passed True, entries 0, matched False for four inputs. So section 3 is right and section 7's absent-current-receipt row applies only where promoted members exist."
     },
     {
       "id": "D08",
@@ -91,7 +91,7 @@
       "reading_b": "Invoking the public read method verify_function is itself the ledger-read boundary, so its internal re-validation occurs after the boundary and thin composition violates the literal order.",
       "why_ambiguous": "The contract alternates API-level language ('then the ledger read') with mechanism-level evidence (zero transaction calls), and those boundaries place internal re-validation differently.",
       "recommendation": "Define ledger read as transaction entry or first SQL access, then explicitly permit verify_function's pure pre-transaction re-validation.",
-      "main_verdict": "unknown"
+      "main_verdict": "ACCEPTED, section 4 clarified. Reading A. The ledger read begins at transaction entry or first SQL; verify_function's own pure re-validation before that boundary conforms. B17 pins the stronger property anyway - a rejected call makes zero verify_function calls too."
     },
     {
       "id": "D09",
@@ -102,7 +102,7 @@
       "reading_b": "Only shape, class, and precedence are binding; an inline equivalent check with different clear wording conforms because sections 1-11 never publish the exact message or require _digest.",
       "why_ambiguous": "The battery obligation demands exact text, but the binding sections provide no message literal and describe a shape check rather than a required helper call.",
       "recommendation": "Publish every exact validation message in section 4 and say explicitly whether _digest reuse is normative or merely an implementation choice.",
-      "main_verdict": "unknown"
+      "main_verdict": "ACCEPTED, section 4 now publishes every exact message. The battery demanded exact text the contract never stated, which is precisely how a paraphrase becomes a pin. Message identity is normative; reuse of the _digest helper is an implementation choice."
     },
     {
       "id": "D10",
@@ -113,7 +113,7 @@
       "reading_b": "The exact captured connection must remain inspectable with in_transaction=False after resolve; a closed connection that raises on inspection does not prove the stated postcondition.",
       "why_ambiguous": "The purity sentence specifies transaction state but not connection lifetime, while the implementation capability normally closes the only handle before callers can inspect it.",
       "recommendation": "Define the observable as context exit plus absence of an active SQLite transaction or lock, and state that connection closure is allowed.",
-      "main_verdict": "unknown"
+      "main_verdict": "ACCEPTED, section 5 clarified. Reading A. The observable is context exit with no active SQLite transaction or lock; closing the only connection handle is allowed and is what the Store does. Reading B would demand an inspectable handle the capability deliberately closes."
     },
     {
       "id": "D11",
@@ -124,7 +124,7 @@
       "reading_b": "'No identifier is allocated' is allocator-independent and also forbids a discarded counter, random token, or rolled-back row identifier that never reaches uuid4.",
       "why_ambiguous": "The guarantee is universal, but its mandated probe observes one concrete allocator and the contract never states that every possible identifier flows through uuid4.",
       "recommendation": "Either narrow the guarantee to UUID allocation through _new_id/uuid4 or enumerate and spy every allocator that the universal claim covers.",
-      "main_verdict": "unknown"
+      "main_verdict": "ACCEPTED, section 5 narrowed. The universal claim outran its mandated probe: uuid4 is one allocator, not a proof that every identifier flows through it. The obligation is now UUID allocation through _new_id/uuid4, which is what B21 actually pins."
     },
     {
       "id": "D12",
@@ -135,7 +135,7 @@
       "reading_b": "A call reaches the ledger only after the transaction context successfully opens; a missing file therefore has zero opened snapshots despite one transaction-factory call.",
       "why_ambiguous": "The prose says a transaction 'opens', but the mandated wraps spy counts method invocation and cannot distinguish a failed context entry from a yielded snapshot.",
       "recommendation": "Specify one Store.transaction invocation after valid preflight, then separately define whether successful context entry is required for the word 'snapshot'.",
-      "main_verdict": "unknown"
+      "main_verdict": "ACCEPTED, section 6 clarified. The wraps= spy counts INVOCATIONS, so the pinned count is one Store.transaction invocation after valid preflight - a deleted ledger included - while 'snapshot' means a context that entered successfully. The prose conflated them."
     },
     {
       "id": "D13",
@@ -146,7 +146,7 @@
       "reading_b": "Purity plus deterministic canonical evaluation implies conditional repeatability when ledger bytes are identical; only equality across an intervening writer is disclaimed.",
       "why_ambiguous": "The categorical 'NO cross-call consistency claim' is broader than the writer example, while section 5 removes every named source of variation inside a byte-identical ledger state.",
       "recommendation": "Separate snapshot-stability from determinism: disclaim stability across writers, and state whether byte-identical-state equality is a tested invariant or merely incidental.",
-      "main_verdict": "unknown"
+      "main_verdict": "ACCEPTED, section 6 clarified. Determinism and snapshot stability are separate: equality over a byte-identical ledger state follows from the code and is NOT a tested invariant, and nothing is promised across an intervening writer. The categorical disclaimer stays; it now says which half is untested rather than implying variation is expected."
     },
     {
       "id": "D14",
@@ -157,7 +157,7 @@
       "reading_b": "revise_operation retires every old member, leaving a valid zero-entry current set; only fabricated stale promoted rows create revision drift and a failed verdict.",
       "why_ambiguous": "RETARGETED from structurally caught corruption: section 7 calls revision drift an ordinary supported state change, but the supported lifecycle removes the stale members that would exhibit it.",
       "recommendation": "Separate public revision retirement from fabricated stale-row drift, and state the former's zero-entry result explicitly before retaining either verdict claim.",
-      "main_verdict": "unknown"
+      "main_verdict": "ACCEPTED, already landed at 455be4c. Reading B is correct and MAIN's own battery reached the same conclusion independently through B29: revise_operation retires every stranded artifact, so the supported route gives a VERIFIED MISS with entries=0 and only a fabricated direct UPDATE produces drift. Two independent instruments, one defect - council rule fires."
     },
     {
       "id": "D15",
@@ -168,7 +168,7 @@
       "reading_b": "Only direct schema, storage, or cursor fabrication needs the label; public overrides and constant patches are supported Python behavior and may substantiate broader API guarantees.",
       "why_ambiguous": "The contract labels both a cap patch and a public override, but defines fabrication by API-unreachable state without specifying whether instrumentation itself or only state creation controls the label.",
       "recommendation": "Publish a fabrication taxonomy covering constant patches, public overrides, private overrides, and storage rewrites, with the evidentiary claims each category may support.",
-      "main_verdict": "unknown"
+      "main_verdict": "ACCEPTED, section 7 gains the taxonomy. The label was defined by API-unreachable STATE while being applied to instrumentation as well, so its evidentiary weight was unstated. Constant patches, public overrides and storage rewrites now carry their own claim limits."
     },
     {
       "id": "D16",
@@ -179,7 +179,7 @@
       "reading_b": "No defensible alternative: section 9 preserves existing negative lease prose, while section 8 explicitly bars the component benchmark from supporting any resolver-price claim.",
       "why_ambiguous": "RETARGETED from vocabulary-only scope to the live citation failure: a literal token ban looks plausible locally, but cross-references close it and make the component citation nonconforming.",
       "recommendation": "Change System.resolve's referent to .agent/decisions/m3u2b-resolve-bench.json and state that the vocabulary rule forbids affirmative performance or lease claims, not explicit denials.",
-      "main_verdict": "unknown"
+      "main_verdict": "ACCEPTED, already landed at 455be4c. The battery's B31 red found the identical defect independently: System.resolve cited the COMPONENT benchmark that section 8 forbids as a resolver-cost referent. Reading A on the vocabulary rule - it forbids affirmative performance and lease claims, never truthful denials such as 'not a lease'."
     }
   ]
 }

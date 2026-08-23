@@ -65,7 +65,10 @@ choice safe to make on consistency grounds.
   returned document. The parameter ships on the real reason: a resolver that cannot pin the identity
   it resolved against forces every pinning caller to reimplement the composition by hand.
 - EXACTLY two fields on `FunctionResolution`. No `input_hash`, no flattened `output`, no `matched`
-  mirror, no `checks` copy. Every candidate field faces the mutation criterion: ship it only with a
+  mirror, no `checks` copy. EXACTLY is unconditional for this unit (D02): the mutation criterion
+  below explains why each candidate is excluded and never authorizes widening M3.2b's frozen shape.
+  A later unit may revisit the shape; a reader of this one may not. Every candidate field faces the
+  mutation criterion: ship it only with a
   committed probe that fails when the field's population logic alone is deleted. A convenience
   mirror of `verification.passed` cannot meet that bar and duplicates the check vocabulary D5
   forbids duplicating.
@@ -98,8 +101,13 @@ returns carries the same domain or it is false.
 | state | `verification.passed` | `match` | `verification.document` | evaluate called |
 |---|---|---|---|---|
 | unverified | `False` | `None` | `None` | no |
-| verified miss | `True` | `FunctionMatch(matched=False, output=None, artifact_hash=None)` | the document | yes |
-| verified hit | `True` | `FunctionMatch(matched=True, output=..., artifact_hash=...)` | the document | yes |
+| verified miss | `True` | `FunctionMatch(matched=False, output=None, artifact_hash=None)` | the unchanged full document | yes |
+| verified hit | `True` | `FunctionMatch(matched=True, output=..., artifact_hash=...)` | the unchanged full document | yes |
+
+Both verified rows carry the SAME value (D04): the complete `FunctionDocument` `verify_function`
+reconstructed, forwarded by object identity. Hit and miss differ only in the `FunctionMatch`
+evaluation produces. `resolve` never projects, trims or re-derives a document, and B08's
+`assertIs(resolution.verification, verification)` is the pin.
 
 The six checks, in emitted order, are `verify_function`'s and are neither renamed nor re-scored
 here: `duplicate-input-digests`, `abi-canonicalizer-uniform`, `sealed-passing-reports`,
@@ -108,13 +116,21 @@ here: `duplicate-input-digests`, `abi-canonicalizer-uniform`, `sealed-passing-re
 CAPACITY IS A FAILED VERDICT, NOT AN ERROR. `FUNCTION_MAX_ENTRIES` is 50,000
 (`function.py:27`). A promoted set above it returns early at `system.py:3037` with `passed=False`,
 `entries` set to the real count, `document=None`, `function_hash=None` and all six checks FALSE,
-without enumerating a single row. `resolve` therefore answers `match=None` for an over-capacity
-scope. This is the unverified state, not a miss and not an exception, and the battery pins the
+without enumerating a single row. ENUMERATE is the observable helper boundary (D05): fetching or
+materializing promoted member rows. One scalar `COUNT` query is permitted and is what the cap check
+itself needs; the storage-engine reading, under which SQLite visiting index entries to satisfy that
+count is enumeration, would forbid the very query the rule depends on. `resolve` therefore answers
+`match=None` for an over-capacity scope. This is the unverified state, not a miss and not an exception, and the battery pins the
 adjacent pair: exactly 50,000 entries verifies, 50,001 does not.
 
 - A failed verdict is NOT a miss. An unverified function has no answer at all; a verified miss is a
   proven absence within a function that verified. Any consumer collapsing the two is a defect.
-- `match is None` iff `passed is False`, OVER EVERY VERIFICATION `verify_function` PRODUCES. Both
+- `match is None` iff `passed is False`, OVER EVERY VERIFICATION THE UNMODIFIED
+  `System.verify_function` IMPLEMENTATION PRODUCES. The domain names the implementation, not the
+  attribute (D06): Python dispatch means a subclass or a patch "produces" its return value too, and
+  such a value falsifies the biconditional by construction. `resolve`'s own weaker invariant holds
+  for an arbitrary override return: `match is None` whenever `passed is False` OR `document is
+  None`, which B14 and B34 pin one term each. Both
   directions are pinned; the biconditional is asserted here deliberately because MAIN-authored
   contracts have repeatedly claimed one where the code implements the other. The domain qualifier is
   load-bearing and was added on review (A12): `FunctionVerification` carries no invariant binding
@@ -137,7 +153,21 @@ adjacent pair: exactly 50,000 entries verifies, 50,001 does not.
 4. `input_value` → `canonicalize(input_value)` (`DEFAULT_MAX_BYTES` 1,048,576, default depth/item
    caps; `ValidationError` on violation)
 
-Then the ledger read, then evaluation.
+Then the ledger read, then evaluation. THE LEDGER READ begins at transaction entry or first SQL
+access (D08), so `verify_function`'s own pure re-validation before that boundary conforms. B17 pins
+the stronger property anyway: a call this section rejects makes zero `Store.transaction` calls AND
+zero `verify_function` calls.
+
+EXACT MESSAGES, published here because the battery pins them and a contract that names none invites
+a paraphrase to become the pin (D09). Message identity is normative; reuse of the `_digest` helper
+is an implementation choice.
+
+| argument | class | message |
+|---|---|---|
+| `partition` | `ValidationError` | `partition must be 1-128 ASCII letters, digits, '.', '_', ':', '/', or '-'` |
+| `operation` | `ValidationError` | `operation must be 1-128 ASCII letters, digits, '.', '_', ':', '/', or '-'` |
+| `expected_function_hash` | `ValidationError` | `expected_function_hash must be a SHA-256 hex digest` |
+| `input_value` | `ValidationError` | `canonicalize`'s own text, e.g. `value of type 'object' is not JSON` |
 
 Rationale: a caller's malformed input is rejected identically whether or not the function verifies,
 and a bad input never buys a full six-check pass over a 50,000-entry set. `_name` is a pure
@@ -159,6 +189,10 @@ Adjacency is the point - a pair spanning two edges cannot localise which one mov
 No `resolve` path may: write any row, commit, allocate an ID, read the clock, emit an event,
 suspend, quarantine, revoke, invoke a `CandidateSource`, create a file, or leave a transaction open.
 
+LEAVE A TRANSACTION OPEN means, observably (D10): the read context has exited and no SQLite
+transaction or lock is still held. Closing the only connection handle satisfies it and is what the
+Store does; no clause requires an inspectable post-return connection.
+
 Pins, one per obligation, never one composite assertion:
 
 - Ledger bytes: sha256 of the ledger file AND full `connection.iterdump()` text are byte-identical
@@ -173,10 +207,12 @@ Pins, one per obligation, never one composite assertion:
   snapshot" refactor: B18, B25 and B26 all PASS and B35 alone fails, on each of the three states.
 - Clock: a `System` whose `_now` raises resolves all three states unchanged.
 - Events: `events()` is byte-identical before and after; the event sequence counter is unchanged.
-- IDs (ADDED, A06): no stated pin detected a discarded allocation, because a wasted
-  `uuid.uuid4()` moves neither the events table nor `sqlite_sequence`. Pin it the way
-  `tests/test_system.py:2530-2531` already does - patch `cement_runtime.system.uuid.uuid4` to raise -
-  across all three states.
+- IDs (ADDED, A06; NARROWED, D11): the obligation is UUID allocation through `_new_id`/`uuid.uuid4`,
+  discarded results included, never the allocator-independent universal. Nothing establishes that
+  every possible identifier flows through `uuid4`, so the universal claim outran its own mandated
+  probe. No stated pin detected a discarded allocation, because a wasted `uuid.uuid4()` moves
+  neither the events table nor `sqlite_sequence`. Pin it the way `tests/test_system.py:2530-2531`
+  already does - patch `cement_runtime.system.uuid.uuid4` to raise - across all three states.
 - No file creation (WIDENED, A07): the deleted-ledger probe fails inside `Store.transaction`, before
   any post-verification branch, so it cannot see a file created on the hit path. Snapshot the full
   ledger DIRECTORY listing across hit, miss and failed verdict, and keep the deleted-ledger probe for
@@ -189,6 +225,9 @@ Pins, one per obligation, never one composite assertion:
 
 - EXACTLY ONE `store.transaction(write=False)` opens per `resolve` call THAT REACHES THE LEDGER, and
   ZERO for a call section 4 rejects. The original universal quantifier contradicted section 4 (A02).
+  The counted event is INVOCATION, because that is what a `wraps=` spy sees (D12): a call whose
+  preflight passes invokes `Store.transaction` exactly once even when the context fails to enter, as
+  a deleted ledger does. SNAPSHOT is the narrower word and means a context that entered.
   The battery pins BOTH counts, by a `wraps=` spy on `Store.transaction`, never by a read-only
   assertion alone: read-only proof and single-snapshot lifetime are separate guarantees.
 - `connection.in_transaction` stays `True` across the whole six-check pass. The stated hazard is
@@ -204,7 +243,10 @@ Pins, one per obligation, never one composite assertion:
   proves that equality rather than assuming it.
 - NO cross-call consistency claim. Two consecutive `resolve` calls are two snapshots, and a writer
   committing between them legitimately changes the second answer. Prose must never call `resolve`
-  repeatable across calls.
+  repeatable across calls. Determinism and snapshot stability are SEPARATE (D13): equality across
+  two calls over a byte-identical ledger state does follow from purity plus canonical evaluation,
+  but it is not a tested invariant here and no shipped sentence may promise it. What is disclaimed
+  is stability across an intervening writer; what is untested is the byte-identical case.
 
 ## 7. Error classification
 
@@ -218,10 +260,26 @@ inherited from `verify_function`, not invented here.
 | missing or unreadable ledger file | `IntegrityError` (M3.2a mapping, no file created) |
 | malformed stored operation scalar - revision, policy hash, policy JSON (`system.py:2960-2967`) | `IntegrityError` |
 | promoted-set count disagrees with the enumerated rows under one snapshot (`system.py:3051`) | `IntegrityError` |
-| suspended member, revocation, absent current receipt, wrong expected hash, over-capacity set | failed verdict, `passed=False` |
+| suspended member, revocation, absent current receipt WHERE PROMOTED MEMBERS EXIST, wrong expected hash, over-capacity set | failed verdict, `passed=False` |
+| a registered operation that has promoted nothing, so no receipt was ever persisted | VERIFIED MISS, `passed=True`, `entries=0` |
 | a FABRICATED stale promoted revision (direct `UPDATE` of `operations.revision`) | failed verdict, `passed=False` |
 | a revision bump through supported `revise_operation` | VERIFIED MISS, `passed=True`, `entries=0` |
 | structurally corrupt bound content - ABI, report binding, digest, projection (`system.py:3098-3319`) | failed verdict, `passed=False` |
+
+FABRICATED - the taxonomy, because the label was defined by API-unreachable STATE while being
+applied to instrumentation too, leaving its evidentiary weight unstated (D15). Three categories,
+three claim limits:
+
+- CONSTANT PATCH (the cap lowered to 3): the code path is real and ordinary; only the boundary
+  moves. Substantiates branch behaviour AND the adjacent-pair shape, never the production constant.
+- PUBLIC OVERRIDE (a `verify_function` returning a value the base method never emits): the caller
+  is real Python, the VALUE is unreachable. Substantiates `resolve`'s defensive branch, never a
+  claim about states a real ledger reaches.
+- STORAGE REWRITE (direct `UPDATE`, schema rewrite, cursor proxy): substantiates that the guard
+  translates corruption, never that the corruption is reachable or that it ever occurs.
+
+No fabricated probe may be cited for reachability, frequency or operator-visible behaviour, and a
+row reached only by fabrication says so where it is claimed.
 
 REACHABILITY, corrected on review (A04). The stored-operation-scalar row raises on WRONG TYPE alone
 (`type(...) is not int` / `is not str`, `system.py:2960-2967`), never on a wrong VALUE of the right
@@ -403,17 +461,34 @@ it is labelled FABRICATED like every other probe of an API-unreachable state.
 
 ## 12. Verdict table - MAIN-final
 
-STILL `PENDING`, and the reason is a delivery failure, not a decision. `test-m3u2b` was dispatched
-diff-blind with the validator and an all-`unknown` 16-row seed committed before dispatch, ran to 58%
-of its window across three polls plus one explicit flush directive, and filled ZERO cells; it was
-stopped at session close. Its worktree branch `wt/test-m3u2b` holds no rows. Session 3 re-dispatches
-phase 1 as `test-m3u2b-2` against the seed, which is unchanged and still graded by the same command.
+CLOSED. 16 divergences enumerated diff-blind from sections 1-11, every one ruled by MAIN:
+`.agent/decisions/m3u2b-divergences.json`, `UNKNOWN-CELLS: 0`, `main_verdict` filled on all 16,
+applied by the idempotent `.scratch/m3u2b-rule-divergences.py` (reruns to the same bytes).
 
-What implementation ran against instead, stated plainly so no reader mistakes this for a ruled
-table: sections 1-11 as written, plus MAIN's own 38-check real-ledger smoke probe
-(`.scratch/m3u2b-smoke.py`, all green at `b5916a9`), plus the twelve review findings in section 13.
-The divergence table's distinct value - readings MAIN did not think to question - is UNBOUGHT, and
-that gap is the honest state of this unit going into its battery session.
+Distribution: 2 CLEARED with no change (D01, D03 - each conceding no defensible alternative), 12
+ACCEPTED as contract clarifications landed in the section each corrects, and 2 ACCEPTED that were
+already fixed at `455be4c` by MAIN's own battery. ZERO code defects, the sixth consecutive unit
+with that shape.
+
+The two independent confirmations are the ones worth naming, because both are the council rule
+firing across instruments rather than lenses. D14 and battery obligation B29 separately found that
+section 7 listed `revision drift` unqualified while `revise_operation` retires every stranded
+artifact, so the supported route gives a verified miss. D16 and battery obligation B31 separately
+found `System.resolve` citing the COMPONENT benchmark that section 8 forbids as a resolver-cost
+referent.
+
+Delivery record, because it is the unit's clearest measurement of what makes a dispatch land.
+`test-m3u2b` got the validator plus an all-`unknown` 16-row seed committed before dispatch, ran to
+58% of its window across three polls and one flush directive, and filled ZERO cells. Its successor
+`test-m3u2b-2` got the identical validator, the identical brief shape and the identical seed plus
+one addition - a `section` anchor and an ungraded `locus` naming each row's SUBJECT - and filled
+16 of 16. Seeding the deliverable is necessary; seeding the row subjects is what makes a generative
+deliverable resumable.
+
+What implementation ran against before this table existed, stated plainly: sections 1-11 as
+written, plus MAIN's own real-ledger smoke probe, plus the twelve review findings in section 13.
+That probe was machine-local and is now superseded - all 43 of its checks map to committed tests in
+`.agent/decisions/m3u2b-smoke-crosswalk.json` (`UNCOVERED: 0`), so no durable claim rests on it.
 
 ## 13. Review dispositions and differential result
 
@@ -470,5 +545,41 @@ those keys.
 
 ### Differential
 
-`PENDING` session 3. Both observation files now exist in tracked state, keyed by the same
-`ORACLE_PROBES` ids, so the comparison is a field-by-field pass over two committed JSON documents.
+CLOSED, and it returned nothing. 26 probes compared field by field over two committed JSON
+documents keyed by the same `ORACLE_PROBES` ids: 0 behavioral divergences, 0 text differences, 0
+missing keys, exit 0 (`.agent/decisions/m3u2b-differential.py` over `m3u2b-main.json` and
+`m3u2b-oracle.json`). MAIN credited it by RE-DERIVATION, never by report - the driver replays
+`m3u2b-main.json` byte-identically, sha256 `55a3f586...`.
+
+Zero TEXT differences is the informative half, against M3.2a's 17 on the same instrument: every
+pinned message here comes from a library validator both implementations delegate to, while
+M3.2a's came from a translation layer authored twice. A differential measures authored surface,
+so a composition that adds none returns none, and that is a result rather than a failure.
+
+### Post-implementation review - 12 findings
+
+`rev2-m3u2b`, dispatched against the landed diff: `.agent/decisions/m3u2b-review.json`. Four
+CLEARED with enforcement classification (V01, V03, V04, V06), eight upheld. V02, V05, V09 and V12
+closed in session 3; V07, V08, V10 and V11 closed in session 4 and are recorded in the sections
+they corrected.
+
+V12 is the one that changes how this unit is closed. Deleting `not verification.passed or` from
+`resolve`'s gate passed all 633 committed tests, and MAIN's independent 23-mutant sweep found the
+same survivor. Cause is structural: `verify_function` sets `document=None` whenever `passed` is
+False, so every REAL output binds both gate terms and no real-ledger probe can separate them. B34
+is the mirror of B14's fabricated probe and closes it. Whenever a fabricated probe or a mutation
+exemption is written for one term of a compound condition, write its mirror in the same breath.
+
+### History correction - `b5916a9`'s subject cause is false (V08)
+
+`b5916a9`'s subject reads `resolving an input cost two snapshots → compose evaluate onto one
+verified snapshot`. The stated cause is REFUTED by this contract's own accepted A01: `verify_function`
+followed by `evaluate` over the returned document was ALREADY one snapshot, because the document is
+a self-contained reconstruction and evaluating it after the snapshot closes returns the same answer
+(section 11, probe C13). Git history cannot be rewritten, so the correction lives here.
+
+What that commit actually bought, stated truthfully: one public entry point for a two-call sequence
+every caller would otherwise compose by hand, with the failed-verdict gate and the `match is None`
+biconditional enforced in one place instead of at each call site. The cost claim in the same commit
+body stands; only the subject's causal clause is wrong. A scoped-commit subject is durable and
+unrewritable, so a later correction needs a tracked home and this section is it.
