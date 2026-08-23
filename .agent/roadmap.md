@@ -114,12 +114,47 @@ Measured gaps driving the arc:
     `orc`/`diff` MAIN cost separately from its base at close; that measurement, never an estimate, sizes
     M3.2b, M3.3 and M3.4. Tags stay as reviewed - seven campaigns were already cut to three and
     justified per unit (`.agent/decisions/m3-plan-review.md` L86-88), so cost was the only open question.
+
+    FIRST MEASUREMENT, from M3.2a's own wave 1. MAIN went 31% -> 75% (74K -> 179K, ~105K) to buy:
+    validator authoring, a 3-teammate wave-1 dispatch, four rounds of steering, one spike-report
+    harvest, MAIN's own reachability census, MAIN's rerun of the decisive harness stage, and the
+    acceptance contract. Implementation had not started. So the priced answer is structural, not a
+    percentage surcharge: AN ORACLE UNIT DOES NOT FIT ONE WINDOW. It takes two sessions, split at the
+    contract, which is exactly route 2. Budget M3.2b, M3.3 and M3.4 the same way and stop trying to
+    close one in a single session.
+    Reliability datapoint, priced the hard way: 1 of 3 wave-1 teammates delivered. `spike-m3u2a-full`
+    died twice and produced 0/32 probes; `map-m3u2a` climbed to 91% (218K) while its report never grew
+    past its skeleton across four flush directives. MAIN absorbed both losses by deriving the census
+    itself, which cost less than a successor would have. Two lessons bind the next wave: a teammate
+    whose deliverable count is flat across two polls is already failing, and a mechanically-derivable
+    fact (an AST census, a count, a span) is cheaper for MAIN to compute than to delegate and verify.
   - M3.2a OPEN tier=kernel tags=oracle depends=none - Store-owned enforced-read capability: existing-only
     `file:` URI with `mode=ro`, `PRAGMA query_only`, write-denying authorizer, one rolled-back
     transaction. Oracle-calibration unit per the ruling above. Measured static span = 46 production
     lines, both methods in `store.py`: `_connect` L488-511 and `transaction` L550-571. Blast radius =
     32 `.transaction(` call sites in `system.py` (57 `write=True` / 90 other, repo-wide), 113 in
     `test_system.py`. Base span sits far under M3.1's, which is what leaves room for the battery.
+    WAVE 1 + CONTRACT DONE; implementation is the next session's entry state. Acceptance contract =
+    `.agent/decisions/m3u2a-contract.md`. Evidence, all tracked and rerunnable: `m3u2a-min-matrix.json`
+    (32/32, 0 mismatches), `m3u2a-min-spike.md`, `m3u2a-min-spike.py` (1,141-line harness,
+    `--stage readonly --matrix <path>`), `m3u2a-matrix-validate.py`. MAIN reran the decisive stage from
+    committed state: 32/32, 0 outcome disagreements against the spike's matrix.
+    Rulings: three mechanisms (Store-owned rolled-back transaction + deny-by-default read-allowlisted
+    authorizer + percent-encoded existing-only `file:` URI `mode=ro`), each with a distinct forcing
+    probe and a distinct leave-one-out failure. `PRAGMA query_only` REJECTED - no probe forces it, so no
+    test could pin it, so it would ship as an undetectably-deletable line. Raw path-to-URI concatenation
+    FORBIDDEN: planted decoys proved `?`, `#` and `%` names open a DIFFERENT ledger, while space,
+    newline and non-ASCII happened to resolve correctly, so a single happy-path test certifies nothing.
+    Two measured defects justify the unit: a write inside a `write=False` block currently COMMITS and
+    persists (ledger sha256 moved), and a read against a deleted ledger CREATES a 0-byte file that a
+    later `Store()` initializes as a fresh empty ledger, laundering deletion into first-run init.
+    Reachability census (MAIN-derived, `ast` over `system.py`): all 17 read sites and all 12 helpers
+    they hand the connection to are SELECT-only, zero commits, and no non-literal SQL exists in the
+    file - so enforcement breaks no shipped call site and the violation is developer-only, which is what
+    licenses the private non-retryable `_ReadOnlyViolation(CementError)` at CLI exit 2.
+    Open at implementation: re-measure setup cost interleaved (spike artifact and report disagree,
+    1.361x vs 1.024x, neither quotable); map Sections B/C (existing read-only test pins, `sqlite3.connect`
+    sites outside `_connect`) were never delivered and are cheap to derive during implementation.
   - M3.2b tier=kernel tags=oracle depends=M3.2a - one-snapshot P1-P6 verification plus `evaluate` behind
     a pure `resolve`; failed verification, verified miss and verified hit stay distinct; publish durable
     1/1,000/50,000 measurements.

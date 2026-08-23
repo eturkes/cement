@@ -1,0 +1,268 @@
+{
+  "alternative": "ALT-MIN incremental set; final candidate omits PRAGMA query_only",
+  "mechanisms": [
+    "one explicit transaction with owner rollback",
+    "read-allowlisted SQLite authorizer",
+    "percent-encoded existing-only file URI with mode=ro"
+  ],
+  "sqlite_version": "3.53.1",
+  "python_version": "3.13.14",
+  "probes": {
+    "R1_select_user_table": {
+      "id": "R1_select_user_table",
+      "expected": "ok",
+      "outcome": "ok",
+      "exc_type": "",
+      "message": "",
+      "notes": "rows=[('fixture', 'base-marker', 12)]"
+    },
+    "R2_pragma_user_version_read": {
+      "id": "R2_pragma_user_version_read",
+      "expected": "ok",
+      "outcome": "ok",
+      "exc_type": "",
+      "message": "",
+      "notes": "user_version=2"
+    },
+    "R3_pragma_application_id_read": {
+      "id": "R3_pragma_application_id_read",
+      "expected": "ok",
+      "outcome": "ok",
+      "exc_type": "",
+      "message": "",
+      "notes": "application_id=0"
+    },
+    "R4_select_sqlite_schema": {
+      "id": "R4_select_sqlite_schema",
+      "expected": "ok",
+      "outcome": "ok",
+      "exc_type": "",
+      "message": "",
+      "notes": "schema_objects=67; triggers=23"
+    },
+    "R5_validate_ledger_call": {
+      "id": "R5_validate_ledger_call",
+      "expected": "ok",
+      "outcome": "ok",
+      "exc_type": "",
+      "message": "",
+      "notes": "_validate_ledger returned"
+    },
+    "R6_connect_setup_pragmas": {
+      "id": "R6_connect_setup_pragmas",
+      "expected": "ok",
+      "outcome": "ok",
+      "exc_type": "",
+      "message": "",
+      "notes": "foreign_keys=ON -> 1; busy_timeout=10000 -> 10000; synchronous=EXTRA -> 3; temp_store=MEMORY -> 2; trusted_schema=OFF -> 0"
+    },
+    "R7_setconfig_defensive": {
+      "id": "R7_setconfig_defensive",
+      "expected": "ok",
+      "outcome": "ok",
+      "exc_type": "",
+      "message": "",
+      "notes": "setconfig present; DEFENSIVE=True; TRUSTED_SCHEMA=False"
+    },
+    "R8_two_reads_one_snapshot": {
+      "id": "R8_two_reads_one_snapshot",
+      "expected": "ok",
+      "outcome": "ok",
+      "exc_type": "",
+      "message": "",
+      "notes": "in_transaction states=[True, True, True]"
+    },
+    "W1_insert": {
+      "id": "W1_insert",
+      "expected": "denied",
+      "outcome": "denied",
+      "exc_type": "sqlite3.DatabaseError",
+      "message": "not authorized",
+      "notes": "write statement raised"
+    },
+    "W2_update": {
+      "id": "W2_update",
+      "expected": "denied",
+      "outcome": "denied",
+      "exc_type": "sqlite3.DatabaseError",
+      "message": "not authorized",
+      "notes": "write statement raised"
+    },
+    "W3_delete": {
+      "id": "W3_delete",
+      "expected": "denied",
+      "outcome": "denied",
+      "exc_type": "sqlite3.DatabaseError",
+      "message": "not authorized",
+      "notes": "write statement raised"
+    },
+    "W4_create_table": {
+      "id": "W4_create_table",
+      "expected": "denied",
+      "outcome": "denied",
+      "exc_type": "sqlite3.DatabaseError",
+      "message": "not authorized",
+      "notes": "write statement raised"
+    },
+    "W5_drop_trigger": {
+      "id": "W5_drop_trigger",
+      "expected": "denied",
+      "outcome": "denied",
+      "exc_type": "sqlite3.DatabaseError",
+      "message": "not authorized",
+      "notes": "write statement raised"
+    },
+    "W6_alter_table": {
+      "id": "W6_alter_table",
+      "expected": "denied",
+      "outcome": "denied",
+      "exc_type": "sqlite3.DatabaseError",
+      "message": "not authorized",
+      "notes": "write statement raised"
+    },
+    "W7_pragma_user_version_write": {
+      "id": "W7_pragma_user_version_write",
+      "expected": "denied",
+      "outcome": "denied",
+      "exc_type": "sqlite3.DatabaseError",
+      "message": "not authorized",
+      "notes": "write statement raised"
+    },
+    "W8_pragma_journal_mode_wal": {
+      "id": "W8_pragma_journal_mode_wal",
+      "expected": "denied",
+      "outcome": "denied",
+      "exc_type": "sqlite3.DatabaseError",
+      "message": "not authorized",
+      "notes": "write statement raised"
+    },
+    "W9_pragma_application_id_write": {
+      "id": "W9_pragma_application_id_write",
+      "expected": "denied",
+      "outcome": "denied",
+      "exc_type": "sqlite3.DatabaseError",
+      "message": "not authorized",
+      "notes": "write statement raised"
+    },
+    "W10_create_temp_table": {
+      "id": "W10_create_temp_table",
+      "expected": "denied",
+      "outcome": "denied",
+      "exc_type": "sqlite3.DatabaseError",
+      "message": "not authorized",
+      "notes": "write statement raised"
+    },
+    "W11_attach_and_write": {
+      "id": "W11_attach_and_write",
+      "expected": "denied",
+      "outcome": "denied",
+      "exc_type": "sqlite3.DatabaseError",
+      "message": "not authorized",
+      "notes": "write statement raised"
+    },
+    "W12_explicit_commit": {
+      "id": "W12_explicit_commit",
+      "expected": "denied",
+      "outcome": "denied",
+      "exc_type": "INSERT: sqlite3.DatabaseError; COMMIT: sqlite3.DatabaseError",
+      "message": "INSERT: not authorized; COMMIT: not authorized",
+      "notes": "denied steps=INSERT,COMMIT"
+    },
+    "W13_vacuum": {
+      "id": "W13_vacuum",
+      "expected": "denied",
+      "outcome": "denied",
+      "exc_type": "sqlite3.OperationalError",
+      "message": "cannot VACUUM from within a transaction",
+      "notes": "write statement raised"
+    },
+    "W14_savepoint_insert": {
+      "id": "W14_savepoint_insert",
+      "expected": "denied",
+      "outcome": "denied",
+      "exc_type": "sqlite3.DatabaseError",
+      "message": "not authorized",
+      "notes": "write statement raised"
+    },
+    "W15_pragma_foreign_keys_off": {
+      "id": "W15_pragma_foreign_keys_off",
+      "expected": "denied",
+      "outcome": "denied",
+      "exc_type": "sqlite3.DatabaseError",
+      "message": "not authorized",
+      "notes": "write statement raised"
+    },
+    "W16_writable_schema_update": {
+      "id": "W16_writable_schema_update",
+      "expected": "denied",
+      "outcome": "denied",
+      "exc_type": "sqlite3.DatabaseError",
+      "message": "not authorized",
+      "notes": "write statement raised"
+    },
+    "W17_reindex_analyze": {
+      "id": "W17_reindex_analyze",
+      "expected": "denied",
+      "outcome": "denied",
+      "exc_type": "REINDEX: sqlite3.DatabaseError; ANALYZE: sqlite3.DatabaseError",
+      "message": "REINDEX: not authorized; ANALYZE: not authorized",
+      "notes": "REINDEX and ANALYZE both denied"
+    },
+    "S1_iterdump_identical": {
+      "id": "S1_iterdump_identical",
+      "expected": "ok",
+      "outcome": "ok",
+      "exc_type": "",
+      "message": "",
+      "notes": "iterdump bytes=14400; sha256=9974a98d2ce3e754452092ad0962bed46ccac02fa0186393577bb6d03c49f6e7"
+    },
+    "S2_file_bytes_identical": {
+      "id": "S2_file_bytes_identical",
+      "expected": "ok",
+      "outcome": "ok",
+      "exc_type": "",
+      "message": "",
+      "notes": "size=208896; sha256=46c334fed4ddec688a0bd17eef59e3cad4f3042956ffb717351bf109419f0dd4; identical=True"
+    },
+    "S3_missing_file_refused": {
+      "id": "S3_missing_file_refused",
+      "expected": "denied",
+      "outcome": "denied",
+      "exc_type": "sqlite3.OperationalError",
+      "message": "unable to open database file",
+      "notes": "path_absent_after=True"
+    },
+    "S4_uri_hazard_paths": {
+      "id": "S4_uri_hazard_paths",
+      "expected": "ok",
+      "outcome": "ok",
+      "exc_type": "",
+      "message": "",
+      "notes": "active=question: expected='marker-question', actual='marker-question', ok=True | fragment: expected='marker-fragment', actual='marker-fragment', ok=True | percent: expected='marker-percent', actual='marker-percent', ok=True | space: expected='marker-space', actual='marker-space', ok=True | newline: expected='marker-newline', actual='marker-newline', ok=True | non_ascii: expected='marker-non_ascii', actual='marker-non_ascii', ok=True; raw_uri=question: opened -> 'raw-decoy-question' | fragment: opened -> 'raw-decoy-fragment' | percent: opened -> 'raw-decoy-percent' | space: opened -> 'marker-space' | newline: opened -> 'marker-newline' | non_ascii: opened -> 'marker-non_ascii'"
+    },
+    "S5_concurrent_writer_visibility": {
+      "id": "S5_concurrent_writer_visibility",
+      "expected": "ok",
+      "outcome": "ok",
+      "exc_type": "",
+      "message": "",
+      "notes": "counts before=1, inside_after_writer=1, after=2; writer_blocked_at_150ms=True; writer_duration_ms=179.688; journal_mode=DELETE"
+    },
+    "S6_rollback_vs_commit": {
+      "id": "S6_rollback_vs_commit",
+      "expected": "ok",
+      "outcome": "ok",
+      "exc_type": "sqlite3.DatabaseError",
+      "message": "",
+      "notes": "rollback size=208896, sha256=46c334fed4ddec688a0bd17eef59e3cad4f3042956ffb717351bf109419f0dd4, identical=True; commit_states=[True, True]; commit denied: sqlite3.DatabaseError: not authorized; transaction remained active; split_snapshot=False; observed_split=False"
+    },
+    "S7_setup_cost_1000_opens": {
+      "id": "S7_setup_cost_1000_opens",
+      "expected": "ok",
+      "outcome": "ok",
+      "exc_type": "",
+      "message": "",
+      "notes": "measured 1000 interleaved opens each after 20 warmups; current _connect=486.550 us/open (200-open round range=462.998..505.917); alternative=498.115 us/open (range=462.999..524.958); delta=+11.565 us/open; ratio=1.024x"
+    }
+  }
+}
