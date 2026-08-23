@@ -175,6 +175,39 @@ Measured gaps driving the arc:
     SESSION 1 CLOSED at the contract, per the M3.2a oracle protocol: wave 1 + acceptance contract
     (`.agent/decisions/m3u2b-contract.md`, sections 1-11 binding, 12-13 PENDING). Session 2 opens with
     that contract as its entry state and implements. MAIN 30% -> 86% (72K -> 205K).
+    SESSION 2 CLOSED with the implementation landed and the contract corrected; the battery is
+    session 3, exactly as the M3.2a protocol predicts. MAIN 5% -> 92%.
+    Shipped at `b5916a9`: `System.resolve` + `FunctionResolution` + export, +56/-1 production lines
+    across three files against the spike's +34/-1 estimate (delta = docstrings). Suite 600 -> 600.
+    MAIN's own 38-check real-ledger smoke probe is green on shipped bytes and covers all three
+    states, the biconditional both ways, `evaluate` call counts 1/1/0, ledger sha256 + full iterdump
+    stability, event-digest stability, a raising `_now`, a raising `propose`, one
+    `Store.transaction(write=False)`, `in_transaction` at the sixth check, six precedence messages,
+    and both escaping error conditions.
+    CONTRACT ATTACK, the session's yield: 12 findings, 12 accepted, 3 blocking, ZERO code defects and
+    12 claim defects in MAIN's own contract - the FIFTH consecutive unit with that distribution, so
+    the pre-implementation attack is settled as the default dispatch. Three reversed MAIN's own
+    rulings: the `or document is None` mutation-criterion exception (A12, now a killable mutant plus
+    a domain qualifier on section 3's biconditional), the precedence pair set MAIN had also shipped
+    in its own smoke probe (A05, two pairs -> four adjacent-edge pairs), and the cost publication
+    (A09, the harness never called `resolve`).
+    COST REPUBLISHED end to end, the unit's durable obligation, now measuring the shipped method
+    (`m3u2b-resolve-benchmark.py` + `m3u2b-resolve-bench.json`): one resolve at the 50,000 cap =
+    37,228 ms cold hit / 40,170 ms warm miss / 985,568 KiB peak; 1,000 = 644 ms; 1 = 5.3 ms. The
+    resolver adds 4.7% over its components at cap, 4.4% at 1,000, 30% at one entry. Time `N^1.037`.
+    Two RSS exponents are now published because the old single figure was not re-derivable from its
+    own artifact: raw `N^0.774`, incremental `N^1.000`. The no-hidden-cache inference is withdrawn -
+    warm is SLOWER than cold at cap, which bounds a cache below noise rather than proving absence.
+    ORACLE delivered 26/26 probes from the contract alone (`m3u2b-oracle.json`, branch
+    `wt/orc-m3u2b`); the differential is session 3 and is now a field-by-field pass over two
+    committed JSON files keyed by the same corpus ids.
+    RELIABILITY, fourth datapoint, and the first FAILURE under seeding: 2 of 3 delivered. Both the
+    reviewer and the oracle hit `UNKNOWN-CELLS: 0`. `test-m3u2b` filled ZERO of 96 cells across three
+    polls, one flush directive and 58% of its window, and was stopped. Same seed, same validator,
+    same brief shape as the two that delivered, so seeding is necessary and not sufficient; the
+    variable this time was the task, not the scaffolding - enumerating divergences has no partial
+    unit the way filling a probe row does. Section 12 stays PENDING and session 3 re-dispatches
+    phase 1 against the unchanged seed.
     FORK RULED on measurement: the plan draft's prescribed "factor `verify_function` onto a supplied
     connection" is SUPERSEDED and does not ship. It was written before M3.2a landed, and there is no
     nesting to fix - none of the six helpers between `system.py:2952` and `system.py:3363` opens a

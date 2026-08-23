@@ -58,10 +58,12 @@ pinned either way by the `inspect.signature` ABI test - which is the only thing 
 choice safe to make on consistency grounds.
 
 - `input_value` is positional, matching `handle`'s `(partition, operation, input_value)` order.
-- `expected_function_hash` is keyword-only and passes through to `verify_function` unchanged. It is
-  FORCED, not convenience: without it a caller wanting identity pinning plus a lookup must call
-  `verify_function` and then evaluate separately, which is two snapshots - the exact defect this
-  unit exists to remove.
+- `expected_function_hash` is keyword-only and passes through to `verify_function` unchanged. The
+  original rationale is WITHDRAWN on review (A01): it claimed that omitting the parameter costs a
+  caller a second snapshot, and section 11's own C13 refutes that - a caller can pin identity in ONE
+  snapshot with `verify_function(..., expected_function_hash=h)` followed by `evaluate` over the
+  returned document. The parameter ships on the real reason: a resolver that cannot pin the identity
+  it resolved against forces every pinning caller to reimplement the composition by hand.
 - EXACTLY two fields on `FunctionResolution`. No `input_hash`, no flattened `output`, no `matched`
   mirror, no `checks` copy. Every candidate field faces the mutation criterion: ship it only with a
   committed probe that fails when the field's population logic alone is deleted. A convenience
@@ -104,9 +106,14 @@ adjacent pair: exactly 50,000 entries verifies, 50,001 does not.
 
 - A failed verdict is NOT a miss. An unverified function has no answer at all; a verified miss is a
   proven absence within a function that verified. Any consumer collapsing the two is a defect.
-- `match is None` iff `passed is False`. Both directions are pinned; the biconditional is asserted
-  here deliberately because MAIN-authored contracts have repeatedly claimed one where the code
-  implements the other.
+- `match is None` iff `passed is False`, OVER EVERY VERIFICATION `verify_function` PRODUCES. Both
+  directions are pinned; the biconditional is asserted here deliberately because MAIN-authored
+  contracts have repeatedly claimed one where the code implements the other. The domain qualifier is
+  load-bearing and was added on review (A12): `FunctionVerification` carries no invariant binding
+  `passed` to `document`, so a hand-constructed `passed=True, document=None` value reaches `match is
+  None` with `passed is True` and falsifies the unqualified form. `verify_function` never emits that
+  value - `system.py:3355` sets `document=document if passed else None` - so the qualified claim is
+  the true one and the one the battery pins.
 - Evaluation NEVER runs on a failed verdict. `verification.document is None` when `passed is False`,
   so an implementation that evaluated anyway would raise rather than answer; the pin is a spy on
   `evaluate` asserting zero calls, not an assertion about the returned value.
@@ -131,7 +138,13 @@ steps 1-3 internally is idempotent and keeps that method independently safe as a
 
 Precedence is a CONTRACT, not an accident: a call with two invalid arguments reports the earlier one
 in this list. Behavioural tests firing one failure at a time cannot see a reordering, so the battery
-carries explicit multi-invalid pairs (bad partition + bad input; bad operation + bad expected hash).
+carries explicit multi-invalid pairs. The original two pairs (bad partition + bad input; bad
+operation + bad expected hash) are INSUFFICIENT (A05): the permutation
+`operation, partition, input, expected hash` satisfies both while violating both `partition <
+operation` and `expected hash < input`. Four pairs are required, one per ADJACENT edge of the order:
+partition + operation reports partition; operation + expected hash reports operation; expected hash
++ input reports the expected hash; and partition + input reports partition as the end-to-end check.
+Adjacency is the point - a pair spanning two edges cannot localise which one moved.
 
 ## 5. Purity obligations - each pinned independently
 
@@ -145,16 +158,30 @@ Pins, one per obligation, never one composite assertion:
   `UPDATE` passes them.
 - Clock: a `System` whose `_now` raises resolves all three states unchanged.
 - Events: `events()` is byte-identical before and after; the event sequence counter is unchanged.
-- No file creation: `resolve` against a deleted ledger raises and leaves the path absent afterwards.
-- Source: a `System` built with a source whose `propose` raises resolves a miss without calling it.
+- IDs (ADDED, A06): no stated pin detected a discarded allocation, because a wasted
+  `uuid.uuid4()` moves neither the events table nor `sqlite_sequence`. Pin it the way
+  `tests/test_system.py:2530-2531` already does - patch `cement_runtime.system.uuid.uuid4` to raise -
+  across all three states.
+- No file creation (WIDENED, A07): the deleted-ledger probe fails inside `Store.transaction`, before
+  any post-verification branch, so it cannot see a file created on the hit path. Snapshot the full
+  ledger DIRECTORY listing across hit, miss and failed verdict, and keep the deleted-ledger probe for
+  its own separate claim - `resolve` raises and does not recreate the path.
+- Source (WIDENED, A08): the miss case alone leaves a hit-guarded or failed-verdict-guarded call
+  alive. Spy the source object across ALL THREE states and assert zero calls on each; a source whose
+  `propose` raises stays as the belt-and-braces form.
 
 ## 6. Snapshot obligations
 
-- EXACTLY ONE `store.transaction(write=False)` opens per `resolve` call. Pinned by a `wraps=` spy on
-  `Store.transaction` asserting one call with `write=False`, never by a read-only assertion alone:
-  read-only proof and single-snapshot lifetime are separate guarantees.
-- `connection.in_transaction` stays `True` across the whole six-check pass. A mid-method `commit()`
-  splits one snapshot into two while every read-only assertion still holds.
+- EXACTLY ONE `store.transaction(write=False)` opens per `resolve` call THAT REACHES THE LEDGER, and
+  ZERO for a call section 4 rejects. The original universal quantifier contradicted section 4 (A02).
+  The battery pins BOTH counts, by a `wraps=` spy on `Store.transaction`, never by a read-only
+  assertion alone: read-only proof and single-snapshot lifetime are separate guarantees.
+- `connection.in_transaction` stays `True` across the whole six-check pass. The stated hazard is
+  CORRECTED (A03): M3.2a's authorizer denies COMMIT, so a mid-method commit raises
+  `_ReadOnlyViolation` rather than silently splitting the snapshot
+  (`store.py:439,493-496`, `tests/test_read_capability_battery.py:71-81`). The pin survives the
+  correction because it covers what the authorizer cannot - a helper that returns before the sixth
+  check, or a future refactor that ends the block early - so it stays a battery obligation.
 - Evaluation runs over the DOCUMENT VALUE. The document is a self-contained reconstruction, so
   evaluating it after the snapshot ends returns the same answer as evaluating it inside; the battery
   proves that equality rather than assuming it.
@@ -177,6 +204,18 @@ inherited from `verify_function`, not invented here.
 | suspended member, revocation, revision drift, absent current receipt, wrong expected hash, over-capacity set | failed verdict, `passed=False` |
 | structurally corrupt bound content - ABI, report binding, digest, projection (`system.py:3098-3319`) | failed verdict, `passed=False` |
 
+REACHABILITY, corrected on review (A04). The stored-operation-scalar row raises on WRONG TYPE alone
+(`type(...) is not int` / `is not str`, `system.py:2960-2967`), never on a wrong VALUE of the right
+type. All 13 user tables are `STRICT` and those columns are `NOT NULL`, so a type violation is
+unstorable through any supported route: reaching that row needs a schema rewrite, a fabricated row or
+a cursor proxy, and any probe for it is labelled FABRICATED. A wrong-value scalar takes the other
+branch and produces a FAILED VERDICT - measured, three cases, none raising: `revision = 0` fails
+`function-hash-matches-snapshot`; a non-hex `policy_hash` and a malformed `policy_json` each fail
+`current-promotion-receipts` and `function-hash-matches-snapshot`. The same caveat applies to the
+enumeration-count row, which needs a concurrent writer inside one snapshot. So of the five escaping
+conditions, exactly TWO are reachable through supported calls: an unregistered operation and a
+missing or unreadable ledger file.
+
 The last row is inherited, not chosen: those `IntegrityError` raises are LOCAL and every one is
 caught by its own check's `(IntegrityError, ValidationError)` handler, which converts the defect into
 a FALSE check with bounded detail. Only the five conditions above them escape `verify_function`.
@@ -197,9 +236,11 @@ the six local catch sites at `system.py:2973, 3111, 3138, 3145, 3170, 3322`.
 M3.2b deliberately pays the whole promoted-set verification on every call. That is honest only if
 its price is published and rerunnable.
 
-- The unit ships `.agent/decisions/m3u2b-benchmark.py` (`N REPEATS`, rerunnable from committed
-  state) and `.agent/decisions/m3u2b-bench.json`, graded by
-  `uv run python .agent/decisions/m3u2b-validate.py .agent/decisions/m3u2b-bench.json`.
+- The unit ships two harnesses, both `N REPEATS` and both rerunnable from committed state:
+  `.agent/decisions/m3u2b-benchmark.py` -> `m3u2b-bench.json` (components, graded by
+  `uv run python .agent/decisions/m3u2b-validate.py .agent/decisions/m3u2b-bench.json`) and
+  `.agent/decisions/m3u2b-resolve-benchmark.py` -> `m3u2b-resolve-bench.json` (the shipped
+  `System.resolve`, end to end).
 
 MEASURED at `019d040`, 3 repetitions, fixture built through public `System` methods in a separate
 process, each cold sample a fresh process and a fresh `System`. The OS page cache was NOT dropped,
@@ -213,12 +254,36 @@ Environment: Python 3.13.14, SQLite 3.53.1, Intel i7-8650U @ 1.90 GHz.
 | 1,000 | 616.362414 | 607.041677 | 0.060578 | 0.004549 | 48,160 | 619,100 | 11,009 | 7.395446 |
 | 50,000 | 35,550.307898 | 36,461.347339 | 0.100214 | 0.007274 | 985,864 | 31,128,100 | 550,009 | 409.582130 |
 
-These are the numbers every claim about resolver cost must cite.
+That table is a COMPONENT baseline and is labelled one on review (A09): its harness times
+`verify_function` and standalone `evaluate` and never calls `resolve`, which did not exist at
+`019d040`. It cannot see argument validation, the second dispatch or result construction, so it may
+not be cited as the resolver's price.
 
-- ONE RESOLVE AT THE 50,000 CAP COSTS ~35.5 SECONDS AND ~963 MiB. The evaluator is 0.00028% of it;
-  full verification is the entire cost. Scaling 1,000 -> 50,000 is `N^1.037` in time and `N^1.000`
-  in resident memory. Warm reuse buys nothing at cap scale (36.5 s warm against 35.5 s cold), which
-  independently confirms no hidden cache exists.
+END-TO-END, the numbers every claim about resolver cost must cite. Harness
+`.agent/decisions/m3u2b-resolve-benchmark.py` calls the shipped `System.resolve` and nothing else,
+3 repetitions, same separate-process fixture method, same environment, measured at `b5916a9`:
+
+| entries | cold hit ms | warm miss ms | warm failed ms | peak RSS KiB | baseline RSS KiB | document bytes | fixture build s |
+|---|---|---|---|---|---|---|---|
+| 1 | 5.342079 | 2.177807 | 2.094797 | 27,280 | 26,640 | 935 | 0.019 |
+| 1,000 | 643.635097 | 643.216052 | 634.907756 | 47,664 | 28,536 | 619,100 | 8.080 |
+| 50,000 | 37,227.984277 | 40,169.974433 | 38,774.884113 | 985,568 | 28,496 | 31,128,100 | 437.082 |
+
+- ONE RESOLVE AT THE 50,000 CAP COSTS ~37.2 SECONDS AND ~963 MiB. The resolver's own overhead above
+  its components is ~4.7% at cap (37.23 s against the component 35.55 s), ~4.4% at 1,000, and ~30% at
+  a single entry, where fixed validation cost dominates a 4 ms verification. Full verification is
+  still the entire shape of the curve; the evaluator remains 0.00028% of it.
+- Scaling 1,000 -> 50,000 is `N^1.037` in time, re-derived end-to-end at `1.037234`.
+- RESIDENT MEMORY, corrected (A10). The published exponent `N^1.000` is INCREMENTAL - peak RSS minus
+  the process baseline - and the committed component artifact records no baseline at all, so that
+  number was not re-derivable from the artifact backing it. Both figures are now published and both
+  are honest about what they measure: raw peak RSS scales `N^0.774`, incremental RSS scales
+  `N^1.000` (measured `1.000180`). The interpreter and imports are the difference, ~28 MiB flat.
+- WARM REUSE, corrected (A11). At cap the warm calls are SLOWER than the cold one (40.2 s and 38.8 s
+  against 37.2 s), so warm reuse buys nothing measurable. The original inference - that this
+  "independently confirms no hidden cache exists" - is withdrawn: timing equivalence bounds a cache's
+  benefit below run-to-run noise and cannot establish absence. Absence rests on the code, where no
+  resolver path stores state between calls.
 - The full 50,000-entry set verifies successfully; `FUNCTION_MAX_ENTRIES` is a reachable working
   maximum, not an aspirational one. No bisect was needed and no point is interpolated.
 - MAIN re-derived the n1 point from committed state: cold 4.159849 ms, warm 1.830171 ms, within
@@ -303,20 +368,88 @@ if not verification.passed or document is None:
     return FunctionResolution(verification=verification, match=None)
 ```
 
-`or document is None` is UNFORCED and ships anyway. That is a deliberate exception to the mutation
-criterion, and the distinction is the reason: M3.2a deleted `PRAGMA query_only` because an unforced
-ENFORCEMENT line carries a defence-in-depth claim nothing verifies. This clause carries no claim and
-has no runtime effect on any reachable state - `system.py:3355` sets `document=document if passed
-else None`, and `passed` requires the P5 build that produced it - so it is a type-narrowing device,
-not a check. Consequences, both binding: the battery pins `passed` alone and writes NO probe for the
-second disjunct, and the mutation catalogue pre-registers deleting `or document is None` as a
-PROVED-EQUIVALENT mutant with this reason, so the sweep cannot manufacture it as a finding.
+`or document is None` ships. The original justification - unforced, no runtime effect on any
+reachable state, therefore a deliberate exception to the mutation criterion - is WITHDRAWN (A12).
+The clause IS forcible from the public surface: `FunctionVerification` is a public dataclass with no
+invariant binding `passed` to `document`, so `FunctionVerification(passed=True, entries=0,
+document=None, function_hash=None, checks=())` is constructible, and a subclass or mock of the public
+`verify_function` returning it reaches `resolve` through ordinary Python. Measured on that probe:
+with the clause, `match is None`; with it deleted, `evaluate(None, ...)` raises
+`AttributeError: 'NoneType' object has no attribute 'input_hashes'`. Consequences, both binding and
+both reversed from the original ruling: the battery WRITES that probe, and the mutation catalogue
+pre-registers deleting `or document is None` as a KILLABLE mutant, never a proved-equivalent one.
+The clause is therefore an ordinary defensive check meeting the standard criterion, and M3.2b takes
+no exception to it. Note what the probe is and is not: mock-reachable, not real-ledger reachable, so
+it is labelled FABRICATED like every other probe of an API-unreachable state.
 
 ## 12. Verdict table - MAIN-final
 
-`PENDING` the diff-blind `test` teammate's phase-1 divergence table, ruled by MAIN before
-implementation.
+STILL `PENDING`, and the reason is a delivery failure, not a decision. `test-m3u2b` was dispatched
+diff-blind with the validator and an all-`unknown` 16-row seed committed before dispatch, ran to 58%
+of its window across three polls plus one explicit flush directive, and filled ZERO cells; it was
+stopped at session close. Its worktree branch `wt/test-m3u2b` holds no rows. Session 3 re-dispatches
+phase 1 as `test-m3u2b-2` against the seed, which is unchanged and still graded by the same command.
+
+What implementation ran against instead, stated plainly so no reader mistakes this for a ruled
+table: sections 1-11 as written, plus MAIN's own 38-check real-ledger smoke probe
+(`.scratch/m3u2b-smoke.py`, all green at `b5916a9`), plus the twelve review findings in section 13.
+The divergence table's distinct value - readings MAIN did not think to question - is UNBOUGHT, and
+that gap is the honest state of this unit going into its battery session.
 
 ## 13. Review dispositions and differential result
 
-`PENDING` wave-2/3 review and differential.
+### Contract attack, pre-implementation - 12 findings, 12 accepted
+
+`rev-m3u2b`, dispatched against sections 1-11 before any code existed, returned 12 findings and MAIN
+accepted all 12 in substance. Artifact with MAIN's per-finding disposition:
+`.agent/decisions/m3u2b-attack.json` (validator-clean, `UNKNOWN-CELLS: 0`). Branch
+`wt/rev-m3u2b` carries its four batch commits.
+
+Distribution: 3 blocking, 9 major. ZERO were code defects and 12 were claim defects in MAIN's own
+contract - a fifth consecutive unit with that shape, so the pre-implementation contract attack is now
+unambiguously the default dispatch, not an experiment.
+
+Amendments this drove, each landed in the section it corrects: section 2 (A01, withdrawn `FORCED`
+rationale), section 3 (A12, domain qualifier on the biconditional), section 4 (A05, two precedence
+pairs replaced by four adjacent-edge pairs), section 5 (A06/A07/A08, three widened or added purity
+pins), section 6 (A02 quantifier, A03 hazard restatement), section 7 (A04 reachability), section 8
+(A09/A10/A11, below), section 11 (A12, ruling reversed).
+
+Three findings are worth naming for successors because each reverses something MAIN had ruled:
+
+- A12 reversed MAIN's own deliberate exception to the mutation criterion. `or document is None` was
+  pre-registered as a proved-equivalent mutant; it is in fact forcible from the public surface,
+  because `FunctionVerification` binds `passed` to `document` by no invariant. The clause now meets
+  the ordinary criterion and the battery writes the probe. The same construction falsifies the
+  UNQUALIFIED biconditional in section 3, which is why that claim now names its domain.
+- A05 caught a coverage hole MAIN had ALSO shipped in its own smoke probe: two precedence pairs pin
+  only two of three adjacent edges, and the permutation `operation, partition, input, expected hash`
+  survives both. A reviewer attacking the contract found the defect in MAIN's test design.
+- A09 found the unit's headline durable claim unmeasured: the cost harness times `verify_function`
+  and standalone `evaluate` and never calls `resolve`. Remedied by measurement, not by wording.
+
+Cleared claims, recorded because a cleared claim is evidence and re-clearing it costs a session:
+section 2's decorator recital and alphabetical export position; section 3's six check keys and their
+order, the concrete `passed => document` invariant inside unmodified `verify_function`, the
+over-capacity branch structure, and the zero-entry passing set; section 4's `_name` purity and the
+canonicalization caps; section 6's one-snapshot count on the valid path, `in_transaction` across 15
+samples, and document self-containment; section 7's invalid-argument classes, unregistered-operation
+and missing-ledger mappings, wrong-scalar-TYPE raises, count-mismatch path, and locally caught
+content corruption; section 8's time exponent (`1.036515`) and evaluator share (`0.000282%`);
+section 9's four shipped prose references, all still true; section 11's call graph, confirming no
+supplied-connection core is forced.
+
+### Oracle - independent implementation, 26/26 probes
+
+`orc-m3u2b` implemented sections 2-7 from the contract alone, with no access to MAIN's code, and
+answered all 26 corpus probes `ok`: `.agent/decisions/m3u2b-oracle.json`, implementation
+`oracle/m3u2b_oracle.py` and driver `oracle/driver.py` on branch `wt/orc-m3u2b` at
+`a38d313f89c076c9475de2ad88e11049e1619076`. Observation key names are the ORACLE's, ruled so
+deliberately: a MAIN-prescribed key set would leak MAIN's reading of each probe into the artifact and
+shrink the divergence surface the differential exists to measure. Session 3's differential mirrors
+those keys.
+
+### Differential
+
+`PENDING` session 3. Both observation files now exist in tracked state, keyed by the same
+`ORACLE_PROBES` ids, so the comparison is a field-by-field pass over two committed JSON documents.

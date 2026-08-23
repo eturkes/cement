@@ -1,140 +1,287 @@
 {
-  "kind": "oracle",
-  "unit": "M3.2b",
   "author": "orc-m3u2b",
-  "impl_path": "unknown",
-  "driver_path": "unknown",
-  "commit": "unknown",
+  "commit": "a38d313f89c076c9475de2ad88e11049e1619076",
+  "driver_path": "oracle/driver.py",
+  "impl_path": "oracle/m3u2b_oracle.py",
+  "kind": "oracle",
   "probes": {
     "R01_hit": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "promoted input: passed, matched, output, artifact_hash, document present"
+      "note": "Resolved one promoted input and recorded the complete verified-hit shape.",
+      "observation": {
+        "artifact_hash_equals_promoted_member": true,
+        "artifact_hash_is_64hex": true,
+        "document_present": true,
+        "entries": 3,
+        "matched": true,
+        "output": {
+          "n": 12,
+          "tag": "middle"
+        },
+        "passed": true
+      },
+      "outcome": "ok"
     },
     "R02_miss": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "absent input: passed True, matched False, output None, artifact_hash None"
+      "note": "Resolved one absent input and recorded the complete verified-miss shape.",
+      "observation": {
+        "artifact_hash_is_none": true,
+        "document_present": true,
+        "entries": 3,
+        "matched": false,
+        "output_is_none": true,
+        "passed": true
+      },
+      "outcome": "ok"
     },
     "R03_failed_suspended": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "a suspended member: passed False, match None, document None"
+      "note": "Suspended the hash-ordered middle member, then resolved a failed verdict.",
+      "observation": {
+        "document_is_none": true,
+        "entries": 2,
+        "match_is_none": true,
+        "passed": false
+      },
+      "outcome": "ok"
     },
     "R04_expected_hash_mismatch": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "a wrong expected_function_hash: passed False, match None"
+      "note": "Passed a distinct valid digest and recorded identity-pinning failure.",
+      "observation": {
+        "document_is_none": true,
+        "hash_check_passed": false,
+        "match_is_none": true,
+        "passed": false
+      },
+      "outcome": "ok"
     },
     "R05_no_promoted_set": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "registered operation with nothing promoted: passed, entries, match"
+      "note": "Resolved a registered zero-member operation and recorded its vacuous function.",
+      "observation": {
+        "artifact_hash_is_none": true,
+        "document_present": true,
+        "entries": 0,
+        "matched": false,
+        "output_is_none": true,
+        "passed": true
+      },
+      "outcome": "ok"
     },
     "R06_over_capacity": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "FUNCTION_MAX_ENTRIES patched below the real count: passed False, entries real, match None, no row enumeration"
+      "note": "FABRICATED: patched FUNCTION_MAX_ENTRIES to two over a real three-member set.",
+      "observation": {
+        "all_checks_failed": true,
+        "document_is_none": true,
+        "entries": 3,
+        "enumeration_calls": 0,
+        "match_is_none": true,
+        "passed": false,
+        "patched_capacity": 2
+      },
+      "outcome": "ok"
     },
     "R07_biconditional": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "across every probed state: match is None iff passed is False, both directions"
+      "note": "Checked both implications across one hit, one miss, and one failed verdict.",
+      "observation": {
+        "failed_implies_match_none": true,
+        "match_none_implies_failed": true,
+        "state_count": 3
+      },
+      "outcome": "ok"
     },
     "R08_invalid_partition": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "exact class and message for a rejected partition"
+      "note": "Submitted an empty partition and captured the exact validation exception.",
+      "observation": {
+        "class": "ValidationError",
+        "message": "partition must be 1-128 ASCII letters, digits, '.', '_', ':', '/', or '-'"
+      },
+      "outcome": "ok"
     },
     "R09_invalid_operation": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "exact class and message for a rejected operation"
+      "note": "Submitted an empty operation and captured the exact validation exception.",
+      "observation": {
+        "class": "ValidationError",
+        "message": "operation must be 1-128 ASCII letters, digits, '.', '_', ':', '/', or '-'"
+      },
+      "outcome": "ok"
     },
     "R10_invalid_expected_hash": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "exact class and message for a non-64-hex expected hash"
+      "note": "Submitted a non-digest expected hash and captured the exact exception.",
+      "observation": {
+        "class": "ValidationError",
+        "message": "expected_function_hash must be a SHA-256 hex digest"
+      },
+      "outcome": "ok"
     },
     "R11_uncanonicalizable_input": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "exact class and message for an input canonicalize refuses"
+      "note": "Submitted an object instance that cement-json-v1 cannot canonicalize.",
+      "observation": {
+        "class": "ValidationError",
+        "message": "value of type 'object' is not JSON"
+      },
+      "outcome": "ok"
     },
     "R12_precedence_partition_before_input": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "bad partition AND bad input: which one is reported"
+      "note": "Submitted an empty partition with an uncanonicalizable input to pin precedence.",
+      "observation": {
+        "class": "ValidationError",
+        "message": "partition must be 1-128 ASCII letters, digits, '.', '_', ':', '/', or '-'"
+      },
+      "outcome": "ok"
     },
     "R13_precedence_operation_before_expected_hash": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "bad operation AND bad expected hash: which one is reported"
+      "note": "Submitted an empty operation with a malformed digest to pin precedence.",
+      "observation": {
+        "class": "ValidationError",
+        "message": "operation must be 1-128 ASCII letters, digits, '.', '_', ':', '/', or '-'"
+      },
+      "outcome": "ok"
     },
     "R14_unregistered_operation": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "valid arguments, operation absent from the partition: class and message"
+      "note": "Resolved a valid absent operation and captured the exact not-found exception.",
+      "observation": {
+        "class": "NotFoundError",
+        "message": "operation is not registered in this partition"
+      },
+      "outcome": "ok"
     },
     "R15_oversize_input": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "input above DEFAULT_MAX_BYTES: class, message, and that no ledger read happened"
+      "note": "Submitted canonical JSON above DEFAULT_MAX_BYTES while spying on every ledger entry point.",
+      "observation": {
+        "class": "ValidationError",
+        "message": "canonical JSON exceeds 1048576 bytes",
+        "transaction_calls": 0,
+        "verify_calls": 0
+      },
+      "outcome": "ok"
     },
     "R16_missing_ledger": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "deleted ledger: class, message, and the path still absent afterwards"
+      "note": "Deleted an initialized clone before resolve and checked that no file reappeared.",
+      "observation": {
+        "class": "IntegrityError",
+        "message": "ledger file is missing or unreadable",
+        "path_absent_after": true,
+        "path_absent_before": true
+      },
+      "outcome": "ok"
     },
     "R17_malformed_stored_revision": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "corrupt stored operation scalar: class and message"
+      "note": "Rebuilt the operations table with one non-integer revision, then resolved it.",
+      "observation": {
+        "class": "IntegrityError",
+        "message": "stored operation revision is invalid"
+      },
+      "outcome": "ok"
     },
     "R18_revoked_member": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "a revoked member produces a failed verdict, never an exception"
+      "note": "Revoked evidence for the hash-ordered middle member through the public API.",
+      "observation": {
+        "document_is_none": true,
+        "match_is_none": true,
+        "passed": false,
+        "suspended_dependents": 1
+      },
+      "outcome": "ok"
     },
     "R19_ledger_bytes_stable": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "ledger sha256 AND full iterdump text identical across hit, miss, failed"
+      "note": "Compared ledger SHA-256 and full SQLite iterdump around all three states.",
+      "observation": {
+        "failed": {
+          "iterdump_equal": true,
+          "sha256_equal": true
+        },
+        "hit": {
+          "iterdump_equal": true,
+          "sha256_equal": true
+        },
+        "miss": {
+          "iterdump_equal": true,
+          "sha256_equal": true
+        }
+      },
+      "outcome": "ok"
     },
     "R20_clock_never_read": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "a System whose _now raises answers all three states unchanged"
+      "note": "Compared all three states against Systems whose clock raises on every call.",
+      "observation": {
+        "failed": {
+          "clock_calls": 0,
+          "same_resolution": true
+        },
+        "hit": {
+          "clock_calls": 0,
+          "same_resolution": true
+        },
+        "miss": {
+          "clock_calls": 0,
+          "same_resolution": true
+        }
+      },
+      "outcome": "ok"
     },
     "R21_events_unchanged": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "events() byte-identical and the event sequence counter unmoved"
+      "note": "Compared serialized events and sqlite_sequence around all three resolve states.",
+      "observation": {
+        "failed": {
+          "events_bytes_equal": true,
+          "sequence_equal": true
+        },
+        "hit": {
+          "events_bytes_equal": true,
+          "sequence_equal": true
+        },
+        "miss": {
+          "events_bytes_equal": true,
+          "sequence_equal": true
+        }
+      },
+      "outcome": "ok"
     },
     "R22_source_never_invoked": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "a source whose propose raises resolves a miss without calling it"
+      "note": "Resolved a miss with a CandidateSource that raises if propose is called.",
+      "observation": {
+        "matched": false,
+        "output_is_none": true,
+        "passed": true,
+        "source_calls": 0
+      },
+      "outcome": "ok"
     },
     "R23_one_snapshot": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "exactly one Store.transaction call, write=False, in_transaction True throughout"
+      "note": "Wrapped Store.transaction and sampled in_transaction around every verification query.",
+      "observation": {
+        "all_in_transaction": true,
+        "transaction_calls": 1,
+        "write_false": true
+      },
+      "outcome": "ok"
     },
     "R24_evaluate_call_counts": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "evaluate call count per state: failed 0, miss 1, hit 1"
+      "note": "Spied on function.evaluate separately for failed, hit, and miss states.",
+      "observation": {
+        "failed": 0,
+        "hit": 1,
+        "miss": 1
+      },
+      "outcome": "ok"
     },
     "R25_document_outside_snapshot": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "the returned document evaluated after the snapshot equals evaluating inside it"
+      "note": "Evaluated the reconstructed document inside verification and after snapshot exit.",
+      "observation": {
+        "document_identity_preserved": true,
+        "inside_equals_outside": true,
+        "inside_in_transaction": true
+      },
+      "outcome": "ok"
     },
     "R26_canonical_equivalent_input": {
-      "outcome": "unknown",
-      "observation": "unknown",
-      "note": "a key-reordered equal input resolves to the same hit"
+      "note": "Resolved one promoted object with reversed key insertion order and compared hits.",
+      "observation": {
+        "artifact_hash_equal": true,
+        "canonical_digest_equal": true,
+        "matched_both": true,
+        "output_equal": true
+      },
+      "outcome": "ok"
     }
-  }
+  },
+  "unit": "M3.2b"
 }

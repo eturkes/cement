@@ -1,0 +1,38 @@
+{
+  "kind": "resolve-bench",
+  "points": {
+    "n1": {
+      "document_bytes": 935,
+      "entries": 1,
+      "fixture_build_seconds": 0.019290232,
+      "peak_rss_kib": 27280,
+      "repeats": 3,
+      "resolve_cold_hit_ms": 5.342079,
+      "resolve_warm_failed_ms": 2.094797,
+      "resolve_warm_miss_ms": 2.177807,
+      "rss_before_kib": 26640
+    },
+    "n1000": {
+      "document_bytes": 619100,
+      "entries": 1000,
+      "fixture_build_seconds": 8.080384093,
+      "peak_rss_kib": 47664,
+      "repeats": 3,
+      "resolve_cold_hit_ms": 643.635097,
+      "resolve_warm_failed_ms": 634.907756,
+      "resolve_warm_miss_ms": 643.216052,
+      "rss_before_kib": 28536
+    },
+    "n50000": {
+      "document_bytes": 31128100,
+      "entries": 50000,
+      "fixture_build_seconds": 437.08208057,
+      "peak_rss_kib": 985568,
+      "repeats": 3,
+      "resolve_cold_hit_ms": 37227.984277,
+      "resolve_warm_failed_ms": 38774.884113,
+      "resolve_warm_miss_ms": 40169.974433,
+      "rss_before_kib": 28496
+    }
+  }
+}

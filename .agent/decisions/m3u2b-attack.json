@@ -6,111 +6,111 @@
   "rows": [
     {
       "id": "A01",
-      "lens": "unknown",
-      "anchor": "unknown",
-      "claim_as_written": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": "unknown"
+      "lens": "claim-soundness",
+      "anchor": "§2",
+      "claim_as_written": "It is FORCED, not convenience: without it a caller wanting identity pinning plus a lookup must call `verify_function` and then evaluate separately, which is two snapshots - the exact defect this unit exists to remove.",
+      "evidence": "`src/cement_runtime/system.py:2952` opens the only transaction in `verify_function`; `src/cement_runtime/function.py:381-399` evaluates only `bundle.entries` and `bundle.input_hashes`; `.agent/decisions/m3u2b-compose-probes.py:491-497` evaluates the returned document after transaction closure. `verify_function(..., expected_function_hash=hash)` followed by `evaluate(document, ...)` therefore uses one ledger snapshot, not two.",
+      "severity": "major",
+      "disposition": "ACCEPTED, contract amended §2: rationale withdrawn, parameter ships on the real reason."
     },
     {
       "id": "A02",
-      "lens": "unknown",
-      "anchor": "unknown",
-      "claim_as_written": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": "unknown"
+      "lens": "claim-soundness",
+      "anchor": "§6",
+      "claim_as_written": "EXACTLY ONE `store.transaction(write=False)` opens per `resolve` call.",
+      "evidence": "§4 simultaneously requires every invalid argument to fail before any ledger read. Probe: wrap `system.store.transaction`, then call the inherited `system.verify_function('!', 'operation')`; observed `ValidationError: partition must be ...; transaction_calls=0`. Thin `resolve` repeats that validation before delegating, so invalid `resolve` calls must open zero transactions. The universal `per resolve call` claim cannot coexist with §4.",
+      "severity": "blocking",
+      "disposition": "ACCEPTED, contract amended §6: quantifier scoped to calls reaching the ledger; zero-transaction count is now its own pin."
     },
     {
       "id": "A03",
-      "lens": "unknown",
-      "anchor": "unknown",
-      "claim_as_written": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": "unknown"
+      "lens": "correctness-vs-code",
+      "anchor": "§6",
+      "claim_as_written": "A mid-method `commit()` splits one snapshot into two while every read-only assertion still holds.",
+      "evidence": "`src/cement_runtime/store.py:439,493-496` allowlists transaction action `BEGIN` only; COMMIT is denied. Real-ledger probe `with Store(...).transaction(write=False) as connection: connection.commit()` observed `_ReadOnlyViolation: read-only ledger transaction refused a write`. `tests/test_read_capability_battery.py:71-81` pins the same result. A caller commit cannot split this snapshot.",
+      "severity": "major",
+      "disposition": "ACCEPTED, contract amended §6: hazard restated: the M3.2a authorizer denies COMMIT, so a split raises. The in_transaction pin survives for early return and future refactor."
     },
     {
       "id": "A04",
-      "lens": "unknown",
-      "anchor": "unknown",
-      "claim_as_written": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": "unknown"
+      "lens": "correctness-vs-code",
+      "anchor": "§7",
+      "claim_as_written": "Only the five conditions above them escape `verify_function`.",
+      "evidence": "Registered three empty operations, then used raw SQLite updates for `revision=0` (`PRAGMA ignore_check_constraints=ON`), `policy_hash='x'`, and `policy_json='{'`; calling `verify_function` observed, respectively: `RETURNED:passed=False;failed=['function-hash-matches-snapshot']`, `RETURNED:passed=False;failed=['current-promotion-receipts','function-hash-matches-snapshot']`, and the same failed pair. None raised `IntegrityError`. `src/cement_runtime/system.py:2960-2967` rejects wrong scalar types only; semantic malformed values flow into local checks, contrary to the table's unqualified row.",
+      "severity": "blocking",
+      "disposition": "ACCEPTED, contract amended §7: raises are type-only and STRICT/NOT NULL makes them unstorable; exactly two of five escaping conditions are reachable through supported calls. Probes for the rest are labelled FABRICATED."
     },
     {
       "id": "A05",
-      "lens": "unknown",
-      "anchor": "unknown",
-      "claim_as_written": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": "unknown"
+      "lens": "coverage-gap",
+      "anchor": "§4",
+      "claim_as_written": "Behavioural tests firing one failure at a time cannot see a reordering, so the battery carries explicit multi-invalid pairs (bad partition + bad input; bad operation + bad expected hash).",
+      "evidence": "`.agent/decisions/m3u2b-wave2-validate.py:92-93` registers only those two precedence pairs. The wrong order `operation, partition, input_value, expected_function_hash` preserves every single-invalid result, still reports partition for partition+input, and still reports operation for operation+hash. It violates both `partition < operation` and `expected hash < input` while every stated precedence probe stays green.",
+      "severity": "major",
+      "disposition": "ACCEPTED, contract amended §4: two pairs replaced by four adjacent-edge pairs. MAIN smoke probe carried the same insufficient pair set."
     },
     {
       "id": "A06",
-      "lens": "unknown",
-      "anchor": "unknown",
-      "claim_as_written": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": "unknown"
+      "lens": "coverage-gap",
+      "anchor": "§5",
+      "claim_as_written": "No `resolve` path may: write any row, commit, allocate an ID, read the clock, emit an event, suspend, quarantine, revoke, invoke a `CandidateSource`, create a file, or leave a transaction open.",
+      "evidence": "No §5 pin intercepts ID generation. R21 at `.agent/decisions/m3u2b-wave2-validate.py:103` observes events and the event sequence only; compose C9 reads only `sqlite_sequence` (`m3u2b-compose-probes.py:138-145`). A discarded `uuid.uuid4()` changes neither. Existing verification purity tests require the missing mechanism by patching `cement_runtime.system.uuid.uuid4` to raise (`tests/test_system.py:2530-2531`). The same mutant added to `resolve` survives every stated pin.",
+      "severity": "major",
+      "disposition": "ACCEPTED, contract amended §5: uuid.uuid4 patch added as its own pin across all three states."
     },
     {
       "id": "A07",
-      "lens": "unknown",
-      "anchor": "unknown",
-      "claim_as_written": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": "unknown"
+      "lens": "coverage-gap",
+      "anchor": "§5",
+      "claim_as_written": "No file creation: `resolve` against a deleted ledger raises and leaves the path absent afterwards.",
+      "evidence": "The only corresponding corpus item is R16, `deleted ledger ... path still absent` (`.agent/decisions/m3u2b-wave2-validate.py:97`). That path fails inside `Store.transaction` before any post-verification branch. A hit-only `Path('resolve-side-effect').touch()` leaves the ledger hash/dump, events, clock, source-miss probe, and deleted-ledger path unchanged; no stated probe snapshots the surrounding directory on hit, miss, and failed verdict. The pin cannot establish the broader no-file obligation.",
+      "severity": "major",
+      "disposition": "ACCEPTED, contract amended §5: widened to a full ledger-directory snapshot across all three states; the deleted-ledger probe keeps its own separate claim."
     },
     {
       "id": "A08",
-      "lens": "unknown",
-      "anchor": "unknown",
-      "claim_as_written": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": "unknown"
+      "lens": "coverage-gap",
+      "anchor": "§5",
+      "claim_as_written": "Source: a `System` built with a source whose `propose` raises resolves a miss without calling it.",
+      "evidence": "R22 repeats only the miss case (`.agent/decisions/m3u2b-wave2-validate.py:104`). A mutant guarded by `if match.matched: self.candidate_source.propose(...)` calls the source on hits but not misses; a symmetric failed-verdict branch also survives. The other pins observe ledger bytes, clock, events, and files, none of which detects a successful or separately spied source call. Thus the stated pin cannot prove `No resolve path may invoke a CandidateSource`.",
+      "severity": "major",
+      "disposition": "ACCEPTED, contract amended §5: source spied across all three states, zero calls asserted on each."
     },
     {
       "id": "A09",
-      "lens": "unknown",
-      "anchor": "unknown",
-      "claim_as_written": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": "unknown"
+      "lens": "claim-soundness",
+      "anchor": "§8",
+      "claim_as_written": "ONE RESOLVE AT THE 50,000 CAP COSTS ~35.5 SECONDS AND ~963 MiB.",
+      "evidence": "The cited harness never calls `System.resolve`: `.agent/decisions/m3u2b-benchmark.py:246,257` times two separate `verify_function` calls, then lines 265 and 271 time standalone `evaluate` over the warm document. `resolve` does not exist at the measured commit. The artifact is a component baseline, not an end-to-end resolver measurement; it cannot detect added validation, duplicate verification, result construction, or other shipped resolver overhead. The binding resolver-cost claim needs a post-implementation `resolve` sample or narrower wording.",
+      "severity": "major",
+      "disposition": "ACCEPTED, remedied by MEASUREMENT rather than wording. m3u2b-resolve-benchmark.py calls the shipped System.resolve end to end; §8 gains a second published table."
     },
     {
       "id": "A10",
-      "lens": "unknown",
-      "anchor": "unknown",
-      "claim_as_written": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": "unknown"
+      "lens": "claim-soundness",
+      "anchor": "§8",
+      "claim_as_written": "Scaling 1,000 -> 50,000 is `N^1.037` in time and `N^1.000` in resident memory.",
+      "evidence": "Recalculation from the contract table: `log(35550.307898/616.362414)/log(50)=1.036515`, but `log(985864/48160)/log(50)=0.771721` for the published peak-RSS values. `N^1.000` appears only after subtracting separate pre-verify baselines found in bench-note prose: `log((985864-28952)/(48160-29008))/log(50)=0.999816`. §8 neither publishes those baselines in its table nor states that resident memory means baseline-subtracted incremental RSS, so the binding exponent is not reproducible from its declared referent.",
+      "severity": "major",
+      "disposition": "ACCEPTED, contract amended §8: the committed artifact carries no rss_before_kib, so N^1.000 was not re-derivable from it at all. Raw-RSS exponent published; the resolve harness records both baselines."
     },
     {
       "id": "A11",
-      "lens": "unknown",
-      "anchor": "unknown",
-      "claim_as_written": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": "unknown"
+      "lens": "claim-soundness",
+      "anchor": "§8",
+      "claim_as_written": "Warm reuse buys nothing at cap scale (36.5 s warm against 35.5 s cold), which independently confirms no hidden cache exists.",
+      "evidence": "`.agent/decisions/m3u2b-benchmark.py:246-263` records one cold and one warm verification per process and compares three-run medians; its own note says the OS page cache and prior repetitions are uncontrolled. A cache may exist yet save less than run noise or only cache a subset while full reconstruction dominates. Timing equivalence cannot establish absence of hidden state; only an explicit state/code invariant plus a deletion-sensitive probe can. The 36.5-vs-35.5 observation supports `no measured warm speedup`, not `independently confirms no cache`.",
+      "severity": "major",
+      "disposition": "ACCEPTED, contract amended §8: downgraded to no measurable warm-reuse benefit, bounding a cache below run noise instead of proving absence."
     },
     {
       "id": "A12",
-      "lens": "unknown",
-      "anchor": "unknown",
-      "claim_as_written": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": "unknown"
+      "lens": "guarantee-gap",
+      "anchor": "§11",
+      "claim_as_written": "This clause carries no claim and has no runtime effect on any reachable state - `system.py:3355` sets `document=document if passed else None`, and `passed` requires the P5 build that produced it - so it is a type-narrowing device, not a check.",
+      "evidence": "The public slotted dataclass accepts `FunctionVerification(passed=True, entries=0, document=None, function_hash=None, checks=())`; no invariant rejects it (`src/cement_runtime/models.py:337-351`). Probe of the ruled branch observed `optional-document-original=match=None`; deleting `or document is None` then reached `evaluate(None, ...)` and observed `AttributeError: 'NoneType' object has no attribute 'input_hashes'`. That value can reach `resolve` through an ordinary override/mock of public `verify_function`. The disjunct changes runtime behavior, the deletion mutant is not equivalent over the public model domain, and the original branch also violates §3's `match is None iff passed is False`.",
+      "severity": "blocking",
+      "disposition": "ACCEPTED, contract amended §11 and §3, reversing MAIN own ruling: the clause is forcible from the public surface, so it is a KILLABLE mutant and the battery writes the probe. §3 biconditional gains its domain qualifier."
     }
   ]
 }
