@@ -726,8 +726,10 @@ class System:
     ) -> str:
         """Ask the configured candidate source for a candidate, then submit it.
 
-        The call writes one request row, one proposal row, and one
-        ``proposal.created`` event. The source runs outside every transaction
+        Cement writes one request row, one proposal row, one
+        ``proposal.created`` event, and no other row. That count covers Cement's
+        own transaction only; a source that reenters the same ``System`` writes
+        on its own. The source runs outside every transaction
         this call holds, because the source executes adapter code that the caller
         supplies. A source that reenters the same ``System`` opens its own
         transaction, which no library can prevent.

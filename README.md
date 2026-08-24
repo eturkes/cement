@@ -216,8 +216,10 @@ back into the same `System` opens its own transaction, which Cement cannot preve
 return the new proposal identifier as a string.
 
 Each call writes one request row, one proposal row, and one `proposal.created` event. Cement writes
-the three records in one transaction. Cement gives no idempotency here. Two identical calls write two
-proposals and return two different identifiers.
+the three records in one transaction, and it writes no other row. That count covers Cement's own
+transaction only. A source that calls back into the same `System` writes on its own transaction.
+Cement gives no idempotency here. Two identical calls write two proposals and return two different
+identifiers.
 
 `submit_proposal` raises `ValidationError` for a rejected partition, operation, input value, or
 candidate. `propose` raises `StateError` when no candidate source is configured. It raises

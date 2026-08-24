@@ -78,7 +78,7 @@ Measured gaps driving the arc:
   it; under this milestone's own fail-closed no-migration contract nobody does, so it would uniquely pay
   two disposable transient test families plus two mid-milestone rewrites for zero operator value.
 
-  Units - 13, 3 DONE + 10 remaining, executing as 7 waves. `depends` shows the DAG; same-wave units name the same
+  Units - 13, 4 DONE + 9 remaining, executing as 7 waves. `depends` shows the DAG; same-wave units name the same
   predecessor. Tier default `kernel`; `oracle` is kept only where an independent implementation can
   actually diverge, so deletion, forwarding and byte-preserving relocation carry none.
 
@@ -208,7 +208,7 @@ Measured gaps driving the arc:
     Seeding the deliverable is necessary; seeding the row SUBJECTS is what makes a generative
     deliverable resumable. `prod-m3u2b-1` then filled 43 crosswalk rows at 33% of its window and
     self-reported its own boundary slip, which MAIN confirmed reversed before harvest.
-  - M3.3 OPEN tier=kernel tags=oracle depends=M3.1 - request-free direct and source-backed submission
+  - M3.3 DONE tier=kernel tags=oracle depends=M3.1 - request-free direct and source-backed submission
     over unchanged schema v2. Also owns `src/cement_runtime/errors.py`: `CandidateSourceError` stays
     public, its supervised-fallback docstring is rewritten, and both it and an arbitrary `Exception`
     normalize to exact public text with no durable row or event, so a broken source leaks nothing.
@@ -307,25 +307,50 @@ Measured gaps driving the arc:
     A DEAD BRANCH AND A SURVIVING MUTANT ARE ONE FACT SEEN TWICE: `provenance-object-check-deleted`
     survived because `canonicalize(dict).value` is always `dict`, which the review reached
     independently as a KISS defect. Deleting the branch removed the mutant and a section 7 row.
-    S4 ENTRY STATE, closure session. Nothing is owed to a teammate; every worktree and `wt/` branch
-    is removed, including `wt/orc-m3u3-1`, whose evidence survives as the committed probe table.
-    SIX REVIEW ROWS ARE RULED CARRIED and are S4's whole job; each acceptance check is stated
-    verbatim in `.agent/decisions/m3u3-review.json` under `main_ruling`.
-    R06 + R07 - one boundary from two lenses: a `Store` commit that durably succeeds and then raises
-    leaves all three rows committed while the caller sees `StateError` and no proposal id. Scope D15
-    and the public prose to failures before commit, publish the commit-uncertainty window with its
-    recovery route, and apply the shared "submission-attributable" scoping to D01, D07, D09, D15 and
-    D16, each of which currently quantifies over work the SOURCE may perform outside every Cement
-    transaction. R06's blocking half - the interior rollback matrix - is already discharged.
-    Z02 - the D06 single-writer pin spies that both methods CALL the seam, which a one-transaction
-    two-helper split satisfies; ship the AST probe and a split-writer mutant.
-    Z03 - three annotation mutants survive because no test reads annotations; ship one
-    `typing.get_type_hints` ABI test and add the three mutants.
-    Z05 - blocking: `tests/test_submission.py` and `m3u3-smoke.py` count 9 of 13 declared tables, so
-    an extra `schema_metadata` write survives them. The battery's own `sqlite_schema`-derived counter
-    already avoids this; port it and add the mutant.
-    Z06 - D17's SQL spy tests `if table in sql` against raw SQL, so `FROM ARTIFACTS` passes.
-    Normalize identifiers case-insensitively or read authorization events; add the mutant.
+    S4 DONE, closure session, ALL SIX CARRIED ROWS DISCHARGED. `main=` 86% 207K/240K at the
+    roadmap-close point; `mate=` 58% 138K/240K (`prod-m3u3-2`; `rev-m3u3-3` 40% 96K). Shipped at
+    `543d2af` + `e3e8351`. Gate reruns from committed state: 744 tests / 0 failures / OK /
+    175.071 s · smoke 40/40 · sweep 48 mutants / 0 survivors / 0 battery gaps against a green
+    control, verdict modules `tests.test_submission` + `tests.test_submission_battery`.
+    Z05/Z06/Z02/Z03 all closed the same way: the instrument was DERIVED instead of named. Z05 -
+    both `tests/test_submission.py` and `m3u3-smoke.py` now read the table set from `sqlite_schema`
+    under ONE exclusion rule (the `sqlite_` prefix) and assert 13. Z06 - D17's spy became a
+    COMPLEMENT, asserting the application tables named EQUAL the permitted four, over tokenized
+    case-folded identifiers, with the recorder total over `execute`/`executemany`/`executescript`/
+    `cursor()`. Z02 - an AST probe over each public method's `self`-call closure requires exactly
+    ONE writer in it and that it is `_persist_proposal`; closure scoping keeps `handle`'s own writes
+    out. Z03 - one `inspect.signature` + `typing.get_type_hints` test. Corpus 42 -> 48; all six new
+    mutants killed.
+    R06 + R07 CLOSED BY PUBLICATION, NOT BY REPAIR. D45 states SUBMISSION-ATTRIBUTABLE once and
+    scopes D01/D07/D09/D15/D16 to it: BOTH paths execute caller code (the source adapter; the
+    provenance mapping's `keys()`/`__getitem__`), either may reenter and commit, so all five are
+    false read unscoped. D46 publishes the window - `StateError` `database is busy or unavailable`,
+    no proposal id, `{requests:1, proposals:1, events:1}` durable - with enumeration as the recovery
+    route and never retry, since D04 gives no idempotency. D15 now says before-commit; D16 withdraws
+    "no failure reaches commit" as an overclaim.
+    THE WINDOW IS A `Store` PROPERTY, MEASURED: `handle` and `register_operation` exhibit it with
+    the identical class and message (W10, W11), so scoping it inside M3.3's candidate boundary would
+    have misattributed it. Evidence = `.agent/decisions/m3u3-window.json` (12 rows, validator PASS)
+    + `m3u3-window.py`, re-derived by MAIN's own run.
+    TWO CLAIMS THAT MUST NOT MERGE, and the teammate harness caught MAIN merging them: the caller's
+    EXCEPTION SURFACE is identical whether the commit failed before or after durability, but a
+    subsequent READ separates the two (pending count 0 vs 1) - which is exactly why the recovery
+    route works. MAIN's own control had compared durable-raise against success, a different pair,
+    and the first D46 wording read as "unknowable". W12 pins both halves.
+    A DIFF-BLIND EVASION MATRIX IS WORTH ITS DISPATCH: `rev-m3u3-3` filled 18 rows (11 blocking)
+    knowing only the six acceptance checks, never MAIN's diff. Sixteen confirmed MAIN's pins already
+    defeat the evasion - A13's `main."ARTIFACTS"` quoting, A15's `cursor().execute` channel, A12's
+    projection back to nine names, A17's deleted positive control. A01 was a REAL uncaught gap:
+    D45 scoped the contract while `propose`'s docstring and README still claimed the whole call
+    writes three rows, which a reentrant source falsifies. Fixed at `e3e8351`+. Matrix committed as
+    `.agent/decisions/m3u3-s4-attack.json`.
+    SEEDING, sixth and seventh datapoints, both confirming the standing rule and adding one:
+    `prod-m3u3-2` filled 9 of 12 rows in three committed batches unprompted. `rev-m3u3-3` sat at 0
+    of 72 cells across four polls, took ONE flush directive re-ordering fill-before-execute, and
+    delivered all 18 rows at `UNKNOWN-CELLS: 0`. NEW: its report said the directive arrived AFTER it
+    had finished, so a flat poll can mean a long tool call rather than a stall - the directive still
+    cost nothing, but read a frozen gauge plus a frozen transcript mtime together before ruling a
+    teammate stalled.
   - M3.4 tier=kernel tags=oracle depends=M3.3 - freeze request-free proposal/read/review/report/event
     public seams behind one internal binding adapter, schema still v2.
   - M3.5a tier=kernel tags=- depends=M3.2b,M3.4 - add `resolve` and `proposal submit` CLI channels with

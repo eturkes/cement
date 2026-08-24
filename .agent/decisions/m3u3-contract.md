@@ -236,9 +236,17 @@ def propose(
   raises and its three rows are durable anyway. MEASURED against a real ledger, direct path:
   `StateError` with the existing text `database is busy or unavailable`, no proposal ID returned to
   the caller, and delta `{requests: 1, proposals: 1, events: 1}` read from a SEPARATE connection.
-  THE CONTROL IS THE FINDING: the identical injection WITHOUT the raise produces the identical
-  delta, so NO ledger observable distinguishes the two. An operator holding only the exception
-  cannot know whether the proposal exists.
+  THE CONTROL IS THE FINDING, and it is TWO claims that must not be merged. (a) The identical
+  injection WITHOUT the raise produces the identical delta, so a durable-then-raised call and an
+  ordinary success leave the same ledger. (b) The CALLER'S EXCEPTION SURFACE is identical whether the
+  commit failed BEFORE or AFTER durability - same class, message, repr and cause - so an operator
+  holding only the exception cannot know whether the proposal exists. What (b) does NOT say is that
+  the fact is unknowable: a subsequent READ separates the two timings (pending count 0 before
+  durability, 1 after), and that is precisely why the recovery route below works. Measured in
+  `m3u3-window.json` W12: `caller_surfaces_equal` true, `post_failure_read_separates` true.
+  W10 and W11 measure the SCOPE: `handle` and `register_operation` exhibit the identical window with
+  the identical class and message, which is what makes it a seam property rather than a submission
+  one.
   SCOPE. This is a property of the `Store` seam, not of submission: every method in the codebase
   that writes shares it. M3.3 publishes it because M3.3's own D15 would otherwise assert it away.
   RECOVERY ROUTE, and it is enumeration, never retry. Cement gives NO idempotency (D04), so a blind

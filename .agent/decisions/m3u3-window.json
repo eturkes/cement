@@ -4,98 +4,98 @@
     {
       "id": "W01",
       "subject": "direct submit_proposal, commit durably succeeds then raises: caller-visible class + exact message",
-      "method": "unknown",
-      "observed": "unknown",
-      "verdict": "unknown",
-      "reproduction": "unknown"
+      "method": "Injected a sqlite3.Connection factory through store_module.sqlite3.connect; a CREATE TEMP TABLE write transaction proved one intercepted commit, then commit() called super().commit(), returned, and raised sqlite3.OperationalError. Captured the public call result after Store.transaction closed.",
+      "observed": "{\"caller_error_class\":\"StateError\",\"caller_error_message\":\"database is busy or unavailable\",\"caller_proposal_id\":null,\"commit_calls\":1,\"durable_commit_calls\":1,\"positive_control_commit_calls\":1,\"rollback_calls\":0}",
+      "verdict": "A durable direct submission can raise StateError and return no proposal ID.",
+      "reproduction": "uv run python .agent/decisions/m3u3-window.py --row W01"
     },
     {
       "id": "W02",
       "subject": "direct: requests/proposals/events row deltas measured AFTER the raising commit returns",
-      "method": "unknown",
-      "observed": "unknown",
-      "verdict": "unknown",
-      "reproduction": "unknown"
+      "method": "Counted every non-sqlite_% table discovered from sqlite_schema on separate connections before injection and after the raised commit; subtracted all 13 counts.",
+      "observed": "{\"application_table_count\":13,\"application_tables\":[\"artifact_evidence\",\"artifact_tests\",\"artifacts\",\"events\",\"example_revocations\",\"examples\",\"function_memberships\",\"function_receipts\",\"operations\",\"proposals\",\"requests\",\"schema_metadata\",\"test_reports\"],\"changed_table_deltas\":{\"events\":1,\"proposals\":1,\"requests\":1},\"table_deltas\":{\"artifact_evidence\":0,\"artifact_tests\":0,\"artifacts\":0,\"events\":1,\"example_revocations\":0,\"examples\":0,\"function_memberships\":0,\"function_receipts\":0,\"operations\":0,\"proposals\":1,\"requests\":1,\"schema_metadata\":0,\"test_reports\":0}}",
+      "verdict": "The raising commit durably adds exactly one request, proposal, and event and changes no other application table.",
+      "reproduction": "uv run python .agent/decisions/m3u3-window.py --row W02"
     },
     {
       "id": "W03",
       "subject": "direct: does the caller receive any proposal id, and is the minted id discoverable at all",
-      "method": "unknown",
-      "observed": "unknown",
-      "verdict": "unknown",
-      "reproduction": "unknown"
+      "method": "Patched uuid.uuid4 to deterministic values, attempted direct submission, then opened a separate connection after the raise and queried requests(id, proposal_id) and proposals(id).",
+      "observed": "{\"call_raised\":true,\"caller_proposal_id\":null,\"stored_proposal_ids\":[\"prop_00000000000000000000000000000002\"],\"stored_request_bindings\":[{\"proposal_id\":\"prop_00000000000000000000000000000002\",\"request_id\":\"req_00000000000000000000000000000001\"}]}",
+      "verdict": "The caller gets no ID, but the minted proposal ID remains discoverable in the durable request/proposal binding.",
+      "reproduction": "uv run python .agent/decisions/m3u3-window.py --row W03"
     },
     {
       "id": "W04",
       "subject": "source propose, same injected commit: class, message and the same three row deltas",
-      "method": "unknown",
-      "observed": "unknown",
-      "verdict": "unknown",
-      "reproduction": "unknown"
+      "method": "Used the live-controlled Connection factory on System.propose after a one-commit positive control. The source returned one deterministic candidate, commit() called super().commit() and then raised, and a separate post-raise connection counted every live application table.",
+      "observed": "{\"application_table_count\":13,\"caller_error_class\":\"StateError\",\"caller_error_message\":\"database is busy or unavailable\",\"caller_proposal_id\":null,\"changed_table_deltas\":{\"events\":1,\"proposals\":1,\"requests\":1},\"commit_calls\":1,\"durable_commit_calls\":1,\"positive_control_commit_calls\":1,\"read_snapshot_rollbacks\":1,\"source_calls\":1,\"stored_proposal_ids\":[\"prop_00000000000000000000000000000004\"],\"stored_request_bindings\":[{\"proposal_id\":\"prop_00000000000000000000000000000004\",\"request_id\":\"req_00000000000000000000000000000003\"}],\"table_deltas\":{\"artifact_evidence\":0,\"artifact_tests\":0,\"artifacts\":0,\"events\":1,\"example_revocations\":0,\"examples\":0,\"function_memberships\":0,\"function_receipts\":0,\"operations\":0,\"proposals\":1,\"requests\":1,\"schema_metadata\":0,\"test_reports\":0}}",
+      "verdict": "Source-backed submission has the same uncertainty window and durable three-row footprint as direct submission.",
+      "reproduction": "uv run python .agent/decisions/m3u3-window.py --row W04"
     },
     {
       "id": "W05",
       "subject": "recovery route: does system.proposals(partition, status='pending') surface the orphan row",
-      "method": "unknown",
-      "observed": "unknown",
-      "verdict": "unknown",
-      "reproduction": "unknown"
+      "method": "After the direct call raised, removed the injected factory and called system.proposals('tenant_a', status='pending') through a fresh read transaction; projected each returned id, request_id, and status.",
+      "observed": "{\"pending_count\":1,\"pending_ids\":[\"prop_00000000000000000000000000000002\"],\"pending_request_ids\":[\"req_00000000000000000000000000000001\"],\"pending_statuses\":[\"pending\"]}",
+      "verdict": "The pending feed surfaces the orphan and both durable IDs, providing the operator's discovery route.",
+      "reproduction": "uv run python .agent/decisions/m3u3-window.py --row W05"
     },
     {
       "id": "W06",
       "subject": "recovery route: does get_proposal(partition, id) resolve the orphan once its id is known",
-      "method": "unknown",
-      "observed": "unknown",
-      "verdict": "unknown",
-      "reproduction": "unknown"
+      "method": "Took the orphan proposal id from durable storage, then called system.get_proposal('tenant_a', id) through an ordinary fresh read transaction and recorded the returned ProposalView fields.",
+      "observed": "{\"id\":\"prop_00000000000000000000000000000002\",\"input\":{\"k\":1},\"operation\":\"echo_1\",\"operation_revision\":1,\"partition\":\"tenant_a\",\"proposed_output\":{\"v\":10},\"provenance\":{\"model\":\"window\"},\"request_id\":\"req_00000000000000000000000000000001\",\"view_class\":\"ProposalView\"}",
+      "verdict": "Once its ID is known, get_proposal fully resolves the orphan and reveals its bound request and candidate content.",
+      "reproduction": "uv run python .agent/decisions/m3u3-window.py --row W06"
     },
     {
       "id": "W07",
       "subject": "recovery route: can an operator bind the orphan proposal back to its requests row",
-      "method": "unknown",
-      "observed": "unknown",
-      "verdict": "unknown",
-      "reproduction": "unknown"
+      "method": "Compared the proposal and request IDs exposed by proposals(status='pending') and get_proposal with a separate-connection JOIN of proposals.request_id to requests.id and the reciprocal requests.proposal_id binding.",
+      "observed": "{\"all_proposal_ids_equal\":true,\"all_request_ids_equal\":true,\"feed_proposal_id\":\"prop_00000000000000000000000000000002\",\"feed_request_id\":\"req_00000000000000000000000000000001\",\"stored_binding\":{\"proposal_id\":\"prop_00000000000000000000000000000002\",\"proposal_request_id\":\"req_00000000000000000000000000000001\",\"request_id\":\"req_00000000000000000000000000000001\",\"request_proposal_id\":\"prop_00000000000000000000000000000002\"},\"view_request_id\":\"req_00000000000000000000000000000001\"}",
+      "verdict": "The public recovery reads expose the exact request ID, and the durable rows bind both IDs reciprocally.",
+      "reproduction": "uv run python .agent/decisions/m3u3-window.py --row W07"
     },
     {
       "id": "W08",
       "subject": "CONTROL, commit that does not raise: the same observables on an ordinary success",
-      "method": "unknown",
-      "observed": "unknown",
-      "verdict": "unknown",
-      "reproduction": "unknown"
+      "method": "Ran the same deterministic direct submission through the same live-proved Connection factory in pass mode, then captured its return and counted every live application table from a separate connection.",
+      "observed": "{\"application_table_count\":13,\"caller_error_class\":null,\"caller_error_message\":null,\"caller_proposal_id\":\"prop_00000000000000000000000000000006\",\"changed_table_deltas\":{\"events\":1,\"proposals\":1,\"requests\":1},\"commit_calls\":1,\"durable_commit_calls\":1,\"positive_control_commit_calls\":1,\"return_matches_stored\":true,\"rollback_calls\":0,\"stored_proposal_ids\":[\"prop_00000000000000000000000000000006\"],\"stored_request_bindings\":[{\"proposal_id\":\"prop_00000000000000000000000000000006\",\"request_id\":\"req_00000000000000000000000000000005\"}],\"table_deltas\":{\"artifact_evidence\":0,\"artifact_tests\":0,\"artifacts\":0,\"events\":1,\"example_revocations\":0,\"examples\":0,\"function_memberships\":0,\"function_receipts\":0,\"operations\":0,\"proposals\":1,\"requests\":1,\"schema_metadata\":0,\"test_reports\":0}}",
+      "verdict": "Ordinary success has the same durable footprint but returns the exact stored proposal ID and raises nothing.",
+      "reproduction": "uv run python .agent/decisions/m3u3-window.py --row W08"
     },
     {
       "id": "W09",
       "subject": "pre-commit interior write failure: row deltas, commit count, rollback count (re-derive D15's matrix)",
-      "method": "unknown",
-      "observed": "unknown",
-      "verdict": "unknown",
-      "reproduction": "unknown"
+      "method": "For fail_after 1, 2, and 3, Connection.execute performed each application INSERT and then injected sqlite3.IntegrityError. Before arming each trial, a committed TEMP write and a forced-rollback TEMP write positively proved the factory, execute, commit, and rollback spies. Separate-connection snapshots covered all live application tables, event sequence, file SHA-256, and iterdump.",
+      "observed": "{\"trials\":[{\"application_table_count\":13,\"changed_table_deltas\":{},\"commit_calls\":0,\"connection_count\":1,\"dump_equal\":true,\"error_class\":\"IntegrityError\",\"error_message\":\"database operation failed an integrity check\",\"event_sequence_delta\":0,\"fail_after\":1,\"interior_writes\":[\"requests\"],\"positive_control_commit_calls\":1,\"positive_control_commit_connections\":1,\"positive_control_commit_execute_nonempty\":true,\"positive_control_rollback_calls\":1,\"positive_control_rollback_connections\":1,\"positive_control_rollback_execute_nonempty\":true,\"rollback_calls\":1,\"sha256_equal\":true,\"successful_commit_calls\":0,\"table_deltas\":{\"artifact_evidence\":0,\"artifact_tests\":0,\"artifacts\":0,\"events\":0,\"example_revocations\":0,\"examples\":0,\"function_memberships\":0,\"function_receipts\":0,\"operations\":0,\"proposals\":0,\"requests\":0,\"schema_metadata\":0,\"test_reports\":0}},{\"application_table_count\":13,\"changed_table_deltas\":{},\"commit_calls\":0,\"connection_count\":1,\"dump_equal\":true,\"error_class\":\"IntegrityError\",\"error_message\":\"database operation failed an integrity check\",\"event_sequence_delta\":0,\"fail_after\":2,\"interior_writes\":[\"requests\",\"events\"],\"positive_control_commit_calls\":1,\"positive_control_commit_connections\":1,\"positive_control_commit_execute_nonempty\":true,\"positive_control_rollback_calls\":1,\"positive_control_rollback_connections\":1,\"positive_control_rollback_execute_nonempty\":true,\"rollback_calls\":1,\"sha256_equal\":true,\"successful_commit_calls\":0,\"table_deltas\":{\"artifact_evidence\":0,\"artifact_tests\":0,\"artifacts\":0,\"events\":0,\"example_revocations\":0,\"examples\":0,\"function_memberships\":0,\"function_receipts\":0,\"operations\":0,\"proposals\":0,\"requests\":0,\"schema_metadata\":0,\"test_reports\":0}},{\"application_table_count\":13,\"changed_table_deltas\":{},\"commit_calls\":0,\"connection_count\":1,\"dump_equal\":true,\"error_class\":\"IntegrityError\",\"error_message\":\"database operation failed an integrity check\",\"event_sequence_delta\":0,\"fail_after\":3,\"interior_writes\":[\"requests\",\"events\",\"proposals\"],\"positive_control_commit_calls\":1,\"positive_control_commit_connections\":1,\"positive_control_commit_execute_nonempty\":true,\"positive_control_rollback_calls\":1,\"positive_control_rollback_connections\":1,\"positive_control_rollback_execute_nonempty\":true,\"rollback_calls\":1,\"sha256_equal\":true,\"successful_commit_calls\":0,\"table_deltas\":{\"artifact_evidence\":0,\"artifact_tests\":0,\"artifacts\":0,\"events\":0,\"example_revocations\":0,\"examples\":0,\"function_memberships\":0,\"function_receipts\":0,\"operations\":0,\"proposals\":0,\"requests\":0,\"schema_metadata\":0,\"test_reports\":0}}]}",
+      "verdict": "All three interior failures roll back once, never call commit, and leave all 13 application tables, the event sequence, file hash, and dump unchanged.",
+      "reproduction": "uv run python .agent/decisions/m3u3-window.py --row W09"
     },
     {
       "id": "W10",
       "subject": "is the window submission-specific, or does System.handle exhibit it identically",
-      "method": "unknown",
-      "observed": "unknown",
-      "verdict": "unknown",
-      "reproduction": "unknown"
+      "method": "MAIN-derived. Same injected `sqlite3.Connection` whose `commit()` calls `super().commit()` and then raises `OperationalError`, applied to `System.handle` on a registered operation. Deltas read from a separate connection over all 13 derived application tables.",
+      "observed": "`StateError: database is busy or unavailable`, delta `{requests: 1}` durable. Identical class and message to the submission window; the row count differs only because `handle` writes a different row set.",
+      "verdict": "The window is NOT submission-specific. `handle` exhibits it identically, so the property belongs to `Store.transaction`, not to M3.3's methods.",
+      "reproduction": "See the W10/W11 probe recorded in the M3.3 S4 commit body; the injection is the same factory the committed test `test_a_commit_that_succeeds_then_raises_leaves_the_rows_durable` installs."
     },
     {
       "id": "W11",
       "subject": "does a non-submission writer (register_operation or review) exhibit it identically",
-      "method": "unknown",
-      "observed": "unknown",
-      "verdict": "unknown",
-      "reproduction": "unknown"
+      "method": "MAIN-derived. Same injection applied to `System.register_operation`, a non-submission writer on a fresh ledger.",
+      "observed": "`StateError: database is busy or unavailable`, delta `{operations: 1, events: 1}` durable.",
+      "verdict": "A non-submission writer exhibits the identical window, confirming W10: every method that commits through `Store.transaction` shares it. Scoping it inside M3.3's candidate boundary would misattribute a seam property.",
+      "reproduction": "Same probe as W10, with `register_operation` as the action."
     },
     {
       "id": "W12",
       "subject": "any observable separating commit-raised-after-durability from commit-raised-before-durability",
-      "method": "unknown",
-      "observed": "unknown",
-      "verdict": "unknown",
-      "reproduction": "unknown"
+      "method": "MAIN-derived control pair, now the committed pin's second half: the identical injection run twice, once raising after `super().commit()` and once not, with deltas compared over all 13 derived application tables.",
+      "observed": "raise-after-commit -> `StateError`, returned `None`, delta `{requests:1, proposals:1, events:1}`. no-raise control -> returned a `prop_` id, delta `{requests:1, proposals:1, events:1}`. The two deltas are EQUAL; the full row set is the same shape and the same content.",
+      "verdict": "NO observable available to the caller in the ledger separates commit-raised-after-durability from an ordinary success. Only the caller's own return-vs-raise differs, and that is exactly the signal the failing caller cannot trust. This is why the published recovery route is content matching over the partition's pending proposals and never a retry.",
+      "reproduction": "`uv run python -m unittest tests.test_submission.SubmissionTests.test_a_commit_that_succeeds_then_raises_leaves_the_rows_durable` - its control half asserts the equality directly."
     }
   ]
 }
