@@ -698,6 +698,11 @@ class System:
         Raise ``ValidationError`` for a rejected partition, operation, input
         value, or candidate. Raise ``NotFoundError`` when the partition holds no
         such operation.
+
+        A failure before the commit writes nothing. If the commit itself
+        succeeds and then fails, the call raises and returns no identifier while
+        the three rows stay durable. Recover by listing the partition's pending
+        proposals; never retry, because a retry writes a second proposal.
         """
         partition = _name(partition, "partition")
         operation = _name(operation, "operation")
@@ -739,6 +744,11 @@ class System:
         ``CandidateSourceError`` when the source fails; that error carries no
         detail from the source. Raise ``StateError`` when the operation revision
         changes during generation.
+
+        A failure before the commit writes nothing. If the commit itself
+        succeeds and then fails, the call raises and returns no identifier while
+        the three rows stay durable. Recover by listing the partition's pending
+        proposals; never retry, because a retry writes a second proposal.
         """
         partition = _name(partition, "partition")
         operation = _name(operation, "operation")

@@ -395,6 +395,87 @@ class SubmissionTests(unittest.TestCase):
                         call()
                     self.assertEqual(commits, [])
 
+    def test_a_commit_that_succeeds_then_raises_leaves_the_rows_durable(self):
+        """D46: the one window where submission raises and the rows are durable.
+
+        D15 is scoped to failures BEFORE commit precisely because this window
+        exists. `Store.transaction` commits, and a `commit()` that durably
+        succeeds and only then raises maps to `StateError` like any other store
+        failure - so the caller sees a raise, receives no proposal id, and the
+        three rows are committed anyway.
+
+        The control is the load-bearing half: the same injection WITHOUT the
+        raise leaves an identical ledger delta. No observable in the ledger
+        separates the two, which is why the published recovery route is
+        enumeration by partition and never a blind retry.
+        """
+
+        def run(*, raise_after_commit: bool):
+            commits: list[str] = []
+
+            class _CommitThenFail(sqlite3.Connection):
+                def commit(self):
+                    commits.append("commit")
+                    super().commit()
+                    if raise_after_commit:
+                        raise sqlite3.OperationalError("database is locked")
+
+            real_connect = store_module.sqlite3.connect
+
+            def spy_connect(*args, **kwargs):
+                kwargs["factory"] = _CommitThenFail
+                return real_connect(*args, **kwargs)
+
+            system, database, _ = self._make_system()
+            before = self._counts(database)
+            raised: Exception | None = None
+            returned: str | None = None
+            with mock.patch.object(store_module.sqlite3, "connect", spy_connect):
+                try:
+                    returned = system.submit_proposal(
+                        "tenant_a", "echo_1", {"k": 1}, candidate=self._candidate()
+                    )
+                except StateError as error:
+                    raised = error
+            after = self._counts(database)
+            delta = {
+                table: after[table] - before[table]
+                for table in after
+                if after[table] != before[table]
+            }
+            return system, database, commits, raised, returned, delta
+
+        system, database, commits, raised, returned, delta = run(raise_after_commit=True)
+        self.assertEqual(commits, ["commit"], "the commit injection failed to install")
+        self.assertIsNotNone(raised, "the injected commit failure did not reach the caller")
+        self.assertEqual(str(raised), "database is busy or unavailable")
+        self.assertIsNone(returned, "the caller must receive no proposal id")
+        # Durability is read from a SEPARATE connection, never the injected one.
+        self.assertEqual(delta, {"requests": 1, "proposals": 1, "events": 1})
+
+        # The recovery route, exactly as published: enumerate by partition, then
+        # resolve. Both are ordinary read APIs that need no id from the caller.
+        pending = system.proposals("tenant_a", status="pending")
+        self.assertEqual(len(pending), 1)
+        orphan = pending[0]["id"]
+        view = system.get_proposal("tenant_a", orphan)
+        self.assertEqual(view.input, {"k": 1})
+        self.assertEqual(view.proposed_output, {"v": 10})
+        self.assertEqual(
+            self._rows(database, "SELECT proposal_id FROM requests")[0]["proposal_id"],
+            orphan,
+        )
+
+        # Control: identical ledger delta, and the id returned. The ledger cannot
+        # tell the operator which of the two happened.
+        _, _, control_commits, control_raised, control_returned, control_delta = run(
+            raise_after_commit=False
+        )
+        self.assertEqual(control_commits, ["commit"])
+        self.assertIsNone(control_raised)
+        self.assertIsNotNone(control_returned)
+        self.assertEqual(control_delta, delta)
+
     def test_submission_reads_no_artifact_example_or_function_table(self):
         """D17: neither path touches a table outside submission's own four.
 

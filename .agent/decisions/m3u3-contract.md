@@ -230,6 +230,25 @@ def propose(
   name none of the forbidden tables on either path, with the recorded list non-empty as its own
   positive control. One `self._now` call inside the write transaction serves all three rows.
 
+- D46. THE COMMIT-UNCERTAINTY WINDOW, published rather than asserted away. `Store.transaction`
+  commits at block exit. A `commit()` that DURABLY SUCCEEDS and only then raises maps through
+  `_transaction_error` like any other store failure, so ONE window exists in which a submission
+  raises and its three rows are durable anyway. MEASURED against a real ledger, direct path:
+  `StateError` with the existing text `database is busy or unavailable`, no proposal ID returned to
+  the caller, and delta `{requests: 1, proposals: 1, events: 1}` read from a SEPARATE connection.
+  THE CONTROL IS THE FINDING: the identical injection WITHOUT the raise produces the identical
+  delta, so NO ledger observable distinguishes the two. An operator holding only the exception
+  cannot know whether the proposal exists.
+  SCOPE. This is a property of the `Store` seam, not of submission: every method in the codebase
+  that writes shares it. M3.3 publishes it because M3.3's own D15 would otherwise assert it away.
+  RECOVERY ROUTE, and it is enumeration, never retry. Cement gives NO idempotency (D04), so a blind
+  retry writes a SECOND proposal for the same input. The orphan is reachable through ordinary reads
+  that need no ID from the caller: `System.proposals(partition, status="pending")` lists it, its
+  `request_id` binds it to the request row, and `System.get_proposal(partition, proposal_id)`
+  resolves its input and proposed output for content matching. Pinned by
+  `test_a_commit_that_succeeds_then_raises_leaves_the_rows_durable`, whose control half is what pins
+  the indistinguishability claim.
+
 ## 7. Error classification - submission-domain texts RULED
 
 Every text below is published HERE, not merely asserted in a test. A test pins what this section

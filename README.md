@@ -228,6 +228,13 @@ because it captures the revision before it calls the source. `submit_proposal` c
 It binds whatever revision is current under its own write lock, so a concurrent revision change
 cannot make it fail.
 
+A failure before the commit writes nothing. One window is different. If the database commit succeeds
+and then fails, Cement raises `StateError` and returns no identifier, but the three records are
+durable. The ledger then looks the same as a success. Do not retry the call, because Cement gives no
+idempotency and a retry writes a second proposal. To recover, list the pending proposals for the
+partition with `System.proposals`. Then read each candidate with `System.get_proposal` and match your
+own input.
+
 The request row stays internal to this route. The two signatures neither accept nor return its
 identifier. Schema v2 keeps the row, and the existing request and proposal readers still show that
 identifier.

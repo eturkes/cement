@@ -77,7 +77,9 @@
 - Treat results as plans. Re-run live policy and authorization immediately before an effect. Use the
   `handle` request ID as an idempotency key. Stop for reconciliation after uncertain effect commit
   state. `submit_proposal` and `propose` give no idempotency. Each call writes a new proposal. Do not
-  repeat those calls to recover.
+  repeat those calls to recover. A `StateError` from either call does not prove that the proposal is
+  absent, because a database commit can succeed and then fail. List the partition's pending proposals
+  and match your input before you act.
 - Keep provider wrappers pure. Model calls can repeat after timeout or lease recovery.
 - Monitor promoted scopes. When policy or expected behavior changes, challenge them. Revise the
   operation instead of overwriting contradictory history.
