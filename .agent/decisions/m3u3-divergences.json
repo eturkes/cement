@@ -1,0 +1,1644 @@
+{
+  "kind": "divergences",
+  "implementation": "MAIN answers measured by m3u3-probe-driver.py against this worktree's imported cement_runtime.system module.",
+  "rows": [
+    {
+      "id": "Q01",
+      "probe": "direct submission of a caller-supplied candidate: returned type, value shape and id prefix",
+      "verdict": "identical",
+      "main_observation": {
+        "return_class": "str",
+        "return_value": "prop_<32hex>",
+        "id_prefix": "prop_",
+        "hex_length": 32,
+        "lowercase_hex": true,
+        "equals_stored_proposal_id": true
+      },
+      "oracle_observation": {
+        "return_class": "str",
+        "return_value": "prop_<32hex>",
+        "id_prefix": "prop_",
+        "hex_length": 32,
+        "lowercase_hex": true,
+        "equals_stored_proposal_id": true
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q02",
+      "probe": "direct submission durable footprint: per-table row-count delta across every table in the schema",
+      "verdict": "identical",
+      "main_observation": {
+        "table_count": 13,
+        "row_count_delta_by_table": {
+          "artifact_evidence": 0,
+          "artifact_tests": 0,
+          "artifacts": 0,
+          "events": 1,
+          "example_revocations": 0,
+          "examples": 0,
+          "function_memberships": 0,
+          "function_receipts": 0,
+          "operations": 0,
+          "proposals": 1,
+          "requests": 1,
+          "schema_metadata": 0,
+          "test_reports": 0
+        },
+        "changed_tables": {
+          "events": 1,
+          "proposals": 1,
+          "requests": 1
+        }
+      },
+      "oracle_observation": {
+        "table_count": 13,
+        "row_count_delta_by_table": {
+          "artifact_evidence": 0,
+          "artifact_tests": 0,
+          "artifacts": 0,
+          "events": 1,
+          "example_revocations": 0,
+          "examples": 0,
+          "function_memberships": 0,
+          "function_receipts": 0,
+          "operations": 0,
+          "proposals": 1,
+          "requests": 1,
+          "schema_metadata": 0,
+          "test_reports": 0
+        },
+        "changed_tables": {
+          "events": 1,
+          "proposals": 1,
+          "requests": 1
+        }
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q03",
+      "probe": "direct submission event: kind, subject_type, subject_id and the exact payload keys",
+      "verdict": "identical",
+      "main_observation": {
+        "kind": "proposal.created",
+        "subject_type": "proposal",
+        "subject_id": "prop_<32hex>",
+        "subject_id_equals_return": true,
+        "payload": {},
+        "payload_keys": [],
+        "publishes_request_id": false
+      },
+      "oracle_observation": {
+        "kind": "proposal.created",
+        "subject_type": "proposal",
+        "subject_id": "prop_<32hex>",
+        "subject_id_equals_return": true,
+        "payload": {},
+        "payload_keys": [],
+        "publishes_request_id": false
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q04",
+      "probe": "direct request row shape: status, proposal_id, lease_owner, lease_until_us, attempts, operation_revision",
+      "verdict": "identical",
+      "main_observation": {
+        "request_id": "req_<32hex>",
+        "status": "pending",
+        "proposal_id": "prop_<32hex>",
+        "proposal_id_equals_return": true,
+        "lease_owner": null,
+        "lease_until_us": null,
+        "attempts": 1,
+        "operation_revision": 1
+      },
+      "oracle_observation": {
+        "request_id": "req_<32hex>",
+        "status": "pending",
+        "proposal_id": "prop_<32hex>",
+        "proposal_id_equals_return": true,
+        "lease_owner": null,
+        "lease_until_us": null,
+        "attempts": 1,
+        "operation_revision": 1
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q05",
+      "probe": "direct submission while a configured candidate_source raises: source invocation count and the result",
+      "verdict": "identical",
+      "main_observation": {
+        "source_invocations": 0,
+        "return_class": "str",
+        "return_value": "prop_<32hex>",
+        "proposed_output_json": "{\"from\":\"direct\"}",
+        "provenance_json": "{\"path\":\"caller\"}"
+      },
+      "oracle_observation": {
+        "source_invocations": 0,
+        "return_class": "str",
+        "return_value": "prop_<32hex>",
+        "proposed_output_json": "{\"from\":\"direct\"}",
+        "provenance_json": "{\"path\":\"caller\"}"
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q06",
+      "probe": "direct proposals row: output and provenance text plus digests, status, and the status_sequence binding",
+      "verdict": "identical",
+      "main_observation": {
+        "proposed_output_json": "{\"y\":2}",
+        "proposed_output_hash": "9a51a7767c3d6fbab05a874b052aa49174a280702a278208810f9cd1a9ef3afa",
+        "output_hash_matches_sha256": true,
+        "provenance_json": "{\"model\":\"manual\"}",
+        "provenance_hash": "cd309ecbb885f9b82ceab923ff3f73db8a1324a4124ca133e0b4909e7214f2d3",
+        "provenance_hash_matches_sha256": true,
+        "status": "pending",
+        "status_sequence": 2,
+        "event_sequence": 2,
+        "status_sequence_equals_event_sequence": true
+      },
+      "oracle_observation": {
+        "proposed_output_json": "{\"y\":2}",
+        "proposed_output_hash": "9a51a7767c3d6fbab05a874b052aa49174a280702a278208810f9cd1a9ef3afa",
+        "output_hash_matches_sha256": true,
+        "provenance_json": "{\"model\":\"manual\"}",
+        "provenance_hash": "cd309ecbb885f9b82ceab923ff3f73db8a1324a4124ca133e0b4909e7214f2d3",
+        "provenance_hash_matches_sha256": true,
+        "status": "pending",
+        "status_sequence": 2,
+        "event_sequence": 2,
+        "status_sequence_equals_event_sequence": true
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q07",
+      "probe": "source-backed submission: returned type, and the footprint compared with Q02 after id normalization",
+      "verdict": "identical",
+      "main_observation": {
+        "return_class": "str",
+        "return_value": "prop_<32hex>",
+        "source_invocations": 1,
+        "source_row_count_delta_by_table": {
+          "artifact_evidence": 0,
+          "artifact_tests": 0,
+          "artifacts": 0,
+          "events": 1,
+          "example_revocations": 0,
+          "examples": 0,
+          "function_memberships": 0,
+          "function_receipts": 0,
+          "operations": 0,
+          "proposals": 1,
+          "requests": 1,
+          "schema_metadata": 0,
+          "test_reports": 0
+        },
+        "direct_row_count_delta_by_table": {
+          "artifact_evidence": 0,
+          "artifact_tests": 0,
+          "artifacts": 0,
+          "events": 1,
+          "example_revocations": 0,
+          "examples": 0,
+          "function_memberships": 0,
+          "function_receipts": 0,
+          "operations": 0,
+          "proposals": 1,
+          "requests": 1,
+          "schema_metadata": 0,
+          "test_reports": 0
+        },
+        "row_count_deltas_equal": true,
+        "normalized_full_footprints_equal": true
+      },
+      "oracle_observation": {
+        "return_class": "str",
+        "return_value": "prop_<32hex>",
+        "source_invocations": 1,
+        "source_row_count_delta_by_table": {
+          "artifact_evidence": 0,
+          "artifact_tests": 0,
+          "artifacts": 0,
+          "events": 1,
+          "example_revocations": 0,
+          "examples": 0,
+          "function_memberships": 0,
+          "function_receipts": 0,
+          "operations": 0,
+          "proposals": 1,
+          "requests": 1,
+          "schema_metadata": 0,
+          "test_reports": 0
+        },
+        "direct_row_count_delta_by_table": {
+          "artifact_evidence": 0,
+          "artifact_tests": 0,
+          "artifacts": 0,
+          "events": 1,
+          "example_revocations": 0,
+          "examples": 0,
+          "function_memberships": 0,
+          "function_receipts": 0,
+          "operations": 0,
+          "proposals": 1,
+          "requests": 1,
+          "schema_metadata": 0,
+          "test_reports": 0
+        },
+        "row_count_deltas_equal": true,
+        "normalized_full_footprints_equal": true
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q08",
+      "probe": "source-backed submission: source invocation count and every field of the CandidateRequest handed over",
+      "verdict": "identical",
+      "main_observation": {
+        "source_invocations": 1,
+        "request_class": "CandidateRequest",
+        "partition": "p",
+        "operation": "op",
+        "operation_revision": 1,
+        "request_id": "req_<32hex>",
+        "request_id_equals_private_row": true,
+        "input": {
+          "x": 1
+        }
+      },
+      "oracle_observation": {
+        "source_invocations": 1,
+        "request_class": "CandidateRequest",
+        "partition": "p",
+        "operation": "op",
+        "operation_revision": 1,
+        "request_id": "req_<32hex>",
+        "request_id_equals_private_row": true,
+        "input": {
+          "x": 1
+        }
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q09",
+      "probe": "connection.in_transaction observed on every Cement-held connection while the source executes",
+      "verdict": "identical",
+      "main_observation": {
+        "source_invocations": 1,
+        "tracked_connections_at_source": 4,
+        "in_transaction_values_at_source": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "any_in_transaction_at_source": false,
+        "all_prior_close_requested": true,
+        "positive_control_in_transaction": true,
+        "result": "prop_<32hex>"
+      },
+      "oracle_observation": {
+        "source_invocations": 1,
+        "tracked_connections_at_source": 4,
+        "in_transaction_values_at_source": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "any_in_transaction_at_source": false,
+        "all_prior_close_requested": true,
+        "positive_control_in_transaction": true,
+        "result": "prop_<32hex>"
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q10",
+      "probe": "the source raises CandidateSourceError: public class, message, __cause__, __context__ and frames",
+      "verdict": "identical",
+      "main_observation": {
+        "class": "CandidateSourceError",
+        "message": "candidate source failed",
+        "cause": null,
+        "context": null,
+        "suppress_context": true,
+        "traceback_frames": [
+          {
+            "file": "m3u3_probes.py",
+            "function": "captured_error"
+          },
+          {
+            "file": "m3u3_probes.py",
+            "function": "<lambda>"
+          },
+          {
+            "file": "system.py",
+            "function": "propose"
+          }
+        ],
+        "source_implementation_frame_present": false,
+        "secret_in_public_surface": false,
+        "source_invocations": 1
+      },
+      "oracle_observation": {
+        "class": "CandidateSourceError",
+        "message": "candidate source failed",
+        "cause": null,
+        "context": null,
+        "suppress_context": true,
+        "traceback_frames": [
+          {
+            "file": "m3u3_probes.py",
+            "function": "captured_error"
+          },
+          {
+            "file": "m3u3_probes.py",
+            "function": "<lambda>"
+          },
+          {
+            "file": "system.py",
+            "function": "propose"
+          }
+        ],
+        "source_implementation_frame_present": false,
+        "secret_in_public_surface": false,
+        "source_invocations": 1
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q11",
+      "probe": "the source raises an arbitrary Exception carrying a planted secret: same observations, secret absent",
+      "verdict": "identical",
+      "main_observation": {
+        "class": "CandidateSourceError",
+        "message": "candidate source failed",
+        "cause": null,
+        "context": null,
+        "suppress_context": true,
+        "traceback_frames": [
+          {
+            "file": "m3u3_probes.py",
+            "function": "captured_error"
+          },
+          {
+            "file": "m3u3_probes.py",
+            "function": "<lambda>"
+          },
+          {
+            "file": "system.py",
+            "function": "propose"
+          }
+        ],
+        "source_implementation_frame_present": false,
+        "secret_in_message": false,
+        "secret_in_repr": false,
+        "secret_in_traceback": false,
+        "secret_in_public_surface": false,
+        "source_invocations": 1
+      },
+      "oracle_observation": {
+        "class": "CandidateSourceError",
+        "message": "candidate source failed",
+        "cause": null,
+        "context": null,
+        "suppress_context": true,
+        "traceback_frames": [
+          {
+            "file": "m3u3_probes.py",
+            "function": "captured_error"
+          },
+          {
+            "file": "m3u3_probes.py",
+            "function": "<lambda>"
+          },
+          {
+            "file": "system.py",
+            "function": "propose"
+          }
+        ],
+        "source_implementation_frame_present": false,
+        "secret_in_message": false,
+        "secret_in_repr": false,
+        "secret_in_traceback": false,
+        "secret_in_public_surface": false,
+        "source_invocations": 1
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q12",
+      "probe": "propose with candidate_source None: class, message and source invocation count",
+      "verdict": "identical",
+      "main_observation": {
+        "class": "StateError",
+        "message": "candidate source is not configured",
+        "source_invocations": 0,
+        "transaction_count": 0,
+        "transaction_modes": []
+      },
+      "oracle_observation": {
+        "class": "StateError",
+        "message": "candidate source is not configured",
+        "source_invocations": 0,
+        "transaction_count": 0,
+        "transaction_modes": []
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q13",
+      "probe": "the source returns a non-Candidate or a malformed provenance: class and exact message",
+      "verdict": "identical",
+      "main_observation": {
+        "non_candidate_class": "CandidateSourceError",
+        "non_candidate_message": "candidate source failed",
+        "non_candidate_source_invocations": 1,
+        "malformed_provenance_class": "CandidateSourceError",
+        "malformed_provenance_message": "candidate source failed",
+        "malformed_provenance_source_invocations": 1,
+        "public_errors_identical": true
+      },
+      "oracle_observation": {
+        "non_candidate_class": "CandidateSourceError",
+        "non_candidate_message": "candidate source failed",
+        "non_candidate_source_invocations": 1,
+        "malformed_provenance_class": "CandidateSourceError",
+        "malformed_provenance_message": "candidate source failed",
+        "malformed_provenance_source_invocations": 1,
+        "public_errors_identical": true
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q14",
+      "probe": "the operation revision changes between generation and the write: class, message and durable footprint",
+      "verdict": "identical",
+      "main_observation": {
+        "class": "StateError",
+        "message": "operation revision changed before proposal submission",
+        "source_invocations": 1,
+        "candidate_request_revision": 1,
+        "revision_returned_inside_source": 2,
+        "revision_at_write_recheck": 2,
+        "requests_delta": 0,
+        "proposals_delta": 0,
+        "proposal_created_events_delta": 0,
+        "all_table_row_count_delta": {
+          "artifact_evidence": 0,
+          "artifact_tests": 0,
+          "artifacts": 0,
+          "events": 1,
+          "example_revocations": 0,
+          "examples": 0,
+          "function_memberships": 0,
+          "function_receipts": 0,
+          "operations": 0,
+          "proposals": 0,
+          "requests": 0,
+          "schema_metadata": 0,
+          "test_reports": 0
+        },
+        "event_kinds_after_call": [
+          "operation.registered",
+          "operation.revised"
+        ]
+      },
+      "oracle_observation": {
+        "class": "StateError",
+        "message": "operation revision changed before proposal submission",
+        "source_invocations": 1,
+        "candidate_request_revision": 1,
+        "revision_returned_inside_source": 2,
+        "revision_at_write_recheck": 2,
+        "requests_delta": 0,
+        "proposals_delta": 0,
+        "proposal_created_events_delta": 0,
+        "all_table_row_count_delta": {
+          "artifact_evidence": 0,
+          "artifact_tests": 0,
+          "artifacts": 0,
+          "events": 1,
+          "example_revocations": 0,
+          "examples": 0,
+          "function_memberships": 0,
+          "function_receipts": 0,
+          "operations": 0,
+          "proposals": 0,
+          "requests": 0,
+          "schema_metadata": 0,
+          "test_reports": 0
+        },
+        "event_kinds_after_call": [
+          "operation.registered",
+          "operation.revised"
+        ]
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q15",
+      "probe": "a bad partition together with a bad input_value: which error is reported",
+      "verdict": "identical",
+      "main_observation": {
+        "direct_class": "ValidationError",
+        "direct_message": "partition must be 1-128 ASCII letters, digits, '.', '_', ':', '/', or '-'",
+        "source_backed_class": "ValidationError",
+        "source_backed_message": "partition must be 1-128 ASCII letters, digits, '.', '_', ':', '/', or '-'",
+        "source_invocations": 0
+      },
+      "oracle_observation": {
+        "direct_class": "ValidationError",
+        "direct_message": "partition must be 1-128 ASCII letters, digits, '.', '_', ':', '/', or '-'",
+        "source_backed_class": "ValidationError",
+        "source_backed_message": "partition must be 1-128 ASCII letters, digits, '.', '_', ':', '/', or '-'",
+        "source_invocations": 0
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q16",
+      "probe": "a bad operation together with a bad input_value: which error is reported",
+      "verdict": "identical",
+      "main_observation": {
+        "direct_class": "ValidationError",
+        "direct_message": "operation must be 1-128 ASCII letters, digits, '.', '_', ':', '/', or '-'",
+        "source_backed_class": "ValidationError",
+        "source_backed_message": "operation must be 1-128 ASCII letters, digits, '.', '_', ':', '/', or '-'",
+        "source_invocations": 0
+      },
+      "oracle_observation": {
+        "direct_class": "ValidationError",
+        "direct_message": "operation must be 1-128 ASCII letters, digits, '.', '_', ':', '/', or '-'",
+        "source_backed_class": "ValidationError",
+        "source_backed_message": "operation must be 1-128 ASCII letters, digits, '.', '_', ':', '/', or '-'",
+        "source_invocations": 0
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q17",
+      "probe": "a bad partition together with an unregistered operation: which error, and transaction count",
+      "verdict": "identical",
+      "main_observation": {
+        "class": "ValidationError",
+        "message": "partition must be 1-128 ASCII letters, digits, '.', '_', ':', '/', or '-'",
+        "transaction_count": 0,
+        "transaction_modes": [],
+        "source_invocations": 0
+      },
+      "oracle_observation": {
+        "class": "ValidationError",
+        "message": "partition must be 1-128 ASCII letters, digits, '.', '_', ':', '/', or '-'",
+        "transaction_count": 0,
+        "transaction_modes": [],
+        "source_invocations": 0
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q18",
+      "probe": "a rejected call: transaction count and source invocation count, each with a positive control",
+      "verdict": "identical",
+      "main_observation": {
+        "rejected_class": "ValidationError",
+        "rejected_message": "value of type 'object' is not JSON",
+        "rejected_transaction_count": 0,
+        "rejected_source_invocations": 0,
+        "transaction_positive_control_count": 2,
+        "transaction_positive_control_modes": [
+          false,
+          true
+        ],
+        "source_positive_control_invocations": 1,
+        "positive_control_result": "prop_<32hex>"
+      },
+      "oracle_observation": {
+        "rejected_class": "ValidationError",
+        "rejected_message": "value of type 'object' is not JSON",
+        "rejected_transaction_count": 0,
+        "rejected_source_invocations": 0,
+        "transaction_positive_control_count": 2,
+        "transaction_positive_control_modes": [
+          false,
+          true
+        ],
+        "source_positive_control_invocations": 1,
+        "positive_control_result": "prop_<32hex>"
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q19",
+      "probe": "submit_proposal called without the candidate keyword: exact TypeError text",
+      "verdict": "identical",
+      "main_observation": {
+        "class": "TypeError",
+        "message": "System.submit_proposal() missing 1 required keyword-only argument: 'candidate'"
+      },
+      "oracle_observation": {
+        "class": "TypeError",
+        "message": "System.submit_proposal() missing 1 required keyword-only argument: 'candidate'"
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q20",
+      "probe": "source= passed to submit_proposal and to propose: exact TypeError text for each",
+      "verdict": "identical",
+      "main_observation": {
+        "submit_class": "TypeError",
+        "submit_message": "System.submit_proposal() got an unexpected keyword argument 'source'",
+        "propose_class": "TypeError",
+        "propose_message": "System.propose() got an unexpected keyword argument 'source'",
+        "source_invocations": 0
+      },
+      "oracle_observation": {
+        "submit_class": "TypeError",
+        "submit_message": "System.submit_proposal() got an unexpected keyword argument 'source'",
+        "propose_class": "TypeError",
+        "propose_message": "System.propose() got an unexpected keyword argument 'source'",
+        "source_invocations": 0
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q21",
+      "probe": "unregistered operation on the source path: class, message, and whether the source ran",
+      "verdict": "identical",
+      "main_observation": {
+        "class": "NotFoundError",
+        "message": "operation is not registered in this partition",
+        "source_invocations_before_error": 0,
+        "transaction_count_before_error": 1,
+        "transaction_modes_before_error": [
+          false
+        ],
+        "source_positive_control_invocations": 1,
+        "positive_control_result": "prop_<32hex>"
+      },
+      "oracle_observation": {
+        "class": "NotFoundError",
+        "message": "operation is not registered in this partition",
+        "source_invocations_before_error": 0,
+        "transaction_count_before_error": 1,
+        "transaction_modes_before_error": [
+          false
+        ],
+        "source_positive_control_invocations": 1,
+        "positive_control_result": "prop_<32hex>"
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q22",
+      "probe": "a failed submission: ledger sha256, full iterdump, row counts and the event sequence counter",
+      "verdict": "identical",
+      "main_observation": {
+        "class": "CandidateSourceError",
+        "message": "candidate source failed",
+        "source_invocations": 1,
+        "ledger_sha256_before": "6139878d7866f57728184c7194e4c4957724288434b0a950f2e793fd0d71a62f",
+        "ledger_sha256_after": "6139878d7866f57728184c7194e4c4957724288434b0a950f2e793fd0d71a62f",
+        "ledger_sha256_equal": true,
+        "iterdump_statement_count_before": 53,
+        "iterdump_statement_count_after": 53,
+        "iterdump_sha256_before": "5707a0bc674a6be55d0f4f1c7d37e6b163c9baa99a5a92575b6d2c07c5217b7c",
+        "iterdump_sha256_after": "5707a0bc674a6be55d0f4f1c7d37e6b163c9baa99a5a92575b6d2c07c5217b7c",
+        "full_iterdump_equal": true,
+        "row_counts_before": {
+          "artifact_evidence": 0,
+          "artifact_tests": 0,
+          "artifacts": 0,
+          "events": 1,
+          "example_revocations": 0,
+          "examples": 0,
+          "function_memberships": 0,
+          "function_receipts": 0,
+          "operations": 1,
+          "proposals": 0,
+          "requests": 0,
+          "schema_metadata": 1,
+          "test_reports": 0
+        },
+        "row_counts_after": {
+          "artifact_evidence": 0,
+          "artifact_tests": 0,
+          "artifacts": 0,
+          "events": 1,
+          "example_revocations": 0,
+          "examples": 0,
+          "function_memberships": 0,
+          "function_receipts": 0,
+          "operations": 1,
+          "proposals": 0,
+          "requests": 0,
+          "schema_metadata": 1,
+          "test_reports": 0
+        },
+        "row_counts_equal": true,
+        "event_sequence_before": 1,
+        "event_sequence_after": 1,
+        "event_sequence_equal": true
+      },
+      "oracle_observation": {
+        "class": "CandidateSourceError",
+        "message": "candidate source failed",
+        "source_invocations": 1,
+        "ledger_sha256_before": "6139878d7866f57728184c7194e4c4957724288434b0a950f2e793fd0d71a62f",
+        "ledger_sha256_after": "6139878d7866f57728184c7194e4c4957724288434b0a950f2e793fd0d71a62f",
+        "ledger_sha256_equal": true,
+        "iterdump_statement_count_before": 53,
+        "iterdump_statement_count_after": 53,
+        "iterdump_sha256_before": "5707a0bc674a6be55d0f4f1c7d37e6b163c9baa99a5a92575b6d2c07c5217b7c",
+        "iterdump_sha256_after": "5707a0bc674a6be55d0f4f1c7d37e6b163c9baa99a5a92575b6d2c07c5217b7c",
+        "full_iterdump_equal": true,
+        "row_counts_before": {
+          "artifact_evidence": 0,
+          "artifact_tests": 0,
+          "artifacts": 0,
+          "events": 1,
+          "example_revocations": 0,
+          "examples": 0,
+          "function_memberships": 0,
+          "function_receipts": 0,
+          "operations": 1,
+          "proposals": 0,
+          "requests": 0,
+          "schema_metadata": 1,
+          "test_reports": 0
+        },
+        "row_counts_after": {
+          "artifact_evidence": 0,
+          "artifact_tests": 0,
+          "artifacts": 0,
+          "events": 1,
+          "example_revocations": 0,
+          "examples": 0,
+          "function_memberships": 0,
+          "function_receipts": 0,
+          "operations": 1,
+          "proposals": 0,
+          "requests": 0,
+          "schema_metadata": 1,
+          "test_reports": 0
+        },
+        "row_counts_equal": true,
+        "event_sequence_before": 1,
+        "event_sequence_after": 1,
+        "event_sequence_equal": true
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q23",
+      "probe": "commit() call count on every failure path through a Connection-subclass factory, with a positive control",
+      "verdict": "identical",
+      "main_observation": {
+        "commit_call_counts": {
+          "positive_write_control": 1,
+          "source_candidate_source_error": 0,
+          "source_arbitrary_exception": 0,
+          "source_invalid_result": 0,
+          "missing_source": 0,
+          "unregistered_operation": 0,
+          "argument_validation": 0,
+          "direct_invalid_candidate": 0,
+          "revision_changed": 0
+        },
+        "positive_control_live": true,
+        "all_failure_counts_zero": true,
+        "connection_factory_class": "CommitConnection"
+      },
+      "oracle_observation": {
+        "commit_call_counts": {
+          "positive_write_control": 1,
+          "source_candidate_source_error": 0,
+          "source_arbitrary_exception": 0,
+          "source_invalid_result": 0,
+          "missing_source": 0,
+          "unregistered_operation": 0,
+          "argument_validation": 0,
+          "direct_invalid_candidate": 0,
+          "revision_changed": 0
+        },
+        "positive_control_live": true,
+        "all_failure_counts_zero": true,
+        "connection_factory_class": "CommitConnection"
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q24",
+      "probe": "clock reads during a successful submission: self._now call count and any other clock consulted",
+      "verdict": "identical",
+      "main_observation": {
+        "direct_result": "prop_<32hex>",
+        "direct_self_now_calls": 1,
+        "direct_injected_clock_calls": 1,
+        "direct_system_time_ns_calls": 0,
+        "source_result": "prop_<32hex>",
+        "source_self_now_calls": 1,
+        "source_injected_clock_calls": 1,
+        "source_system_time_ns_calls": 0,
+        "source_invocations": 1
+      },
+      "oracle_observation": {
+        "direct_result": "prop_<32hex>",
+        "direct_self_now_calls": 1,
+        "direct_injected_clock_calls": 1,
+        "direct_system_time_ns_calls": 0,
+        "source_result": "prop_<32hex>",
+        "source_self_now_calls": 1,
+        "source_injected_clock_calls": 1,
+        "source_system_time_ns_calls": 0,
+        "source_invocations": 1
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q25",
+      "probe": "every SELECT executed during a successful submission, by table",
+      "verdict": "identical",
+      "main_observation": {
+        "result": "prop_<32hex>",
+        "select_count": 2,
+        "select_count_by_table": {
+          "operations": 2
+        },
+        "selects": [
+          {
+            "sql": "SELECT revision FROM operations WHERE partition = ? AND name = ?",
+            "parameters": [
+              "p",
+              "op"
+            ]
+          },
+          {
+            "sql": "SELECT revision FROM operations WHERE partition = ? AND name = ?",
+            "parameters": [
+              "p",
+              "op"
+            ]
+          }
+        ],
+        "source_invocations": 1
+      },
+      "oracle_observation": {
+        "result": "prop_<32hex>",
+        "select_count": 2,
+        "select_count_by_table": {
+          "operations": 2
+        },
+        "selects": [
+          {
+            "sql": "SELECT revision FROM operations WHERE partition = ? AND name = ?",
+            "parameters": [
+              "p",
+              "op"
+            ]
+          },
+          {
+            "sql": "SELECT revision FROM operations WHERE partition = ? AND name = ?",
+            "parameters": [
+              "p",
+              "op"
+            ]
+          }
+        ],
+        "source_invocations": 1
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q26",
+      "probe": "the submitted proposal seen through get_proposal, proposal, proposals and function_report",
+      "verdict": "identical",
+      "main_observation": {
+        "proposal_id": "prop_<32hex>",
+        "get_proposal": {
+          "class": "ProposalView",
+          "id": "prop_<32hex>",
+          "request_id": "req_<32hex>",
+          "operation": "op",
+          "operation_revision": 1,
+          "input": {
+            "x": 1
+          },
+          "proposed_output": {
+            "y": 2
+          },
+          "provenance": {
+            "model": "manual"
+          },
+          "created_at_us": "<timestamp_us>"
+        },
+        "proposal": {
+          "class": "dict",
+          "id": "prop_<32hex>",
+          "request_id": "req_<32hex>",
+          "status": "pending",
+          "input": {
+            "x": 1
+          },
+          "proposed_output": {
+            "y": 2
+          },
+          "provenance": {
+            "model": "manual"
+          }
+        },
+        "proposals": {
+          "class": "list",
+          "count": 1,
+          "id": "prop_<32hex>",
+          "request_id": "req_<32hex>",
+          "status": "pending"
+        },
+        "function_report": {
+          "class": "FunctionReport",
+          "operation_revision": 1,
+          "pending_proposal_count": 1,
+          "projected_pending_count": 1,
+          "proposal_id": "prop_<32hex>",
+          "request_id": "req_<32hex>",
+          "gap_operation_revision": 1,
+          "input_hash": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+        },
+        "all_proposal_ids_equal": true,
+        "all_request_ids_equal": true
+      },
+      "oracle_observation": {
+        "proposal_id": "prop_<32hex>",
+        "get_proposal": {
+          "class": "ProposalView",
+          "id": "prop_<32hex>",
+          "request_id": "req_<32hex>",
+          "operation": "op",
+          "operation_revision": 1,
+          "input": {
+            "x": 1
+          },
+          "proposed_output": {
+            "y": 2
+          },
+          "provenance": {
+            "model": "manual"
+          },
+          "created_at_us": "<timestamp_us>"
+        },
+        "proposal": {
+          "class": "dict",
+          "id": "prop_<32hex>",
+          "request_id": "req_<32hex>",
+          "status": "pending",
+          "input": {
+            "x": 1
+          },
+          "proposed_output": {
+            "y": 2
+          },
+          "provenance": {
+            "model": "manual"
+          }
+        },
+        "proposals": {
+          "class": "list",
+          "count": 1,
+          "id": "prop_<32hex>",
+          "request_id": "req_<32hex>",
+          "status": "pending"
+        },
+        "function_report": {
+          "class": "FunctionReport",
+          "operation_revision": 1,
+          "pending_proposal_count": 1,
+          "projected_pending_count": 1,
+          "proposal_id": "prop_<32hex>",
+          "request_id": "req_<32hex>",
+          "gap_operation_revision": 1,
+          "input_hash": "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+        },
+        "all_proposal_ids_equal": true,
+        "all_request_ids_equal": true
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q27",
+      "probe": "review accepting a submitted proposal, then compile and promote, end to end",
+      "verdict": "identical",
+      "main_observation": {
+        "first_proposal": "prop_<32hex>",
+        "first_review": {
+          "class": "Resolved",
+          "source": "confirmed",
+          "output": {
+            "y": 2
+          },
+          "example_id": "ex_<32hex>"
+        },
+        "second_proposal": "prop_<32hex>",
+        "second_review": {
+          "class": "Resolved",
+          "source": "confirmed",
+          "output": {
+            "y": 2
+          },
+          "example_id": "ex_<32hex>"
+        },
+        "compile": {
+          "created": [
+            "art_<32hex>"
+          ],
+          "existing": [],
+          "blocked": []
+        },
+        "verification": {
+          "class": "VerificationReport",
+          "report_id": "report_<32hex>",
+          "artifact_id": "art_<32hex>",
+          "passed": true,
+          "tests": 8,
+          "failures": []
+        },
+        "promotion": {
+          "class": "Promotion",
+          "artifact_id": "art_<32hex>",
+          "replaced_artifact_ids": [],
+          "promoted_at_us": "<timestamp_us>"
+        },
+        "post_promotion_handle": {
+          "class": "Resolved",
+          "request_id": "q27-resolution",
+          "output": {
+            "y": 2
+          },
+          "source": "artifact",
+          "artifact_id": "art_<32hex>"
+        },
+        "proposal_statuses": [
+          "accepted",
+          "accepted"
+        ],
+        "request_statuses": [
+          "resolved",
+          "resolved",
+          "resolved"
+        ],
+        "artifact_status": "promoted",
+        "artifact_support": 2,
+        "artifact_reviewer_count": 2,
+        "row_counts": {
+          "artifact_evidence": 2,
+          "artifact_tests": 8,
+          "artifacts": 1,
+          "events": 9,
+          "example_revocations": 0,
+          "examples": 2,
+          "function_memberships": 0,
+          "function_receipts": 0,
+          "operations": 1,
+          "proposals": 2,
+          "requests": 3,
+          "schema_metadata": 1,
+          "test_reports": 1
+        }
+      },
+      "oracle_observation": {
+        "first_proposal": "prop_<32hex>",
+        "first_review": {
+          "class": "Resolved",
+          "source": "confirmed",
+          "output": {
+            "y": 2
+          },
+          "example_id": "ex_<32hex>"
+        },
+        "second_proposal": "prop_<32hex>",
+        "second_review": {
+          "class": "Resolved",
+          "source": "confirmed",
+          "output": {
+            "y": 2
+          },
+          "example_id": "ex_<32hex>"
+        },
+        "compile": {
+          "created": [
+            "art_<32hex>"
+          ],
+          "existing": [],
+          "blocked": []
+        },
+        "verification": {
+          "class": "VerificationReport",
+          "report_id": "report_<32hex>",
+          "artifact_id": "art_<32hex>",
+          "passed": true,
+          "tests": 8,
+          "failures": []
+        },
+        "promotion": {
+          "class": "Promotion",
+          "artifact_id": "art_<32hex>",
+          "replaced_artifact_ids": [],
+          "promoted_at_us": "<timestamp_us>"
+        },
+        "post_promotion_handle": {
+          "class": "Resolved",
+          "request_id": "q27-resolution",
+          "output": {
+            "y": 2
+          },
+          "source": "artifact",
+          "artifact_id": "art_<32hex>"
+        },
+        "proposal_statuses": [
+          "accepted",
+          "accepted"
+        ],
+        "request_statuses": [
+          "resolved",
+          "resolved",
+          "resolved"
+        ],
+        "artifact_status": "promoted",
+        "artifact_support": 2,
+        "artifact_reviewer_count": 2,
+        "row_counts": {
+          "artifact_evidence": 2,
+          "artifact_tests": 8,
+          "artifacts": 1,
+          "events": 9,
+          "example_revocations": 0,
+          "examples": 2,
+          "function_memberships": 0,
+          "function_receipts": 0,
+          "operations": 1,
+          "proposals": 2,
+          "requests": 3,
+          "schema_metadata": 1,
+          "test_reports": 1
+        }
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q28",
+      "probe": "byte-identical content submitted twice: proposal ids, request rows, events and any conflict",
+      "verdict": "identical",
+      "main_observation": {
+        "first_proposal_id": "prop_<32hex>",
+        "second_proposal_id": "prop_<32hex>",
+        "proposal_ids_distinct": true,
+        "proposal_row_count": 2,
+        "request_row_count": 2,
+        "proposal_created_event_count": 2,
+        "distinct_request_ids": 2,
+        "proposal_contents_equal": true,
+        "request_inputs_equal": true,
+        "event_subjects_distinct": true,
+        "event_payloads": [
+          {},
+          {}
+        ],
+        "conflict_raised": false
+      },
+      "oracle_observation": {
+        "first_proposal_id": "prop_<32hex>",
+        "second_proposal_id": "prop_<32hex>",
+        "proposal_ids_distinct": true,
+        "proposal_row_count": 2,
+        "request_row_count": 2,
+        "proposal_created_event_count": 2,
+        "distinct_request_ids": 2,
+        "proposal_contents_equal": true,
+        "request_inputs_equal": true,
+        "event_subjects_distinct": true,
+        "event_payloads": [
+          {},
+          {}
+        ],
+        "conflict_raised": false
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q29",
+      "probe": "handle on the same System after a submission: result and durable footprint against the baseline",
+      "verdict": "identical",
+      "main_observation": {
+        "submitted_proposal": "prop_<32hex>",
+        "source_calls_after_submit": 0,
+        "handle_result": {
+          "class": "ReviewRequired",
+          "request_id": "req_<32hex>",
+          "proposal_id": "prop_<32hex>",
+          "status": "review_required"
+        },
+        "source_calls_after_handle": 1,
+        "source_calls_during_handle": 1,
+        "row_count_delta_by_table": {
+          "artifact_evidence": 0,
+          "artifact_tests": 0,
+          "artifacts": 0,
+          "events": 1,
+          "example_revocations": 0,
+          "examples": 0,
+          "function_memberships": 0,
+          "function_receipts": 0,
+          "operations": 0,
+          "proposals": 1,
+          "requests": 1,
+          "schema_metadata": 0,
+          "test_reports": 0
+        },
+        "changed_tables": {
+          "events": 1,
+          "proposals": 1,
+          "requests": 1
+        },
+        "matches_submission_footprint": true,
+        "original_proposal_status": "pending",
+        "handled_request_status": "pending",
+        "handled_request_proposal_matches_result": true
+      },
+      "oracle_observation": {
+        "submitted_proposal": "prop_<32hex>",
+        "source_calls_after_submit": 0,
+        "handle_result": {
+          "class": "ReviewRequired",
+          "request_id": "req_<32hex>",
+          "proposal_id": "prop_<32hex>",
+          "status": "review_required"
+        },
+        "source_calls_after_handle": 1,
+        "source_calls_during_handle": 1,
+        "row_count_delta_by_table": {
+          "artifact_evidence": 0,
+          "artifact_tests": 0,
+          "artifacts": 0,
+          "events": 1,
+          "example_revocations": 0,
+          "examples": 0,
+          "function_memberships": 0,
+          "function_receipts": 0,
+          "operations": 0,
+          "proposals": 1,
+          "requests": 1,
+          "schema_metadata": 0,
+          "test_reports": 0
+        },
+        "changed_tables": {
+          "events": 1,
+          "proposals": 1,
+          "requests": 1
+        },
+        "matches_submission_footprint": true,
+        "original_proposal_status": "pending",
+        "handled_request_status": "pending",
+        "handled_request_proposal_matches_result": true
+      },
+      "divergence": "no divergence: probe, outcome, observation key set, every observation value, and note match exactly.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Q30",
+      "probe": "read-site census: read-transaction sites, write-transaction sites, reached helpers and violations",
+      "verdict": "identical",
+      "main_observation": {
+        "read_transaction_site_count": 18,
+        "read_transaction_site_methods": [
+          "_submission_revision",
+          "request_status",
+          "get_proposal",
+          "proposal",
+          "proposals",
+          "latest_function_receipt",
+          "function_receipts",
+          "function_report",
+          "reconstruct_function_receipt",
+          "verify_function",
+          "inspect_function_promotion",
+          "operations",
+          "examples",
+          "artifacts",
+          "artifact",
+          "report",
+          "reports",
+          "events"
+        ],
+        "write_transaction_site_count": 16,
+        "write_transaction_site_methods": [
+          "register_operation",
+          "revise_operation",
+          "_persist_proposal",
+          "handle",
+          "handle",
+          "_fail_generation",
+          "review",
+          "compile",
+          "verify_drafts",
+          "verify",
+          "promote_function",
+          "promote",
+          "challenge",
+          "challenge",
+          "revoke_example",
+          "suspend_artifact"
+        ],
+        "reached_helper_count": 12,
+        "reached_helpers": [
+          "_current_build_projections",
+          "_function_promotion_entry",
+          "_function_promotion_plan",
+          "_function_report_member",
+          "_operation_report_artifact",
+          "_outcome",
+          "_persisted_function_receipt_check",
+          "_project_current_build",
+          "_reconstruct_function_receipt",
+          "_run_verification",
+          "_validate_promoted",
+          "_validate_report"
+        ],
+        "violations": [],
+        "new_read_site_present": true,
+        "new_write_site_present": true,
+        "successful_submission_transaction_modes": [
+          false,
+          true
+        ],
+        "successful_submission_result": "prop_<32hex>",
+        "successful_submission_source_invocations": 1
+      },
+      "oracle_observation": {
+        "read_transaction_site_count": 18,
+        "read_transaction_site_methods": [
+          "_submission_revision",
+          "request_status",
+          "get_proposal",
+          "proposal",
+          "proposals",
+          "latest_function_receipt",
+          "function_receipts",
+          "function_report",
+          "reconstruct_function_receipt",
+          "verify_function",
+          "inspect_function_promotion",
+          "operations",
+          "examples",
+          "artifacts",
+          "artifact",
+          "report",
+          "reports",
+          "events"
+        ],
+        "write_transaction_site_count": 16,
+        "write_transaction_site_methods": [
+          "register_operation",
+          "revise_operation",
+          "_persist_submission",
+          "handle",
+          "handle",
+          "_fail_generation",
+          "review",
+          "compile",
+          "verify_drafts",
+          "verify",
+          "promote_function",
+          "promote",
+          "challenge",
+          "challenge",
+          "revoke_example",
+          "suspend_artifact"
+        ],
+        "reached_helper_count": 12,
+        "reached_helpers": [
+          "_current_build_projections",
+          "_function_promotion_entry",
+          "_function_promotion_plan",
+          "_function_report_member",
+          "_operation_report_artifact",
+          "_outcome",
+          "_persisted_function_receipt_check",
+          "_project_current_build",
+          "_reconstruct_function_receipt",
+          "_run_verification",
+          "_validate_promoted",
+          "_validate_report"
+        ],
+        "violations": [],
+        "new_read_site_present": true,
+        "new_write_site_present": true,
+        "successful_submission_transaction_modes": [
+          false,
+          true
+        ],
+        "successful_submission_result": "prop_<32hex>",
+        "successful_submission_source_invocations": 1
+      },
+      "divergence": "no divergence: after the explicit Q30 private-seam label substitution _persist_proposal \u2194 _persist_submission, every contract-bearing census and live-execution field joins exactly; Z01 retains the raw name difference.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Z01",
+      "probe": "private persistence seam name: raw MAIN and oracle class-level writer names, with no contract obligation attached",
+      "verdict": "differs",
+      "main_observation": {
+        "implementation": "MAIN",
+        "private_persistence_seams": [
+          "_persist_proposal"
+        ],
+        "seam_count": 1
+      },
+      "oracle_observation": {
+        "implementation": "ORACLE",
+        "private_persistence_seams": [
+          "_persist_submission"
+        ],
+        "seam_count": 1
+      },
+      "divergence": "The private single-writer seam is named _persist_proposal in MAIN and _persist_submission in the oracle. D06 constrains ownership and cardinality, not this private identifier, so the difference carries no contract defect.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Z02",
+      "probe": "direct-path transaction count: live Store.transaction spy plus a read-transaction positive control",
+      "verdict": "differs",
+      "main_observation": {
+        "implementation": "MAIN",
+        "spy_positive_control_modes": [
+          false
+        ],
+        "spy_positive_control_live": true,
+        "direct_transaction_count": 1,
+        "direct_transaction_modes": [
+          true
+        ],
+        "result": "prop_<32hex>"
+      },
+      "oracle_observation": {
+        "implementation": "ORACLE",
+        "spy_positive_control_modes": [
+          false
+        ],
+        "spy_positive_control_live": true,
+        "direct_transaction_count": 2,
+        "direct_transaction_modes": [
+          false,
+          true
+        ],
+        "result": "prop_<32hex>"
+      },
+      "divergence": "Expected divergence 1: direct_transaction_count moves 1 \u2192 2 and direct_transaction_modes moves [true] \u2192 [false, true]. MAIN performs only the authoritative write transaction; the oracle adds an entry read.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Z03",
+      "probe": "direct-path revision race: revise_operation commits immediately before the implementation's persistence seam",
+      "verdict": "differs",
+      "main_observation": {
+        "implementation": "MAIN",
+        "injection_seam": "_persist_proposal",
+        "injection_calls": 1,
+        "revised_revision": 2,
+        "operation_revision_after": 2,
+        "stored_request_operation_revisions": [
+          2
+        ],
+        "stored_revision_matches_current": true,
+        "public_result": {
+          "raised": false,
+          "return_class": "str",
+          "return": "prop_<32hex>"
+        },
+        "requests_delta": 1,
+        "proposals_delta": 1,
+        "proposal_created_events_delta": 1
+      },
+      "oracle_observation": {
+        "implementation": "ORACLE",
+        "injection_seam": "_persist_submission",
+        "injection_calls": 1,
+        "revised_revision": 2,
+        "operation_revision_after": 2,
+        "stored_request_operation_revisions": [],
+        "stored_revision_matches_current": null,
+        "public_result": {
+          "raised": true,
+          "class": "StateError",
+          "message": "operation revision changed before proposal submission"
+        },
+        "requests_delta": 0,
+        "proposals_delta": 0,
+        "proposal_created_events_delta": 0
+      },
+      "divergence": "Expected divergence 1: after the injected revision commit, MAIN returns a proposal and writes one request/proposal/proposal.created event whose request binds the revision current under the write lock; the oracle raises StateError('operation revision changed before proposal submission') and writes none. The seam label also moves as isolated by Z01.",
+      "main_ruling": "unknown"
+    },
+    {
+      "id": "Z04",
+      "probe": "direct-path clock placement: active write-transaction state observed at the injected _now clock read",
+      "verdict": "differs",
+      "main_observation": {
+        "implementation": "MAIN",
+        "clock_spy_positive_control": [
+          {
+            "active_transaction_count": 1,
+            "active_modes": [
+              true
+            ],
+            "in_transaction": [
+              true
+            ]
+          }
+        ],
+        "clock_spy_positive_control_live": true,
+        "direct_clock_read_count": 1,
+        "direct_clock_states": [
+          {
+            "active_transaction_count": 1,
+            "active_modes": [
+              true
+            ],
+            "in_transaction": [
+              true
+            ]
+          }
+        ],
+        "direct_transaction_modes": [
+          true
+        ],
+        "result": "prop_<32hex>"
+      },
+      "oracle_observation": {
+        "implementation": "ORACLE",
+        "clock_spy_positive_control": [
+          {
+            "active_transaction_count": 1,
+            "active_modes": [
+              true
+            ],
+            "in_transaction": [
+              true
+            ]
+          }
+        ],
+        "clock_spy_positive_control_live": true,
+        "direct_clock_read_count": 1,
+        "direct_clock_states": [
+          {
+            "active_transaction_count": 0,
+            "active_modes": [],
+            "in_transaction": []
+          }
+        ],
+        "direct_transaction_modes": [
+          false,
+          true
+        ],
+        "result": "prop_<32hex>"
+      },
+      "divergence": "Expected divergence 2: MAIN's clock observes one active write transaction, while the oracle observes zero active transactions before opening its write. The direct transaction modes also move [true] \u2192 [false, true].",
+      "main_ruling": "unknown"
+    }
+  ]
+}
