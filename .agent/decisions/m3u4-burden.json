@@ -1,0 +1,66 @@
+{
+  "base": "da63741",
+  "stages": [
+    {
+      "broken_tests": 252,
+      "tests_run": 744,
+      "seconds": 137.352,
+      "by_module": {
+        "tests.test_system.SystemTests": 242,
+        "tests.test_submission_battery.SubmissionBatteryTests": 7,
+        "tests.test_submission.SubmissionTests": 2,
+        "tests.test_cli.CLITests": 1
+      },
+      "deepest_frames": {
+        "src/cement_runtime/system.py:1316 in get_proposal": 227,
+        "src/cement_runtime/system.py:2676 in _pending_proposal_gap_from_row": 24,
+        "tests/test_system.py:13448 in test_function_report_public_shape_is_exact_frozen_slotted_and_exported": 1
+      },
+      "distinct_edit_sites": 3,
+      "stage": 1,
+      "gate_returncode": 1
+    },
+    {
+      "broken_tests": 9,
+      "tests_run": 744,
+      "seconds": 145.977,
+      "by_module": {
+        "tests.test_system.SystemTests": 5,
+        "tests.test_submission_battery.SubmissionBatteryTests": 3,
+        "tests.test_cli.CLITests": 1
+      },
+      "deepest_frames": {
+        "tests/test_submission_battery.py:445 in test_d04_domain_identifiers_remain_stored_verbatim": 1,
+        "tests/test_submission_battery.py:827 in test_d14_propose_hands_the_source_a_candidaterequest": 1,
+        "tests/test_submission_battery.py:1411 in test_d23_the_eight_named_seams_still_expose": 1,
+        "tests/test_system.py:15002 in test_function_report_pending_count_reaches_the_10001_tail_with_bounded_detail": 1,
+        "tests/test_system.py:14911 in test_function_report_pending_proposals_bind_partition_operation_request_and_revision": 1,
+        "tests/test_system.py:16753 in test_function_report_pending_request_join_is_like_and_case_exact": 1
+      },
+      "distinct_edit_sites": 9,
+      "stage": 2,
+      "gate_returncode": 1
+    },
+    {
+      "broken_tests": 112,
+      "tests_run": 744,
+      "seconds": 51.004,
+      "by_module": {
+        "tests.test_cli.CLITests": 101,
+        "tests.test_system.SystemTests": 8,
+        "tests.test_submission_battery.SubmissionBatteryTests": 3
+      },
+      "deepest_frames": {
+        "tests/test_cli.py:245 in confirm": 100,
+        "tests/test_cli.py:425 in test_full_operator_lifecycle": 1,
+        "tests/test_submission_battery.py:445 in test_d04_domain_identifiers_remain_stored_verbatim": 1,
+        "tests/test_submission_battery.py:827 in test_d14_propose_hands_the_source_a_candidaterequest": 1,
+        "tests/test_submission_battery.py:1411 in test_d23_the_eight_named_seams_still_expose": 1,
+        "tests/test_system.py:15002 in test_function_report_pending_count_reaches_the_10001_tail_with_bounded_detail": 1
+      },
+      "distinct_edit_sites": 13,
+      "stage": 3,
+      "gate_returncode": 1
+    }
+  ]
+}
