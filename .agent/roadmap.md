@@ -276,7 +276,13 @@ Measured gaps driving the arc:
     does not help when the BRIEF sequences the ungraded half first; order the graded artifact first
     and let the implementation catch up.
     S3 DONE, battery session, ran past one compaction boundary. `main=` 92% 222K/240K at the
-    boundary; `mate=` 98% 235K/240K (`rev-m3u3-2`, the highest teammate reading of the unit).
+    boundary and 96% 230K/240K in the post-compaction close window; `mate=` 99% 239K/240K
+    (`rev-m3u3-2`; `test-m3u3-2` 78% 187K, `diff-m3u3-1` 72% 173K). A REPORT EMITTED AT 99% IS
+    CONTEXT-STARVED: `rev-m3u3-2` delivered 22 complete rows and could not have answered a
+    follow-up, so every one of its findings had to be re-derived by MAIN before action - which is
+    what caught that two of its six blocking-or-material instrument findings were already satisfied
+    by the battery it never read.
+    Gate reruns from committed state: 741 tests, 0 failures, OK, 173.967 s.
     D30 AND X12 ARE BOTH DISCHARGED, which was S3's whole job. D30 publishes three verbatim commands
     and enumerates all 42 mutants by site; X12 ships as D15's fifth pin, the rollback matrix
     injecting after each interior write. MEASURED at close: gate 741 / 0 failures / 0 errors /
