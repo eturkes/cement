@@ -1,0 +1,101 @@
+{
+  "kind": "window",
+  "rows": [
+    {
+      "id": "W01",
+      "subject": "direct submit_proposal, commit durably succeeds then raises: caller-visible class + exact message",
+      "method": "unknown",
+      "observed": "unknown",
+      "verdict": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "W02",
+      "subject": "direct: requests/proposals/events row deltas measured AFTER the raising commit returns",
+      "method": "unknown",
+      "observed": "unknown",
+      "verdict": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "W03",
+      "subject": "direct: does the caller receive any proposal id, and is the minted id discoverable at all",
+      "method": "unknown",
+      "observed": "unknown",
+      "verdict": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "W04",
+      "subject": "source propose, same injected commit: class, message and the same three row deltas",
+      "method": "unknown",
+      "observed": "unknown",
+      "verdict": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "W05",
+      "subject": "recovery route: does system.proposals(partition, status='pending') surface the orphan row",
+      "method": "unknown",
+      "observed": "unknown",
+      "verdict": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "W06",
+      "subject": "recovery route: does get_proposal(partition, id) resolve the orphan once its id is known",
+      "method": "unknown",
+      "observed": "unknown",
+      "verdict": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "W07",
+      "subject": "recovery route: can an operator bind the orphan proposal back to its requests row",
+      "method": "unknown",
+      "observed": "unknown",
+      "verdict": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "W08",
+      "subject": "CONTROL, commit that does not raise: the same observables on an ordinary success",
+      "method": "unknown",
+      "observed": "unknown",
+      "verdict": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "W09",
+      "subject": "pre-commit interior write failure: row deltas, commit count, rollback count (re-derive D15's matrix)",
+      "method": "unknown",
+      "observed": "unknown",
+      "verdict": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "W10",
+      "subject": "is the window submission-specific, or does System.handle exhibit it identically",
+      "method": "unknown",
+      "observed": "unknown",
+      "verdict": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "W11",
+      "subject": "does a non-submission writer (register_operation or review) exhibit it identically",
+      "method": "unknown",
+      "observed": "unknown",
+      "verdict": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "W12",
+      "subject": "any observable separating commit-raised-after-durability from commit-raised-before-durability",
+      "method": "unknown",
+      "observed": "unknown",
+      "verdict": "unknown",
+      "reproduction": "unknown"
+    }
+  ]
+}

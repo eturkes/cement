@@ -1,0 +1,149 @@
+{
+  "kind": "attack",
+  "rows": [
+    {
+      "id": "A01",
+      "subject": "R06/R07 scoping: an evasion where 'submission-attributable' is stated but the prose still overclaims",
+      "evasion": "unknown",
+      "concrete_mutant": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "A02",
+      "subject": "R06/R07 window: a commit-uncertainty publication a reader cannot act on (no recovery route reachable)",
+      "evasion": "unknown",
+      "concrete_mutant": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "A03",
+      "subject": "R06/R07 probe: a committed probe that passes whether or not the window exists",
+      "evasion": "unknown",
+      "concrete_mutant": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "A04",
+      "subject": "Z02 AST probe: a split writer that keeps all three writes textually inside _persist_proposal yet is not the sole owner",
+      "evasion": "unknown",
+      "concrete_mutant": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "A05",
+      "subject": "Z02 AST probe: a probe keyed on helper NAME that a rename defeats while ownership is unchanged",
+      "evasion": "unknown",
+      "concrete_mutant": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "A06",
+      "subject": "Z02 mutant: a one-transaction two-helper split the prescribed AST probe would still pass",
+      "evasion": "unknown",
+      "concrete_mutant": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "A07",
+      "subject": "Z03 ABI: an annotation weakening that typing.get_type_hints reports identically",
+      "evasion": "unknown",
+      "concrete_mutant": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "A08",
+      "subject": "Z03 ABI: a signature change the prescribed test does not read (order, default, kind, or *args)",
+      "evasion": "unknown",
+      "concrete_mutant": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "A09",
+      "subject": "Z03 mutant: an ABI mutant that a string-compare-only annotation test lets survive",
+      "evasion": "unknown",
+      "concrete_mutant": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "A10",
+      "subject": "Z05 footprint: a live-schema derivation that still omits a table SQLite reports differently",
+      "evasion": "unknown",
+      "concrete_mutant": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "A11",
+      "subject": "Z05 footprint: an exclusion rule that drops an application table along with the SQLite-owned ones",
+      "evasion": "unknown",
+      "concrete_mutant": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "A12",
+      "subject": "Z05 mutant: a write the derived footprint still cannot see",
+      "evasion": "unknown",
+      "concrete_mutant": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "A13",
+      "subject": "Z06 SQL spy: a normalization that misses a forbidden table (quoting, schema prefix, whitespace, comment)",
+      "evasion": "unknown",
+      "concrete_mutant": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "A14",
+      "subject": "Z06 SQL spy: a substring match that FALSELY fires on a permitted statement (false positive cost)",
+      "evasion": "unknown",
+      "concrete_mutant": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "A15",
+      "subject": "Z06 spy installation: a read path the Connection.execute override never records (executemany, cursor, executescript)",
+      "evasion": "unknown",
+      "concrete_mutant": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "A16",
+      "subject": "Z06 mutant: a forbidden read the prescribed instrument still admits",
+      "evasion": "unknown",
+      "concrete_mutant": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "A17",
+      "subject": "cross-check: any S4 pin whose deletion the S4 mutant corpus would not detect",
+      "evasion": "unknown",
+      "concrete_mutant": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown"
+    },
+    {
+      "id": "A18",
+      "subject": "cross-check: any S4 pin that forces PRODUCTION code to change to satisfy an exact-count gate",
+      "evasion": "unknown",
+      "concrete_mutant": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown"
+    }
+  ]
+}
