@@ -1,0 +1,106 @@
+{
+  "kind": "spike",
+  "alternative": "unknown",
+  "adapter_signature": "unknown",
+  "worktree_commit": "unknown",
+  "rows": [
+    {
+      "id": "P01",
+      "probe": "the adapter's exact signature, return type and column set, as shipped in this worktree",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P02",
+      "probe": "get_proposal through the adapter: every ProposalView field value against a real ledger, versus baseline",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P03",
+      "probe": "proposals over a 3-proposal ledger: SQL statement count executed, and whether ordering stays byte-identical",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P04",
+      "probe": "function_report over the same ledger: SQL statement count, exact pending count, and the detail projection",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P05",
+      "probe": "review's use of the adapter INSIDE the existing write transaction: connection.in_transaction and transaction count",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P06",
+      "probe": "the companion request-status writes: kept, moved or dropped by this alternative, and what a later read observes",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P07",
+      "probe": "confinement: run an AST or source instrument naming every function that mentions requests, and report the exact set",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P08",
+      "probe": "ReviewResult: the shape this alternative ships and the exact CLI JSON for accept, correct and reject versus today",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P09",
+      "probe": "PendingProposalGap without request_id: the shipped field set and every call site rewritten",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P10",
+      "probe": "the .review( and ProposalView call sites this alternative breaks: count, and the mechanical rewrite for each shape",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P11",
+      "probe": "scalar corruption of the MIDDLE and the LAST of >=3 proposals, read through the adapter: exact class and message",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P12",
+      "probe": "partition and operation colliders (tenant_a versus tenantXa, case variants) through every adapted read",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P13",
+      "probe": "measured production line delta per file for this alternative, plus the static source span it edits",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    },
+    {
+      "id": "P14",
+      "probe": "a proposal whose private request row is missing or mismatched: class, message, and whether the state is reachable",
+      "outcome": "unknown",
+      "observation": {},
+      "note": ""
+    }
+  ]
+}

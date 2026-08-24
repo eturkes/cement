@@ -1,0 +1,338 @@
+{
+  "kind": "map",
+  "rows": [
+    {
+      "id": "Q01",
+      "anchor": "unknown",
+      "subject": "get_proposal's requests JOIN: exact columns taken from the request row and which reach ProposalView",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Q02",
+      "anchor": "unknown",
+      "subject": "proposal's requests JOIN: how it differs from get_proposal and why both exist",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Q03",
+      "anchor": "unknown",
+      "subject": "proposals' requests JOIN: filters, ORDER BY, LIMIT, and the exact list projection",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Q04",
+      "anchor": "unknown",
+      "subject": "review's requests JOIN under the write lock: what it reads and which checks depend on it",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Q05",
+      "anchor": "unknown",
+      "subject": "review's UPDATE requests SET status='rejected': the companion write and every observable it moves",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Q06",
+      "anchor": "unknown",
+      "subject": "review's UPDATE requests on accept/correct: the companion write and every observable it moves",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Q07",
+      "anchor": "unknown",
+      "subject": "function_report's first requests JOIN: the pending-proposal count and detail projection",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Q08",
+      "anchor": "unknown",
+      "subject": "function_report's second requests JOIN: the pending-gap projection feeding PendingProposalGap",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Q09",
+      "anchor": "unknown",
+      "subject": "_proposal_record: which fields it validates, which come from the request row, and its fail-closed classes",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Q10",
+      "anchor": "unknown",
+      "subject": "_proposal_content: same census, plus whether it can be served without a request join",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "S01",
+      "anchor": "unknown",
+      "subject": "ProposalView.request_id: every read of the field across src, tests, examples and docs",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "S02",
+      "anchor": "unknown",
+      "subject": "PendingProposalGap.request_id: every read of the field, and what identifies a gap without it",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "S03",
+      "anchor": "unknown",
+      "subject": "review's Outcome return (Resolved at system.py:1646, Rejected at 1510): every field each consumer actually uses",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "S04",
+      "anchor": "unknown",
+      "subject": "cli.py's proposal review leaf: the exact JSON it emits today for accept, correct and reject",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "S05",
+      "anchor": "unknown",
+      "subject": "proposal event payloads (proposal.created, proposal.rejected, any accept event): whether any carries request identity",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "S06",
+      "anchor": "unknown",
+      "subject": "__init__.py exports and models.py ordering that adding ReviewResult and editing two shapes disturbs",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "S07",
+      "anchor": "unknown",
+      "subject": "README plus every docs/*.md sentence naming request identity in a proposal, review or report context",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "P01",
+      "anchor": "unknown",
+      "subject": "proposal status transitions pending -> accepted/corrected/rejected: exact row writes and their order",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "P02",
+      "anchor": "unknown",
+      "subject": "reviewer, note and reviewed_at_us provenance capture and validation bounds",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "P03",
+      "anchor": "unknown",
+      "subject": "immutable example creation on accept and correct, and its absence on reject",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "P04",
+      "anchor": "unknown",
+      "subject": "review's conflict quarantine path and every condition that reaches it",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "P05",
+      "anchor": "unknown",
+      "subject": "event sequencing and the proposals.status_sequence binding",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "P06",
+      "anchor": "unknown",
+      "subject": "cross-partition and cross-operation proposal invisibility in every read path",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "P07",
+      "anchor": "unknown",
+      "subject": "= versus LIKE isolation on partition and operation, including _ colliders and case folding",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "P08",
+      "anchor": "unknown",
+      "subject": "function_report pending counts: exactness, the bounded detail cap, the tail beyond 10,000, and the documented order",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "P09",
+      "anchor": "unknown",
+      "subject": "every persisted scalar these paths convert, and whether TypeError/ValueError/OverflowError are translated fail-closed",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "P10",
+      "anchor": "unknown",
+      "subject": "handle's own proposal path at system.py:1029 and request_status at 1280: what M3.4 must not break while leaving them to a later unit",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "A01",
+      "anchor": "unknown",
+      "subject": "the column union all eight sites need from the request row, and the minimal binding record that serves it",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "A02",
+      "anchor": "unknown",
+      "subject": "N+1 risk: which sites project many proposals at once and what a row-at-a-time adapter costs them",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "A03",
+      "anchor": "unknown",
+      "subject": "where the adapter can live (module function, private System method, private class) and what pins its confinement",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "A04",
+      "anchor": "unknown",
+      "subject": "store.py schema facts that make the binding safe: the proposals FK, uniqueness on (partition, request_id), NOT NULL columns",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "A05",
+      "anchor": "unknown",
+      "subject": "revise_operation's UPDATE requests at system.py:548: whether M3.4 owns it, and the evidence either way",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "G01",
+      "anchor": "unknown",
+      "subject": "M3.3's _persist_proposal private-plumbing precedent: what it established and which committed tests pin it",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "G02",
+      "anchor": "unknown",
+      "subject": "M3.3's AST closure instrument in tests/test_submission_battery.py: exactly what it measures and whether M3.4 can reuse it",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "G03",
+      "anchor": "unknown",
+      "subject": "M3.2b's resolve as the analog for adding one public model plus method: measured production line delta",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "G04",
+      "anchor": "unknown",
+      "subject": "M2.u4b churn re-derived at HEAD, against the plan draft's 776-production-line claim",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "G05",
+      "anchor": "unknown",
+      "subject": "the 24 .review( call sites across tests: how many read a field M3.4 changes",
+      "finding": "unknown",
+      "evidence": "unknown",
+      "action": "unknown",
+      "main_verdict": "unknown"
+    }
+  ]
+}
