@@ -54,7 +54,8 @@ the request. The command inherits the current environment by default, so it can 
 configured credentials. The Python API can instead pass an exact environment mapping.
 
 Through `handle`, Cement can invoke the adapter again after a failed request or an expired generation
-lease. `System.propose` invokes the adapter one time for each call, and it never retries. Provider
+lease. `System.propose` invokes the adapter at most one time for each call, and it never retries. A
+call that fails input validation or operation lookup invokes the adapter zero times. Provider
 calls must create no external effects. `request_id` is partition-local and available for provider-side
 idempotency and tracing. Adapters that use a global idempotency namespace must key on
 `(partition, request_id)`.

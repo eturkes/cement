@@ -210,8 +210,10 @@ proposal_id = system.propose("tenant-42", "support.reply", {"question": "Where i
 ```
 
 `submit_proposal` takes the candidate from the caller. It never invokes the configured candidate
-source. `propose` invokes the configured source one time, and it never retries. The source runs
-outside every transaction. Both methods return the new proposal identifier as a string.
+source. `propose` invokes the configured source one time for each call that reaches invocation, and
+it never retries. The source runs outside every transaction that the call holds. A source that calls
+back into the same `System` opens its own transaction, which Cement cannot prevent. Both methods
+return the new proposal identifier as a string.
 
 Each call writes one request row, one proposal row, and one `proposal.created` event. Cement writes
 the three records in one transaction. Cement gives no idempotency here. Two identical calls write two
@@ -221,7 +223,10 @@ proposals and return two different identifiers.
 candidate. `propose` raises `StateError` when no candidate source is configured. It raises
 `CandidateSourceError` when the source fails or returns an unusable candidate. That error carries no
 detail from the source. Both methods raise `NotFoundError` when the partition holds no such
-operation. Both raise `StateError` when the operation revision changes before the write.
+operation. `propose` also raises `StateError` when the operation revision changes during generation,
+because it captures the revision before it calls the source. `submit_proposal` captures no revision.
+It binds whatever revision is current under its own write lock, so a concurrent revision change
+cannot make it fail.
 
 The request row stays internal to this route. The two signatures neither accept nor return its
 identifier. Schema v2 keeps the row, and the existing request and proposal readers still show that

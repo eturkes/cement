@@ -29,6 +29,7 @@ class CandidateSourceError(CementError):
     """The candidate source failed to produce a usable candidate.
 
     A source adapter raises this error to declare its own failure.
-    ``System.propose`` also raises it when the source fails. It carries no detail
-    from the source.
+    ``System.propose`` also raises it when the source fails. The instance that
+    ``System.propose`` raises carries no detail from the source: no class, no
+    message, no cause, no context, and no adapter frame.
     """

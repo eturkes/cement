@@ -425,10 +425,9 @@ class System:
             minimum=1,
             maximum=3_600,
         )
-        if candidate_source is not None and not callable(
-            getattr(candidate_source, "propose", None)
-        ):
-            raise ValidationError("candidate_source must provide a callable propose method")
+        # A source is classified where it is invoked, never here: reading
+        # ``propose`` off a descriptor already executes caller-supplied code, so a
+        # constructor pre-flight is the very hazard it looks like a guard against.
         if clock_us is not None and not callable(clock_us):
             raise ValidationError("clock_us must be callable")
         self.store = Store(database)
@@ -577,13 +576,14 @@ class System:
         if type(candidate) is not Candidate:
             raise ValidationError("candidate must be a Candidate")
         proposed = canonicalize(candidate.output)
-        try:
-            mapping = dict(candidate.provenance)
-        except (TypeError, ValueError):
-            raise ValidationError("candidate provenance must be a mapping") from None
-        provenance = canonicalize(mapping, max_bytes=65_536)
-        if type(provenance.value) is not dict:
-            raise ValidationError("candidate provenance must be a JSON object")
+        # ``dict()`` alone accepts any iterable of pairs, which admits a list or a
+        # generator as provenance and silently drains a one-shot iterator.
+        if not isinstance(candidate.provenance, Mapping):
+            raise ValidationError("candidate provenance must be a mapping")
+        # ``dict(Mapping)`` reads through ``keys()`` and ``__getitem__``. A direct
+        # caller owns that object, so its own exception reaches it unchanged; the
+        # source path contains the same failure with every other adapter defect.
+        provenance = canonicalize(dict(candidate.provenance), max_bytes=65_536)
         return proposed, provenance
 
     def _submission_revision(self, partition: str, operation: str) -> int:
@@ -691,10 +691,13 @@ class System:
 
         Return the identifier of the new proposal.
 
+        The call opens one transaction and binds whatever operation revision is
+        current under that write lock. It captures no earlier revision, so a
+        concurrent revision change cannot make it fail.
+
         Raise ``ValidationError`` for a rejected partition, operation, input
         value, or candidate. Raise ``NotFoundError`` when the partition holds no
-        such operation. Raise ``StateError`` when the operation revision changes
-        before the write.
+        such operation.
         """
         partition = _name(partition, "partition")
         operation = _name(operation, "operation")
@@ -719,8 +722,10 @@ class System:
         """Ask the configured candidate source for a candidate, then submit it.
 
         The call writes one request row, one proposal row, and one
-        ``proposal.created`` event. The source runs outside every transaction,
-        because the source executes adapter code that the caller supplies.
+        ``proposal.created`` event. The source runs outside every transaction
+        this call holds, because the source executes adapter code that the caller
+        supplies. A source that reenters the same ``System`` opens its own
+        transaction, which no library can prevent.
 
         Cement gives no idempotency. Each call writes a new proposal. Two calls
         with identical content write two proposals and return two different

@@ -1,15 +1,16 @@
-# M3.3 acceptance contract - request-free submission over unchanged schema v2
+# M3.3 acceptance contract - explicit proposal submission over a retained schema-v2 request row
 
 Every downstream artifact decides against this document: the diff-blind red suite, the independent
 oracle, the differential probes, both reviewers, and MAIN's own implementation. A disagreement with
 the code is a defect in one of them, never a difference of opinion.
 
-Section 12 is COMPLETE: all 58 verdict rows are ruled. Section 13 is PARTIAL - the contract attack is
-disposed; the oracle differential and the post-implementation review land at S3 and S4.
+Sections 12 and 13 are COMPLETE: all 58 verdict rows, all 24 attack rows, all 34 differential rows
+and all 22 review rows are ruled. Six review findings are ruled CARRIED, with their acceptance checks
+stated verbatim; they are S4's whole job.
 
 ## 1. Scope
 
-M3.3 adds request-free proposal submission beside the existing request lifecycle. Two paths ship:
+M3.3 adds explicit proposal submission beside the existing request lifecycle. Two paths ship:
 DIRECT, where the caller supplies the candidate, and SOURCE-BACKED, where Cement invokes the
 configured `CandidateSource`. `System.resolve`, shipped by M3.2b, already answers the read side.
 
@@ -163,13 +164,23 @@ def propose(
 - D36. `propose` SNAPSHOTS `self.candidate_source` into one local before the `None` check, so the
   check and the single invocation bind the same object. Reassignment during the call cannot split
   them, and no second attribute read exists to invoke a different source.
-- D37. Unusable non-`None` configuration is CONTAINED, not pre-validated. A missing `propose`
-  attribute, a non-callable `propose`, and a descriptor that raises all normalize to
-  `CandidateSourceError`, exactly like a raised or malformed source result. No `callable()`
-  pre-flight ships: it is unsound under descriptors and `__getattr__`, it duplicates the failure the
-  invocation itself produces, and testing a descriptor means EXECUTING it - which is the case whose
-  exception can carry a secret. Only `None` gets its own published error, because only `None` is
-  unambiguously "not configured" rather than "configured wrong". Footprint stays zero.
+- D37. Unusable non-`None` configuration is CONTAINED, not pre-validated, AT EVERY SITE INCLUDING
+  `System.__init__`. A missing `propose` attribute, a non-callable `propose`, and a descriptor that
+  raises all normalize to `CandidateSourceError`, exactly like a raised or malformed source result.
+  No `callable()` pre-flight ships: it is unsound under descriptors and `__getattr__`, it duplicates
+  the failure the invocation itself produces, and testing a descriptor means EXECUTING it - which is
+  the case whose exception can carry a secret. Only `None` gets its own published error, because only
+  `None` is unambiguously "not configured" rather than "configured wrong". Footprint stays zero.
+  RULED BEHAVIOUR CHANGE, carried by this unit. `System.__init__` shipped
+  `callable(getattr(candidate_source, "propose", None))` from `3b7769b` and raised
+  `ValidationError("candidate_source must provide a callable propose method")`. The battery, reading
+  D37 alone, drove a raising descriptor through construction and read the planted secret out of the
+  traceback: the pre-flight IS the hazard D37's grounds name, and it made D37 false while it shipped.
+  It is DELETED. `System(database, candidate_source=<unusable>)` now constructs, and the first
+  `propose` raises `CandidateSourceError`. `handle` already contained the same failures, so no route
+  loses a check; the construction-time `ValidationError` is the sole observable loss, and buying
+  fail-fast ergonomics with an unsound check that executes caller code at construction is the wrong
+  trade. `tests/test_system.py` records the change where the old assertion stood.
 
 ## 6. Purity and containment obligations - each pinned independently
 
@@ -212,16 +223,34 @@ adding them to M3.3's scope is not.
 | operation absent from the partition | `NotFoundError` | `operation is not registered in this partition` |
 | rejected `partition`, `operation`, or `input_value` | `ValidationError` | the existing `_name` and canonicalization texts, unchanged |
 | `candidate` is not a `Candidate` (DIRECT) | `ValidationError` | `candidate must be a Candidate` |
-| `candidate.provenance` is not a mapping (DIRECT) | `ValidationError` | `candidate provenance must be a mapping` |
-| `candidate.provenance` is not a JSON object (DIRECT) | `ValidationError` | `candidate provenance must be a JSON object` |
+| `candidate.provenance` is not a `Mapping` (DIRECT) | `ValidationError` | `candidate provenance must be a mapping` |
 | `candidate.output` or provenance fails canonicalization (DIRECT) | `ValidationError` | the existing canonicalization texts, unchanged |
+| canonical provenance exceeds 65,536 bytes (DIRECT) | `ValidationError` | `canonical JSON exceeds 65536 bytes` |
+
+- D43. THE CANDIDATE DOMAIN, published as a type test. `candidate` is accepted when
+  `type(candidate) is Candidate`; a SUBCLASS is rejected with the same text, because a subclass may
+  reimplement `output` or `provenance` as a descriptor and a type test is the only check that reads
+  no caller code. `candidate.provenance` is accepted when it is a
+  `collections.abc.Mapping` instance. A list of pairs, a generator of pairs, and any other iterable
+  of pairs are REJECTED: `dict()` alone accepts all three, which admits a one-shot iterator whose
+  drain the caller cannot observe. The pin covers both paths - `ValidationError` direct,
+  `CandidateSourceError` source.
+- D44. THE PROVENANCE BOUND, published as a number. Provenance canonicalizes under
+  `max_bytes=65_536`; `output` canonicalizes under the module default. The bound is the same figure
+  `source.py` and `cli.py` already apply to provenance, so the three submission routes agree. Both
+  bounds ship pinned, because an unpinned limit is a limit a later edit can drop silently.
 
 - D38. THE RETURN ROW. Candidate validation on the SOURCE path runs inside the same containment
   boundary as invocation, outside every transaction. A non-`Candidate` return, an unusable
-  `output`, a non-mapping provenance, and a provenance mapping whose iteration raises are all
-  adapter failures. Containment must not depend on whether the adapter raised or returned - a
-  mapping whose `items` raises with a secret is the case that settles it. The DIRECT path keeps the
-  `ValidationError` rows below, because there the candidate is the CALLER'S argument.
+  `output`, a non-`Mapping` provenance, an oversized provenance, and a provenance `Mapping` whose
+  own access raises are all adapter failures. Containment must not depend on whether the adapter
+  raised or returned - a `Mapping` whose `__iter__` raises with a secret is the case that settles
+  it. THE ACCESS PATH IS NAMED, because a settling case off the path settles nothing: `dict(Mapping)`
+  reads `keys()` and `__getitem__`, so `items()` is never called and a `Mapping` whose `items` raises
+  submits normally. The DIRECT path keeps the `ValidationError` rows above for the shapes those rows
+  name, and otherwise lets the caller's own exception reach the caller UNCHANGED: there the object is
+  the CALLER'S argument, and rewriting their `RuntimeError` into `candidate provenance must be a
+  mapping` would misdescribe an object that is a mapping.
 - D39. THE `BaseException` BOUNDARY. The catch is exactly `Exception`. `KeyboardInterrupt`,
   `SystemExit`, `GeneratorExit` and cancellation propagate UNCHANGED, because swallowing process
   control costs more than the containment it would buy. Footprint on that path is still zero;
@@ -269,18 +298,60 @@ v2 no proposal can exist without a request row. M3.3 therefore generates one int
   It must reach 635 + N tests with zero failures, N = the tests M3.3 adds. Zero errors and zero
   SKIPS among the added tests, because a skipped test increments the count and still prints OK.
   MEASURED at implementation close: 668 tests (N = 33), 0 failures, 0 errors, 206.045 s.
-- D27. `test_b20_read_site_census_has_no_mutations` asserts EXACT counts: 17 read sites, 15 write
-  sites, 12 reached helpers, and `violations == []`. The test is cited by NAME, because a line anchor
-  into a file this unit edits is stale on arrival. M3.3's new transaction sites break the first two. The counts are a
-  TRIPWIRE that forces deliberate acknowledgement of every new site, not an invariant that the totals
-  never grow; `violations == []` is the load-bearing assertion.
+  MEASURED at battery close: 741 tests, 0 failures, 0 errors, 0 skips, 205.725 s. 668 + 73 = 741 is
+  exact: the battery contributes all 73 and nothing else survives from the battery wave. The
+  four-test review-probe module was added at the red checkpoint and DELETED at close, because the
+  battery now carries its findings permanently and two parallel probe files for one boundary is the
+  duplication this project prunes. Grader: 52 obligations, 73 tests, UNFILLED 0, UNCOVERED 0, PASS.
+- D27. `test_b20_read_site_census_has_no_mutations` asserts EXACT counts. AT THE `f9b9755` BASELINE
+  those counts are 17 read sites, 15 write sites, 12 reached helpers, and `violations == []`. The
+  test is cited by NAME, because a line anchor into a file this unit edits is stale on arrival.
+  M3.3's new transaction sites break the first two. The counts are a TRIPWIRE that forces deliberate
+  acknowledgement of every new site, not an invariant that the totals never grow; `violations == []`
+  is the load-bearing assertion.
 - D28. M3.3 UPDATES those counts to the numbers its ruled design actually produces, in the same
   commit that adds the sites, and the implementation records each new site by method name. Contorting
-  production code to hold the old totals is a defect, not a pass - see D13.
+  production code to hold the old totals is a defect, not a pass - see D13. LANDED TOTALS, published
+  here so no later lens has to re-derive them: 18 read sites, 16 write sites, 12 reached helpers,
+  `violations == []`. The two additions are `_submission_revision` (read) and `_persist_proposal`
+  (write), each recorded by method name.
 - D29. `violations == []` and the reached-helper discipline stay untouched. A new site that cannot
   bind a simple connection name is a defect in the implementation.
 - D30. Closure is mechanical: the full gate green, the battery grader reporting every obligation
   filled, and a mutation sweep over the added predicates. A green suite alone never closes this unit.
+  THREE COMMANDS, published verbatim, each rerunnable from committed state:
+
+  1. `PYTHONDONTWRITEBYTECODE=1 uv run -q python -m unittest discover -s tests -t .`
+  2. `uv run python .agent/decisions/m3u3-battery-validate.py`
+  3. `uv run python .agent/decisions/m3u3-mutants.py`
+
+  Command 2 grades `tests/test_submission_battery.py` against the obligation manifest inside the
+  grader and exits 0 only when every id owns at least its required number of filled, documented
+  tests. Command 3 runs the MUTATION CORPUS below. Its verdict modules default to
+  `tests.test_submission` plus `tests.test_submission_battery`; `--full` re-runs the whole suite on a
+  survivor, which separates "the battery misses it" from "nothing pins it".
+
+  THE MUTATION CORPUS IS ENUMERATED IN `.agent/decisions/m3u3-mutants.py`: 42 mutants over the
+  predicates this unit adds, each addressed by a unique anchor string the runner proves occurs
+  exactly once. By site: `_canonical_candidate` 5 (candidate type test deleted and widened to
+  `isinstance`, provenance mapping guard deleted and widened, provenance byte bound dropped);
+  `System.__init__` 1 (the deleted pre-flight restored); `_submission_revision` 4 (read becomes a
+  write, partition scope weakened to `LIKE`, name scope weakened, missing operation admitted);
+  `_persist_proposal` 15 (seam partition and name scopes weakened, missing operation admitted,
+  revision guard unconditional, deleted and inverted, proposal id prefix changed, clock read per row,
+  request row status, event kind renamed, event publishes the request id, event subject is the
+  request, status sequence unbound, provenance columns swapped, seam split into two transactions);
+  `submit_proposal` 6 (keyword marker
+  dropped, candidate defaulted, three validation-order swaps, revision captured); `propose` 10
+  (source attribute read twice, missing-source check moved after the lookup, caller object passed as
+  request input, source invoked twice, return validation moved outside containment, catch widened to
+  `BaseException` and narrowed to the declared error, raise moved inside the handler, contained raise
+  keeps its cause, source path drops its revision guard); `errors.py` 1 (the D31 docstring reverted).
+
+  THE STANDARD IS ZERO. Command 3 exits 0 only when every mutant is killed by a verdict module or is
+  a declared equivalent. A survivor names the obligation no committed test pins, and the fix is the
+  missing test, never a corpus deletion: a mutant leaves the corpus only when the predicate it
+  targets leaves the code.
 
 ## 10. Fork ruling - two methods versus one XOR signature
 
@@ -440,17 +511,81 @@ TWO ROWS ARE WORTH RE-READING BEFORE M3.4 REOPENS THIS SURFACE.
   Fixed at S2 close, and D41 now states the obligation positively so a docstring cannot discharge it
   again.
 
-CARRIED INTO S3, both ruled and neither discharged. D30: the obligation grader has no published
-command and the mutation corpus is unenumerated, so closure is not yet mechanical. X12: the seam is
-structurally atomic - one write transaction containing all three INSERTs - but that is an argument,
-not a measurement, and D15 can currently pass on pre-write failures alone. The battery ships the
-rollback matrix that injects after each interior write.
+DISCHARGED AT S3, both raised at S2 and both ruled then. D30 now publishes its three commands
+verbatim and enumerates all 42 mutants by site; section 9 carries the standard and section 13 the
+measurement. X12 asked for a measurement where S2 had only the argument that the seam is
+structurally atomic - one write transaction containing all three INSERTs - because D15 could pass on
+pre-write failures alone. The battery ships the rollback matrix that injects after each interior
+write, so D15's fifth pin now measures what X12 asked for.
 
 ## 13. Review dispositions and differential result
 
-PARTIAL at S2. The contract attack is disposed below, and the oracle's 30-probe corpus is harvested
-and ruled. The full differential over that corpus and the post-implementation review land at S3 and
-S4.
+COMPLETE at S3. The contract attack is disposed below, the differential is run and credited by MAIN's
+own re-derivation, and every review row is ruled. Machine copies:
+`m3u3-attack.json` (`main_disposition`, patcher `m3u3-rule-attack.py`), `m3u3-review.json` and
+`m3u3-divergences.json` (`main_ruling`, patcher `m3u3-rule-wave3.py`). Both patchers take `--check`
+and are the in-sync gate.
+
+DIFFERENTIAL RESULT, S3, MAIN-rerun credited. `m3u3-probe-driver.py` re-derived all 34 probe
+outcomes against the shipped post-fix code (`system.py` sha256 `302d0342f06a...`), and
+`m3u3-differential.py` graded them against the oracle's committed table: 30 of 30 seeded probes
+IDENTICAL across `probe`, `outcome`, `observation` and `note`, with Q30 identical under the single
+declared normalization `_persist_proposal` -> `_persist_submission`. All four Z extensions re-derived
+byte-identically to their recorded MAIN observations.
+
+THE EMPTY SEEDED DIVERGENCE SET IS ITSELF THE FINDING, and it is the reusable one. The oracle wrote
+its 30 probes to demonstrate its own conformance to this contract, so every probe measures a property
+both implementations were built to satisfy. Such a corpus CANNOT discriminate two designs: 29
+identical, 1 adapted, 0 differs. The instrument only became evidentiary once MAIN added Z01-Z04
+targeting the two RULED divergences directly, and Z03 is the row that pays for the whole exercise -
+it exhibits the oracle raising `StateError` and storing nothing where MAIN succeeds, which is the
+defect V-D12 removed from MAIN's own code. Write oracle probes against the ruled disagreements, never
+against the shared contract.
+
+CLOSURE MEASUREMENT, S3. Full gate 741 tests / 0 failures / 0 errors / 0 skips / 205.725 s. Grader
+52 obligations / 73 tests / UNFILLED 0 / UNCOVERED 0 / PASS. Mutation sweep 42 mutants / 42 killed /
+0 survivors / 0 battery gaps against a green control. D30 and X12 are both discharged.
+
+POST-IMPLEMENTATION REVIEW, `rev-m3u3-2`, 16 seeded lenses plus 6 the reviewer added, 22 rows: 3
+blocking, 12 material, 7 cleared. Rulings are in `m3u3-review.json`. Summary, MAIN-final.
+
+TWO CODE DEFECTS, each confirmed by two independent lenses, so the council rule accepts both outright
+without a MAIN probe - and MAIN probed them anyway because both change shipped behaviour.
+
+- `dict(candidate.provenance)` accepted a list of pairs and a generator of pairs as "a mapping",
+  violating the declared `Candidate.provenance: Mapping[str, object]` and silently draining a
+  one-shot iterator. R01 and R15 both reached it. FIXED: D43's `isinstance` guard. The same edit
+  deleted the unreachable JSON-object branch, which mutant `provenance-object-check-deleted` had
+  already reported as dead by surviving - a dead branch and a surviving mutant are one fact seen
+  twice.
+- `System.__init__` pre-flighted `callable(getattr(candidate_source, "propose", None))`. R07a and the
+  battery's own D37 test both drove a raising descriptor through construction and read the planted
+  secret out of the traceback. FIXED by DELETION, ruled in D37 with its behaviour change recorded.
+
+CLAIM DEFECTS, all landed at S3: `submit_proposal`'s docstring promised the revision `StateError`
+V-D12 made unreachable (R09a with battery D32) · `65_536` appeared nowhere in the contract though
+section 13 claimed the bound was published (R07b, now D44) · D38 named a mapping whose `items()`
+raises as the settling case, but `dict(Mapping)` reads `keys()` and `__getitem__`, so it was never
+called (R01) · section 7 carried two rows that conflicted for a non-str-key mapping (R01) · README,
+`architecture.md` and `adapter-protocol.md` repeated the rejected direct-path revision guard and
+over-broadened two quantifiers (R10) · D27 published the pre-unit census totals as if they were the
+landed ones (Z01) · the roadmap and memory overclaimed closure in four places (R08) · this contract's
+own title used the `request-free` label D33 bans (Z04).
+
+SIX ROWS RULED CARRIED, undischarged, and they are S4's whole job. Acceptance checks are stated
+verbatim in `m3u3-review.json`; the subjects are: R06 + R07 commit-uncertainty and the shared
+"submission-attributable" scoping of D01/D07/D09/D15/D16 · Z02 the AST single-writer probe that a
+one-transaction two-helper split would fail · Z03 the annotation half of the frozen ABI · Z05 the
+9-of-13-table footprint instrument in `tests/test_submission.py` and `m3u3-smoke.py`, which the
+battery's own `sqlite_schema`-derived counter already avoids · Z06 the case-sensitive substring SQL
+spy behind D17.
+
+THE MUTATION NUMBER IS MEANINGLESS WITHOUT ITS VERDICT MODULE LIST. R12 measured 12 of 25 mutants
+surviving and MAIN's own pre-battery baseline measured 13 of 41, both against
+`tests.test_submission` alone. The same corpus against `tests.test_submission` plus
+`tests.test_submission_battery` kills everything. Neither earlier number was wrong; both were
+answering a different question, and a sweep that does not print its verdict modules invites the
+reader to answer the wrong one.
 
 ORACLE, `orc-m3u3-1`, 30 probes, corpus at `m3u3-probes.json`, implementation on `wt/orc-m3u3-1`,
 worktree RETAINED for S3. It built the identical contract without seeing MAIN's code and was

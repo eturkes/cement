@@ -9,7 +9,7 @@
       "evidence": "system.py:576-587. `PYTHONDONTWRITEBYTECODE=1 uv run -q python -m unittest tests.test_m3u3_review_probe` prints `EFFF`, 4 tests, 3 failures and 1 error: both pair-iterable paths raise nothing, direct `_IterationBomb` leaks `RuntimeError: ITERATION-SECRET-42`, and source `_ItemsBomb` raises nothing. The helper probe still prints input type `list` and canonical result type `dict`.",
       "severity": "blocking",
       "acceptance_check": "Require exact Candidate plus a real Mapping, exercise the Mapping items boundary, and translate every direct rejection to its published ValidationError while source returns normalize to CandidateSourceError. All four red probes must pass, and the unreachable JSON-object branch must be removed or made reachable.",
-      "main_ruling": "unknown"
+      "main_ruling": "ACCEPTED, three of four, and the fourth ruled the other way. Two lenses reached the pair-iterable defect (R01 + R15), so the council rule accepts outright. LANDED: `isinstance(candidate.provenance, Mapping)` now gates the conversion, which rejects a list, a tuple, a generator and a keys/__getitem__ duck type on both paths; D43 publishes that domain. The unreachable JSON-object branch is DELETED with its section 7 row on the standing mutation criterion - `canonicalize(dict).value` is always `dict`, and a non-str-key mapping raises `JSON object keys must be strings` from the canonicalizer first, so no input reaches it. Mutant `provenance-object-check-deleted` survived for exactly that reason: a dead branch and a surviving mutant are one fact seen twice. RULED THE OTHER WAY, the items-raising case: `dict(Mapping)` reads `keys()` and `__getitem__`, so `items` is never called and the contract's own settling case was off the access path. D38 now names the path and moves the settling case onto it; the battery's `ExplodingAccess` raises from `__iter__` and `__getitem__`. SCOPED, the direct raw exception: a direct caller owns the object it passed, so its `RuntimeError` reaches it unchanged. Rewriting it into `candidate provenance must be a mapping` would misdescribe an object that IS a mapping, and the partial `except (TypeError, ValueError)` that did so is DELETED - the boundary is now total and matches `handle`'s."
     },
     {
       "id": "R02",
@@ -18,7 +18,7 @@
       "evidence": "src/cement_runtime/system.py:589-620,704-712,755-763; the two selected revision tests ran as `..`, `Ran 2 tests`, `OK`, proving revised direct binding and source-window rejection.",
       "severity": "cleared",
       "acceptance_check": "Keep both revision tests green and retain `expected_revision=None` for direct submission plus the scoped pre-read and equality guard for source-backed submission.",
-      "main_ruling": "unknown"
+      "main_ruling": "CLEARED. MAIN agrees; V-D12 is the ruling this lens re-derives, and both revision tests stay green."
     },
     {
       "id": "R03",
@@ -27,7 +27,7 @@
       "evidence": "`.scratch/batch1_probe.py` against system.py:599-672 printed complete rows: pending request with attempts 1 and null lease, pending proposal with null review fields, empty event payload, and `R03_SHARED=True`; three committed row tests also printed `... OK`.",
       "severity": "cleared",
       "acceptance_check": "Retain the complete-row probe outcome: all D42 hashes and null defaults match canonical inputs, all three timestamps match, and proposal status_sequence equals the created-event sequence.",
-      "main_ruling": "unknown"
+      "main_ruling": "CLEARED. MAIN agrees; D42's row shape is pinned by the battery's own D42 test and by mutants `status-sequence-unbound` and `provenance-columns-swapped`, both killed."
     },
     {
       "id": "R04",
@@ -36,7 +36,7 @@
       "evidence": "`.scratch/batch1_probe.py` against system.py:737-763 printed unchanged stored/caller input, `R04_EVENT={}`, and `R04_ERROR={\"cause\": null, \"context\": null, \"frames\": [\"<module>\", \"propose\"], \"message\": \"candidate source failed\", \"sha_equal\": true}`; the committed leak test printed `OK`.",
       "severity": "cleared",
       "acceptance_check": "Keep failure cause, context, traceback, event payload, and ledger free of adapter failure bytes; retain the detached input snapshot while persisting successful candidate fields by design.",
-      "main_ruling": "unknown"
+      "main_ruling": "CLEARED. MAIN agrees; mutants `contained-raise-keeps-cause`, `raise-moved-inside-handler` and `request-input-is-caller-object` are all killed, so the containment this lens measured is now pinned against deletion."
     },
     {
       "id": "R05",
@@ -45,7 +45,7 @@
       "evidence": "src/cement_runtime/system.py:745-763; `PYTHONDONTWRITEBYTECODE=1 uv run -q python .scratch/batch2_probe.py` printed identical KeyboardInterrupt, SystemExit, GeneratorExit, and CancelledError objects with `counts_equal` and `snapshot_equal` true, plus `R05_RETURN` KeyboardInterrupt from provenance conversion with both true.",
       "severity": "cleared",
       "acceptance_check": "Retain the exact `except Exception` boundary and keep every source-invocation or return-canonicalization BaseException unchanged, with zero request, proposal, event, sequence, digest, or dump delta.",
-      "main_ruling": "unknown"
+      "main_ruling": "CLEARED. MAIN agrees; mutant `catch-widened-to-baseexception` is killed by the battery's D39 test, so the exact `Exception` boundary cannot regress silently."
     },
     {
       "id": "R06",
@@ -54,7 +54,7 @@
       "evidence": "system.py:613-672 and store.py:664-685. Interior request/event/proposal injections each print zero commits, one rollback, and equal counts/sha/dump/sequence. Separately, `.scratch/commit_uncertainty_probe.py` prints `RAISED=StateError:database is busy or unavailable`, `COMMITS=[committed]`, and `COUNTS={requests:1, proposals:1, events:2}` after the baseline registration event.",
       "severity": "material",
       "acceptance_check": "Keep the three-point rollback matrix, then either scope D15 and public prose to pre-commit failures and publish commit uncertainty, or recover after a commit exception by verifying the generated proposal ID and returning it only when all three bound rows are durable.",
-      "main_ruling": "unknown"
+      "main_ruling": "CARRIED to S4, blocking there. The interior rollback matrix is ACCEPTED and shipped as D15's fifth pin, which discharges X12. The commit-uncertainty half is a REAL and UNRULED gap: a `Connection` whose commit durably succeeds and then raises leaves all three rows committed while the caller sees `StateError` and no proposal id. That is a property of the `Store` seam, not of submission, and every method in the codebase shares it - so scoping it belongs with the seam, not inside M3.3's candidate boundary. S4 CHECK, verbatim: scope D15 and the public prose to failures before commit, publish the commit-uncertainty window with the recovery route (the proposal id is discoverable through `get_proposal` by partition), and pin the probe."
     },
     {
       "id": "R07",
@@ -63,7 +63,7 @@
       "evidence": "Live probes against system.py:428-431,576-584,613-672 print: successful source side effect `DELTA={operations:1, requests:1, proposals:1, events:2}`; rejected direct Mapping `TRANSACTIONS=1` and operation/event delta 1; commit-then-fail `StateError`, `COMMITS=[committed]`, rows persisted; revision-race failure `COMMITS=[commit]`; constructor two ValidationErrors plus raw descriptor RuntimeError; and 65,536 accepted / 65,537 rejected. Contract lines 89-93,130-190,166-171 and verdicts.json:186-199 conflict.",
       "severity": "blocking",
       "acceptance_check": "Scope D01, D07, D09, D15, and D16 to submission-owned work, and scope purity to pre-commit failures. Publish post-commit uncertainty. Reconcile D37 with constructor behavior. State the 65,536-byte bound and the complete direct/source Mapping failure taxonomy with live probes.",
-      "main_ruling": "unknown"
+      "main_ruling": "ACCEPTED IN PART at S3, remainder CARRIED. LANDED NOW: D37 no longer contradicts the constructor, because the pre-flight is deleted - the battery drove a raising descriptor through construction and read the planted secret out, which is the hazard D37's own grounds name; D44 publishes the 65,536-byte provenance bound the shipped code always applied; D38 states the complete direct/source mapping failure taxonomy including the raw direct exception. CARRIED to S4: D01, D07, D09, D15 and D16 each quantify over work the SOURCE may perform outside every Cement transaction, and the fix is one shared scoping sentence - 'submission-attributable' - applied to five obligations plus the commit window of R06. Ruled together with R06 because they are one boundary seen from two lenses."
     },
     {
       "id": "R08",
@@ -72,7 +72,7 @@
       "evidence": "memory.md:143, roadmap.md:228,247,284, and m3u3-smoke.py:334 versus system.py:428-431 and the P06 freeze. Constructor probe prints two ValidationErrors plus raw `RuntimeError:CONSTRUCTOR-SECRET-42`. `/usr/bin/rg` shows `Shipped at 4b96e4d + 719b48a`, then both `oracle differential ... ruled` and `Then run`. Smoke reports 40/40, but its P06 check observes only the outcome type.",
       "severity": "material",
       "acceptance_check": "Scope memory to the actual call boundary; list `4b96e4d`, `719b48a`, and `57a4571`; distinguish ruled oracle observations from the pending committed differential; and rename or strengthen the smoke P06 check so its label states only what it measures.",
-      "main_ruling": "unknown"
+      "main_ruling": "ACCEPTED, all four. LANDED: memory scoped to the actual call boundary; the roadmap lists `4b96e4d`, `719b48a` and `57a4571`; the differential is now RUN and credited by MAIN's own re-derivation rather than described as ruled; and the smoke check is renamed to state only what it measures. The general rule this pays for: a record that says 'ruled' where it means 'planned' reads as closure to every later session, and the only defence is naming the instrument that produced the number."
     },
     {
       "id": "R09",
@@ -81,7 +81,7 @@
       "evidence": "system.py:696-697,722; errors.py:28-34; source.py:168,257-290. `PYTHONDONTWRITEBYTECODE=1 uv run -q python .scratch/docs_probe.py` prints direct success after an in-call revision change, `SOURCE_INSIDE_OWN_TRANSACTION=[True]`, and `ERROR_DETAIL=SOURCE-DETAIL-42`. Production source.py constructs detailed CandidateSourceError messages before `System.propose` normalizes them.",
       "severity": "material",
       "acceptance_check": "Remove the direct stale-revision promise; scope transaction absence to transactions held by the submission call; and state that only the fresh exception raised by `System.propose` carries no adapter detail. Pin each corrected sentence to its live route.",
-      "main_ruling": "unknown"
+      "main_ruling": "ACCEPTED, all three. LANDED: `submit_proposal`'s docstring drops the unreachable revision `StateError` and states positively that it binds whatever revision is current under its sole write lock; `propose` scopes transaction absence to transactions the call holds and names the reentrancy caveat; `CandidateSourceError`'s docstring scopes 'carries no detail' to the instance `System.propose` raises, leaving an adapter's own detailed instance untouched."
     },
     {
       "id": "R10",
@@ -90,7 +90,7 @@
       "evidence": "README.md:214,224; architecture.md:58-62; adapter-protocol.md:57. `.scratch/docs_probe.py` prints direct success at revision 2, a reentrant source observing `[True]`, and `PROPOSE_PREINVOCATION=[\"ValidationError\", \"NotFoundError\"];calls=0`. Banned-word scan returns `BANNED_RC=1`; positive `System.propose` control returns `CONTROL_RC=0`.",
       "severity": "material",
       "acceptance_check": "Publish direct and source revision behavior separately. Say the source runs outside transactions held by the submission call. State one invocation only for calls that reach invocation, zero before it, and qualify three-row/no-idempotency claims as successful-call behavior.",
-      "main_ruling": "unknown"
+      "main_ruling": "ACCEPTED, all three. LANDED: README publishes direct and source revision behaviour separately; README and `architecture.md` say the source runs outside every transaction the call holds; `adapter-protocol.md` says at most one invocation per call and zero for calls that fail validation or lookup. The battery's D34 fragments move with them, so the prose cannot drift back."
     },
     {
       "id": "R11",
@@ -99,7 +99,7 @@
       "evidence": "`.scratch/census_probe.py` prints `READ(18)` with `_submission_revision:590`, `WRITE(16)` with `_persist_proposal:613`, `HELPERS(12)`, `VIOLATIONS(0)=[]`; baseline `f9b9755` probe prints `BASELINE_READ=17 BASELINE_WRITE=15`; the named census test prints one dot and `OK`.",
       "severity": "cleared",
       "acceptance_check": "Retain exact totals 18/16/12, method-name counts of one for both M3.3 sites, `violations == []`, and the scoped `SELECT revision` rather than routing through `operations()`.",
-      "main_ruling": "unknown"
+      "main_ruling": "CLEARED. MAIN agrees; D28's landed totals are published at S3 per review Z01, so the census now states the numbers this lens measured."
     },
     {
       "id": "R12",
@@ -108,7 +108,7 @@
       "evidence": "Pristine control: `PYTHONDONTWRITEBYTECODE=1 uv run -q python -m unittest tests.test_submission tests.test_read_capability_battery` -> 82 tests, OK. Isolated-copy sweep of the same two committed modules, after per-mutant cache purge, unique-anchor count 1, byte-change assertion, and imported code-object hash change, prints `mutants=25, killed=13, survived=12`; every survivor records distinct baseline/mutant SHA-256. `tests/test_submission_battery.py` is absent and was not graded.",
       "severity": "material",
       "acceptance_check": "Commit the mutant catalogue and kill every reachable survivor with focused probes: subclass, malformed iterable, 65,536/65,537 bytes, cross-partition and underscore colliders, reassignment snapshot, BaseException, caller-input mutation, and incrementing clock. Delete or redesign M05 because no real input reaches it.",
-      "main_ruling": "unknown"
+      "main_ruling": "ACCEPTED, and DISCHARGED with a wider corpus than the finding asked for. The committed catalogue is `.agent/decisions/m3u3-mutants.py`, 42 mutants over every predicate the unit adds, enumerated by site in D30. Measured at S3 close with `tests.test_submission` plus `tests.test_submission_battery` as verdict: 42 killed, 0 survivors, 0 battery gaps, green control. M05 is deleted with its dead branch per R01. The lens's own sweep read 12 of 25 surviving because it graded a corpus the battery had not yet been added to - which is the reusable rule: a mutation number is meaningless without its verdict module list."
     },
     {
       "id": "R13",
@@ -117,7 +117,7 @@
       "evidence": "The 25-mutant sweep leaves M02, M04, M08, and M13 alive. Live probes print `CURRENT=ValidationError... ISINSTANCE=True EXACT=False`, the adjacent provenance outcomes `65536:accepted` / `65537:ValidationError`, and SQLite `(1, 1, 1, 1)` for `tenant_a`/`tenantXa` and `echo_1`/`echoX1` LIKE comparisons.",
       "severity": "material",
       "acceptance_check": "Add an exact Candidate subclass rejection, adjacent 65,536/65,537 provenance cases, and cross-partition plus cross-operation collider fixtures with different revisions; each focused test must kill its corresponding live mutant.",
-      "main_ruling": "unknown"
+      "main_ruling": "ACCEPTED. LANDED: the battery gains a `Candidate` subclass rejection and four pair-iterable rejections (D43), an oversized-provenance case with the exact bound text plus the same payload passing as `output` (D44), and the D13 collider fixtures already plant `tenantXa`/`echoX1`/`TENANT_A` rows. Mutants `candidate-type-widened-to-isinstance`, `provenance-bound-dropped`, and all four `LIKE` scope weakenings are killed."
     },
     {
       "id": "R14",
@@ -126,7 +126,7 @@
       "evidence": "`git show --unified=0 57a4571 -- .agent/memory.md` measurement prints `ADDED_BULLETS=10 WORDS=902 BYTES=5932 PROVENANCE_BULLETS=8`; examples are memory.md:141,144,146 and contract.md:414,437. Negative future wording is threat-model.md:79-80 and adapter-protocol.md:57-58. Judgment-only finding; no red code test applies.",
       "severity": "material",
       "acceptance_check": "Compress memory additions into provenance-free general rules and move unit history to the decision record/archive. Rewrite future instructions positively, for example `Recover through the returned proposal ID` and `Keep provider calls pure`, while retaining the required facts.",
-      "main_ruling": "unknown"
+      "main_ruling": "ACCEPTED. LANDED: the memory bullets are rewritten as provenance-free general rules and the unit history stays in this decision record, which is where a measurement is checkable. REJECTED on one point: measurements, SHAs and named conventions are this document's payload, and the Authoring rule's provenance ban targets dates, discovery narration and origin stories - the same boundary attack row X06 already fixed. Negative-form shipped instructions are rewritten positively."
     },
     {
       "id": "R15",
@@ -135,7 +135,7 @@
       "evidence": "system.py:576-587. The committed review module is red on all four candidate-domain probes (`EFFF`): accepted pair iterables on both paths, leaked direct RuntimeError, and accepted items-bomb source return. M05 deletion survives with a changed imported code-object hash because `canonicalize(dict(...)).value` is always an exact dict.",
       "severity": "material",
       "acceptance_check": "Implement one minimal, total candidate boundary over the declared exact Candidate/Mapping domain; normalize direct and source failures by ownership; delete or redesign the unreachable branch; and retain one `_persist_proposal` seam plus the P06-frozen `handle` body.",
-      "main_ruling": "unknown"
+      "main_ruling": "ACCEPTED. Confirmed independently by R01, so the council rule accepts outright. LANDED: `_canonical_candidate` is now one minimal total boundary - exact `Candidate`, `Mapping` instance, one canonicalization under the published bound - with no partial exception translation and no dead branch. Ownership normalizes by path, not by exception class: the direct caller keeps its own exception, the source path contains everything."
     },
     {
       "id": "R16",
@@ -144,7 +144,7 @@
       "evidence": "Live probe prints `SCHEMA_VERSION=2`, `SCHEMA_BYTES=14580`, sha256 `5be3d79f...a77`, and fingerprint match true; all three B02 files compare byte-equal to `f9b9755` with `FROZEN_DIFF_RC=0`; handle prints 12866/1182130a2b3a, 12867/cd60036faf5c, 12862/c27e71b0b4c7. Unit commit source list contains only errors.py and system.py.",
       "severity": "cleared",
       "acceptance_check": "Retain schema version, bytes, digest, B02 byte equality, and all three handle convention rows; keep every source edit within `system.py` submission methods and `errors.py` CandidateSourceError documentation.",
-      "main_ruling": "unknown"
+      "main_ruling": "CLEARED. MAIN agrees, and re-derived every pin: schema 14,580 B / `5be3d79f...` equal to `SCHEMA_FINGERPRINT`; `cli.py`, `_command_supervisor.py` and `example_adapter.py` byte-identical to `f9b9755`; all three `handle` conventions reproduce. S3 adds one deliberate out-of-unit edit, ruled in D37: `System.__init__`'s pre-flight is deleted and `tests/test_system.py` records the change where the old assertion stood."
     },
     {
       "id": "Z01",
@@ -153,7 +153,7 @@
       "evidence": "contract.md:272-278; `/usr/bin/rg -n \"17 read sites|15 write sites\" .agent/decisions/m3u3-contract.md` returns D27. The independent AST census prints `READ(18)`, `WRITE(16)`, `HELPERS(12)`, `VIOLATIONS(0)=[]`; the named test prints one dot and `OK`. roadmap.md:233 independently records 18/16.",
       "severity": "material",
       "acceptance_check": "Change D27 to identify 17/15 as the `f9b9755` baseline and publish the landed 18/16 totals in D28. Keep 12 reached helpers and zero violations, then rerun the census test and the structural contract scan.",
-      "main_ruling": "unknown"
+      "main_ruling": "ACCEPTED. LANDED: D27 identifies 17 reads / 15 writes as the `f9b9755` BASELINE, and D28 publishes the landed 18 reads / 16 writes / 12 reached helpers / zero violations. The stale-anchor lesson repeats from A09 and X03: a count inside a document the unit edits is stale on arrival unless it names which state it measures."
     },
     {
       "id": "Z02",
@@ -162,7 +162,7 @@
       "evidence": "contract.md:363-366 and test_submission.py:552-571. An isolated mutant moved the requests INSERT into `_insert_submission_request` while retaining `_persist_proposal` as wrapper. Liveness output prints the mutant module path, helper present, changed code hash, and INSERT in helper; `tests.test_submission + tests.test_read_capability_battery` then print `Ran 82 tests`, `OK`, RC=0.",
       "severity": "material",
       "acceptance_check": "Add the AST probe the verdict row prescribes: enumerate the M3.3 requests INSERT, proposal INSERT, and proposal.created call; require all three to reside in `_persist_proposal`; require both public methods to call that sole owner. The split-writer mutant must fail.",
-      "main_ruling": "unknown"
+      "main_ruling": "CARRIED to S4. The finding holds: `test_both_methods_route_through_one_persistence_seam` spies that both public methods CALL the seam, which a split writer satisfies while the requests INSERT lives in a second private helper. Section 12's description of it as a call-graph pin overstates what it measures. Mutant `seam-write-becomes-two-transactions` kills the two-TRANSACTION split but not the one-transaction two-HELPER split. S4 CHECK, verbatim: an AST probe enumerating the M3.3 requests INSERT, the proposals INSERT and the `proposal.created` call, requiring all three inside `_persist_proposal` and both public methods calling that sole owner, plus a split-writer mutant in the corpus that it kills."
     },
     {
       "id": "Z03",
@@ -171,7 +171,7 @@
       "evidence": "Isolated ABI sweep prints all five changed `inspect.signature` values and `returncode=0`: A01 keyword-only deletion, A02 Candidate-to-object annotation, A03 submit return object, A04 optional propose candidate, A05 propose return object. Summary is `mutants=5, survived=5`; each run targets only tests.test_submission and tests.test_read_capability_battery.",
       "severity": "material",
       "acceptance_check": "Commit one `inspect.signature` plus `typing.get_type_hints` ABI test that pins parameter order, keyword-only kind, required/default state, exact candidate annotation, absence of candidate/source on propose, and both `str` return annotations. All five ABI mutants must fail.",
-      "main_ruling": "unknown"
+      "main_ruling": "CARRIED to S4. Two of the five ABI mutants are already dead - `direct-keyword-marker-dropped` and `direct-candidate-defaulted` are in the corpus and killed by the battery's P01 signature test. The three ANNOTATION weakenings survive because no committed test reads annotations. S4 CHECK, verbatim: one `inspect.signature` plus `typing.get_type_hints` test pinning parameter order, keyword-only kind, required state, the exact `Candidate` annotation, the absence of a candidate or source parameter on `propose`, and both `str` returns; add the three annotation mutants to the corpus and require the sweep to kill them."
     },
     {
       "id": "Z04",
@@ -180,7 +180,7 @@
       "evidence": "`/usr/bin/rg -n -i request-free` prints contract.md:1,12,328; roadmap.md:211,288; and tests/test_submission.py:1. D33 at contract.md:325-329 says the phrase is avoided because D14 retains a real row and names only the roadmap as the unit-name exception. D14/D23 and live rows show request_id remains stored and source-visible.",
       "severity": "material",
       "acceptance_check": "Use a positive, exact label outside the roadmap unit name, such as `explicit proposal submission over a retained schema-v2 request row`. Update the contract title/scope and test docstring, then require `request-free` matches only the explicitly exempt roadmap labels and D33 explanation.",
-      "main_ruling": "unknown"
+      "main_ruling": "ACCEPTED. LANDED: the contract title and scope sentence now say `explicit proposal submission over a retained schema-v2 request row`, and `tests/test_submission.py`'s docstring says the same. D33's own prohibition applied to D33's own document was the defect. The roadmap unit name stays as the one expressly exempt label."
     },
     {
       "id": "Z05",
@@ -189,7 +189,7 @@
       "evidence": "AST/schema probe prints `DECLARED=13 COUNTED=9 OMITTED=[artifact_evidence, artifact_tests, schema_metadata, test_reports]` for tests/test_submission.py and m3u3-smoke.py. A live isolated mutant inserts one unique schema_metadata row inside `_persist_proposal`; liveness prints `True`, then the two committed modules print `Ran 82 tests`, `OK`, RC=0.",
       "severity": "blocking",
       "acceptance_check": "Derive the footprint table set from live declared schema objects, excluding only SQLite-owned tables by an explicit rule. Compare all 13 application tables before and after both paths. The extra-schema_metadata mutant must fail while the ordinary three-table delta stays exact.",
-      "main_ruling": "unknown"
+      "main_ruling": "CARRIED to S4, blocking there, and NARROWED by measurement. The battery is already clean: `table_counts` enumerates every table from `sqlite_schema` and excludes only `sqlite_%`, so its D01, D15 and D38 footprint pins compare all 13 application tables and the extra-`schema_metadata` mutant would fail them. The finding stands against `tests/test_submission.py` and `.agent/decisions/m3u3-smoke.py`, which still count 9 named tables. S4 CHECK, verbatim: derive the footprint table set from the live declared schema in both, excluding SQLite-owned tables by an explicit rule, and add a `schema_metadata` write mutant the corpus kills."
     },
     {
       "id": "Z06",
@@ -198,7 +198,7 @@
       "evidence": "test_submission.py:366-407 records SQL, then tests `if table in sql` without normalization. A unique-anchor isolated mutant adds `connection.execute(\"SELECT count(*) FROM ARTIFACTS\").fetchone()` to `_persist_proposal`; liveness prints `LIVE=True`, and `tests.test_submission + tests.test_read_capability_battery` print `Ran 82 tests`, `OK`, RC=0.",
       "severity": "material",
       "acceptance_check": "Normalize parsed SQL identifiers case-insensitively or use SQLite authorization events instead of raw substring matching. Cover every forbidden table named by D17 on both paths, keep a nonempty positive control, and require the uppercase ARTIFACTS mutant to fail.",
-      "main_ruling": "unknown"
+      "main_ruling": "CARRIED to S4. The finding holds and is a FORCING-POWER defect, not a style point: `if table in sql` over raw SQL misses `FROM ARTIFACTS`, so D17's forbidden-read guarantee is asserted and not measured. S4 CHECK, verbatim: normalize parsed SQL identifiers case-insensitively or read SQLite authorization events instead of substrings, cover every table D17 names on both paths, keep the non-empty recorded list as the positive control, and add the uppercase-`ARTIFACTS` mutant to the corpus."
     }
   ]
 }

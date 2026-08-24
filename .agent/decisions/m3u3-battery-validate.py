@@ -100,6 +100,8 @@ OBLIGATIONS: dict[str, tuple[int, str]] = {
     "D40": (1, "one canonical snapshot serves the call; mutating request.input changes no stored byte"),
     "D41": (1, "README and the normative docs name both methods and publish authority, return, cost and containment"),
     "D42": (1, "the proposal row shape, including status_sequence bound to the proposal.created sequence"),
+    "D43": (2, "candidate is exactly Candidate and provenance is a Mapping, on both paths"),
+    "D44": (1, "provenance canonicalizes under 65,536 bytes and output under the module default"),
 }
 
 STUB_HEADER = '''"""Diff-blind obligation battery for M3.3 request-free submission.

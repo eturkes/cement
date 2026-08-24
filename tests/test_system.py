@@ -685,12 +685,12 @@ class SystemTests(unittest.TestCase):
         for invoke in invalid_calls:
             with self.subTest(invoke=invoke), self.assertRaises(ValidationError):
                 invoke()
-        for configuration in (
-            {"candidate_source": False},
-            {"clock_us": 0},
-        ):
+        for configuration in ({"clock_us": 0},):
             with self.subTest(configuration=configuration), self.assertRaises(ValidationError):
                 System(self.database, **configuration)
+        # M3.3 D37: an unusable source is classified where it is invoked, because
+        # reading ``propose`` off a descriptor already executes caller code.
+        self.assertIsNotNone(System(self.database, candidate_source=False))
         overflow = System(self.database, clock_us=lambda: 2**63)
         with self.assertRaises(StateError):
             overflow.register_operation(

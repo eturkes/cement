@@ -1,4 +1,4 @@
-"""Diff-blind obligation battery for M3.3 request-free submission.
+"""Diff-blind obligation battery for M3.3 explicit proposal submission.
 
 One test per numbered obligation of ``.agent/decisions/m3u3-contract.md``, named
 ``test_<id>_<slug>``. Coverage is graded by
@@ -61,6 +61,16 @@ class _RaisingSource:
         del request
         self.calls += 1
         raise self.exception
+
+
+class _DuckMapping:
+    """Reads like a mapping to ``dict()`` and is not a ``Mapping`` instance."""
+
+    def keys(self) -> tuple[str, ...]:
+        return ("model",)
+
+    def __getitem__(self, key: str) -> object:
+        return "adapter_43"
 
 
 class _CallbackSource:
@@ -1665,8 +1675,12 @@ class SubmissionBatteryTests(unittest.TestCase):
                 self.assertIn("return the identifier", docstring)
                 self.assertIn("validationerror", docstring)
                 self.assertIn("notfounderror", docstring)
-                self.assertIn("stateerror", docstring)
 
+        # V-D12 leaves the direct path no revision guard, so naming StateError on
+        # submit_proposal would publish an error that route cannot raise.
+        self.assertIn("stateerror", propose)
+        self.assertNotIn("stateerror", submit)
+        self.assertIn("binds whatever operation revision is current", submit)
         self.assertIn("never invokes the configured candidate source", submit)
         self.assertNotIn("operation revision changes", submit)
         self.assertIn("source runs outside every transaction", propose)
@@ -1711,7 +1725,8 @@ class SubmissionBatteryTests(unittest.TestCase):
             ROOT / "docs/adapter-protocol.md": (
                 "through `handle`",
                 "through `system.propose`, the same failures raise `candidatesourceerror`",
-                "`system.propose` invokes the adapter one time for each call, and it never retries",
+                "`system.propose` invokes the adapter at most one time for each call",
+                "invokes the adapter zero times",
             ),
         }
         for path, fragments in required.items():
@@ -1908,20 +1923,19 @@ class SubmissionBatteryTests(unittest.TestCase):
 
     def test_d38_a_malformed_source_return_is_contained(self) -> None:
         """D38. Five malformed returns match a raised adapter error's public observation, erase a mapping secret, and write nothing."""
-        secret = "MAPPING_ITEMS_SECRET_38"
+        secret = "MAPPING_ACCESS_SECRET_38"
 
-        class ExplodingItems(Mapping[str, object]):
+        class ExplodingAccess(Mapping[str, object]):
+            """D38's settling case, placed on the path ``dict(Mapping)`` reads."""
+
             def __getitem__(self, key: str) -> object:
-                return 38
+                raise RuntimeError(secret)
 
             def __iter__(self) -> Iterator[str]:
-                return iter(("key",))
+                raise RuntimeError(secret)
 
             def __len__(self) -> int:
                 return 1
-
-            def items(self) -> object:
-                raise RuntimeError(secret)
 
         def observe(source: object) -> tuple[tuple[object, ...] | None, list[str]]:
             system, path = self.new_system(source=source)
@@ -1969,7 +1983,7 @@ class SubmissionBatteryTests(unittest.TestCase):
                 "non-json-object",
                 Candidate(output={}, provenance={38: "bad"}),  # type: ignore[dict-item]
             ),
-            ("items-raises", Candidate(output={}, provenance=ExplodingItems())),
+            ("access-raises", Candidate(output={}, provenance=ExplodingAccess())),
         )
         for label, returned in malformed:
             with self.subTest(label=label):
@@ -1998,7 +2012,7 @@ class SubmissionBatteryTests(unittest.TestCase):
             (
                 "non-json-object",
                 Candidate(output={}, provenance={38: "bad"}),  # type: ignore[dict-item]
-                "candidate provenance must be a JSON object",
+                "JSON object keys must be strings",
             ),
             (
                 "bad-output",
@@ -2241,6 +2255,115 @@ class SubmissionBatteryTests(unittest.TestCase):
                 self.assertEqual(event[1], proposal_id)
                 self.assertEqual(event[2], proposal["created_at_us"])
                 self.assertEqual(proposal["status_sequence"], event[0])
+
+    def test_d43_candidate_is_exactly_candidate_and_provenance(self) -> None:
+        """D43. A Candidate subclass and four pair-iterable provenances are rejected on the direct path with the published texts."""
+
+        class SubclassedCandidate(Candidate):
+            """A subclass may reimplement output or provenance as a descriptor."""
+
+        system, path = self.new_system()
+        before = self.ledger_snapshot(path)
+        pairs = (("model", "adapter_43"),)
+        rejected = (
+            (
+                "candidate-subclass",
+                SubclassedCandidate(output={"answer": 43}, provenance={}),
+                "candidate must be a Candidate",
+            ),
+            (
+                "list-of-pairs",
+                Candidate(output={}, provenance=list(pairs)),  # type: ignore[arg-type]
+                "candidate provenance must be a mapping",
+            ),
+            (
+                "tuple-of-pairs",
+                Candidate(output={}, provenance=pairs),  # type: ignore[arg-type]
+                "candidate provenance must be a mapping",
+            ),
+            (
+                "generator-of-pairs",
+                Candidate(output={}, provenance=(pair for pair in pairs)),  # type: ignore[arg-type]
+                "candidate provenance must be a mapping",
+            ),
+            (
+                "keys-only-duck-type",
+                Candidate(output={}, provenance=_DuckMapping()),  # type: ignore[arg-type]
+                "candidate provenance must be a mapping",
+            ),
+        )
+        for label, candidate, message in rejected:
+            with self.subTest(label=label):
+                with self.assertRaises(cement_runtime.ValidationError) as raised:
+                    system.submit_proposal(PARTITION, OPERATION, INPUT, candidate=candidate)
+                self.assertEqual(str(raised.exception), message)
+
+        self.assertEqual(self.ledger_snapshot(path), before)
+
+    def test_d43_source_returned_pair_iterables_are_contained(self) -> None:
+        """D43. The same pair iterables returned by a source raise the contained error, never ValidationError, and drain no iterator."""
+        drained: list[str] = []
+
+        def counting_pairs() -> Iterator[tuple[str, str]]:
+            drained.append("entered")
+            yield ("model", "adapter_43")
+
+        returned = (
+            ("list-of-pairs", [("model", "adapter_43")]),
+            ("generator-of-pairs", counting_pairs()),
+            ("keys-only-duck-type", _DuckMapping()),
+        )
+        for label, provenance in returned:
+            with self.subTest(label=label):
+                source = _ReturningSource(
+                    Candidate(output={}, provenance=provenance)  # type: ignore[arg-type]
+                )
+                system, path = self.new_system(source=source)
+                before = self.ledger_snapshot(path)
+
+                with self.assertRaisesRegex(
+                    cement_runtime.CandidateSourceError, r"^candidate source failed$"
+                ):
+                    system.propose(PARTITION, OPERATION, INPUT)
+
+                self.assertEqual(len(source.calls), 1)
+                self.assertEqual(self.ledger_snapshot(path), before)
+
+        self.assertEqual(drained, [])
+
+    def test_d44_provenance_canonicalizes_under_65_536_bytes(self) -> None:
+        """D44. Provenance one byte over 65,536 raises the exact bound text while the same payload passes as output."""
+        filler = "x" * 65_536
+        oversized = {"model": filler}
+        self.assertGreater(len(canonicalize(oversized).text.encode("utf-8")), 65_536)
+
+        system, path = self.new_system(source=_ReturningSource(Candidate(output={}, provenance=oversized)))
+        before = self.ledger_snapshot(path)
+
+        with self.assertRaises(cement_runtime.ValidationError) as raised:
+            system.submit_proposal(
+                PARTITION,
+                OPERATION,
+                INPUT,
+                candidate=Candidate(output={}, provenance=oversized),
+            )
+        self.assertEqual(str(raised.exception), "canonical JSON exceeds 65536 bytes")
+
+        with self.assertRaisesRegex(
+            cement_runtime.CandidateSourceError, r"^candidate source failed$"
+        ):
+            system.propose(PARTITION, OPERATION, INPUT)
+        self.assertEqual(self.ledger_snapshot(path), before)
+
+        # The same payload as OUTPUT clears the module default, so the failure
+        # above measures the provenance bound and not the payload's size.
+        accepted = system.submit_proposal(
+            PARTITION,
+            OPERATION,
+            INPUT,
+            candidate=Candidate(output=oversized, provenance={"model": "adapter_44"}),
+        )
+        self.assertTrue(accepted.startswith("prop_"))
 
 
 if __name__ == "__main__":  # pragma: no cover

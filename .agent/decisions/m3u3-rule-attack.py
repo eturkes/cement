@@ -64,9 +64,10 @@ DISPOSITIONS: dict[str, str] = {
     ),
     "A07": (
         "UPHELD, blocking. D07 ordered DIRECT candidate validation while section 7 published no "
-        "class, text, or accepted shape for any of its failures. LANDED: four candidate rows in the "
-        "section 7 table, covering the wrong container, non-mapping provenance, non-object "
-        "provenance, and canonicalization failure."
+        "class, text, or accepted shape for any of its failures. LANDED: candidate rows in the "
+        "section 7 table covering the wrong container, non-mapping provenance, canonicalization "
+        "failure and the byte bound. The non-object row shipped with them and was DELETED at S3: "
+        "no input reaches it, so review rows R01 and R15 struck the branch and its row together."
     ),
     "A08": (
         "UPHELD IN PART. The eight seams are API-level and true as named; `cli.py` also serializes "
@@ -148,8 +149,11 @@ DISPOSITIONS: dict[str, str] = {
         "UPHELD, blocking, and broader than A07. The accepted candidate runtime shape, the "
         "provenance byte limit, and the ownership split between DIRECT `ValidationError` and "
         "SOURCE-BACKED containment were all undefined. Verdict rows X01 and X02 confirm both halves "
-        "independently. LANDED: four candidate rows plus the malformed-RETURN row in section 7; "
-        "D38 rules the ownership split and names the secret-carrying `items` case that settles it."
+        "independently. LANDED: candidate rows plus the malformed-RETURN row in section 7; D38 "
+        "rules the ownership split, D43 publishes the accepted domain and D44 the 65,536-byte "
+        "bound. D38's settling case moved at S3: `dict(Mapping)` reads `keys()` and `__getitem__`, "
+        "so the `items`-raising mapping this row named is never consulted, and the secret-carrying "
+        "case is now a mapping whose `__iter__` raises."
     ),
     "Y03": (
         "UPHELD, blocking. D01 counted the proposals row and specified nothing about it, so a "

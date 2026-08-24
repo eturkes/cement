@@ -47,15 +47,17 @@ BATTERY = ["tests.test_submission", "tests.test_submission_battery"]
 
 CANDIDATE_TYPE = "        if type(candidate) is not Candidate:\n"
 PROVENANCE_MAPPING = (
-    "        try:\n"
-    "            mapping = dict(candidate.provenance)\n"
-    "        except (TypeError, ValueError):\n"
-    '            raise ValidationError("candidate provenance must be a mapping") from None\n'
+    "        if not isinstance(candidate.provenance, Mapping):\n"
+    '            raise ValidationError("candidate provenance must be a mapping")\n'
 )
-PROVENANCE_BOUND = "        provenance = canonicalize(mapping, max_bytes=65_536)\n"
-PROVENANCE_OBJECT = (
-    "        if type(provenance.value) is not dict:\n"
-    '            raise ValidationError("candidate provenance must be a JSON object")\n'
+PROVENANCE_BOUND = (
+    "        # source path contains the same failure with every other adapter defect.\n"
+    "        provenance = canonicalize(dict(candidate.provenance), max_bytes=65_536)\n"
+)
+INIT_NO_PREFLIGHT = (
+    "        # A source is classified where it is invoked, never here: reading\n"
+    "        # ``propose`` off a descriptor already executes caller-supplied code, so a\n"
+    "        # constructor pre-flight is the very hazard it looks like a guard against.\n"
 )
 READ_TRANSACTION = (
     "    def _submission_revision(self, partition: str, operation: str) -> int:\n"
@@ -167,8 +169,9 @@ ERROR_DOC = (
     '    """The candidate source failed to produce a usable candidate.\n'
     "\n"
     "    A source adapter raises this error to declare its own failure.\n"
-    "    ``System.propose`` also raises it when the source fails. It carries no detail\n"
-    "    from the source.\n"
+    "    ``System.propose`` also raises it when the source fails. The instance that\n"
+    "    ``System.propose`` raises carries no detail from the source: no class, no\n"
+    "    message, no cause, no context, and no adapter frame.\n"
 )
 
 
@@ -183,49 +186,54 @@ class Mutant:
 
 
 MUTANTS: tuple[Mutant, ...] = (
-    # --- _canonical_candidate: the DIRECT path's own validation (section 7) ---
+    # --- _canonical_candidate: the DIRECT path's own validation (D43, D44) ---
     Mutant(
         "candidate-type-check-deleted",
         SYSTEM,
         CANDIDATE_TYPE,
         "        if False:\n",
-        "section 7 candidate rows",
+        "D43 candidate type domain",
     ),
     Mutant(
         "candidate-type-widened-to-isinstance",
         SYSTEM,
         CANDIDATE_TYPE,
         "        if not isinstance(candidate, Candidate):\n",
-        "section 7 candidate rows",
+        "D43 candidate type domain",
     ),
     Mutant(
         "provenance-mapping-guard-deleted",
         SYSTEM,
         PROVENANCE_MAPPING,
-        "        mapping = dict(candidate.provenance)\n",
-        "section 7 provenance mapping row",
+        "        if False:\n"
+        '            raise ValidationError("candidate provenance must be a mapping")\n',
+        "D43 provenance mapping domain",
     ),
     Mutant(
-        "provenance-mapping-keeps-context",
+        "provenance-mapping-widened-to-iterable",
         SYSTEM,
         PROVENANCE_MAPPING,
-        PROVENANCE_MAPPING.replace(' from None\n', "\n"),
-        "D18",
+        "        if not isinstance(candidate.provenance, (Mapping, list)):\n"
+        '            raise ValidationError("candidate provenance must be a mapping")\n',
+        "D43 provenance mapping domain",
     ),
     Mutant(
         "provenance-bound-dropped",
         SYSTEM,
         PROVENANCE_BOUND,
-        "        provenance = canonicalize(mapping)\n",
-        "Y02 provenance byte limit",
+        PROVENANCE_BOUND.replace(", max_bytes=65_536", ""),
+        "D44 provenance byte bound",
     ),
+    # --- System.__init__: the pre-flight D37 deleted -------------------------
     Mutant(
-        "provenance-object-check-deleted",
+        "init-preflight-restored",
         SYSTEM,
-        PROVENANCE_OBJECT,
-        "        if False:\n"
-        '            raise ValidationError("candidate provenance must be a JSON object")\n',
-        "section 7 provenance object row",
+        INIT_NO_PREFLIGHT,
+        "        if candidate_source is not None and not callable(\n"
+        '            getattr(candidate_source, "propose", None)\n'
+        "        ):\n"
+        '            raise ValidationError("candidate_source must provide a callable propose method")\n',
+        "D37 no constructor pre-flight",
     ),
     # --- _submission_revision: the pre-invocation read (D13, D21, D35) -------
     Mutant(
@@ -262,6 +270,13 @@ MUTANTS: tuple[Mutant, ...] = (
         SYSTEM,
         SEAM_QUERY,
         SEAM_QUERY.replace("partition = ? AND name = ?", "partition LIKE ? AND name = ?"),
+        "D13",
+    ),
+    Mutant(
+        "seam-name-scope-weakened",
+        SYSTEM,
+        SEAM_QUERY,
+        SEAM_QUERY.replace("partition = ? AND name = ?", "partition = ? AND name LIKE ?"),
         "D13",
     ),
     Mutant(

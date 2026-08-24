@@ -225,7 +225,8 @@ Measured gaps driving the arc:
     it without a third spike - the first time an alternative's own advocate ruled against it.
     S2 DONE, implementation session, ran past one compaction boundary. `main=` 100% 239K/240K at the
     boundary, 65% 156K/240K in the post-compaction close window; `mate=` 78% 187K/240K
-    (`orc-m3u3-1`). Shipped at `4b96e4d` + `719b48a`. Suite 635 -> 668, gate green 203.921 s.
+    (`orc-m3u3-1`). Shipped at `4b96e4d` + `719b48a` + `57a4571`. Suite 635 -> 668, gate green
+    203.921 s.
     `wt/spike-m3u3-split` is RETIRED as a design input: it collapsed `handle` onto the shared seam,
     which P06 forbids, and its `operations()` reuse is rejected at D13. Both avoided.
     SHIPPED: `submit_proposal` + `propose` + `_persist_proposal` + `_submission_revision` +
@@ -244,8 +245,8 @@ Measured gaps driving the arc:
     seed). Every teammate ADDED rows beyond its seed, which is the seeding format working:
     `test-m3u3-1` 46 -> 58 loci (12 `X` extension rows), 48 divergent; `rev-m3u3-1` 18 -> 24 lenses
     (6 `Y` rows), blocking=6 material=14 cleared=3 minor=1; `orc-m3u3-1` 30/30 probes + a full
-    independent implementation. All 58 verdicts, all 24 dispositions and the oracle differential are
-    ruled in contract sections 12-13, filled by the idempotent patchers `m3u3-rule-verdicts.py` +
+    independent implementation. All 58 verdicts and all 24 dispositions are ruled in contract
+    sections 12-13, filled by the idempotent patchers `m3u3-rule-verdicts.py` +
     `m3u3-rule-attack.py` (`--check` = in-sync gate), so the wave re-derives from the teammate
     tables. Worktrees + branches for `test`/`rev` retired; `wt/orc-m3u3-1` RETAINED for S3.
     THE EXTENSION ROWS OUTWEIGHED THE SEED: 8 new contract obligations came from them (B01/B02
@@ -274,17 +275,51 @@ Measured gaps driving the arc:
     `unreachable` + a note is a FILLED cell - moved it to 19 within one poll. Seeding the deliverable
     does not help when the BRIEF sequences the ungraded half first; order the graded artifact first
     and let the implementation catch up.
-    S3 ENTRY STATE, battery session. All three tables are harvested, ruled and committed; nothing
-    is owed to a teammate. TWO OBLIGATIONS ARE RULED AND UNDISCHARGED, and they are S3's whole job.
-    D30: closure is not yet mechanical - publish the obligation grader's exact command, enumerate the
-    added predicates and the mutant set, and require a committed red per mutant. X12: the seam is
-    structurally atomic (one write transaction, three INSERTs) but that is an ARGUMENT; D15 can
-    still pass on pre-write failures alone, so ship the rollback matrix injecting after each of the
-    request, event and proposal writes and assert taxonomy + counts + file digest + zero successful
-    commits. Then run the oracle differential over the 30-probe corpus from `wt/orc-m3u3-1`
-    (`git checkout wt/orc-m3u3-1 -- <path>`, never `merge --squash`: it is based PRE-implementation
-    at `d1829a7`, so a squash reverts `main`), with the two ruled divergences as expected, not as
-    failures. Gate at S2 close: 668 tests, 0 failures, OK, 203.921 s.
+    S3 DONE, battery session, ran past one compaction boundary. `main=` 92% 222K/240K at the
+    boundary; `mate=` 98% 235K/240K (`rev-m3u3-2`, the highest teammate reading of the unit).
+    D30 AND X12 ARE BOTH DISCHARGED, which was S3's whole job. D30 publishes three verbatim commands
+    and enumerates all 42 mutants by site; X12 ships as D15's fifth pin, the rollback matrix
+    injecting after each interior write. MEASURED at close: gate 741 / 0 failures / 0 errors /
+    0 skips / 205.725 s · grader 52 obligations / 73 tests / UNFILLED 0 / PASS · sweep 42 mutants /
+    0 survivors / 0 battery gaps against a green control.
+    A MUTATION NUMBER IS MEANINGLESS WITHOUT ITS VERDICT MODULE LIST. The pre-battery baseline read
+    13 survivors of 41 against `tests.test_submission` alone; the same corpus against that module
+    plus `tests.test_submission_battery` kills all 42. Print the verdict modules with every sweep.
+    DIFFERENTIAL RUN AND CREDITED BY MAIN'S OWN RE-DERIVATION, not merely ruled: 30/30 seeded probes
+    identical, all four Z extensions byte-identical to their recorded MAIN observations, re-derived
+    against the shipped post-fix `system.py`. THE EMPTY SEEDED DIVERGENCE SET IS THE FINDING - the
+    oracle wrote its probes to demonstrate its own conformance, so they cannot discriminate two
+    designs. Only MAIN's four added Z probes, aimed at the RULED divergences, made the instrument
+    evidentiary; Z03 exhibits the oracle raising `StateError` and storing nothing where MAIN
+    succeeds, which is the defect V-D12 removed from MAIN's code.
+    TWO CODE DEFECTS FOUND AND FIXED, each confirmed by two independent lenses: `dict(provenance)`
+    accepted pair iterables as a mapping (now `isinstance(..., Mapping)`, D43), and
+    `System.__init__` pre-flighted `callable(getattr(source, "propose", None))`, which executes a
+    raising descriptor at construction and leaked its planted secret. The pre-flight is DELETED -
+    a RULED public behaviour change on a surface stable since `3b7769b`, recorded in D37 with its
+    grounds and its `tests/test_system.py` landing site.
+    A DEAD BRANCH AND A SURVIVING MUTANT ARE ONE FACT SEEN TWICE: `provenance-object-check-deleted`
+    survived because `canonicalize(dict).value` is always `dict`, which the review reached
+    independently as a KISS defect. Deleting the branch removed the mutant and a section 7 row.
+    S4 ENTRY STATE, closure session. Nothing is owed to a teammate; every worktree and `wt/` branch
+    is removed, including `wt/orc-m3u3-1`, whose evidence survives as the committed probe table.
+    SIX REVIEW ROWS ARE RULED CARRIED and are S4's whole job; each acceptance check is stated
+    verbatim in `.agent/decisions/m3u3-review.json` under `main_ruling`.
+    R06 + R07 - one boundary from two lenses: a `Store` commit that durably succeeds and then raises
+    leaves all three rows committed while the caller sees `StateError` and no proposal id. Scope D15
+    and the public prose to failures before commit, publish the commit-uncertainty window with its
+    recovery route, and apply the shared "submission-attributable" scoping to D01, D07, D09, D15 and
+    D16, each of which currently quantifies over work the SOURCE may perform outside every Cement
+    transaction. R06's blocking half - the interior rollback matrix - is already discharged.
+    Z02 - the D06 single-writer pin spies that both methods CALL the seam, which a one-transaction
+    two-helper split satisfies; ship the AST probe and a split-writer mutant.
+    Z03 - three annotation mutants survive because no test reads annotations; ship one
+    `typing.get_type_hints` ABI test and add the three mutants.
+    Z05 - blocking: `tests/test_submission.py` and `m3u3-smoke.py` count 9 of 13 declared tables, so
+    an extra `schema_metadata` write survives them. The battery's own `sqlite_schema`-derived counter
+    already avoids this; port it and add the mutant.
+    Z06 - D17's SQL spy tests `if table in sql` against raw SQL, so `FROM ARTIFACTS` passes.
+    Normalize identifiers case-insensitively or read authorization events; add the mutant.
   - M3.4 tier=kernel tags=oracle depends=M3.3 - freeze request-free proposal/read/review/report/event
     public seams behind one internal binding adapter, schema still v2.
   - M3.5a tier=kernel tags=- depends=M3.2b,M3.4 - add `resolve` and `proposal submit` CLI channels with

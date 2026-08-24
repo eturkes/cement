@@ -1,4 +1,4 @@
-"""M3.3 request-free submission - the implementation suite.
+"""M3.3 explicit proposal submission over a retained schema-v2 request row - the implementation suite.
 
 Pins the headline predicates of `.agent/decisions/m3u3-contract.md`: the two
 paths' durable footprint, validation precedence on every adjacent edge, source

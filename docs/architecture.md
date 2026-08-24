@@ -55,8 +55,9 @@ The function format is bounded at 64 MiB, 50,000 entries, one million items, and
 limits of 1 MiB, 100,000 items, and depth 64 still apply, so a rich set can fail before 50,000 entries.
 
 Steps 1 to 3 describe `handle`, the request lifecycle. Two methods enter the same pipeline at step 3
-alone. `System.submit_proposal` stores a caller-supplied candidate. `System.propose` calls the
-configured candidate source one time, outside every transaction, and stores the result. Both methods
+alone. `System.submit_proposal` stores a caller-supplied candidate. `System.propose` validates its
+inputs and reads the operation first. If those checks pass, it calls the configured candidate source
+one time, outside every transaction that the call holds, and stores the result. Both methods
 write one request row, one proposal row, and one `proposal.created` event in one transaction. They
 return the new proposal identifier. Neither method resolves an artifact, reserves an idempotent
 request, or takes a generation lease. Review at step 4 receives their proposals unchanged. The

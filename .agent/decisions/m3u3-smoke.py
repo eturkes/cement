@@ -329,9 +329,11 @@ def main() -> int:
               any(entry["id"] == proposal_id for entry in listed), str(len(listed)))
 
         # --- P06 handle still works unchanged --------------------------------------
+        # P06 freezes handle's BYTES; this check measures only its outcome class, so
+        # the name states that. The byte pin lives in the battery's own P06 test.
         system11, ledger11 = build(_mk(directory, "h1"), source=Recorder(lambda r: good))
         outcome = system11.handle("tenant_a", "echo_1", {"k": 11})
-        check("P06", "handle still returns ReviewRequired on the same seam",
+        check("P06", "handle still returns ReviewRequired",
               type(outcome).__name__ == "ReviewRequired", type(outcome).__name__)
 
     failures = [row for row in RESULTS if row[0] == "FAIL"]

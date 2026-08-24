@@ -62,7 +62,7 @@
       "evidence": ".agent/decisions/m3u3-contract.md:84-86 orders DIRECT candidate validation, but the section-7 table lists only source/config/revision/operation/input failures. models.py:51-57 permits arbitrary output/provenance values; json_value.py:70-107 supplies multiple reachable ValidationError texts.",
       "severity": "blocking",
       "acceptance_check": "Add a candidate-error table and probes for wrong runtime type, invalid output JSON, non-mapping provenance, invalid provenance JSON, and 65,537-byte provenance; pin exact class/text, adjacent precedence, and zero ledger/source activity.",
-      "main_disposition": "UPHELD, blocking. D07 ordered DIRECT candidate validation while section 7 published no class, text, or accepted shape for any of its failures. LANDED: four candidate rows in the section 7 table, covering the wrong container, non-mapping provenance, non-object provenance, and canonicalization failure."
+      "main_disposition": "UPHELD, blocking. D07 ordered DIRECT candidate validation while section 7 published no class, text, or accepted shape for any of its failures. LANDED: candidate rows in the section 7 table covering the wrong container, non-mapping provenance, canonicalization failure and the byte bound. The non-object row shipped with them and was DELETED at S3: no input reaches it, so review rows R01 and R15 struck the branch and its row together."
     },
     {
       "id": "A08",
@@ -179,7 +179,7 @@
       "evidence": "models.py:51-57 types output as object and provenance as Mapping. Existing handle at system.py:768-771 canonicalizes output at the default limit, copies provenance to dict, caps it at 65,536 B, and requires an object. Exact rg for those bounds/rules in the contract returned rc=1; candidate control returned rc=0.",
       "severity": "blocking",
       "acceptance_check": "Publish the candidate normalization contract for both paths and add adjacent accept/reject probes for each bound, non-Candidate returns, non-mapping provenance, and invalid JSON; pin exact class/text and zero writes.",
-      "main_disposition": "UPHELD, blocking, and broader than A07. The accepted candidate runtime shape, the provenance byte limit, and the ownership split between DIRECT `ValidationError` and SOURCE-BACKED containment were all undefined. Verdict rows X01 and X02 confirm both halves independently. LANDED: four candidate rows plus the malformed-RETURN row in section 7; D38 rules the ownership split and names the secret-carrying `items` case that settles it."
+      "main_disposition": "UPHELD, blocking, and broader than A07. The accepted candidate runtime shape, the provenance byte limit, and the ownership split between DIRECT `ValidationError` and SOURCE-BACKED containment were all undefined. Verdict rows X01 and X02 confirm both halves independently. LANDED: candidate rows plus the malformed-RETURN row in section 7; D38 rules the ownership split, D43 publishes the accepted domain and D44 the 65,536-byte bound. D38's settling case moved at S3: `dict(Mapping)` reads `keys()` and `__getitem__`, so the `items`-raising mapping this row named is never consulted, and the secret-carrying case is now a mapping whose `__iter__` raises."
     },
     {
       "id": "Y03",
