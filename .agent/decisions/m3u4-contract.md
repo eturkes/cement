@@ -261,7 +261,42 @@ now; one that forces every consumer to be re-edited at M3.6b has bought a rename
 
 Both spikes were told to MEASURE the swap by performing it, not to argue it.
 
-Ruling and grounds land here at harvest.
+WAVE-1 OUTCOME: THE FORK IS NOT RULED, and the reason is a defect in MAIN's dispatch rather than in
+either teammate. Both spikes filled all 14 probe rows and both reported `adapter_present=False` on
+every one: they answered the whole corpus against BASELINE, which is exactly what the brief ordered
+("fill the graded artifact first, implementation second"). Thirteen of the fourteen probes I wrote
+were answerable without an implementation, so the graded metric reached zero while measuring only the
+status quo. Neither `Z50` row was ever added.
+
+What survives is real and is not thrown away:
+
+- `m3u4-spike-binding.json` and `m3u4-spike-projection.json` are a thorough BASELINE census — exact
+  SQL statement counts per read path (`get_proposal` 7/1, `proposals` 7/1, `function_report` 19/13
+  with 2 request statements, `review` accept 14/8 correct 14/8 reject 12/6), the collider matrix,
+  middle-and-last corruption classes, the `.review(` call-site census (30 total: 24 tests, 5
+  examples, 1 production), the `PendingProposalGap` dependent-site split, and the verbatim CLI JSON
+  for all three decisions. Section 9's corpus and the battery both consume this directly.
+- `wt/spike-m3u4-binding` DOES carry a real ALT-BINDING implementation: +433/-147 across
+  `system.py`, `models.py` and `__init__.py`, adding `_ProposalBinding`, `_ProposalBindingSet`,
+  `_proposal_binding`, a BATCH `_proposal_bindings` answering the N+1 exposure, and
+  `_write_proposal_request_status`. Its own table never measured it, but the diff is evidence.
+- `wt/spike-m3u4-projection` ALSO carries a real ALT-PROJECTION implementation: +181/-117, adding
+  `_PROPOSAL_BINDING_SQL`, a `_ProposalBinding` record and a `_proposal_binding(row)` validator. It
+  was uncommitted when `TaskStop` landed and was preserved by the close order's per-worktree status
+  read, at `cb0ef3e`. Both spikes therefore built their alternative AFTER the flush directive
+  re-ordered their work — the corpus defect delayed the implementations, it did not prevent them.
+
+FIRST COMPARABLE NUMBER, and it favours ALT-PROJECTION: +181/-117 against ALT-BINDING's +433/-147,
+for the same eight sites. It is a size measurement only, taken from two trees of unequal maturity,
+and it settles nothing on its own — the deciding criterion remains `Z50`.
+
+S2 ENTRY STATE for this fork: both worktrees are RETAINED and both hold a shipped alternative. Rule
+by running the DIFFERENTIAL rows against the two committed diffs and by answering `Z50` on each,
+which is now cheap because neither side has to be built from nothing.
+
+DISPATCH CORRECTION, binding on every future spike: a probe corpus answerable against baseline does
+not force an implementation. Either write each probe as a DELTA that requires both sides, or make the
+implementation a separately graded deliverable the validator can see.
 
 ## 13. FORK 2 — the `ReviewResult` payload (PENDING wave 1)
 
@@ -277,5 +312,11 @@ Evidence already in hand: dropping `output` is what makes 100 CLI tests fail thr
 (section 7 stage 3), which measures the payload's reach rather than settling it. The draft is a
 prescription with an expiry date and R1 carries no independent grounds beyond minimality.
 
-Ruling and grounds land here at harvest, together with the exact CLI JSON for accept, correct and
-reject under the chosen shape.
+WAVE-1 OUTCOME: NOT RULED, same cause as section 12. But the baseline evidence needed to rule it is
+now in hand and is recorded in both spike artifacts under `P08` — the verbatim CLI JSON emitted today
+for accept, correct and reject, plus the return classes and exit codes. `wt/spike-m3u4-binding` has
+already committed a concrete `ReviewResult`; MAIN rules its field set at S2 against that payload
+rather than against the draft's prescription.
+
+Ruling and grounds land here at S2, together with the exact CLI JSON for accept, correct and reject
+under the chosen shape.

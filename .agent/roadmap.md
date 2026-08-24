@@ -352,7 +352,76 @@ Measured gaps driving the arc:
     cost nothing, but read a frozen gauge plus a frozen transcript mtime together before ruling a
     teammate stalled.
   - M3.4 tier=kernel tags=oracle depends=M3.3 - freeze request-free proposal/read/review/report/event
-    public seams behind one internal binding adapter, schema still v2.
+    public seams behind one internal binding adapter, schema still v2. Budget FOUR MAIN sessions per
+    the oracle estimator: contract, implementation, battery, closure.
+    S1 DONE, contract session, `main=` 84% 203K/240K against the estimator's 84-86%; `mate=` 70%
+    168K/240K (`spike-m3u4-binding`; `map-m3u4` 61% 146K, `spike-m3u4-projection` 60% 143K).
+    Shipped at `da63741` + `6ea4c9c`: `.agent/decisions/m3u4-contract.md`, 13 sections, 27
+    obligations, sections 12-13 PENDING.
+    SURFACE FIXED BY MEASUREMENT, not by the draft: M3.4 owns exactly EIGHT `requests` sites in
+    `system.py` (1300, 1340, 1378, 1451, 1487, 1616, 2920, 2940), AST-attributed at `da63741`. The
+    other 14 carry their owning unit in contract section 1.
+    THE PLAN DRAFT'S CENTRAL PREDICATE IS EXPIRED AND DOES NOT SHIP. Its seed - "an application-SQL
+    proxy rejects any statement naming `requests`" - was written assuming M3.3 delivered schema v3.
+    Schema cuts ONCE at M3.6b, so `_persist_proposal` still writes the proposal's scope, input and
+    revision onto a private request row and every read joins to recover them; that proxy would
+    reject the unit's own storage layer. Replacement = CONFINEMENT (D01-D06) + PUBLIC SHAPE
+    (D07-D14), where confinement is a COMPLEMENT assertion over the shipped module (the set of
+    definitions whose SQL names `requests` must EQUAL a permitted set), because a forbidden-list
+    grep fails open on exactly the member nobody thought of.
+    SIZING RULED, NO PRE-OPEN SPLIT, and measured rather than forecast. The draft estimated
+    260 prod / 240 test behind a trigger the plan review itself rejected as not pre-open measurable,
+    so MAIN deleted the surface and let the gate produce the work list (`m3u4-burden.py` +
+    `m3u4-burden.json`, three staged gate runs against fresh worktrees at `da63741`): stage 1 drop
+    the two `request_id` fields = 252 broken / 3 frames; stage 2 + repair the production
+    constructors = 9 broken / 9 frames; stage 3 + `review` returns `ReviewResult` = 112 broken / 13
+    frames. 243 of stage 1's failures are a production cascade from TWO constructors
+    (`get_proposal` 227, `_pending_proposal_gap_from_row` 24) and 100 of stage 3's stand behind ONE
+    fixture helper (`tests/test_cli.py:245` in `confirm`). Work list = ~21 distinct test methods
+    plus one helper against ~20 production lines outside the adapter. A BREAK COUNT IS NOT A WORK
+    LIST until its shared frames are factored out - here they differ by 28x.
+    BOTH FORKS UNRULED, and the cause is MAIN's dispatch, not either teammate. Wave 1 = `map-m3u4` +
+    two spikes, all three seeded by a MAIN-committed validator. `map-m3u4` delivered
+    `UNKNOWN-CELLS: 0` at 42 rows (37 seeded + 5 extension). Both spikes also filled all 14 probe
+    rows - and both reported `adapter_present=False` on EVERY one, because they answered the whole
+    corpus against BASELINE exactly as the brief ordered ("fill the graded artifact first,
+    implementation second"). Thirteen of fourteen probes were answerable WITHOUT an implementation,
+    so the graded metric reached zero while measuring only the status quo, and neither added the
+    `Z50` swap row MAIN sent mid-flight.
+    A PROBE CORPUS ANSWERABLE AGAINST BASELINE DOES NOT FORCE AN IMPLEMENTATION. This is the
+    seeding rule's next failure mode after "order the graded artifact first": ordering it first
+    works, and it silently substitutes for the ungraded half whenever the graded rows can be
+    answered without it. Fix, binding on every future spike - write each probe as a DELTA requiring
+    both sides, or make the implementation a separately graded deliverable the validator can see.
+    WAVE 1 STILL PAID. The two spike artifacts are a thorough baseline census the contract's corpus
+    and the battery consume directly: exact SQL statement counts per read path (`get_proposal` 7/1,
+    `proposals` 7/1, `function_report` 19/13 with 2 request statements, `review` accept 14/8 correct
+    14/8 reject 12/6), the collider matrix, middle-and-last corruption classes, the `.review(`
+    census (30 = 24 tests + 5 examples + 1 production), and the verbatim CLI JSON for all three
+    decisions. And `wt/spike-m3u4-binding` DOES carry a real ALT-BINDING implementation, +433/-147,
+    adding `_ProposalBinding`, `_ProposalBindingSet`, `_proposal_binding`, a BATCH
+    `_proposal_bindings` answering the N+1 exposure, and `_write_proposal_request_status`. Its own
+    table never measured it; the diff is the evidence.
+    THE CLOSE ORDER'S PER-WORKTREE STATUS READ PAID FOR ITSELF. `spike-m3u4-projection` looked
+    implementation-free until `TaskStop` cut it mid-write: its uncommitted tree held a full
+    ALT-PROJECTION (+181/-117 - `_PROPOSAL_BINDING_SQL`, a `_ProposalBinding` record, a
+    `_proposal_binding(row)` validator), preserved at `cb0ef3e`. Both spikes built their alternative
+    AFTER the flush directive re-ordered their work, so the corpus defect DELAYED the
+    implementations rather than preventing them. Reading status per worktree in its own call, at
+    the last point the content exists, is what kept a whole design alternative.
+    FIRST COMPARABLE NUMBER favours ALT-PROJECTION: +181/-117 against ALT-BINDING's +433/-147 over
+    the same eight sites. Size only, from two trees of unequal maturity - it settles nothing alone
+    and `Z50` remains the deciding criterion.
+    S2 ENTRY STATE: contract sections 1-11 are binding; open with the fork rulings, not with code.
+    All three worktrees are RETAINED and BOTH spikes hold a shipped alternative, so ruling fork 1
+    is now a differential over two committed diffs plus `Z50` on each, with neither side built from
+    nothing. Rule fork 2 against the P08 baseline CLI payloads. MAIN must also validate
+    `m3u4-map.json` before crediting it; it is attention-directing, harvested but not re-derived.
+    ONE BASH WORKING DIRECTORY IS SHARED BY MAIN AND EVERY TEAMMATE. MAIN `cd`-ed into its own
+    measurement worktree and silently moved all three teammates' shells; one spike caught it and
+    invalidated a batch of measurements. Anchors and line numbers taken this way look valid and
+    resolve to the wrong bytes. MAIN now runs every located command as `(cd <path> && ...)` in a
+    subshell or `git -C`, and every brief carries a mandatory per-call `cd <worktree> &&` prefix.
   - M3.5a tier=kernel tags=- depends=M3.2b,M3.4 - add `resolve` and `proposal submit` CLI channels with
     exact exit and payload contracts. The submission channel shape is an open fork - one spike compares an
     aggregate JSON envelope against direct flags, stdin and file, including framing bound and exact error

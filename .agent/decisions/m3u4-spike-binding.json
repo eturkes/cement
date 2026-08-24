@@ -7,100 +7,281 @@
     {
       "id": "P01",
       "probe": "the adapter's exact signature, return type and column set, as shipped in this worktree",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "unreachable",
+      "observation": {
+        "adapter_present": false,
+        "signature": null,
+        "return_type": null,
+        "column_set": [],
+        "baseline_owned_request_sites": 8
+      },
+      "note": "Baseline at da63741 has eight direct request-table sites and no binding adapter; this row will be remeasured after implementation."
     },
     {
       "id": "P02",
       "probe": "get_proposal through the adapter: every ProposalView field value against a real ledger, versus baseline",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "differs",
+      "observation": {
+        "adapter_used": false,
+        "loaded_module": "src/cement_runtime/system.py",
+        "sql_statements_total": 7,
+        "application_statements": 1,
+        "field_set": [
+          "created_at_us",
+          "id",
+          "input",
+          "operation",
+          "operation_revision",
+          "partition",
+          "proposed_output",
+          "provenance",
+          "request_id"
+        ],
+        "field_values": {
+          "created_at_us": 10000013,
+          "id": "prop_probe_12",
+          "input": {"index": 2},
+          "operation": "echo_1",
+          "operation_revision": 1,
+          "partition": "tenant_a",
+          "proposed_output": {"answer": 22},
+          "provenance": {"model": "probe", "rank": 13},
+          "request_id": "req_probe_12"
+        },
+        "equals_baseline": true
+      },
+      "note": "The baseline method returns the expected ledger values but still performs its own requests JOIN and exposes request_id."
     },
     {
       "id": "P03",
       "probe": "proposals over a 3-proposal ledger: SQL statement count executed, and whether ordering stays byte-identical",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "differs",
+      "observation": {
+        "adapter_used": false,
+        "proposal_count": 3,
+        "proposal_ids_in_order": ["prop_probe_11", "prop_probe_12", "prop_probe_13"],
+        "sequences_in_order": [2, 3, 4],
+        "sql_statements_total": 7,
+        "application_statements": 1,
+        "request_table_statements": 1,
+        "byte_identical_to_baseline": true,
+        "ordering": "p.status_sequence ASC"
+      },
+      "note": "Baseline is one bulk JOIN rather than N+1 and returns the insertion-independent status-sequence order, but still names requests directly."
     },
     {
       "id": "P04",
       "probe": "function_report over the same ledger: SQL statement count, exact pending count, and the detail projection",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "differs",
+      "observation": {
+        "adapter_used": false,
+        "sql_statements_total": 19,
+        "application_statements": 13,
+        "request_table_statements": 2,
+        "pending_count": 3,
+        "projected_count": 3,
+        "proposal_ids": ["prop_probe_11", "prop_probe_12", "prop_probe_13"],
+        "request_ids": ["req_probe_11", "req_probe_12", "req_probe_13"],
+        "operation_revisions": [1, 1, 1],
+        "input_hashes": [
+          "29219e41f7d3be520df73c53a60c5b096e3984e06f48d6048c5cd44077c27380",
+          "49a3059f750079b138322cee2fb15716b68e1fa5acee9392e4374dcd2118699f",
+          "219b2d6a40f7a67a96d4131fcaa642e66ef9077519f002d5ae591ce23eecf08d"
+        ],
+        "byte_identical_to_baseline": true
+      },
+      "note": "Baseline reports the exact count and all three bounded details, but two application statements independently JOIN requests."
     },
     {
       "id": "P05",
       "probe": "review's use of the adapter INSIDE the existing write transaction: connection.in_transaction and transaction count",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "differs",
+      "observation": {
+        "adapter_present": false,
+        "connections_opened": 1,
+        "transaction_count": 1,
+        "begin_statements": 1,
+        "commits": 1,
+        "rollbacks": 0,
+        "request_join_count": 1,
+        "request_join_in_transaction": [true],
+        "sql_statements_total": 14,
+        "application_statements": 8
+      },
+      "note": "Baseline proves the request JOIN already runs inside one write transaction; implementation must preserve that lifetime through the resolver."
     },
     {
       "id": "P06",
       "probe": "the companion request-status writes: kept, moved or dropped by this alternative, and what a later read observes",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "differs",
+      "observation": {
+        "baseline_disposition": "kept-inline",
+        "request_statuses_after_review": ["resolved", "resolved", "rejected"],
+        "request_outputs_after_review": ["{\"answer\":11}", "{\"answer\":222}", null],
+        "request_example_ids": ["ex_probe_11", "ex_probe_12", null],
+        "later_public_status_types": ["Resolved", "Resolved", "Rejected"],
+        "later_public_status_values": ["resolved", "resolved", "rejected"]
+      },
+      "note": "The v2 request row remains live plumbing: dropping either companion update would make request_status disagree with the reviewed proposal."
     },
     {
       "id": "P07",
       "probe": "confinement: run an AST or source instrument naming every function that mentions requests, and report the exact set",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "differs",
+      "observation": {
+        "instrument": "AST source-segment word-boundary census",
+        "system_function_count": 10,
+        "system_functions": [
+          "revise_operation",
+          "_persist_proposal",
+          "handle",
+          "_fail_generation",
+          "request_status",
+          "get_proposal",
+          "proposal",
+          "proposals",
+          "review",
+          "function_report"
+        ],
+        "m3u4_owned_direct_consumers": ["get_proposal", "proposal", "proposals", "review", "function_report"]
+      },
+      "note": "Baseline has five M3.4 consumers naming requests; the final census must replace them with one resolver plus one companion writer."
     },
     {
       "id": "P08",
       "probe": "ReviewResult: the shape this alternative ships and the exact CLI JSON for accept, correct and reject versus today",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "differs",
+      "observation": {
+        "review_result_present": false,
+        "baseline_return_types": ["Resolved", "Resolved", "Rejected"],
+        "baseline_exit_codes": [0, 0, 0],
+        "baseline_accept_json": "{\n  \"artifact_id\": null,\n  \"example_id\": \"ex_probe_11\",\n  \"output\": {\n    \"answer\": 11\n  },\n  \"request_id\": \"req_probe_11\",\n  \"source\": \"confirmed\",\n  \"status\": \"resolved\"\n}\n",
+        "baseline_correct_json": "{\n  \"artifact_id\": null,\n  \"example_id\": \"ex_probe_12\",\n  \"output\": {\n    \"answer\": 222\n  },\n  \"request_id\": \"req_probe_12\",\n  \"source\": \"confirmed\",\n  \"status\": \"resolved\"\n}\n",
+        "baseline_reject_json": "{\n  \"proposal_id\": \"prop_probe_13\",\n  \"request_id\": \"req_probe_13\",\n  \"status\": \"rejected\"\n}\n"
+      },
+      "note": "Current CLI serialization leaks request identity and returns different model families; ReviewResult must collapse all three decisions."
     },
     {
       "id": "P09",
       "probe": "PendingProposalGap without request_id: the shipped field set and every call site rewritten",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "differs",
+      "observation": {
+        "baseline_field_set": ["proposal_id", "request_id", "operation_revision", "input_hash"],
+        "production_constructors": ["src/cement_runtime/system.py:2676"],
+        "test_constructors": 4,
+        "test_request_id_attribute_reads": 3,
+        "test_signature_pins": 1,
+        "cli_serialized_key_pins": 1,
+        "mechanical_rewrite": "remove request_id from the model and every constructor, attribute assertion, signature tuple, and serialized key set"
+      },
+      "note": "Baseline has one production constructor and nine test or CLI references that must move together when the public field disappears."
     },
     {
       "id": "P10",
       "probe": "the .review( and ProposalView call sites this alternative breaks: count, and the mechanical rewrite for each shape",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "differs",
+      "observation": {
+        "review_calls_repo": 30,
+        "review_calls_tests": 24,
+        "review_calls_examples": 5,
+        "review_calls_production": 1,
+        "test_review_reads_removed_fields": 2,
+        "removed_review_fields_read": ["output", "request_id"],
+        "test_review_reads_retained_fields": ["example_id", "status"],
+        "proposal_view_production_constructors": 1,
+        "proposal_view_request_id_reads_tests": 4,
+        "mechanical_rewrites": {
+          "review.output": "read proposal(...)[\"final_output\"] after review",
+          "review.request_id": "delete lifecycle-identity assertion and retain proposal_id",
+          "ProposalView.request_id": "delete field reads or inspect the private ledger only in plumbing-specific tests",
+          "ProposalView_constructor": "remove the request_id keyword"
+        }
+      },
+      "note": "Most review calls ignore the result or consume retained fields; six direct removed-field readers plus one constructor are the mechanical break set."
     },
     {
       "id": "P11",
       "probe": "scalar corruption of the MIDDLE and the LAST of >=3 proposals, read through the adapter: exact class and message",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "differs",
+      "observation": {
+        "fixture_size": 3,
+        "corrupted_positions": ["middle", "last"],
+        "corrupted_column": "requests.operation_revision",
+        "corrupted_value": 0,
+        "patch_applied_values": [0, 0],
+        "get_proposal_classes": [null, null],
+        "get_proposal_revision_values": [0, 0],
+        "proposals_revision_vectors": [[1, 0, 1], [1, 1, 0]],
+        "function_report_class": "IntegrityError",
+        "function_report_message": "pending proposal operation revision is invalid",
+        "review_class": "StateError",
+        "review_message": "proposal belongs to an obsolete operation revision; reject it or use a new request"
+      },
+      "note": "Baseline validates this scalar only in function_report; get/list leak zero and review misclassifies corruption as ordinary revision drift."
     },
     {
       "id": "P12",
       "probe": "partition and operation colliders (tenant_a versus tenantXa, case variants) through every adapted read",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "differs",
+      "observation": {
+        "partitions": ["tenant_a", "tenantXa", "Tenant_A"],
+        "operations": ["echo_1", "echoX1", "ECHO_1"],
+        "target_partition_list_count": 3,
+        "target_partition_list_operations": ["echo_1", "echoX1", "ECHO_1"],
+        "partition_collider_ids_excluded": [true, true],
+        "wrong_partition_get": ["NotFoundError", "proposal does not exist in this partition"],
+        "wrong_partition_proposal": ["NotFoundError", "proposal does not exist in this partition"],
+        "wrong_partition_review": ["NotFoundError", "proposal does not exist in this partition"],
+        "case_partition_review": ["NotFoundError", "proposal does not exist in this partition"],
+        "function_report_pending_counts": {
+          "tenant_a/echo_1": 1,
+          "tenantXa/echo_1": 1,
+          "Tenant_A/echo_1": 1,
+          "tenant_a/echoX1": 1,
+          "tenant_a/ECHO_1": 1
+        }
+      },
+      "note": "Baseline exact-equality joins resist underscore and case colliders on all scoped reads; the adapter must preserve these concrete separations."
     },
     {
       "id": "P13",
       "probe": "measured production line delta per file for this alternative, plus the static source span it edits",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "unreachable",
+      "observation": {
+        "baseline_commit": "da63741",
+        "production_additions": 0,
+        "production_deletions": 0,
+        "files_changed": [],
+        "planned_static_spans": {
+          "src/cement_runtime/models.py": [69, 135, 245, 249],
+          "src/cement_runtime/system.py": [1289, 1651, 2641, 2682, 2751, 3106],
+          "src/cement_runtime/__init__.py": [20, 116]
+        }
+      },
+      "note": "Only the graded artifact differs at this checkpoint; measured production churn and final edited spans will replace this baseline after implementation."
     },
     {
       "id": "P14",
       "probe": "a proposal whose private request row is missing or mismatched: class, message, and whether the state is reachable",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "differs",
+      "observation": {
+        "missing_supported_api_reachable": false,
+        "missing_fk_on_delete": ["IntegrityError", "FOREIGN KEY constraint failed"],
+        "missing_forced_with_fk_off": true,
+        "missing_get_proposal": ["NotFoundError", "proposal does not exist in this partition"],
+        "missing_proposal": ["NotFoundError", "proposal does not exist in this partition"],
+        "missing_review": ["NotFoundError", "proposal does not exist in this partition"],
+        "missing_proposals_projected_ids": ["prop_missing_11", "prop_missing_13"],
+        "missing_function_report_count": 2,
+        "mismatch_supported_api_reachable": false,
+        "mismatch_direct_sql_with_fk_on_reachable": true,
+        "mismatch_get_proposal": ["IntegrityError", "proposal and request states are inconsistent"],
+        "mismatch_proposal": ["IntegrityError", "proposal and request states are inconsistent"],
+        "mismatch_proposals": ["IntegrityError", "proposal and request states are inconsistent"],
+        "mismatch_review": ["IntegrityError", "proposal rejection transition lost its state binding"],
+        "mismatch_function_report": ["IntegrityError", "pending proposal scope or request binding mismatch"]
+      },
+      "note": "Baseline fails closed on mismatches but an FK-disabled missing row becomes a false not-found or silent undercount, exposing the inner-JOIN hazard."
     }
   ]
 }

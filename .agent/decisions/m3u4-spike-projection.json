@@ -1,106 +1,450 @@
 {
   "kind": "spike",
-  "alternative": "unknown",
+  "alternative": "ALT-PROJECTION",
   "adapter_signature": "unknown",
   "worktree_commit": "unknown",
   "rows": [
     {
       "id": "P01",
       "probe": "the adapter's exact signature, return type and column set, as shipped in this worktree",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "unreachable",
+      "observation": {
+        "adapter_present": false,
+        "signature": null,
+        "return_type": null,
+        "column_set": [],
+        "baseline_query_owners": [
+          "System.get_proposal",
+          "System.proposal",
+          "System.proposals",
+          "System.review",
+          "System.function_report/count",
+          "System.function_report/detail"
+        ]
+      },
+      "note": "Baseline measurement: no binding adapter exists yet, so the shipped-signature half is unreachable until implementation."
     },
     {
       "id": "P02",
       "probe": "get_proposal through the adapter: every ProposalView field value against a real ledger, versus baseline",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "unreachable",
+      "observation": {
+        "adapter_present": false,
+        "baseline_field_set": [
+          "created_at_us",
+          "id",
+          "input",
+          "operation",
+          "operation_revision",
+          "partition",
+          "proposed_output",
+          "provenance",
+          "request_id"
+        ],
+        "baseline_values": {
+          "created_at_us": 10000077,
+          "id": "prop_43d523dd7e7f46fab9e1867b2ed2da1d",
+          "input": {
+            "ordinal": 11,
+            "scope": "target"
+          },
+          "operation": "op_main",
+          "operation_revision": 1,
+          "partition": "batch_3",
+          "proposed_output": {
+            "accepted": false,
+            "ordinal": 11
+          },
+          "provenance": {
+            "engine": "projection-spike",
+            "ordinal": 11
+          },
+          "request_id": "req_a22948ba48b34c03a1f320fb450fe041"
+        },
+        "baseline_sql_statement_count": 7,
+        "baseline_application_statement_count": 1
+      },
+      "note": "Real-ledger baseline is recorded field-for-field; no adapter path exists yet, so post-change equality remains to be executed."
     },
     {
       "id": "P03",
       "probe": "proposals over a 3-proposal ledger: SQL statement count executed, and whether ordering stays byte-identical",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "unreachable",
+      "observation": {
+        "adapter_present": false,
+        "proposal_count": 3,
+        "sql_statement_count": 7,
+        "application_statement_count": 1,
+        "transaction_begin_count": 1,
+        "requests_statement_count": 1,
+        "repeat_ordering_byte_identical": true,
+        "ordered_sequences": [
+          7,
+          8,
+          9
+        ],
+        "ordered_input_ordinals": [
+          11,
+          22,
+          33
+        ]
+      },
+      "note": "Total connection/cursor instrumentation measured one list query and one transaction; adapter composition is not implemented yet."
     },
     {
       "id": "P04",
       "probe": "function_report over the same ledger: SQL statement count, exact pending count, and the detail projection",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "unreachable",
+      "observation": {
+        "adapter_present": false,
+        "sql_statement_count": 19,
+        "application_statement_count": 13,
+        "transaction_begin_count": 1,
+        "requests_statement_count": 2,
+        "pending_count": 3,
+        "pending_detail_count": 3,
+        "detail_field_set": [
+          "input_hash",
+          "operation_revision",
+          "proposal_id",
+          "request_id"
+        ],
+        "detail_order": "proposal_id ascending"
+      },
+      "note": "Real-ledger baseline used the same three proposals; the adapter-specific projection remains unreachable before implementation."
     },
     {
       "id": "P05",
       "probe": "review's use of the adapter INSIDE the existing write transaction: connection.in_transaction and transaction count",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "unreachable",
+      "observation": {
+        "adapter_present": false,
+        "decision_sql_statement_counts": {
+          "accept": 14,
+          "correct": 14,
+          "reject": 12
+        },
+        "decision_application_statement_counts": {
+          "accept": 8,
+          "correct": 8,
+          "reject": 6
+        },
+        "transaction_count_each": 1,
+        "binding_read_in_transaction_each": true,
+        "request_read_write_in_transaction_vectors": {
+          "accept": [
+            true,
+            true
+          ],
+          "correct": [
+            true,
+            true
+          ],
+          "reject": [
+            true,
+            true
+          ]
+        }
+      },
+      "note": "Total recorder covered connection and cursor channels; baseline join and companion write both execute under one write transaction."
     },
     {
       "id": "P06",
       "probe": "the companion request-status writes: kept, moved or dropped by this alternative, and what a later read observes",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "unreachable",
+      "observation": {
+        "adapter_present": false,
+        "baseline_companion_writes": "kept",
+        "accept_stored_request": {
+          "status": "resolved",
+          "source_kind": "confirmed",
+          "example_id": "ex_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "output_json": "{\"accepted\":false,\"ordinal\":11}"
+        },
+        "correct_stored_request": {
+          "status": "resolved",
+          "source_kind": "confirmed",
+          "example_id": "ex_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "output_json": "{\"corrected\":true,\"ordinal\":22}"
+        },
+        "reject_stored_request": {
+          "status": "rejected",
+          "source_kind": null,
+          "example_id": null,
+          "output_json": null
+        },
+        "later_request_statuses": {
+          "accept": "resolved",
+          "correct": "resolved",
+          "reject": "rejected"
+        }
+      },
+      "note": "Baseline writes preserve the later request_status lifecycle seam; the alternative's keep-or-drop decision remains to be executed."
     },
     {
       "id": "P07",
       "probe": "confinement: run an AST or source instrument naming every function that mentions requests, and report the exact set",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "unreachable",
+      "observation": {
+        "adapter_present": false,
+        "request_token_string_literal_count": 22,
+        "function_set": [
+          "System._fail_generation",
+          "System._persist_proposal",
+          "System.function_report",
+          "System.get_proposal",
+          "System.handle",
+          "System.proposal",
+          "System.proposals",
+          "System.request_status",
+          "System.review",
+          "System.revise_operation"
+        ],
+        "m3u4_owned_read_literal_owners": [
+          "System.function_report",
+          "System.get_proposal",
+          "System.proposal",
+          "System.proposals",
+          "System.review"
+        ],
+        "m3u4_owned_read_literal_count": 6,
+        "module_binding_constant_present": false
+      },
+      "note": "AST literal census is exact on the baseline module; no confinement pin or canonical projection constant exists yet."
     },
     {
       "id": "P08",
       "probe": "ReviewResult: the shape this alternative ships and the exact CLI JSON for accept, correct and reject versus today",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "unreachable",
+      "observation": {
+        "review_result_present": false,
+        "baseline_return_classes": {
+          "accept": "Resolved",
+          "correct": "Resolved",
+          "reject": "Rejected"
+        },
+        "baseline_cli_exit": {
+          "accept": 0,
+          "correct": 0,
+          "reject": 0
+        },
+        "baseline_cli_stdout": {
+          "accept": "{\n  \"artifact_id\": null,\n  \"example_id\": \"ex_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n  \"output\": {\n    \"accepted\": false,\n    \"ordinal\": 11\n  },\n  \"request_id\": \"req_a22948ba48b34c03a1f320fb450fe041\",\n  \"source\": \"confirmed\",\n  \"status\": \"resolved\"\n}\n",
+          "correct": "{\n  \"artifact_id\": null,\n  \"example_id\": \"ex_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\n  \"output\": {\n    \"corrected\": true,\n    \"ordinal\": 22\n  },\n  \"request_id\": \"req_af822ecc83374deab7b95e743eaf884d\",\n  \"source\": \"confirmed\",\n  \"status\": \"resolved\"\n}\n",
+          "reject": "{\n  \"proposal_id\": \"prop_301fa74882f947809643fc164dc4ae0b\",\n  \"request_id\": \"req_c09c402271de48bfb1e7aad8ea1d7b6e\",\n  \"status\": \"rejected\"\n}\n"
+        }
+      },
+      "note": "Exact in-process CLI bytes are captured with deterministic example IDs; ReviewResult does not exist on the baseline."
     },
     {
       "id": "P09",
       "probe": "PendingProposalGap without request_id: the shipped field set and every call site rewritten",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "unreachable",
+      "observation": {
+        "adapter_present": false,
+        "baseline_field_set": [
+          "proposal_id",
+          "request_id",
+          "operation_revision",
+          "input_hash"
+        ],
+        "baseline_request_id_dependent_production_sites": 2,
+        "baseline_request_id_dependent_test_sites": 8,
+        "test_site_kinds": {
+          "public_shape_expectation": 1,
+          "constructor_calls": 4,
+          "field_reads": 3
+        },
+        "export_sites_unchanged": 2
+      },
+      "note": "Baseline census covers the model field, projector constructor, four expected values, and three field reads; rewrites await implementation."
     },
     {
       "id": "P10",
       "probe": "the .review( and ProposalView call sites this alternative breaks: count, and the mechanical rewrite for each shape",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "unreachable",
+      "observation": {
+        "adapter_present": false,
+        "review_call_sites_total": 30,
+        "review_call_sites_by_tree": {
+          "src": 1,
+          "tests": 24,
+          "examples": 5
+        },
+        "proposal_view_type_sites": 6,
+        "proposal_view_constructor_sites": 1,
+        "proposal_view_request_id_field_reads": 2,
+        "mechanical_rewrite_classes": {
+          "ignored_review_return": "no source rewrite expected",
+          "request_id_read": "delete assertion or recover only through private request_status fixture",
+          "resolved_output_read": "use known submitted output or a subsequent proposal projection",
+          "example_id_read": "read ReviewResult.example_id",
+          "serialized_return": "expect ReviewResult fields only"
+        }
+      },
+      "note": "AST/rg baseline finds 24 test calls exactly as seeded plus five example calls and the CLI dispatch; actual break set awaits execution."
     },
     {
       "id": "P11",
       "probe": "scalar corruption of the MIDDLE and the LAST of >=3 proposals, read through the adapter: exact class and message",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "unreachable",
+      "observation": {
+        "adapter_present": false,
+        "fixture_size": 3,
+        "middle": {
+          "index": 1,
+          "patch_applied": true,
+          "class": "IntegrityError",
+          "message": "proposal request input digest mismatch"
+        },
+        "last": {
+          "index": 2,
+          "patch_applied": true,
+          "class": "IntegrityError",
+          "message": "proposal request input digest mismatch"
+        },
+        "mutation_channel": "real STRICT ledger UPDATE of requests.input_hash",
+        "module_loaded": "src/cement_runtime/system.py"
+      },
+      "note": "Both real-ledger corruptions are reachable because requests.input_hash has no immutable trigger; adapter execution remains pending."
     },
     {
       "id": "P12",
       "probe": "partition and operation colliders (tenant_a versus tenantXa, case variants) through every adapted read",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "unreachable",
+      "observation": {
+        "adapter_present": false,
+        "revisions": {
+          "tenant_a/op_1": 11,
+          "tenantXa/op_1": 12,
+          "TENANT_A/op_1": 13,
+          "tenant_a/opX1": 14,
+          "tenant_a/OP_1": 15
+        },
+        "get_proposal_wrong_partition": {
+          "tenantXa": [
+            "NotFoundError",
+            "proposal does not exist in this partition"
+          ],
+          "TENANT_A": [
+            "NotFoundError",
+            "proposal does not exist in this partition"
+          ]
+        },
+        "proposal_wrong_partition": {
+          "tenantXa": [
+            "NotFoundError",
+            "proposal does not exist in this partition"
+          ],
+          "TENANT_A": [
+            "NotFoundError",
+            "proposal does not exist in this partition"
+          ]
+        },
+        "proposals_operations": {
+          "tenant_a": [
+            "op_1",
+            "opX1",
+            "OP_1"
+          ],
+          "tenantXa": [
+            "op_1"
+          ],
+          "TENANT_A": [
+            "op_1"
+          ]
+        },
+        "function_report_pending_count_each": 1,
+        "function_report_exact_id_each": true,
+        "review_wrong_partition": [
+          "NotFoundError",
+          "proposal does not exist in this partition"
+        ],
+        "review_exact_revision": 11,
+        "review_exact_succeeded": true
+      },
+      "note": "Real colliders cross underscore, ASCII case, and revisions above nine; every baseline read isolates exactly, but no adapter exists yet."
     },
     {
       "id": "P13",
       "probe": "measured production line delta per file for this alternative, plus the static source span it edits",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "unreachable",
+      "observation": {
+        "adapter_present": false,
+        "baseline_commit": "da63741",
+        "production_line_delta": {},
+        "production_net_line_delta": 0,
+        "planned_static_method_spans": {
+          "src/cement_runtime/system.py": {
+            "get_proposal": "1289-1326",
+            "proposal": "1328-1347",
+            "proposals": "1349-1391",
+            "_proposal_record": "1393-1420",
+            "review": "1422-1651",
+            "_pending_proposal_gap_from_row": "2640-2681",
+            "function_report": "2751-3106"
+          },
+          "src/cement_runtime/models.py": {
+            "ProposalView": "125-135",
+            "PendingProposalGap": "244-249"
+          }
+        },
+        "planned_system_method_span_lines": 757
+      },
+      "note": "Baseline has no production delta; exact diff ranges and per-file additions/deletions require the implementation checkpoint."
     },
     {
       "id": "P14",
       "probe": "a proposal whose private request row is missing or mismatched: class, message, and whether the state is reachable",
-      "outcome": "unknown",
-      "observation": {},
-      "note": ""
+      "outcome": "unreachable",
+      "observation": {
+        "adapter_present": false,
+        "missing_request": {
+          "reachability": "live System opened before an out-of-band foreign_keys-disabled delete",
+          "fresh_constructor": [
+            "IntegrityError",
+            "SQLite foreign-key check failed"
+          ],
+          "get_proposal": [
+            "NotFoundError",
+            "proposal does not exist in this partition"
+          ],
+          "proposal": [
+            "NotFoundError",
+            "proposal does not exist in this partition"
+          ],
+          "proposals_count": 2,
+          "function_report_pending_count": 2,
+          "review": [
+            "NotFoundError",
+            "proposal does not exist in this partition"
+          ]
+        },
+        "mismatched_request": {
+          "reachability": "schema-valid direct scalar update; unsupported by Cement API",
+          "get_proposal": [
+            "IntegrityError",
+            "proposal and request states are inconsistent"
+          ],
+          "proposal": [
+            "IntegrityError",
+            "proposal and request states are inconsistent"
+          ],
+          "proposals": [
+            "IntegrityError",
+            "proposal and request states are inconsistent"
+          ],
+          "function_report": [
+            "IntegrityError",
+            "pending proposal scope or request binding mismatch"
+          ],
+          "review": [
+            "IntegrityError",
+            "proposal confirmation transition lost its state binding"
+          ]
+        }
+      },
+      "note": "Baseline inner joins hide a missing binding from a live System, while a fresh System rejects the FK violation during construction."
     }
   ]
 }
