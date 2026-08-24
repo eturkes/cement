@@ -13,9 +13,12 @@ from __future__ import annotations
 import ast
 from contextlib import closing
 import hashlib
+import inspect
 import pathlib
+import re
 import sqlite3
 import tempfile
+import typing
 import unittest
 from unittest import mock
 
@@ -33,17 +36,29 @@ from cement_runtime import (
 )
 
 SECRET = "adapter-secret-42"
-TABLES = (
-    "operations",
-    "requests",
-    "proposals",
-    "events",
-    "examples",
-    "artifacts",
-    "example_revocations",
-    "function_receipts",
-    "function_memberships",
-)
+
+# D01's footprint quantifies over every APPLICATION table the live ledger
+# declares, derived here rather than named, because a hand-written list is a
+# footprint with holes: nine named tables left `artifact_evidence`,
+# `artifact_tests`, `schema_metadata` and `test_reports` unmeasured, so an extra
+# write to any of them passed every count. The exclusion rule is explicit and is
+# the only one: SQLite owns the `sqlite_` prefix, and `events.sequence` is
+# AUTOINCREMENT, so `sqlite_sequence` legitimately moves on every success.
+SQLITE_OWNED = "sqlite_"
+DECLARED_APPLICATION_TABLES = 13
+
+
+def _application_tables(connection: sqlite3.Connection) -> list[str]:
+    tables = [
+        name
+        for (name,) in connection.execute(
+            "SELECT name FROM sqlite_schema WHERE type = 'table' ORDER BY name"
+        )
+        if not name.startswith(SQLITE_OWNED)
+    ]
+    if not tables:
+        raise AssertionError("the schema derivation found no application tables")
+    return tables
 
 
 class _Source:
@@ -75,9 +90,11 @@ class SubmissionTests(unittest.TestCase):
 
     def _counts(self, database: pathlib.Path) -> dict[str, int]:
         with closing(sqlite3.connect(database)) as connection:
+            tables = _application_tables(connection)
+            self.assertEqual(len(tables), DECLARED_APPLICATION_TABLES)
             return {
                 table: connection.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
-                for table in TABLES
+                for table in tables
             }
 
     def _fingerprint(self, database: pathlib.Path) -> tuple[str, str]:
@@ -107,7 +124,7 @@ class SubmissionTests(unittest.TestCase):
         system.submit_proposal("tenant_a", "echo_1", {"k": 1}, candidate=self._candidate())
         after = self._counts(database)
         self.assertEqual(
-            {table: after[table] - before[table] for table in TABLES if after[table] != before[table]},
+            {table: after[table] - before[table] for table in after if after[table] != before[table]},
             {"requests": 1, "proposals": 1, "events": 1},
         )
 
@@ -167,7 +184,7 @@ class SubmissionTests(unittest.TestCase):
         after = self._counts(database)
         self.assertIs(type(proposal_id), str)
         self.assertEqual(
-            {table: after[table] - before[table] for table in TABLES if after[table] != before[table]},
+            {table: after[table] - before[table] for table in after if after[table] != before[table]},
             {"requests": 1, "proposals": 1, "events": 1},
         )
 
@@ -379,12 +396,63 @@ class SubmissionTests(unittest.TestCase):
                     self.assertEqual(commits, [])
 
     def test_submission_reads_no_artifact_example_or_function_table(self):
+        """D17: neither path touches a table outside submission's own four.
+
+        The instrument is a COMPLEMENT, not a hand-written forbidden list: it
+        tokenizes each recorded statement into SQL identifiers, folds them to
+        lower case, and asserts the set of application tables named is exactly
+        the permitted four. `if table in sql` over raw SQL was neither - it
+        missed `FROM ARTIFACTS` on case alone, and it could never see a table
+        the list forgot to name.
+
+        This is a TRIPWIRE. A change that legitimately reads a fifth table must
+        widen `permitted` deliberately, which is the acknowledgement D17 exists
+        to force. It is not a cardinality gate: nothing here can be satisfied by
+        hiding a read behind a wider query, because a wider query names more
+        tables, not fewer.
+        """
+
         executed: list[str] = []
+
+        class _RecordingCursor:
+            """Total over the cursor API, so no read escapes by changing channel."""
+
+            def __init__(self, inner):
+                self._inner = inner
+
+            def __getattr__(self, name):
+                return getattr(self._inner, name)
+
+            def __iter__(self):
+                return iter(self._inner)
+
+            def execute(self, sql, *args, **kwargs):
+                executed.append(sql)
+                return self._inner.execute(sql, *args, **kwargs)
+
+            def executemany(self, sql, *args, **kwargs):
+                executed.append(sql)
+                return self._inner.executemany(sql, *args, **kwargs)
+
+            def executescript(self, sql, *args, **kwargs):
+                executed.append(sql)
+                return self._inner.executescript(sql, *args, **kwargs)
 
         class _RecordingConnection(sqlite3.Connection):
             def execute(self, sql, *args, **kwargs):
                 executed.append(sql)
                 return super().execute(sql, *args, **kwargs)
+
+            def executemany(self, sql, *args, **kwargs):
+                executed.append(sql)
+                return super().executemany(sql, *args, **kwargs)
+
+            def executescript(self, sql, *args, **kwargs):
+                executed.append(sql)
+                return super().executescript(sql, *args, **kwargs)
+
+            def cursor(self, *args, **kwargs):
+                return _RecordingCursor(super().cursor(*args, **kwargs))
 
         real_connect = store_module.sqlite3.connect
 
@@ -392,7 +460,7 @@ class SubmissionTests(unittest.TestCase):
             kwargs["factory"] = _RecordingConnection
             return real_connect(*args, **kwargs)
 
-        system, _, _ = self._make_system()
+        system, database, _ = self._make_system()
         with mock.patch.object(store_module.sqlite3, "connect", spy_connect):
             executed.clear()
             system.submit_proposal(
@@ -404,20 +472,22 @@ class SubmissionTests(unittest.TestCase):
             sourced = list(executed)
 
         self.assertTrue(direct and sourced, "the SQL spy failed to install")
-        forbidden = (
-            "artifacts",
-            "examples",
-            "example_revocations",
-            "function_receipts",
-            "function_memberships",
-        )
+        with closing(sqlite3.connect(database)) as connection:
+            application = set(_application_tables(connection))
+        permitted = {"operations", "requests", "proposals", "events"}
+        self.assertLess(permitted, application, "the permitted set must be a strict subset")
+        forbidden = application - permitted
+        self.assertEqual(len(forbidden), DECLARED_APPLICATION_TABLES - len(permitted))
+
+        identifier = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
         for label, statements in (("direct", direct), ("source", sourced)):
-            for table in forbidden:
-                with self.subTest(path=label, table=table):
-                    self.assertFalse(
-                        [sql for sql in statements if table in sql],
-                        f"{label} path touched {table}",
-                    )
+            words = {word.lower() for sql in statements for word in identifier.findall(sql)}
+            with self.subTest(path=label):
+                self.assertEqual(
+                    sorted(application & words),
+                    sorted(permitted),
+                    f"{label} path named {sorted(forbidden & words)} outside its four tables",
+                )
 
     # -- validation precedence, one probe per ADJACENT edge -----------------
 
@@ -544,6 +614,165 @@ class SubmissionTests(unittest.TestCase):
                 self.assertNotIn(name, cement_runtime.__all__)
                 self.assertFalse(hasattr(cement_runtime, name))
                 self.assertTrue(hasattr(System, name))
+
+    def test_the_seam_is_the_sole_writer_in_both_call_closures(self):
+        """D06, structurally: `_persist_proposal` OWNS all three writes.
+
+        The runtime spy below proves both public methods CALL the seam. That is
+        satisfied by a split writer - keep `_persist_proposal` as a wrapper, move
+        the `requests` INSERT into a second private helper it calls, and every
+        behavioural pin still passes. Ownership is a property of the source, so
+        it is measured on the source.
+
+        The probe walks the `self.<method>` call closure of each public method
+        and requires exactly ONE function in it to execute SQL writes. Scoping to
+        the closure is what keeps `handle`'s own request/proposal writes, which
+        M3.3 does not touch, out of the measurement.
+        """
+
+        source = pathlib.Path(cement_runtime.system.__file__).read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        system_class = next(
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ClassDef) and node.name == "System"
+        )
+        methods = {
+            node.name: node
+            for node in system_class.body
+            if isinstance(node, ast.FunctionDef)
+        }
+
+        def self_calls(node: ast.FunctionDef) -> set[str]:
+            return {
+                child.func.attr
+                for child in ast.walk(node)
+                if isinstance(child, ast.Call)
+                and isinstance(child.func, ast.Attribute)
+                and isinstance(child.func.value, ast.Name)
+                and child.func.value.id == "self"
+                and child.func.attr in methods
+            }
+
+        def closure(entry: str) -> set[str]:
+            seen: set[str] = set()
+            pending = [entry]
+            while pending:
+                name = pending.pop()
+                if name in seen:
+                    continue
+                seen.add(name)
+                pending.extend(self_calls(methods[name]) - seen)
+            return seen
+
+        writes = re.compile(r"\binsert\s+into\s+(requests|proposals)\b", re.IGNORECASE)
+
+        def write_profile(node: ast.FunctionDef) -> tuple[list[str], int]:
+            tables = [
+                match.group(1).lower()
+                for child in ast.walk(node)
+                if isinstance(child, ast.Constant) and isinstance(child.value, str)
+                for match in writes.finditer(child.value)
+            ]
+            events = [
+                child
+                for child in ast.walk(node)
+                if isinstance(child, ast.Call)
+                and isinstance(child.func, ast.Name)
+                and child.func.id == "_event"
+                and any(
+                    keyword.arg == "kind"
+                    and isinstance(keyword.value, ast.Constant)
+                    and keyword.value.value == "proposal.created"
+                    for keyword in child.keywords
+                )
+            ]
+            return sorted(tables), len(events)
+
+        for entry in ("submit_proposal", "propose"):
+            with self.subTest(entry=entry):
+                reached = closure(entry)
+                self.assertIn("_persist_proposal", reached)
+                writers = {
+                    name for name in reached if write_profile(methods[name]) != ([], 0)
+                }
+                self.assertEqual(
+                    writers,
+                    {"_persist_proposal"},
+                    f"{entry} reaches writers outside the seam: {sorted(writers)}",
+                )
+                # The public method delegates; it holds no write of its own.
+                self.assertEqual(write_profile(methods[entry]), ([], 0))
+
+        # Positive control plus the exact ownership claim: the seam writes each
+        # row once and emits the event once. A count of 0 anywhere would make the
+        # `writers` comparison above pass vacuously.
+        self.assertEqual(write_profile(methods["_persist_proposal"]), (["proposals", "requests"], 1))
+
+    def test_the_frozen_public_shape_of_both_submission_methods(self):
+        """P01: signature AND annotations, neither of which behaviour can see.
+
+        Removing the keyword-only marker, weakening `candidate` to `object`,
+        weakening either return annotation, and adding an ignored `candidate`
+        keyword to `propose` all leave every behavioural test green.
+        """
+
+        expected = {
+            "submit_proposal": (
+                (
+                    ("self", inspect.Parameter.POSITIONAL_OR_KEYWORD, True),
+                    ("partition", inspect.Parameter.POSITIONAL_OR_KEYWORD, True),
+                    ("operation", inspect.Parameter.POSITIONAL_OR_KEYWORD, True),
+                    ("input_value", inspect.Parameter.POSITIONAL_OR_KEYWORD, True),
+                    ("candidate", inspect.Parameter.KEYWORD_ONLY, True),
+                ),
+                {
+                    "partition": str,
+                    "operation": str,
+                    "input_value": object,
+                    "candidate": Candidate,
+                    "return": str,
+                },
+            ),
+            "propose": (
+                (
+                    ("self", inspect.Parameter.POSITIONAL_OR_KEYWORD, True),
+                    ("partition", inspect.Parameter.POSITIONAL_OR_KEYWORD, True),
+                    ("operation", inspect.Parameter.POSITIONAL_OR_KEYWORD, True),
+                    ("input_value", inspect.Parameter.POSITIONAL_OR_KEYWORD, True),
+                ),
+                {
+                    "partition": str,
+                    "operation": str,
+                    "input_value": object,
+                    "return": str,
+                },
+            ),
+        }
+        for name, (parameters, hints) in expected.items():
+            method = getattr(System, name)
+            with self.subTest(method=name):
+                # Order, kind and required-vs-defaulted state, all in one tuple.
+                self.assertEqual(
+                    tuple(
+                        (
+                            parameter.name,
+                            parameter.kind,
+                            parameter.default is inspect.Parameter.empty,
+                        )
+                        for parameter in inspect.signature(method).parameters.values()
+                    ),
+                    parameters,
+                )
+                # Exact annotation objects, resolved through the module globals
+                # that `from __future__ import annotations` defers them to. An
+                # equality on the whole mapping pins absence as well as presence,
+                # so an added `candidate` on `propose` fails here too.
+                self.assertEqual(typing.get_type_hints(method), hints)
+
+        self.assertNotIn("source", inspect.signature(System.propose).parameters)
+        self.assertNotIn("candidate", inspect.signature(System.propose).parameters)
+        self.assertNotIn("source", inspect.signature(System.submit_proposal).parameters)
 
     def test_both_methods_route_through_one_persistence_seam(self):
         """D06: the seam is the single writer, and it behaves the same either way."""

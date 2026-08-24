@@ -32,17 +32,14 @@ from cement_runtime import (  # noqa: E402
 )
 
 RESULTS: list[tuple[str, str, str]] = []
-TABLES = (
-    "operations",
-    "requests",
-    "proposals",
-    "events",
-    "examples",
-    "artifacts",
-    "example_revocations",
-    "function_receipts",
-    "function_memberships",
-)
+
+# D01's footprint is derived from the LIVE declared schema, never named: nine
+# named tables left four unmeasured, so an extra write to `schema_metadata`,
+# `artifact_evidence`, `artifact_tests` or `test_reports` passed every count.
+# One explicit exclusion rule - SQLite owns the `sqlite_` prefix, and
+# `events.sequence` is AUTOINCREMENT so `sqlite_sequence` legitimately moves.
+SQLITE_OWNED = "sqlite_"
+DECLARED_APPLICATION_TABLES = 13
 
 
 def check(obligation: str, name: str, ok: bool, detail: str = "") -> None:
@@ -63,9 +60,18 @@ class Recorder:
 
 def counts(path: Path) -> dict[str, int]:
     with sqlite3.connect(path) as connection:
+        tables = [
+            name
+            for (name,) in connection.execute(
+                "SELECT name FROM sqlite_schema WHERE type = 'table' ORDER BY name"
+            )
+            if not name.startswith(SQLITE_OWNED)
+        ]
+        if len(tables) != DECLARED_APPLICATION_TABLES:
+            raise SystemExit(f"schema derivation found {len(tables)} application tables")
         return {
             table: connection.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
-            for table in TABLES
+            for table in tables
         }
 
 
@@ -92,7 +98,7 @@ def main() -> int:
         before = counts(ledger)
         proposal_id = system.submit_proposal("tenant_a", "echo_1", {"k": 1}, candidate=good)
         after = counts(ledger)
-        delta = {t: after[t] - before[t] for t in TABLES if after[t] != before[t]}
+        delta = {t: after[t] - before[t] for t in after if after[t] != before[t]}
         check("D01", "direct footprint is one request, one proposal, one event",
               delta == {"requests": 1, "proposals": 1, "events": 1}, str(delta))
         check("P02", "submit_proposal returns a bare str proposal id",
@@ -136,7 +142,7 @@ def main() -> int:
         before3 = counts(ledger3)
         source_id = system3.propose("tenant_a", "echo_1", {"k": 3})
         after3 = counts(ledger3)
-        delta3 = {t: after3[t] - before3[t] for t in TABLES if after3[t] != before3[t]}
+        delta3 = {t: after3[t] - before3[t] for t in after3 if after3[t] != before3[t]}
         check("D01", "source footprint matches the direct footprint",
               delta3 == {"requests": 1, "proposals": 1, "events": 1}, str(delta3))
         check("D05", "propose invokes the source exactly once",

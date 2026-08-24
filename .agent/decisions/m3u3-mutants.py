@@ -165,6 +165,78 @@ SOURCE_PERSIST = (
     "            operation=operation,\n"
     "            expected_revision=revision,\n"
 )
+# --- S4 anchors: the six mutants the carried review rows demanded ------------
+
+SEAM_HEADER = (
+    "    def _persist_proposal(\n"
+    "        self,\n"
+    "        *,\n"
+    "        partition: str,\n"
+    "        operation: str,\n"
+    "        expected_revision: int | None,\n"
+    "        request_id: str,\n"
+    "        input_json: CanonicalJSON,\n"
+    "        proposed: CanonicalJSON,\n"
+    "        provenance: CanonicalJSON,\n"
+    "    ) -> str:\n"
+    "        # The proposal binds to the revision current under the write lock. Only a\n"
+)
+# One transaction, TWO helpers: `_persist_proposal` survives as a wrapper both
+# public methods still call, so every behavioural pin and the runtime seam spy
+# stay green while the seam has stopped owning a single write.
+SEAM_SPLIT_WRITER = (
+    "    def _persist_proposal(\n"
+    "        self,\n"
+    "        *,\n"
+    "        partition: str,\n"
+    "        operation: str,\n"
+    "        expected_revision: int | None,\n"
+    "        request_id: str,\n"
+    "        input_json: CanonicalJSON,\n"
+    "        proposed: CanonicalJSON,\n"
+    "        provenance: CanonicalJSON,\n"
+    "    ) -> str:\n"
+    "        return self._write_submission_rows(\n"
+    "            partition=partition,\n"
+    "            operation=operation,\n"
+    "            expected_revision=expected_revision,\n"
+    "            request_id=request_id,\n"
+    "            input_json=input_json,\n"
+    "            proposed=proposed,\n"
+    "            provenance=provenance,\n"
+    "        )\n"
+    "\n"
+    "    def _write_submission_rows(\n"
+    "        self,\n"
+    "        *,\n"
+    "        partition: str,\n"
+    "        operation: str,\n"
+    "        expected_revision: int | None,\n"
+    "        request_id: str,\n"
+    "        input_json: CanonicalJSON,\n"
+    "        proposed: CanonicalJSON,\n"
+    "        provenance: CanonicalJSON,\n"
+    "    ) -> str:\n"
+    "        # The proposal binds to the revision current under the write lock. Only a\n"
+)
+SEAM_MINT = (
+    '            proposal_id = _new_id("prop")\n'
+    "            created = self._now()\n"
+    "            connection.execute(\n"
+    '                """\n'
+    "                INSERT INTO requests(\n"
+)
+DIRECT_SIG_TAIL = (
+    "        *,\n"
+    "        candidate: Candidate,\n"
+    "    ) -> str:\n"
+)
+SOURCE_SIG_TAIL = (
+    "        input_value: object,\n"
+    "    ) -> str:\n"
+    '        """Ask the configured candidate source for a candidate, then submit it.\n'
+)
+
 ERROR_DOC = (
     '    """The candidate source failed to produce a usable candidate.\n'
     "\n"
@@ -563,6 +635,56 @@ MUTANTS: tuple[Mutant, ...] = (
         "    from the source.\n",
         "D31",
     ),
+    # --- S4: the six mutants the carried review rows demanded ---------------
+    Mutant(
+        "seam-split-into-two-helpers",
+        SYSTEM,
+        SEAM_HEADER,
+        SEAM_SPLIT_WRITER,
+        "D06 the seam is the sole writer",
+    ),
+    # A fourteenth write the nine-table footprint could not see.
+    Mutant(
+        "seam-writes-schema-metadata",
+        SYSTEM,
+        SEAM_MINT,
+        "            connection.execute(\n"
+        '                "INSERT OR REPLACE INTO schema_metadata(key, value) VALUES (?, ?)",\n'
+        '                ("last-proposal", request_id),\n'
+        "            )\n" + SEAM_MINT,
+        "D01 footprint over every declared application table",
+    ),
+    # A forbidden read that lowercase substring matching cannot see.
+    Mutant(
+        "seam-reads-artifacts-uppercase",
+        SYSTEM,
+        SEAM_MINT,
+        '            connection.execute("SELECT count(*) FROM ARTIFACTS").fetchone()\n'
+        + SEAM_MINT,
+        "D17 no artifact, example or function-table read",
+    ),
+    # Three annotation weakenings no behavioural test can observe.
+    Mutant(
+        "direct-candidate-annotation-weakened",
+        SYSTEM,
+        DIRECT_SIG_TAIL,
+        DIRECT_SIG_TAIL.replace("candidate: Candidate", "candidate: object"),
+        "P01 frozen public shape",
+    ),
+    Mutant(
+        "direct-return-annotation-weakened",
+        SYSTEM,
+        DIRECT_SIG_TAIL,
+        DIRECT_SIG_TAIL.replace(") -> str:", ") -> object:"),
+        "P01 frozen public shape",
+    ),
+    Mutant(
+        "source-return-annotation-weakened",
+        SYSTEM,
+        SOURCE_SIG_TAIL,
+        SOURCE_SIG_TAIL.replace(") -> str:", ") -> object:"),
+        "P01 frozen public shape",
+    ),
 )
 
 
@@ -635,7 +757,12 @@ def run(selection: list[str], verdict_modules: list[str], *, full: bool) -> int:
             gaps.append(mutant)
 
     purge()
-    print(f"\nmutants={len(chosen)} survivors={len(survivors)} battery_gaps={len(gaps)}")
+    # A survivor count is meaningless without its verdict module list: the same
+    # 41-mutant corpus read 13 survivors against one module and 0 against two.
+    print(
+        f"\nmutants={len(chosen)} survivors={len(survivors)} battery_gaps={len(gaps)} "
+        f"verdict_modules={verdict_modules}"
+    )
     for mutant in survivors:
         print(f"SURVIVOR {mutant.identifier} -> obligation {mutant.obligation} does not pin it")
     for mutant in gaps:

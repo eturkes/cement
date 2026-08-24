@@ -88,9 +88,26 @@ def propose(
 
 ## 3. The two submission paths - the unit's headline predicates
 
+- D45. SUBMISSION-ATTRIBUTABLE, the DOMAIN of every footprint and purity obligation in this contract.
+  A submission call is not the only writer that can run during its own extent, because BOTH paths
+  execute caller-supplied code: `propose` invokes the source adapter outside every transaction the
+  call holds, and `submit_proposal` reads the caller's provenance through `keys()` and `__getitem__`
+  (D38, D43). Either may reenter the same `System` and commit - the revision-race fixture does exactly
+  that through `revise_operation`. Work is SUBMISSION-ATTRIBUTABLE when Cement performs it inside a
+  transaction the submission call itself opened. D01, D07, D09, D15 and D16 quantify over
+  submission-attributable work ALONE. Read without this scope every one of the five is FALSE, because
+  caller code that writes makes the ledger move on a call the obligation calls pure, and a caller
+  object that reenters makes a REJECTED call open a transaction. Two consequences are load-bearing.
+  The comparison window is measured AFTER any caller-owned commit has landed, never call entry
+  against call exit. And "zero transactions" counts transactions Cement opened for the submission,
+  measured at `Store.transaction`, never connections observed on the ledger file.
 - D01. SUCCESS FOOTPRINT, identical for both paths after generated-ID normalization: exactly one new
   `requests` row, exactly one new `proposals` row, exactly one new `events` row. No other table
-  changes.
+  changes. SCOPE: submission-attributable (D45). The footprint is measured over every APPLICATION
+  table the live schema declares, derived from `sqlite_schema` with ONE explicit exclusion rule - the
+  `sqlite_` prefix SQLite owns - and never from a hand-written list. Nine named tables left
+  `artifact_evidence`, `artifact_tests`, `schema_metadata` and `test_reports` unmeasured, so an extra
+  write to any of the four passed every count; the live ledger declares 13.
 - D02. The request row is written DIRECTLY as `status='pending'` with `proposal_id` set,
   `lease_owner IS NULL`, `lease_until_us IS NULL`, `attempts=1`. The schema v2 CHECK constraint
   ADMITS this shape; it does not enforce it, and it also accepts a `pending` row with `attempts > 1`,
@@ -123,13 +140,19 @@ def propose(
 
 - D07. Argument validation runs BEFORE any ledger read and before any source invocation, in this
   order: `partition`, `operation`, `input_value` canonicalization, then `candidate` on the DIRECT
-  path.
+  path. SCOPE: submission-attributable (D45). "Before any ledger read" orders CEMENT's reads.
+  Validating `candidate` executes the caller's own mapping, so a mapping that reenters the `System`
+  reads the ledger during step four - the caller's read, on the caller's transaction, inside its own
+  argument.
 - D08. A bad `partition` together with a bad `input_value` reports the PARTITION error. Both spikes
   measured this on both alternatives; it matches `resolve`'s ruled precedence in
   `m3u2b-contract.md` section 4. SAMPLE ONLY: that pair SPANS two edges of D07's order and pins
   neither interior one, so D07's three adjacent probes carry the obligation and D08 rides along.
 - D09. A rejected call performs ZERO transactions and ZERO source invocations. The obligation is
-  measured with live spies proved on a positive control, never by a bare zero count.
+  measured with live spies proved on a positive control, never by a bare zero count. SCOPE:
+  submission-attributable (D45). The spy counts `Store.transaction` calls the SUBMISSION made. A
+  provenance mapping whose `keys()` reenters `System` raises the transaction count on the ledger
+  while submission's own count stays zero, and the second is the obligation.
 - D10. Omitting `candidate` on `submit_proposal` raises Python's own missing-keyword-only
   `TypeError`. Passing `source=` to either method raises Python's own unexpected-keyword `TypeError`.
   M3.3 writes no validator for either: the signature is the check. A test may pin the exact text
@@ -184,17 +207,22 @@ def propose(
 
 ## 6. Purity and containment obligations - each pinned independently
 
-- D15. A failed submission causes ZERO ledger mutation of its own. Four INDEPENDENT pins, never one
-  aggregate assertion: `requests` and `proposals` row counts, the event count and the event sequence
-  counter, the ledger file's sha256, and the full `tuple(connection.iterdump())` text.
-  DOMAIN, and the wording is load-bearing: the source runs outside every Cement transaction and may
-  itself write to the same ledger, which the revision-race fixture does deliberately through
-  `revise_operation`. Byte identity therefore compares the ledger AFTER any such injected commit
-  against the ledger after the rejected submission returns - never call entry against call exit.
-- D16. Zero `commit()` calls occur on every failure that arises BEFORE commit, measured through a
-  `sqlite3.Connection` subclass injected as the connect `factory`, with a write-transaction positive
-  control proving the spy live. This mirrors M3.2b's B35. A `commit()` that itself raises is one
-  invocation and no reading forbids it; the obligation is that no failure reaches commit.
+- D15. A submission that fails BEFORE COMMIT causes ZERO ledger mutation of its own. Four INDEPENDENT
+  pins, never one aggregate assertion: `requests` and `proposals` row counts, the event count and the
+  event sequence counter, the ledger file's sha256, and the full `tuple(connection.iterdump())` text.
+  DOMAIN, and the wording is load-bearing: submission-attributable (D45), and BEFORE COMMIT. Byte
+  identity compares the ledger AFTER any caller-owned commit against the ledger after the rejected
+  submission returns - never call entry against call exit. The before-commit qualifier is not
+  hedging: D46 states the one window where a submission raises and the rows are durable anyway, and
+  an unqualified D15 asserts that window away instead of publishing it.
+- D16. Zero SUBMISSION-ATTRIBUTABLE `commit()` calls occur on every failure that arises BEFORE
+  commit, measured through a `sqlite3.Connection` subclass injected as the connect `factory`, with a
+  write-transaction positive control proving the spy live. This mirrors M3.2b's B35. SCOPE:
+  submission-attributable (D45) - a source that reenters and commits raises the ledger's commit count
+  while submission's own stays zero, and the second is the obligation. The earlier reading "no
+  failure reaches commit" is WITHDRAWN as an overclaim: a `commit()` that itself raises is one
+  invocation, it is a failure that reached commit, and D46 states what the ledger and the caller then
+  hold.
 - D17. Neither method reads the clock except through `self._now`, and neither consults the artifact,
   example, function-receipt or membership tables. Submission records a proposal; it does not resolve.
   FORCING INSTRUMENT, required because row, file, dump and commit pins all pass while a forbidden
