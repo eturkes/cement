@@ -422,6 +422,52 @@ Measured gaps driving the arc:
     invalidated a batch of measurements. Anchors and line numbers taken this way look valid and
     resolve to the wrong bytes. MAIN now runs every located command as `(cd <path> && ...)` in a
     subshell or `git -C`, and every brief carries a mandatory per-call `cd <worktree> &&` prefix.
+    S2 DONE, implementation session, `main=` 98% 236K/240K, over the estimator band; `mate=` 85%
+    205K/240K (`rev-m3u4-1`; `test-m3u4-1` 52% 125K). Shipped at `bdbe94a` (system), `0e9130c` +
+    `d8ab9fc` (validator), `c603b07` (sections 14 + 57 verdicts), `d1621ab` (section 15 + 39
+    lenses). Gate 744 -> 753 tests, OK, 173.8s; failures ran 121 -> 15 -> 3 -> 0.
+    BOTH FORKS RULED. Fork 1 = COMPOSE, neither spike as written: `_proposal_bindings(connection, *,
+    partition, selection)` issues the COMPLETE statement per selection over `_ProposalIds` /
+    `_ProposalFeed` / `_PendingProposals`, `_write_proposal_request_status` is the sole review-path
+    writer, `_proposal_binding` is a SQL-free singular wrapper, and the inner JOIN is preserved
+    everywhere. Fork 2 = R2+, four fields, with `status` newly `accepted`/`corrected`/`rejected` -
+    a ruled public behaviour change, because baseline said `resolved` for BOTH confirming decisions.
+    A SPIKE'S SHIPPED DIFF CARRIES DEFECTS ITS OWN TABLE NEVER MEASURED. Both spikes graded
+    UNKNOWN-CELLS: 0; the ruling came from reading the two diffs. ALT-PROJECTION left two raw
+    `UPDATE requests` in `review` (a read-only SQL constant cannot confine a write, and it built no
+    writer). ALT-BINDING confined in full but was a SIDE lookup that M3.6b's direct columns delete.
+    Choose the alternative that survives the NEXT unit, not the smaller diff: +181/-117 lost to
+    +433/-147 here.
+    THE ATTACK TABLE FALSIFIED A COMMITTED GROUND, which is the highest-value thing wave 2 produced.
+    Y9 ran both shapes through `EXPLAIN QUERY PLAN` (SQLite 3.53.1) and got IDENTICAL plans, so the
+    "ALT-PROJECTION materializes the partition before filtering by operation" ground is WITHDRAWN -
+    SQLite flattens the wrapper and pushes the predicate down. The ruling stands on its other two
+    grounds and the LEFT JOIN ground got sharper. Standing rule: a subquery is not a materialization,
+    so never assert a query plan without running the planner.
+    FOUR MORE CLAIM CORRECTIONS, all against text MAIN had already committed: Z50 is a COUPLING
+    CENSUS, not a performed swap (A18); section 1's "no consumer loses information" was false for
+    public consumers (Y18); D12's byte-identity rule had to exempt `status` explicitly (Y4); D24's
+    "fabricated only" premise was false on two real-ledger paths - malformed JSON in a schema-valid
+    TEXT column, and five legitimately-nullable columns (A14, Y17).
+    A VALIDATOR SEEDED BEFORE ITS CONTRACT GREW BLOCKS EVERY TEAMMATE AT ONCE. The `SECTION` regex
+    accepted `D<nn>` only; MAIN then appended sections 12-13, so both teammates hit INVALID on
+    legitimate citations and neither could reach a clean grade. Two grammar widenings failed before
+    the right move: pull the CENSUS of all 77 distinct values and check the two things a pointer can
+    be checked for - it resolves somewhere, and it stays under 60 chars. Re-grade both ways after
+    any validator edit; the seed credential dies with it.
+    WAVE 2 CLOSED BOTH TABLES: 57 verdicts (22 seeded + 35 extension) and 39 lenses (18 + 21), each
+    ruled through an idempotent `--check` patcher that pins serialization by round-trip before
+    writing and asserts the id set. Extensions outnumbered seeds in both.
+    S3 ENTRY STATE, battery session. Sections 1-15 are binding; 19 lenses are DEFERRED-S3 with the
+    battery obligation named per lens in `m3u4-attack.json` - the sharpest are A13 (both assertions
+    D23 permits survive an ORDER BY change, so self-consistency is not a pin), A02 (Literal is not
+    runtime-enforced, so both confirming paths can still return `resolved`), Y11 (a validation SELECT
+    inside the adapter recreates the per-consumer cost that ruled ALT-BINDING out), and Y8 (a
+    survivor count needs its catalogue). `orc` was deliberately deferred to S3: an oracle corpus
+    written to demonstrate its own conformance is a control, and the evidentiary probes are the ones
+    MAIN aims at the ruled disagreements, which exist only now that the implementation has landed.
+    Section 15 schedules the contract's wave chronology for `.agent/archive/` at milestone close;
+    its grounds are still load-bearing for the battery.
   - M3.5a tier=kernel tags=- depends=M3.2b,M3.4 - add `resolve` and `proposal submit` CLI channels with
     exact exit and payload contracts. The submission channel shape is an open fork - one spike compares an
     aggregate JSON envelope against direct flags, stdin and file, including framing bound and exact error
