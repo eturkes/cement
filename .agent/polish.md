@@ -516,3 +516,40 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   under a `set_trace_callback` spy, one drives each half-missing resolved-writer input, and rerunning
   `uv run python .agent/decisions/m3u4-mutants.py --id M02 --id M03 --id M15 --id M26` reports every one
   of them killed.
+
+## M3.5a deferrals
+
+- Argparse option abbreviation is live on EVERY parser node, not only the root. Measured at `4783eed`
+  by `.agent/decisions/m3u5a-s2-probe.py`: root `--part` resolves to `--partition` and nested
+  `function eval --bun`/`--in` resolve to `--bundle`/`--input`, while abbreviated LEAF names
+  (`function ev`, `proposal sho`) are rejected. M3.5a scopes `allow_abbrev=False` to its two new
+  nodes alone, because disabling it globally is a public grammar change outside this unit's mandate
+  and the weakness bites on REMOVAL predicates, which M3.5b owns: a deleted flag stays reachable
+  through any unambiguous prefix of a surviving one, so an absence predicate written as an exact
+  spelling is weaker than the grammar actually accepts. Acceptance: every parser node constructed in
+  `_parser()` sets `allow_abbrev=False`, and one census-derived test walking `_parser()` asserts
+  `--part`, `--bun` and `--in` each return exit 2 with `unrecognized arguments`, alongside at least
+  one removed-flag prefix from M3.5b's own deletion set.
+- No public existing-only or read-only `System` construction exists. `Store.__init__` opens an absent
+  path with `O_CREAT|O_EXCL` and `_initialize` then opens a WRITABLE connection, begins IMMEDIATE and
+  commits even for an existing ledger (`m3u5a-map.json` `X02`); a probe measured ordinary
+  construction turning an absent path into a 208,896-byte v2 ledger. M3.5a's D13 answers the operator
+  case with a resolve-only pre-construction existence check that forwards the library's own
+  `ledger file is missing or unreadable` verdict at exit 5 — a check, never a construction mode, and
+  race-prone by construction: a path deleted between the check and `Store` is still recreated.
+  Acceptance: an unpatched `main` on an absent path AND on a path inside a read-only directory
+  creates nothing and answers 5, asserted without the `mock.patch.object` pattern that
+  `tests/test_read_capability_battery.py:425` uses, which constructs `System` first and therefore
+  cannot see this defect. Owner: M3.6b, which reworks construction.
+- Every WRITE leaf still creates a ledger on a typo'd `--db`. Both M3.5a spikes measured it
+  independently (`Z15` in `m3u5a-spike-flags.json` and `m3u5a-spike-envelope.json`): a misspelled
+  path exits 3 for an unregistered operation while leaving a fresh v2 database behind, so the
+  diagnosis names the operation when the real defect is the path. D13 fixes the read verb only,
+  because changing every write leaf is a cross-cutting behaviour change M3.5a does not own.
+  Acceptance: one ruling applied uniformly to all write leaves, with a test per leaf asserting the
+  absent-path invocation creates no file and reports the path rather than its consequence.
+- 49 of `m3u5a-map.json`'s 55 rows are attention-directing only. MAIN re-derived six findings in
+  `m3u5a-s2-probe.py` and consumed the rest as pointers; a validator grade proves each anchor
+  resolves and each cell is filled, never that a finding is true. Acceptance: any row promoted to a
+  durable claim in a contract, doc or roadmap line is re-derived against HEAD first, and the
+  re-derivation is committed beside the claim.

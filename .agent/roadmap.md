@@ -594,13 +594,65 @@ Measured gaps driving the arc:
     entered at 57% against M3.2a's 31%, because M3 attached state plus this unit's ground-state read now
     costs a third of the window before any dispatch. Two consequences: budget a wave-1 session at ~70K
     of MAIN ON TOP of the entry cost, and treat the entry cost itself as the thing to cut.
-    S2 ENTRY STATE: rule fork 1 from the two TRACKED PATCHES plus the two tables, never from the reports
-    - `spike-m3u5a-envelope`'s report was cut mid-write, so its verdict exists only as its table. Rule
-    the `resolve` payload shape against the shipped `function eval` and `function verify` precedents
-    that map rows M01/M02 anchor. Then write the acceptance contract. All three worktrees are RETAINED
-    at `.scratch/worktrees/`; `map-m3u5a` holds no implementation, both spikes do. MAIN must validate
-    `m3u5a-map.json`'s 55 rows before crediting them: the grade proves each anchor resolves and each
-    cell is filled, never that a finding is true.
+    S2 DONE, fork-ruling + contract session, `main=` 79% 190K/240K. NO teammate dispatched: fork
+    arbitration plus contract authoring is MAIN-retained work, the same shape as M3.4's S4.
+    Shipped: `.agent/decisions/m3u5a-contract.md` (14 sections, 30 obligations D01-D30 gapless,
+    sections 13-14 PENDING) + `m3u5a-s2-probe.py`, MAIN's own re-derivation of the six map findings
+    the contract asserts as fact.
+    BOTH FORKS RULED, each from the two TRACKED PATCHES rather than the tables or the reports.
+    Fork 1 = ENVELOPE CORE, `@PATH` REMOVED, cap DERIVED - neither spike as written. The decisive
+    ground is ASYMMETRY OF RELIEF, not the shared wall: both spikes measured the identical `execve`
+    ceiling (131,071 bytes launch, 131,072 = `E2BIG`), but only ONE field can leave argv through
+    stdin because the second `_input("-")` reads a drained stream, so a flags submission can NEVER
+    carry more than one of three fields at the library's 1,048,576-byte contract, under any
+    invocation, and at least two of three candidate fields are always world-readable in
+    `/proc/<pid>/cmdline`. One `--submission -` frame carries all three at their maxima, measured at
+    exactly 2,162,722 bytes accepted and one more rejected. Unconditional defect loses to a
+    conditional one whose regime the operator chooses.
+    A SPIKE'S SHIPPED DIFF CARRIES DEFECTS ITS OWN TABLE NEVER MEASURED, second consecutive unit.
+    The envelope's `@PATH` reader opens `pathlib.Path(...)` directly and inherits NONE of
+    `_read_function_bundle`'s descriptor hardening (`O_RDONLY|O_NONBLOCK`, `fstat` regular-file
+    grading, bounded read, strict UTF-8), so a FIFO blocks and a directory answers through OS
+    wording; its own `Y06` row measured the message taxonomy alone. `@PATH` is CUT and the channel
+    loses nothing - `--submission - < file` is the file route. Its aggregate cap also wrote a FOURTH
+    copy of the provenance limit; MAIN's probe measured 3 unexported `65_536` literals already in
+    `system.py`, so the ruling exports `PROVENANCE_MAX_BYTES` and derives the cap. That constant is
+    the whole production change outside the two new leaves.
+    Fork 2 = ONE FIXED SEVEN-KEY PAYLOAD across all three resolve states, ruled against the shipped
+    exit-6 stdout precedents, which are fixed-key on both branches without exception. `passed`, not
+    the draft's `verified`, because it is `FunctionVerification`'s own field name and `function
+    verify`'s own key. `matched` is three-valued - `true`/`false`/`null` - so a verified miss and a
+    failed verdict stay distinguishable under their shared exit 6, with the biconditional scoped to
+    values `System.resolve` actually returns. `--expected-function-hash` IS exposed, widening the
+    draft grammar: it is the only single-snapshot route to a pinned resolution, and the workaround
+    costs a second full verification plus a gap between two snapshots. `resolve` stays a ROOT leaf.
+    THE B02 TRIPWIRE WAS FOUND IN AN UNTRACKED GATE LOG, not in any table, and the contract's first
+    draft omitted it. S1 had already flagged it in this roadmap; MAIN still wrote 30 obligations
+    without it and caught it only while reading the retiring worktree's leftover log. STANDING RULE:
+    a tripwire named in the roadmap becomes a numbered contract OBLIGATION in the session that opens
+    the unit, or it re-emerges in the next session disguised as a regression. Ruled at D27 - B02
+    drops `cli.py` and keeps the other two files frozen, and the retired member's property MIGRATES
+    to D24/D25/D26, which are strictly stronger because they constrain what the new bytes may be
+    rather than that there are none. Re-pinning `cli.py` per unit is rejected: the plan already
+    schedules M3.5b to break it again, and a pin the plan commits to breaking is noise.
+    SIZING CORRECTION, binding on M3.5b..M3.9b: THE FOUR-SESSION SHAPE IS DRIVEN BY THE WAVE, NOT BY
+    THE `oracle` TAG. M3.2b measured four for an oracle unit and the estimator was written as an
+    oracle surcharge; M3.5a carries `tags=-` and is also taking four (wave 1, fork ruling + contract,
+    implementation, battery + closure), because the cost sits in dispatching a wave, harvesting it,
+    re-deriving its grades and arbitrating its forks. Budget FOUR sessions for any unit that opens a
+    spike wave regardless of tag, and budget a unit with no fork to rule WITHOUT S1 and S2.
+    WORKTREES RETIRED, branches deleted, NO TAGS. The two implementations, both probe drivers and
+    both tables are tracked, so applying a patch and running its driver re-derives either table in
+    any clone - M3.4's local-only-tag defect discharged in advance rather than repeated.
+    MAIN re-derived 6 of `m3u5a-map.json`'s 55 rows; the other 49 stay attention-directing and are
+    recorded as a polish row, because a grade proves each anchor resolves and each cell is filled and
+    never that a finding is true.
+    S3 ENTRY STATE, implementation session: contract sections 1-12 are binding; open by
+    dispositioning B02 (D27), not by reading 810 passed / 1 failed as a regression. Dispatch the
+    diff-blind `test` phase-1 verdict table BEFORE implementing - it is the instrument that has
+    indicted MAIN's own code before commit twice. Implement in the primary tree against the delivered
+    red suite. `.scratch/worktrees/` is empty and every S1 branch is gone, so S3's wave creates its
+    own.
   - M3.5b tier=kernel tags=- depends=M3.5a - remove `handle`/`request`/source grammar, imports, fixtures,
     help and operator prose.
   - M3.6a tier=kernel tags=- depends=M3.5b - delete public lifecycle methods, leases, result models and
