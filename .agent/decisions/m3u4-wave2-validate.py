@@ -34,7 +34,17 @@ from pathlib import Path
 
 UNKNOWN = "unknown"
 PROSE_MIN = 40
-SECTION = re.compile(r"(?:§|D|P|R)[0-9]{1,2}(?:[.\-][0-9A-Za-z]{1,3})?(?:,\s*\S+)*\Z")
+# One contract citation: a decision/predicate/requirement id, or a numbered section. `§13`
+# and `Section 13` are the same locus and both spellings are accepted. A citation may carry
+# up to three trailing qualifier words, so the two `§13` ruling blocks and a named section
+# fragment stay distinguishable. EVERY comma-joined element must OPEN with a citation; the
+# seeded form accepted any non-space token after a comma, which admitted free prose.
+_CITATION = (
+    r"(?:§\s?|Section\s|D|P|R)[0-9]{1,2}"
+    r"(?:[.\-][0-9A-Za-z]{1,3})?"
+    r"(?:\s[0-9A-Za-z]{1,9}){0,3}"
+)
+SECTION = re.compile(rf"{_CITATION}(?:,\s*{_CITATION})*\Z")
 VERDICT_EXTENSION = re.compile(r"X[0-9]{1,3}")
 ATTACK_EXTENSION = re.compile(r"Y[0-9]{1,3}")
 
