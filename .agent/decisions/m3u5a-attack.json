@@ -1,0 +1,207 @@
+{
+  "kind": "attack",
+  "unit": "M3.5a",
+  "note": "Seeded rows are a FLOOR, never a cap. Add extension rows with ids Y01, Y02, ... for any locus the seed missed; extensions have outnumbered seeds in every M3 wave. A cleared claim is a filled cell: write 'no defensible alternative: <reason>' rather than leaving unknown.",
+  "rows": [
+    {
+      "id": "A01",
+      "section": "D09",
+      "lens": "the biconditional: construct a value making matched null while passed is true, or prove the domain closes it",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A02",
+      "section": "D07",
+      "lens": "how a conforming-looking key-set pin satisfies D07's letter without forcing all seven keys",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A03",
+      "section": "D13",
+      "lens": "the pre-construction check's residual race: is the stated honesty complete or does it overclaim",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A04",
+      "section": "D16",
+      "lens": "re-derive 2162722 from 2 * DEFAULT_MAX_BYTES + PROVENANCE_MAX_BYTES + framing",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A05",
+      "section": "D17",
+      "lens": "does strict parsing really pre-empt the exact-key check on every reachable path",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A06",
+      "section": "D18",
+      "lens": "provenance defaulting to {} is called a durable empty mapping: verify durability, not acceptance",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A07",
+      "section": "D20",
+      "lens": "every successful submission is pending by construction: attack the premise, not the key",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A08",
+      "section": "D23",
+      "lens": "no message or doc sentence may advise retry: state the mechanical test that could fail",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A09",
+      "section": "D24",
+      "lens": "how a zero-source-call pin satisfies its letter without forcing the isolation",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A10",
+      "section": "D25",
+      "lens": "can the census-derived test pass while abbreviation behaviour elsewhere silently changed",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A11",
+      "section": "D26",
+      "lens": "is store.py byte-identity derived or transcribed, and against which object",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A12",
+      "section": "D27",
+      "lens": "do D24, D25 and D26 really carry every property B02 retired, or is one lost",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A13",
+      "section": "D30",
+      "lens": "is the cost figure derived from the artifact at its stated precision or transcribed",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A14",
+      "section": "D10",
+      "lens": "does putting a negative resolve verdict on stdout disturb function export's stderr channel",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A15",
+      "section": "D06",
+      "lens": "one read transaction per invocation: name an instrument that can actually observe it",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A16",
+      "section": "S1",
+      "lens": "preservation plus no new source reach: does any obligation assert preservation mechanically",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A17",
+      "section": "D12",
+      "lens": "the exit map is called unchanged and untouched: verify against main rather than assert",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A18",
+      "section": "D28",
+      "lens": "positive publication: what would make the grep test pass while a reader still cannot learn the grammar",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A19",
+      "section": "D29",
+      "lens": "every placeholder in a new command block has a producing command earlier in that block",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A20",
+      "section": "S12",
+      "lens": "project CLAUDE.md conformance on every durable file this unit touches, and whether each deferral carries a real acceptance check",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    }
+  ]
+}
