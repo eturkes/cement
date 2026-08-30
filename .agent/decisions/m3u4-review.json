@@ -1,0 +1,185 @@
+{
+  "kind": "review",
+  "rows": [
+    {
+      "id": "R01",
+      "section": "correctness",
+      "locus": "_proposal_bindings: the three selection branches and their parameter binding",
+      "finding": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": null
+    },
+    {
+      "id": "R02",
+      "section": "correctness",
+      "locus": "_proposal_binding_from_row: which fields it validates and which it passes through raw",
+      "finding": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": null
+    },
+    {
+      "id": "R03",
+      "section": "correctness",
+      "locus": "_proposal_binding: the cardinality check and the None contract",
+      "finding": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": null
+    },
+    {
+      "id": "R04",
+      "section": "correctness",
+      "locus": "_write_proposal_request_status: the two UPDATE statements and their rowcount use",
+      "finding": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": null
+    },
+    {
+      "id": "R05",
+      "section": "correctness",
+      "locus": "get_proposal and proposal: what changed beside the dropped field",
+      "finding": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": null
+    },
+    {
+      "id": "R06",
+      "section": "correctness",
+      "locus": "proposals: the feed selection, its status filter and its limit",
+      "finding": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": null
+    },
+    {
+      "id": "R07",
+      "section": "correctness",
+      "locus": "review: decision routing, the writer call site and the returned value",
+      "finding": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": null
+    },
+    {
+      "id": "R08",
+      "section": "correctness",
+      "locus": "function_report: the pending count, the detail cap and the gap projection",
+      "finding": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": null
+    },
+    {
+      "id": "R09",
+      "section": "claim soundness",
+      "locus": "the S2 commit message and roadmap record against what the diff actually does",
+      "finding": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": null
+    },
+    {
+      "id": "R10",
+      "section": "claim soundness",
+      "locus": "contract section 12's RULING text against the shipped adapter",
+      "finding": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": null
+    },
+    {
+      "id": "R11",
+      "section": "claim soundness",
+      "locus": "contract section 15's corrections: whether each replacement ground holds",
+      "finding": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": null
+    },
+    {
+      "id": "R12",
+      "section": "guarantee gap",
+      "locus": "what the confinement instrument proves and what its prose claims",
+      "finding": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": null
+    },
+    {
+      "id": "R13",
+      "section": "guarantee gap",
+      "locus": "what the shape instrument proves and what D11 claims it carries",
+      "finding": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": null
+    },
+    {
+      "id": "R14",
+      "section": "guarantee gap",
+      "locus": "the ruled public behaviour change: every surface that still reports the old value",
+      "finding": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": null
+    },
+    {
+      "id": "R15",
+      "section": "CLAUDE.md authoring",
+      "locus": "the durable files this unit touched, against the Authoring rules",
+      "finding": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": null
+    },
+    {
+      "id": "R16",
+      "section": "CLAUDE.md engineering",
+      "locus": "the shipped code against KISS, deduplication and scoped-module rules",
+      "finding": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": null
+    },
+    {
+      "id": "R17",
+      "section": "KISS",
+      "locus": "any branch, guard or field the shipped design carries that nothing can reach",
+      "finding": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": null
+    },
+    {
+      "id": "R18",
+      "section": "regression risk",
+      "locus": "behaviour the eight owned sites had at 30195e7 that no test now pins",
+      "finding": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": null
+    }
+  ]
+}

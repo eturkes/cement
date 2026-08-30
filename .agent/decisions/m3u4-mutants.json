@@ -1,0 +1,445 @@
+{
+  "kind": "mutants",
+  "rows": [
+    {
+      "id": "M01",
+      "section": "adapter",
+      "locus": "the _ProposalIds branch selector",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M02",
+      "section": "adapter",
+      "locus": "the empty-selection early return",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M03",
+      "section": "adapter",
+      "locus": "the duplicate-identifier guard",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M04",
+      "section": "adapter",
+      "locus": "the _ProposalIds WHERE partition predicate",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M05",
+      "section": "adapter",
+      "locus": "the _ProposalIds id-list predicate",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M06",
+      "section": "adapter",
+      "locus": "the _ProposalFeed status filter",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M07",
+      "section": "adapter",
+      "locus": "the _ProposalFeed after_sequence predicate",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M08",
+      "section": "adapter",
+      "locus": "the _ProposalFeed ORDER BY and LIMIT",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M09",
+      "section": "adapter",
+      "locus": "the _PendingProposals count statement's predicates",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M10",
+      "section": "adapter",
+      "locus": "the missing-count guard",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M11",
+      "section": "adapter",
+      "locus": "the _PendingProposals detail predicates",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M12",
+      "section": "adapter",
+      "locus": "the _PendingProposals ORDER BY p.id",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M13",
+      "section": "adapter",
+      "locus": "the _PendingProposals LIMIT",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M14",
+      "section": "adapter",
+      "locus": "the pending selection's unbounded total",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M15",
+      "section": "adapter",
+      "locus": "the invalid-selection fallback",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M16",
+      "section": "adapter",
+      "locus": "the JOIN's partition equality",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M17",
+      "section": "adapter",
+      "locus": "the JOIN's request-id equality",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M18",
+      "section": "adapter",
+      "locus": "the JOIN kind itself, inner against outer",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M19",
+      "section": "row record",
+      "locus": "each scalar validator call in _proposal_binding_from_row",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M20",
+      "section": "row record",
+      "locus": "the exception tuple that maps a bad scalar to IntegrityError",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M21",
+      "section": "row record",
+      "locus": "the raw pass-through of request_status",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M22",
+      "section": "singular",
+      "locus": "the cardinality check in _proposal_binding",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M23",
+      "section": "singular",
+      "locus": "the empty-result None return",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M24",
+      "section": "writer",
+      "locus": "the rejected UPDATE's status and pending predicates",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M25",
+      "section": "writer",
+      "locus": "the rejected UPDATE's proposal_id predicate",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M26",
+      "section": "writer",
+      "locus": "the resolved branch's output and example guard",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M27",
+      "section": "writer",
+      "locus": "the resolved UPDATE's column assignments",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M28",
+      "section": "writer",
+      "locus": "the resolved UPDATE's predicates",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M29",
+      "section": "writer",
+      "locus": "the returned rowcount",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M30",
+      "section": "consumer",
+      "locus": "get_proposal's binding lookup and its NotFoundError",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M31",
+      "section": "consumer",
+      "locus": "proposal's binding lookup",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M32",
+      "section": "consumer",
+      "locus": "proposals' feed parameters",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M33",
+      "section": "consumer",
+      "locus": "_proposal_record's field set",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M34",
+      "section": "consumer",
+      "locus": "_proposal_content's argument source",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M35",
+      "section": "consumer",
+      "locus": "review's binding lookup and revision fence",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M36",
+      "section": "consumer",
+      "locus": "review's writer call arguments per decision",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M37",
+      "section": "consumer",
+      "locus": "the ReviewResult constructed per decision",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M38",
+      "section": "consumer",
+      "locus": "function_report's pending count source",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M39",
+      "section": "consumer",
+      "locus": "function_report's detail cap",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M40",
+      "section": "consumer",
+      "locus": "_pending_proposal_gap_from_row's field set",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M41",
+      "section": "shape",
+      "locus": "ReviewResult's frozen and slots flags",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M42",
+      "section": "shape",
+      "locus": "the removed request_id on ProposalView",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M43",
+      "section": "shape",
+      "locus": "the removed request_id on PendingProposalGap",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    },
+    {
+      "id": "M44",
+      "section": "export",
+      "locus": "the __init__ export and __all__ entry",
+      "anchor": "unknown",
+      "mutation": "unknown",
+      "expected_killer": "unknown",
+      "result": "unknown",
+      "main_ruling": null
+    }
+  ]
+}

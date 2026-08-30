@@ -1,0 +1,365 @@
+{
+  "kind": "probes",
+  "rows": [
+    {
+      "id": "Z01",
+      "section": "§14 D24, §15",
+      "locus": "mismatched binding through the singular read: class, message and precedence",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z02",
+      "section": "§14 D24, §15",
+      "locus": "mismatched binding through the list feed",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z03",
+      "section": "§14 X32, §D22",
+      "locus": "mismatched binding through the report, including past the detail cap",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z04",
+      "section": "§15 LEFT JOIN",
+      "locus": "orphan proposal whose request row is absent: singular read",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z05",
+      "section": "§15 LEFT JOIN",
+      "locus": "orphan proposal: list feed visibility",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z06",
+      "section": "§15 LEFT JOIN",
+      "locus": "orphan proposal: review",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z07",
+      "section": "§13 RULING",
+      "locus": "ReviewResult returned by accept: every field value",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z08",
+      "section": "§13 RULING",
+      "locus": "ReviewResult returned by correct: every field value",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z09",
+      "section": "§13 RULING",
+      "locus": "ReviewResult returned by reject: the two null-valued fields",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z10",
+      "section": "§13 CLI triples",
+      "locus": "CLI JSON for accept: exact sorted key set, values and exit code",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z11",
+      "section": "§13 CLI triples",
+      "locus": "CLI JSON for correct",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z12",
+      "section": "§13 CLI triples",
+      "locus": "CLI JSON for reject, including both explicit nulls",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z13",
+      "section": "§12 RULING, Y11",
+      "locus": "statements issued by the singular read over the whole channel",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z14",
+      "section": "§12 RULING, Y11",
+      "locus": "statements issued by the list feed",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z15",
+      "section": "§12 RULING, Y11",
+      "locus": "statements issued by the report's pending count and detail",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z16",
+      "section": "§12 RULING, Y11",
+      "locus": "statements issued by review on accept",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z17",
+      "section": "§D23, A13",
+      "locus": "pending page order on a reverse-created fixture at a small projection limit",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z18",
+      "section": "§D23, A13",
+      "locus": "pending page order at the full projection limit",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z19",
+      "section": "§D22, §15 tail",
+      "locus": "pending count with rows past the detail cap",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z20",
+      "section": "§12 RULING",
+      "locus": "a selection carrying duplicate proposal identifiers",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z21",
+      "section": "§12 RULING",
+      "locus": "an empty selection",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z22",
+      "section": "§D15, Y21",
+      "locus": "stale operation revision crossed with accept",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z23",
+      "section": "§D15, Y21",
+      "locus": "stale operation revision crossed with correct",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z24",
+      "section": "§D15, Y21",
+      "locus": "stale operation revision crossed with reject",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z25",
+      "section": "§D17, A09",
+      "locus": "conflict quarantine: example rows created for the reviewed proposal",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z26",
+      "section": "§D19, A10",
+      "locus": "proposals.status_sequence against the decision event sequence",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z27",
+      "section": "§D21",
+      "locus": "partition isolation against an underscore collider and a case variant",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z28",
+      "section": "§D21",
+      "locus": "operation isolation against an underscore collider and a case variant",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z29",
+      "section": "§15 D24",
+      "locus": "malformed input_json on a real ledger through each read path",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z30",
+      "section": "§15 D24",
+      "locus": "a legitimately NULL column reaching a scalar conversion",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z31",
+      "section": "§14 D10",
+      "locus": "the handle route's proposal.created payload",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z32",
+      "section": "§14 D10",
+      "locus": "the direct route's proposal.created payload",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z33",
+      "section": "§Y16",
+      "locus": "the connection the adapter reads on, against the one the caller opened",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z34",
+      "section": "§Y16",
+      "locus": "review's binding lookup and request status write, and whether one lock spans both",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z35",
+      "section": "§D20",
+      "locus": "cross-partition invisibility on each read path that names a partition",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    },
+    {
+      "id": "Z36",
+      "section": "§D08",
+      "locus": "PendingProposalGap values projected by the report",
+      "probe": "unknown",
+      "observed": "unknown",
+      "main_observed": null,
+      "differs": null,
+      "main_ruling": null
+    }
+  ]
+}
