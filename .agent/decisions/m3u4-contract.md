@@ -298,6 +298,56 @@ DISPATCH CORRECTION, binding on every future spike: a probe corpus answerable ag
 not force an implementation. Either write each probe as a DELTA that requires both sides, or make the
 implementation a separately graded deliverable the validator can see.
 
+### RULING (S2) — COMPOSE. Adapter owns the whole statement; neither alternative ships as written.
+
+Each spike's shipped diff carries a defect the other lacks, so the disposition is the composition,
+not either token. Measured from the two committed trees at `aa77d9f` and `cb0ef3e`:
+
+- ALT-PROJECTION's consumers survive `Z50` — every embedded `WHERE` names `p.` columns or the
+  constant's own `binding_*` aliases, never `r.`, so rewriting `_PROPOSAL_BINDING_SQL` at M3.6b
+  touches no consumer. That was the open question and the answer is favourable.
+- ALT-PROJECTION fails D03 as shipped: `review` still issues two raw `UPDATE requests` statements
+  (`system.py:1546`, `:1679` in its tree). A read-only SQL constant cannot confine a write, and the
+  spike never built the missing writer.
+- ALT-PROJECTION's `function_report` pays for textual confinement with a wrapping subquery
+  (`SELECT ... FROM ( {SQL} WHERE p.partition = ? ) WHERE binding_operation = ?`), which
+  materialises the partition's proposals before filtering by operation. Baseline filters
+  `r.operation = ?` inside the join. That is a D22 regression bought for grammar.
+- ALT-BINDING satisfies D03 in full — `_write_proposal_request_status` owns both `review` writes and
+  no consumer names `requests`.
+- ALT-BINDING pays a redundant statement: `_proposal_binding` is a SIDE lookup, so `get_proposal`,
+  `proposal` and `review` each keep their own row query and add a second one, and `proposals` reads
+  its feed then re-reads the same proposals by id list. Its adapter is a lookup beside the query
+  rather than the query.
+- ALT-BINDING at M3.6b degrades badly for the same reason: once `proposals` carries direct columns a
+  side lookup has nothing left to look up, so the honest swap DELETES the adapter and rewrites all
+  six call sites. ALT-PROJECTION's constant degrades into the canonical proposal projection and
+  keeps its consumers. Z50 therefore splits ALT-BINDING's ownership from its survival.
+
+SHIPPED SHAPE, taking each alternative's winning property:
+
+1. ONE private read adapter `_proposal_bindings(connection, *, partition, selection)` issuing the
+   COMPLETE statement per named selection — `_ProposalIds`, `_ProposalFeed(status, after_sequence,
+   limit)`, `_PendingProposals(operation, limit)` — so a consumer supplies parameters and never SQL.
+   One statement per call, matching baseline cardinality (ALT-PROJECTION's property) with the
+   adapter owning every access (ALT-BINDING's property).
+2. `_proposal_binding(...)` = the singular wrapper over `_ProposalIds`, cardinality-checked.
+3. `_write_proposal_request_status(...)` taken from ALT-BINDING, unchanged in role: the sole writer
+   of the private request row on the review path.
+4. `_ProposalBinding` = a frozen record carrying every value recovered from the request row
+   (`operation`, `operation_revision`, `input`, `input_hash`, `request_id`, `request_status`) plus
+   the proposal row itself for `p.*` fields. Consumers read request-derived values ONLY through the
+   record.
+
+D06 grounds for rejecting bare textual confinement: composing a join fragment into six consumers is
+the "builds SQL from fragments" case D06 names, and it passes the D02 instrument while the join is
+still spread across seven definitions. Statement ownership is what makes the complement assertion
+mean what it says.
+
+Permitted-set delta for D03: add `_proposal_bindings`, `_proposal_binding` and
+`_write_proposal_request_status`. `_ProposalBinding`, `_ProposalIds`, `_ProposalFeed` and
+`_PendingProposals` hold no SQL and stay out.
+
 ## 13. FORK 2 — the `ReviewResult` payload (PENDING wave 1)
 
 `review` currently returns `Resolved(request_id, output, source="confirmed", example_id)` on
@@ -318,5 +368,48 @@ for accept, correct and reject, plus the return classes and exit codes. `wt/spik
 already committed a concrete `ReviewResult`; MAIN rules its field set at S2 against that payload
 rather than against the draft's prescription.
 
-Ruling and grounds land here at S2, together with the exact CLI JSON for accept, correct and reject
-under the chosen shape.
+### RULING (S2) — R2+, four fields. `ReviewResult(proposal_id, status, example_id, output)`
+
+```python
+@dataclass(frozen=True, slots=True)
+class ReviewResult:
+    proposal_id: str
+    status: Literal["accepted", "corrected", "rejected"]
+    example_id: str | None
+    output: JSONValue | None
+```
+
+Both spikes shipped R1, and R1 is REJECTED on D12. D12 forbids dropping any other PROJECTED value
+while dropping `request_id`, and `output` is projected today on both confirming decisions
+(P08 baseline accept/correct JSON). R1 drops it, so R1 trades one removal for two.
+
+Field-by-field grounds against the P08 baseline:
+
+| baseline key | disposition | grounds |
+|---|---|---|
+| `request_id` | REMOVED | the unit's purpose (D10). |
+| `proposal_id` | KEPT, now on all three | already the reject identity; becomes the single identity for every decision, and it is the key every read path already accepts. |
+| `status` | KEPT, REDEFINED | see the ruled change below. |
+| `example_id` | KEPT | D17; `None` on reject, where no example is created. |
+| `output` | KEPT | D12. `None` on reject. |
+| `source` | REMOVED | constant `"confirmed"` on this path, and `status` now carries the same fact with more resolution. Not a projected value, so D12 does not reach it. |
+| `artifact_id` | REMOVED | structurally `None` from every `review` return — it is `Resolved`'s handle-path field, and D10 keeps `Resolved` intact for M3.6a. Not a projected value. |
+
+RULED PUBLIC BEHAVIOUR CHANGE, recorded with its grounds rather than absorbed silently: `status` was
+`"resolved"` for BOTH accept and correct and is now `"accepted"` / `"corrected"`. Grounds — the
+payload's status now equals `proposals.status`, so `proposal confirm` and `proposal show` agree on
+one vocabulary; accept and correct become distinguishable without comparing outputs, which the
+baseline payload could not do; and M3 is pre-1.0 under a fail-closed no-migration contract. Landing
+site for the pin: the shape test carrying D11.
+
+Exact CLI JSON under the ruled shape, keys sorted as `cli.py` emits them:
+
+```
+accept:  {"example_id": "ex_...", "output": {...}, "proposal_id": "prop_...", "status": "accepted"}
+correct: {"example_id": "ex_...", "output": {...}, "proposal_id": "prop_...", "status": "corrected"}
+reject:  {"example_id": null, "output": null, "proposal_id": "prop_...", "status": "rejected"}
+```
+
+Reject emits both null-valued keys rather than omitting them: one frozen shape means one key set, and
+a scripted operator testing `example_id is None` beats one testing for a missing key. Exit code stays
+0 on all three; no exit-class change is in this unit's scope.
