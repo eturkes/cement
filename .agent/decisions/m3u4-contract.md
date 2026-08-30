@@ -413,3 +413,72 @@ reject:  {"example_id": null, "output": null, "proposal_id": "prop_...", "status
 Reject emits both null-valued keys rather than omitting them: one frozen shape means one key set, and
 a scripted operator testing `example_id is None` beats one testing for a missing key. Exit code stays
 0 on all three; no exit-class change is in this unit's scope.
+
+## 14. S2 RULINGS — the five conflicts the diff-blind verdict table surfaced
+
+`m3u4-verdicts.json` (57 rows, 22 seeded + 35 extension) reports five places where the shipped
+implementation and the contract's own text cannot both be read literally. Every one is a defect in the
+contract text, not in the shipped shape, because each obligation was written before the fork it
+constrains was ruled. The rulings below AMEND sections 3, 4 and 5 and bind the S3 battery.
+
+D01 IS AMENDED: exactly one named private READER and at most one named private WRITER, not one
+surface. D01's "exactly ONE" was written while both spike alternatives were read-only, and section
+12's ruling proved a read-only surface cannot confine a write - that is precisely why ALT-PROJECTION
+failed D03 with two raw `UPDATE requests` left in `review`. The shipped set is `_proposal_bindings`
+(reader) and `_write_proposal_request_status` (writer). Two members is a consequence of the row having
+both a read and a write side; it is not a weakening. D03's "plus the adapter section 12 names" already
+admits the plural and needs no change.
+
+D02 ATTRIBUTION IS LEXICAL, and `_proposal_binding` is deliberately OUTSIDE the permitted set. D02
+already describes a lexical AST walk; the word was never written down, so the table could read D02 and
+D03 as call-closure attribution, under which the singular wrapper reaches `requests` and belongs in
+the set. Lexical is the ruling, and it is SOUND rather than convenient: a delegating wrapper that
+carries its own SQL naming `requests` lands in the set and fails the complement, and one that carries
+no SQL cannot reach the row except through a permitted member. Confinement is a property of WHO
+WRITES THE SQL, not of who calls it. Call-closure attribution would additionally drag every public
+consumer back into the set and make the obligation unsatisfiable by construction.
+
+D12 GAINS ITS MISSING DEFINITION. A PROJECTED VALUE is a value READ FROM THE LEDGER for that decision.
+It is not a constant of the model being replaced. Measured on the pre-M3.4 return
+`Resolved(request_id=..., output=final.value, source="confirmed", example_id=example_id)`:
+`output` and `example_id` are ledger-derived and are KEPT - that is what rejects R1 - while
+`request_id` is the value this unit exists to drop, `source` is the literal `"confirmed"` on this path
+and `artifact_id` defaults to `None` because review creates an example and never an artifact. Removing
+two path-constants drops no projected value, so section 13 does not conflict with D12.
+
+D20 IS SCOPE-RELATIVE, per V20. Each read path hides everything outside the scope IT NAMES. A path
+that names no operation carries no cross-operation obligation, and its partition obligation is total.
+`proposals(partition, *, status, after_sequence, limit)` takes no operation and lists a partition-wide
+feed, so a literal cross-operation reading of D20 makes the shipped signature non-conforming while
+describing no reachable leak. `get_proposal`, `proposal` and `review` name a proposal id inside a
+partition; `function_report` names both partition and operation and keeps the full obligation.
+
+D24 IS UNCHANGED and V17 is correct as written. D24 fixes the exception CLASS for a missing binding and
+says nothing about message text, so V17 asserting `IntegrityError` plus path coverage is the whole
+obligation. New message text is free.
+
+X32 IS ACCEPTED as an obligation: a binding missing beyond `function_report`'s 10,000-row detail cap
+must still raise `IntegrityError`. The cap bounds RETURNED DETAIL, never validation, and D22's exact
+counts are computed over the unbounded partition. The battery owns the fixture.
+
+X26 IS ANSWERED BY THE D01 AND D02 AMENDMENTS TOGETHER: D02's SQL-owner equality is measured
+lexically, so section 12's SQL-free singular wrapper is not an owner and the two do not conflict.
+
+D10 IS SCOPED TO THE EVENTS THE OWNED SITES EMIT, and X15 IS FALSIFIED BY THE SHIPPED CODE. X15 claims
+`proposal.created` carries `payload={}` on all three creation routes; measured in `system.py`, the two
+direct routes emit `payload={}` (line 880) and the `handle` route emits
+`payload={"request_id": request_id}` (line 1262). V22's "no proposal or review event payload contains
+a request_id key" is therefore over-broad, and a battery encoding it literally goes RED against
+correct code.
+
+RULING: M3.4's event obligation covers the events its EIGHT OWNED SITES emit - the review-path
+transitions and the direct-route `proposal.created`. Measured and request-free:
+`proposal.rejected` `{reviewer}`, `proposal.accepted` / `proposal.corrected`
+`{example_id, receipt_hash, reviewer, suspended_artifact_ids}`, `artifact.counterexample`
+`{example_id, proposal_id}`, direct `proposal.created` `{}`. The `handle` route's `proposal.created`
+KEEPS its `request_id` under the same handle-lifecycle exception D10 already grants the lifecycle
+models: `handle` is not an owned site, M3.5b removes its grammar and M3.6a deletes the method.
+Stripping it here edits a method this unit does not own and destroys the only audit link between a
+request and its proposal while the request lifecycle is still public. The battery asserts the six
+payloads above and asserts the `handle` payload UNCHANGED, so the exception is pinned rather than
+merely tolerated.
