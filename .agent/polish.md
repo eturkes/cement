@@ -493,8 +493,13 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   selection, `.agent/decisions/m3u4-probes.json`), so the substance is recorded and only the gate is
   absent. Ordering is the open question the corpus raises: the oracle treats a unique id set as
   MEMBERSHIP and returns table order for a reversed selection, and no obligation grants selection order,
-  so whichever answer is pinned must be stated rather than inherited. Acceptance: one committed test
-  constructs `_ProposalIds` directly with two ids and asserts the returned order against the documented
-  rule, one asserts a duplicate set raises `IntegrityError`, one asserts an empty selection issues zero
-  statements under a `set_trace_callback` spy, and deleting any one of the three production branches
-  turns exactly one of them red.
+  so whichever answer is pinned must be stated rather than inherited. The decisive mutation campaign
+  measures the whole exposure and it is four guards plus one impossible branch, all of the same class:
+  `M02` empty selection, `M03` duplicate rejection, `M15` the invalid-selection fallback, `M26` the
+  resolved writer's output-and-example guard, and `count_row is None`, which `COUNT(*)` without
+  `GROUP BY` cannot reach on a real SQLite connection. Acceptance: one committed test constructs
+  `_ProposalIds` directly with two ids and asserts the returned order against the documented rule, one
+  asserts a duplicate set raises `IntegrityError`, one asserts an empty selection issues zero statements
+  under a `set_trace_callback` spy, one drives each half-missing resolved-writer input, and rerunning
+  `uv run python .agent/decisions/m3u4-mutants.py --id M02 --id M03 --id M15 --id M26` reports every one
+  of them killed.

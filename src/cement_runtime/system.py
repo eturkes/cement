@@ -503,7 +503,12 @@ def _proposal_bindings(
     partition: str,
     selection: _ProposalIds | _ProposalFeed | _PendingProposals,
 ) -> _ProposalBindingSet:
-    """Resolve proposals with their private request binding, one statement per selection."""
+    """Resolve proposals with their private request binding.
+
+    One complete statement per selection, except `_PendingProposals`, which issues an
+    unbounded count and a bounded detail: the count proves that every pending binding in
+    the partition EXISTS, and the detail materializes only the rows the caller reads.
+    """
 
     if type(selection) is _ProposalIds:
         if not selection.values:

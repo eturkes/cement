@@ -471,9 +471,17 @@ D24 IS UNCHANGED and V17 is correct as written. D24 fixes the exception CLASS fo
 says nothing about message text, so V17 asserting `IntegrityError` plus path coverage is the whole
 obligation. New message text is free.
 
-X32 IS ACCEPTED as an obligation: a binding missing beyond `function_report`'s 10,000-row detail cap
-must still raise `IntegrityError`. The cap bounds RETURNED DETAIL, never validation, and D22's exact
-counts are computed over the unbounded partition. The battery owns the fixture.
+X32 IS ACCEPTED as an obligation and BOUNDED: a binding MISSING beyond `function_report`'s
+10,000-row detail cap must still raise `IntegrityError`, because the pending count statement proves
+binding EXISTENCE over the unbounded partition and D22's exact counts are computed there. "The cap
+bounds RETURNED DETAIL, never validation" is WITHDRAWN as written; validation splits three ways.
+EXISTENCE is unbounded. CROSS-FIELD consistency (`requests.proposal_id` against the proposal id, and
+every other request-to-proposal scalar) and JSON CONTENT hold for RETURNED DETAIL alone, at each
+consumer's own position - hoisting either into the adapter would pre-empt `_validate_proposal_shape`
+and rewrite the class, message and precedence every corrupt ledger reports. A present-but-mismatched
+binding in the unreturned tail therefore returns a report; `docs/architecture.md` publishes that
+bound, and the singular reads, the feed, review and `reconstruct_function_receipt` each validate the
+row they materialize. The battery owns both fixtures.
 
 X26 IS ANSWERED BY THE D01 AND D02 AMENDMENTS TOGETHER: D02's SQL-owner equality is measured
 lexically, so section 12's SQL-free singular wrapper is not an owner and the two do not conflict.
@@ -551,9 +559,11 @@ a raw `TypeError` from a real ledger. D24 must therefore ENUMERATE nullable vers
 fields, translate real-ledger malformed JSON to `IntegrityError` on all five paths, and reserve the
 word "fabricated" for proxy-injected storage classes alone.
 
-D22'S TAIL IS COUNTED, NOT REACHABLE. The API exposes no cursor past `projection_limit`, so row 10,001
-is observable only through `pending_proposal_count`. The obligation is that the tail CONTRIBUTES TO
-THE EXACT COUNT and is still VALIDATED (section 14, X32), never that a caller can read it.
+D22'S TAIL IS COUNTED, NOT REACHABLE, AND ITS VALIDATION IS EXISTENCE ALONE. The API exposes no cursor
+past `projection_limit`, which is itself capped at 10,000, so row 10,001 is observable only through
+`pending_proposal_count`. The obligation is that the tail CONTRIBUTES TO THE EXACT COUNT and that every
+tail binding EXISTS (section 14, X32), never that a caller can read the row or that its content and
+cross-field consistency are checked.
 
 TWO FINDINGS CLOSED IN CODE THIS SESSION. `slots=True` was unpinned - turning it off keeps the
 constructor signature and resolved hints identical and only adds `__dict__` - so the shape test now

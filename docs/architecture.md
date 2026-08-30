@@ -13,7 +13,9 @@ Cement is a pure decision-plan router, a local control plane, and a portable fun
 4. A separate review action accepts, corrects, or rejects the candidate. Accept/correct creates an
    immutable replay fixture; reject remains audit evidence only. Review returns a `ReviewResult`,
    which names the proposal, the decision, the created example, and the confirmed output. It carries
-   no request identifier, and neither does any proposal read or report value.
+   no request identifier, and neither does any proposal read or report value. The event payload of a
+   proposal or a review action also carries no request identifier. The `handle` lifecycle keeps the
+   request identifier in its own event payload, because that audit link belongs to the request.
 5. A scheduled compiler groups active fixtures by exact scope. It requires the operation's configured
    support, distinct-reviewer, time-span, and zero-conflict gates.
 6. The compiler emits `cement-exact-lookup-v1`, a capability-free JSON document with only `exact` and
@@ -116,7 +118,8 @@ snapshot, and it keeps the two anchors in separate number spaces. Historical mem
 reviewer counts are frozen at build time. Active evidence and policy state remain current, so
 complements or ratios across the two anchors are meaningless. The current-state half counts ready and
 blocked scopes, pending proposals, artifact statuses, and stale-revision anomalies. `projection_limit`
-bounds the returned detail. The report validates only the members it returns; use
+bounds the returned detail. The report proves that every pending proposal in the partition keeps its
+internal binding. It validates the content of only the members that it returns. Use
 `reconstruct_function_receipt` to validate every member.
 
 These are operational gates, not proof that supervisors were correct. Exact matching makes the coverage

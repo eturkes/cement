@@ -459,8 +459,10 @@ Measured gaps driving the arc:
     WAVE 2 CLOSED BOTH TABLES: 57 verdicts (22 seeded + 35 extension) and 39 lenses (18 + 21), each
     ruled through an idempotent `--check` patcher that pins serialization by round-trip before
     writing and asserts the id set. Extensions outnumbered seeds in both.
-    S3 ENTRY STATE, battery session. Sections 1-15 are binding; 19 lenses are DEFERRED-S3 with the
-    battery obligation named per lens in `m3u4-attack.json` - the sharpest are A13 (both assertions
+    S3 ENTRY STATE, battery session. Sections 1-15 are binding; 15 lenses carry a `DEFERRED-S3`
+    disposition (A02, A07, A08, A09, A10, A13, A15, Y7, Y8, Y11, Y12, Y14, Y16, Y20, Y21) with the
+    battery obligation named per lens in `m3u4-attack.json`; two further rows name S3 in prose
+    (A04 corrected, Y15 scheduling the section 12-13 archive move) - the sharpest are A13 (both assertions
     D23 permits survive an ORDER BY change, so self-consistency is not a pin), A02 (Literal is not
     runtime-enforced, so both confirming paths can still return `resolved`), Y11 (a validation SELECT
     inside the adapter recreates the per-consumer cost that ruled ALT-BINDING out), and Y8 (a
@@ -469,6 +471,58 @@ Measured gaps driving the arc:
     MAIN aims at the ruled disagreements, which exist only now that the implementation has landed.
     Section 15 schedules the contract's wave chronology for `.agent/archive/` at milestone close;
     its grounds are still load-bearing for the battery.
+    S3 DONE, battery session, ran past one compaction boundary. `main=` 76% 183K/240K; `mate=` 100%
+    240K/240K (`test-m3u4-2`; `diff-m3u4-1` 68% 163K, `orc-m3u4-1` 63% 151K, `gate-m3u4-1` 62% 149K,
+    `rev-m3u4-2` 53% 126K). Shipped at `841e710` + `6e9ac37` + `1143332` (system + contract) and this
+    commit. Gate 753 -> 755 -> 756 -> 811 tests, OK, 180.5s.
+    THE DIFFERENTIAL FIRED AND FOUND A FOURTH CODE DEFECT, which is the whole reason `orc` exists.
+    An EXISTING proposal whose private request row was deleted hid behind the inner join: all four
+    read paths reported `NotFoundError`, which section 14 rejects, and `841e710` had closed the
+    report count alone. `6e9ac37` LEFT JOINs the ids and feed statements and refuses a NULL
+    `bound_request_id` in `_proposal_binding_from_row`. NO REVIEWER LENS CAUGHT IT because the four
+    paths AGREED WITH EACH OTHER; agreement among sibling paths is not evidence, and only an
+    implementation built to a contract rather than to MAIN's code disagreed. `test-m3u4-2` found it
+    independently, so two lenses confirmed before the fix.
+    A MUTATION HARNESS HIDES VERDICTS TWICE OVER, and both failures abort rather than report. Stale
+    anchors: `841e710` and `6e9ac37` rewrote the statements six mutants target, and the first
+    `ANCHOR-MISS` aborted the campaign, hiding 35 later verdicts. The naive whole-string census said
+    10 stale and was WRONG - multi-patch mutants join sections with `---`; loading the harness's own
+    `MUTANTS` gave 6 mutants over 12 patches. Fixed by an idempotent re-anchor script plus an anchor
+    PRE-FLIGHT census that prints every stale anchor at once. Two of the six INVERT rather than move,
+    and that is the substance: M18 becomes outer-to-INNER and M34 becomes `binding`-to-`binding.row`,
+    because the shipped code is now what they used to mutate INTO. A mutant left pointing at its own
+    fix tests nothing.
+    THE SECOND HARNESS DEFECT IS THE SUBTLER ONE. `first_failure` matched only the docstring-free
+    one-line verbose record (`test_x (tests.M.C.test_x) ... FAIL`); a docstring moves `... FAIL` onto
+    the next line, so a mutant whose only witnesses were battery tests raised
+    `VERDICT-FAIL-WITHOUT-TEST` and aborted at M33. The summary header `FAIL: name (tests.M.C.name)`
+    is authoritative instead, because it survives both a docstring and a subtest. STANDING RULE: the
+    catalogue is written PER MUTANT, so an aborted campaign leaves a MIXED table - classify every row
+    by its own recorded verdict-module list before quoting a survivor count.
+    DECISIVE MUTATION CAMPAIGN: 44 mutants over FOUR verdict modules (`test_proposal_binding`,
+    `test_proposal_binding_battery`, `test_system`, `test_cli`), control green at 538, 40 KILLED, 0
+    equivalent, 4 SURVIVED - `M02`, `M03`, `M15`, `M26`, every one an unforced guard the polish row
+    owns. The 3-module campaign had said 35/9. Its named killers cite classes that were never
+    written, so a prescribed killer is a PRESCRIPTION and only the module-set verdict is a
+    measurement.
+    TWO SURVIVORS WERE REAL GATE GAPS AND BECAME OBLIGATIONS. B39 pins the feed's ascending
+    `status_sequence` and its LIMIT, which one row per call cannot observe. B40 pins
+    `binding.request_status` against the REQUEST row on a ledger whose two status columns differ -
+    every fixture that transitions a proposal moves both rows together, so reading the proposal's own
+    column stayed correct everywhere the suite looked. Battery 53 -> 55 tests, 40 obligations, PASS.
+    BOTH DIVERGENCES RULED MAIN-CONFORMING AGAINST TEXT THAT OVER-CLAIMED. 42 probes, 40 agree. Z03:
+    X32's obligation is a MISSING binding beyond the cap, which the unbounded pending count proves;
+    its rationale "the cap bounds returned detail, never validation" is WITHDRAWN, because
+    cross-field consistency and JSON content hold for RETURNED DETAIL alone and the same corruption
+    still fails closed on every other path. Z15: section 12's "one complete statement per selection"
+    was already withdrawn for the pending selection, whose pair is exactly what X32 and section 15
+    require together. Both rulings are now in the contract, in `_proposal_bindings`' docstring, and
+    in `docs/architecture.md`.
+    S4 ENTRY STATE, closure session. All three S3 tables grade PASS with zero unknown cells: probes
+    42, mutants 44, review 18. Every review finding is ruled and one is CARRIED: R15 moves contract
+    sections 7 and 12-15's wave chronology to `.agent/archive/`, now that its grounds have finished
+    serving the battery. The four surviving mutants stay survivors by ruling, and the polish row
+    names the command that must report them killed when the pin lands.
   - M3.5a tier=kernel tags=- depends=M3.2b,M3.4 - add `resolve` and `proposal submit` CLI channels with
     exact exit and payload contracts. The submission channel shape is an open fork - one spike compares an
     aggregate JSON envelope against direct flags, stdin and file, including framing bound and exact error

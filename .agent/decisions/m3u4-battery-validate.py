@@ -27,7 +27,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 BATTERY = ROOT / "tests" / "test_proposal_binding_battery.py"
-CONTRACT = ROOT / ".agent" / "decisions" / "m3u4-contract.md"
 
 UNFILLED = "UNFILLED"
 DOCSTRING_MIN = 40
@@ -81,10 +80,13 @@ OBLIGATIONS: dict[str, tuple[int, str]] = {
     "B32": (1, "the schema freeze: SCHEMA_VERSION 2, 14580 bytes, sha256 5be3d79f, equal to SCHEMA_FINGERPRINT"),
     "B33": (1, "A02 Literal is not runtime enforced, so accept correct and reject are called and their values asserted"),
     "B34": (2, "the complete statements LEFT JOIN and the row validator refuses the NULL binding, so an orphan fails closed on all five paths and an absent proposal still answers NotFoundError"),
-    "B35": (2, "Y11 statement cardinality: one statement per adapter call over the whole channel, per path"),
+    "B35": (2, "Y11 statement cardinality: the measured per-path request-statement counts with exactly one adapter call per path"),
     "B36": (2, "Y16 one transaction and adapter connection identity per path, with review sharing one write lock"),
     "B37": (1, "Y21 one stale fixture crossed with all three decisions: accept and correct raise, reject completes"),
     "B38": (1, "Y8 the committed mutation catalogue, its liveness proofs, its control and its verdict modules"),
+    # --- survivors the decisive mutation campaign left alive ----------------
+    "B39": (1, "the feed orders by ascending status_sequence and its LIMIT truncates, so a reversed or unbounded feed is red"),
+    "B40": (1, "binding.request_status is read from the request row, proved on a ledger whose two status columns differ"),
 }
 
 STUB_HEADER = '''"""Diff-blind obligation battery for M3.4 request-free proposal seams.

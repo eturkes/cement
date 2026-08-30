@@ -5,181 +5,181 @@
       "id": "R01",
       "section": "correctness",
       "locus": "_proposal_bindings: the three selection branches and their parameter binding",
-      "finding": "unknown",
-      "severity": "unknown",
-      "reproduction": "unknown",
-      "acceptance_check": "unknown",
-      "disposition": null
+      "finding": "_PendingProposals counts only rows that survive its INNER JOIN. Deleting the private request for proposal 10,001 makes both the unbounded count and the bounded detail report 10,000 valid bindings, so the missing tail binding is hidden instead of raising IntegrityError as section 14 X32 requires.",
+      "severity": "material",
+      "reproduction": "uv run python -m unittest tests.test_system.SystemTests.test_function_report_pending_count_reaches_the_10001_tail_with_bounded_detail",
+      "acceptance_check": "The named test passes: an intact 10,001-row scope reports count 10,001/detail 10,000, then deleting req_tail_10000 makes function_report(..., projection_limit=10000) raise IntegrityError.",
+      "disposition": "CONFIRMED and FIXED at 6e9ac37. The inner join deleted an orphaned proposal from the result set, which made it indistinguishable from a proposal that was never stored. The ids and feed statements now LEFT JOIN and _proposal_binding_from_row refuses a NULL bound_request_id, so absent and orphaned stay distinguishable inside one statement. Pinned by test_orphaned_binding_fails_closed_and_stays_distinct_from_an_absent_proposal and by B34's two tests; mutants M18 and M31 die on them."
     },
     {
       "id": "R02",
       "section": "correctness",
       "locus": "_proposal_binding_from_row: which fields it validates and which it passes through raw",
-      "finding": "unknown",
-      "severity": "unknown",
-      "reproduction": "unknown",
-      "acceptance_check": "unknown",
-      "disposition": null
+      "finding": "Section 12 says _ProposalBinding carries every request-derived value, including input, while row carries only p.*. The shipped record omits input, _proposal_bindings projects r.input_json into row, and _proposal_content reads that raw joined row; the adapter therefore does not provide the claimed binding boundary.",
+      "severity": "material",
+      "reproduction": "uv run python -m unittest tests.test_proposal_binding.RequestRowConfinementTests.test_binding_record_owns_every_request_derived_value",
+      "acceptance_check": "The named shape test passes with input owned by _ProposalBinding, and an AST/source assertion confirms proposal consumers no longer read r.input_json through binding.row.",
+      "disposition": "CONFIRMED as a text defect and CORRECTED at 1143332; the shipped code already held the boundary. Section 12 named the field `input`, which no shape carries, and now names `input_json`. bound_input_json is read at exactly one site, inside _proposal_binding_from_row, and _proposal_content consumes binding.input_json with binding.input_hash. The AST assertion the acceptance check asks for is carried mechanically by mutant M34, which rewrites _proposal_content(binding) to _proposal_content(binding.row) and is killed."
     },
     {
       "id": "R03",
       "section": "correctness",
       "locus": "_proposal_binding: the cardinality check and the None contract",
-      "finding": "unknown",
-      "severity": "unknown",
-      "reproduction": "unknown",
-      "acceptance_check": "unknown",
-      "disposition": null
+      "finding": "no defensible alternative: the wrapper maps zero joined rows to None so each consumer retains its own NotFoundError, rejects any non-one positive cardinality, and returns the sole row; _ProposalIds duplicate rejection prevents caller-created multiplicity.",
+      "severity": "cleared",
+      "reproduction": "Contract section 14 X18 and src/cement_runtime/system.py:573-590; the zero/one/multi-row branches are explicit and the wrapper contains no other exit.",
+      "acceptance_check": "Keep independent zero-row, one-row, and fabricated multi-row wrapper tests green with each public caller's existing NotFoundError unchanged.",
+      "disposition": "CLEARED. The lens ran and found no defensible alternative to the shipped design, so the row is evidence of coverage rather than a defect."
     },
     {
       "id": "R04",
       "section": "correctness",
       "locus": "_write_proposal_request_status: the two UPDATE statements and their rowcount use",
-      "finding": "unknown",
-      "severity": "unknown",
-      "reproduction": "unknown",
-      "acceptance_check": "unknown",
-      "disposition": null
+      "finding": "no defensible alternative: each UPDATE scopes partition, request id, pending status, and proposal id; reject and resolved bindings are distinct; both review call sites consume the returned rowcount and atomically reject any value other than one.",
+      "severity": "cleared",
+      "reproduction": "src/cement_runtime/system.py:593-631,1685-1694,1821-1830; inspect both UPDATE predicates and both immediate rowcount guards in one source revision.",
+      "acceptance_check": "Keep reject/resolve SQL predicate tests and both zero-rowcount rollback paths green; the confinement census must continue to name only _write_proposal_request_status for review-path request writes.",
+      "disposition": "CLEARED. The lens ran and found no defensible alternative to the shipped design, so the row is evidence of coverage rather than a defect."
     },
     {
       "id": "R05",
       "section": "correctness",
       "locus": "get_proposal and proposal: what changed beside the dropped field",
-      "finding": "unknown",
-      "severity": "unknown",
-      "reproduction": "unknown",
-      "acceptance_check": "unknown",
-      "disposition": null
+      "finding": "no defensible alternative: both singular paths retain argument validation, one read transaction, INNER-JOIN orphan hiding, caller-specific NotFoundError, and converter/error ordering. get_proposal additionally replaces permissive str/int casts with fail-closed adapter scalar validation; the only public projection loss is request_id.",
+      "severity": "cleared",
+      "reproduction": "git diff --unified=30 30195e7..HEAD -- src/cement_runtime/system.py; uv run python -m unittest tests.test_system.SystemTests.test_request_idempotency_and_partition_isolation tests.test_system.SystemTests.test_proposal_content_hashes_fail_closed_on_storage_mutation",
+      "acceptance_check": "Both named regression tests pass, and a baseline-vs-HEAD corpus over pending, historical, missing, cross-partition, orphan, malformed-shape, and mismatched-binding rows differs only by request_id removal and stricter domain exceptions.",
+      "disposition": "CLEARED. The lens ran and found no defensible alternative to the shipped design, so the row is evidence of coverage rather than a defect."
     },
     {
       "id": "R06",
       "section": "correctness",
       "locus": "proposals: the feed selection, its status filter and its limit",
-      "finding": "unknown",
-      "severity": "unknown",
-      "reproduction": "unknown",
-      "acceptance_check": "unknown",
-      "disposition": null
+      "finding": "no defensible alternative: proposals validates the closed status vocabulary and numeric bounds, maps 'all' to a null filter, applies exact partition/status/sequence predicates, preserves status_sequence order, binds the caller's limit, and converts every returned binding before exposing any list item.",
+      "severity": "cleared",
+      "reproduction": "src/cement_runtime/system.py:514-534,1566-1598; uv run python -m unittest tests.test_system.SystemTests.test_monotonic_feeds_survive_transitions_and_clock_rollback",
+      "acceptance_check": "Keep status=all and each concrete status, after_sequence boundaries, limit 1/10000, exact-partition colliders, stable ordering, and middle/last malformed-binding no-partial-list tests green.",
+      "disposition": "CLEARED. The lens ran and found no defensible alternative to the shipped design, so the row is evidence of coverage rather than a defect."
     },
     {
       "id": "R07",
       "section": "correctness",
       "locus": "review: decision routing, the writer call site and the returned value",
-      "finding": "unknown",
-      "severity": "unknown",
-      "reproduction": "unknown",
-      "acceptance_check": "unknown",
-      "disposition": null
+      "finding": "no defensible alternative: decision validation remains before the write transaction; reject routes to the rejected request writer and returns null example/output; accept/correct share the resolved request writer while preserving distinct proposal statuses, selected output, example id, quarantine, events, rowcount guards, and four-field ReviewResult.",
+      "severity": "cleared",
+      "reproduction": "src/cement_runtime/system.py:1629-1856; uv run python -m unittest tests.test_submission_battery.SubmissionBatteryTests.test_d23_the_eight_named_seams_still_expose",
+      "acceptance_check": "Keep independent accept/correct/reject route tests green, including corrected-output required/forbidden pairs, stale revision, one example versus none, rollback on each rowcount loss, event order/payload, quarantine, and exact returned triples.",
+      "disposition": "CLEARED. The lens ran and found no defensible alternative to the shipped design, so the row is evidence of coverage rather than a defect."
     },
     {
       "id": "R08",
       "section": "correctness",
       "locus": "function_report: the pending count, the detail cap and the gap projection",
-      "finding": "unknown",
-      "severity": "unknown",
-      "reproduction": "unknown",
-      "acceptance_check": "unknown",
-      "disposition": null
+      "finding": "function_report inherits R01's hidden-tail defect: pending_proposal_count is the count of INNER-JOIN survivors, not pending proposal rows, and detail validates only the bounded survivors. A missing binding at row 10,001 therefore lowers the count to 10,000 and returns a complete-looking page instead of raising.",
+      "severity": "material",
+      "reproduction": "uv run python -m unittest tests.test_system.SystemTests.test_function_report_pending_count_reaches_the_10001_tail_with_bounded_detail",
+      "acceptance_check": "The named test passes with exact intact count/detail and IntegrityError after deleting only req_tail_10000; count and validation must remain unbounded while returned detail remains capped at 10,000.",
+      "disposition": "CONFIRMED and FIXED with R01. The pending count statement proves that every pending binding in the partition EXISTS, unbounded by the detail cap, so a hidden tail raises instead of shrinking the count. B28's two tests split the cases: a binding missing inside the page and a binding missing beyond it. Section 14 X32 now also states the bound this does NOT give - cross-field consistency and JSON content hold for returned detail alone."
     },
     {
       "id": "R09",
       "section": "claim soundness",
       "locus": "the S2 commit message and roadmap record against what the diff actually does",
-      "finding": "unknown",
-      "severity": "unknown",
-      "reproduction": "unknown",
-      "acceptance_check": "unknown",
-      "disposition": null
+      "finding": "The durable S2 record still upgrades Z50's lexical coupling census into a performed-survival claim. roadmap.md says to choose the alternative that 'survives the NEXT unit', and the confinement test says M3.6b changes the adapter with 'no consumer moves'; section 15 expressly says no v3 swap was performed and survival is an unverified prediction.",
+      "severity": "material",
+      "reproduction": "Judgment-only claim check: /usr/bin/rg -n 'survives the NEXT unit|no consumer moves|survives the swap' .agent/roadmap.md tests/test_proposal_binding.py .agent/decisions/m3u4-contract.md; compare contract section 15 Z50 correction.",
+      "acceptance_check": "The grep finds only text labeling survival as an M3.6b prediction; every M3.4 claim is limited to the measured fact that current consumer SQL does not name r.* or depend on join-fragment aliases beyond the adapter contract.",
+      "disposition": "CONFIRMED and CORRECTED at 1143332. Z50 measured lexical coupling; survival through M3.6b is a PREDICTION resting on that census, and both the roadmap and tests/test_proposal_binding.py now say so. A census measures coupling, never survival."
     },
     {
       "id": "R10",
       "section": "claim soundness",
       "locus": "contract section 12's RULING text against the shipped adapter",
-      "finding": "unknown",
-      "severity": "unknown",
-      "reproduction": "unknown",
-      "acceptance_check": "unknown",
-      "disposition": null
+      "finding": "Section 12's shipped-shape prose does not describe the shipped adapter literally. _PendingProposals executes COUNT plus detail, not 'one statement per call'; _ProposalBinding omits ruled input; binding.partition is supplied by the caller rather than recovered; and binding.row contains r.input_json/bound_request_* despite the claim that consumers read request-derived values only through record fields.",
+      "severity": "material",
+      "reproduction": "Judgment-only contract/code comparison: .agent/decisions/m3u4-contract.md section 12 SHIPPED SHAPE items 1 and 4 against src/cement_runtime/system.py:435-450,488-570 and tests/test_proposal_binding.py::RequestRowConfinementTests::test_binding_record_owns_every_request_derived_value.",
+      "acceptance_check": "Reconcile section 12 and code mechanically: trace asserts the documented per-selection statement counts; the binding shape owns every claimed request-derived value; row contains only documented proposal columns; caller scope versus recovered scope is named accurately.",
+      "disposition": "CONFIRMED and CORRECTED at 1143332. Section 12 item 1 WITHDRAWS 'one statement per call' and publishes measured counts: requests-naming statements per selection are ids 1, feed 1, pending 2; whole-channel counts are get_proposal 8, proposals 8, function_report 20, review-accept 15. Item 4 corrects `input` to `input_json` and states that `partition` is the caller's scope echoed, never recovered. _proposal_bindings' own docstring now carries the same pair."
     },
     {
       "id": "R11",
       "section": "claim soundness",
       "locus": "contract section 15's corrections: whether each replacement ground holds",
-      "finding": "unknown",
-      "severity": "unknown",
-      "reproduction": "unknown",
-      "acceptance_check": "unknown",
-      "disposition": null
+      "finding": "Section 15's materialization withdrawal, Z50 narrowing, storage-only claim, status exemption, tail-count wording, slots pin, README contrast, and five text corrections match the landed text/code. Its D24 replacement does not: malformed real-ledger input_json leaks ValidationError from get_proposal, proposal, proposals, and review; only function_report translates it to IntegrityError.",
+      "severity": "material",
+      "reproduction": "uv run python -m unittest tests.test_system.SystemTests.test_proposal_paths_translate_malformed_persisted_json",
+      "acceptance_check": "The named five-path test passes with IntegrityError from get_proposal, proposal, proposals, review, and function_report after one real SQLite TEXT mutation to malformed input_json; no proxy or non-STRICT storage class is used.",
+      "disposition": "CONFIRMED and FIXED at 841e710. Malformed stored input_json reached callers as ValidationError from four of the five paths; _proposal_content now translates every stored-JSON failure to IntegrityError, and the five-path fixture uses one real SQLite TEXT mutation with no proxy storage class. The independent oracle agrees on all five paths (Z28)."
     },
     {
       "id": "R12",
       "section": "guarantee gap",
       "locus": "what the confinement instrument proves and what its prose claims",
-      "finding": "unknown",
-      "severity": "unknown",
-      "reproduction": "unknown",
-      "acceptance_check": "unknown",
-      "disposition": null
+      "finding": "The confinement instrument proves a lexical literal-string census, not that every SQL access is confined. _definitions_naming_table scans any string token (including docstrings) and misses runtime-composed identifiers, while its docstrings/comments claim the definitions whose SQL name requests are exact and that every later definition is covered. Section 15 already concedes the hostile-author hole.",
+      "severity": "material",
+      "reproduction": "Judgment-only guarantee probe: uv run python -c \"from tests.test_proposal_binding import _definitions_naming_table; print(_definitions_naming_table(\\\"def leaked():\\\\n return 'SELECT * FROM ' + ''.join(('re','quests'))\\\\n\\\", 'requests'))\" prints set(); compare tests/test_proposal_binding.py:88-136 and contract section 15 A04 correction.",
+      "acceptance_check": "Instrument prose says literal lexical census and names its runtime-composition limit; a positive control demonstrates that limit, while D06 separately forbids hiding. No durable text calls the census complete against a hostile author.",
+      "disposition": "CONFIRMED and CORRECTED at 1143332. The confinement instrument proves a LEXICAL literal-string census: runtime-composed SQL, cross-module SQL and views stay invisible to it. The docstrings now state that limit and B06 owns the tripwire boundary, which accepts a literal hidden namer and rejects runtime composition."
     },
     {
       "id": "R13",
       "section": "guarantee gap",
       "locus": "what the shape instrument proves and what D11 claims it carries",
-      "finding": "unknown",
-      "severity": "unknown",
-      "reproduction": "unknown",
-      "acceptance_check": "unknown",
-      "disposition": null
+      "finding": "D11 says every frozen shape is pinned with inspect.signature plus get_type_hints, but the all-at-once test applies those checks only to ReviewResult/System.review. ProposalView and PendingProposalGap pin field names, frozen, and slots only; changing either field annotation survives the claimed shape instrument.",
+      "severity": "material",
+      "reproduction": "Mutation probe: set ProposalView.__annotations__['operation_revision']='str', then run FrozenPublicShapeTests.test_review_result_and_proposal_shapes_are_frozen; it still passes because that test never reads ProposalView hints or signature.",
+      "acceptance_check": "A mutation changing each field type, default, positional/keyword kind, frozen flag, or slots flag in each of ReviewResult, ProposalView, and PendingProposalGap makes the named shape instrument fail independently.",
+      "disposition": "CONFIRMED and FIXED at 1143332. ProposalView and PendingProposalGap gained annotation-text pins, resolved-hint spot checks and no-default checks. Proved by mutation: retyping ProposalView.input to str turns the shape test red, and models.py restores byte-clean."
     },
     {
       "id": "R14",
       "section": "guarantee gap",
       "locus": "the ruled public behaviour change: every surface that still reports the old value",
-      "finding": "unknown",
-      "severity": "unknown",
-      "reproduction": "unknown",
-      "acceptance_check": "unknown",
-      "disposition": null
+      "finding": "no defensible alternative: review and proposal surfaces report accepted/corrected/rejected, CLI serialization carries those exact values, and README/architecture publish them. Remaining resolved values are confined to the explicitly exempt private request row and handle/request lifecycle models, and README contrasts the vocabularies.",
+      "severity": "cleared",
+      "reproduction": "/usr/bin/rg -n '\"status\"\\s*:\\s*\"resolved\"|status.*resolved|resolved.*status' src/cement_runtime tests README.md docs --glob '*.py' --glob '*.md'; inspect only request-lifecycle hits against contract sections 13-15.",
+      "acceptance_check": "Exact accept/correct/reject API and CLI triples pass; the surface census finds no resolved review/proposal/report value; lifecycle tests continue to pin resolved on System.handle and System.request_status.",
+      "disposition": "CLEARED. The lens ran and found no defensible alternative to the shipped design, so the row is evidence of coverage rather than a defect."
     },
     {
       "id": "R15",
       "section": "CLAUDE.md authoring",
       "locus": "the durable files this unit touched, against the Authoring rules",
-      "finding": "unknown",
-      "severity": "unknown",
-      "reproduction": "unknown",
-      "acceptance_check": "unknown",
-      "disposition": null
+      "finding": "The unit knowingly violates the durable-authoring rule: contract sections 7 and 12-15 retain wave chronology, dispatch history, worktree state, measurements, and discovery narrative; section 15 itself says this provenance must move to .agent/archive. That material remains attached session state and competes with the binding obligations.",
+      "severity": "material",
+      "reproduction": "Judgment-only authoring audit: .agent/decisions/m3u4-contract.md:175-246,247-418,488-565 against CLAUDE.md Authoring ('omit + prune provenance') and contract section 15 'THE CONTRACT CARRIES PROVENANCE IT SHOULD NOT'.",
+      "acceptance_check": "Move chronology, dispatch/worktree state, superseded measurements, and discovery narrative to .agent/archive; the live contract retains only ruled obligations, grounds needed to interpret them, probes, and gates, with all cross-links valid.",
+      "disposition": "CONFIRMED and SCHEDULED for S4. Contract sections 7 and 12-15 retain wave chronology, dispatch history and worktree state, which the durable-authoring rule prunes. The grounds stayed load-bearing while the battery was written, so the move waits for the closure session: chronology to .agent/archive/, rulings and measured numbers stay in the contract."
     },
     {
       "id": "R16",
       "section": "CLAUDE.md engineering",
       "locus": "the shipped code against KISS, deduplication and scoped-module rules",
-      "finding": "unknown",
-      "severity": "unknown",
-      "reproduction": "unknown",
-      "acceptance_check": "unknown",
-      "disposition": null
+      "finding": "no defensible alternative: the adapter is one scoped module-local boundary with three closed selection records, one result record, one singular wrapper, and one writer. Its repeated full SELECT text is intentional D06 statement ownership; factoring a join fragment would weaken confinement. Shared conversion is centralized without moving consumer-specific precedence checks.",
+      "severity": "cleared",
+      "reproduction": "src/cement_runtime/system.py:413-631 and contract sections 12,14-15; /usr/bin/rg -n '_proposal_bindings\\(|_write_proposal_request_status\\(' src/cement_runtime/system.py",
+      "acceptance_check": "Keep the lexical owner set exact, no SQL fragments composed by consumers, one shared scalar converter, consumer-local consistency precedence, and no adapter generalization beyond the eight owned paths.",
+      "disposition": "CLEARED. The lens ran and found no defensible alternative to the shipped design, so the row is evidence of coverage rather than a defect."
     },
     {
       "id": "R17",
       "section": "KISS",
       "locus": "any branch, guard or field the shipped design carries that nothing can reach",
-      "finding": "unknown",
-      "severity": "unknown",
-      "reproduction": "unknown",
-      "acceptance_check": "unknown",
-      "disposition": null
+      "finding": "The plural _ProposalIds machinery carries unreachable production capacity: its only constructor is a singleton in _proposal_binding, so empty selection, duplicate rejection, dynamic multi-id placeholders, and the wrapper's positive non-one cardinality branch cannot occur with the shipped unique schema. COUNT(*) without GROUP BY also makes count_row is None unreachable on a real SQLite connection.",
+      "severity": "minor",
+      "reproduction": "Judgment-only reachability census: /usr/bin/rg -n '_ProposalIds\\(' src/cement_runtime/system.py finds only selection=_ProposalIds((proposal_id,)); inspect system.py:496-513,535-547,581-590 against the proposals/requests uniqueness constraints.",
+      "acceptance_check": "Either reduce _ProposalIds to one identifier and remove impossible real-ledger branches, or name an owned multi-id caller/proxy invariant and pin every retained branch with a reachable test; no dead generalization remains unexplained.",
+      "disposition": "KEEP, with the pin DEFERRED to .agent/polish.md (pri=3 size=S). M3.6b's direct-column swap is expected to want the plural form, so deleting it now to re-add it there is churn. The decisive mutation campaign measures the exposure exactly: M02 empty selection, M03 duplicate rejection, M15 invalid-selection fallback and M26 the resolved writer's output guard survive all four verdict modules, and the polish row carries their acceptance check. Ordering is the open question a pin must answer first, because no obligation grants selection order."
     },
     {
       "id": "R18",
       "section": "regression risk",
       "locus": "behaviour the eight owned sites had at 30195e7 that no test now pins",
-      "finding": "unknown",
-      "severity": "unknown",
-      "reproduction": "unknown",
-      "acceptance_check": "unknown",
-      "disposition": null
+      "finding": "The landed tests do not pin the ruled INNER-JOIN orphan behavior independently. Replacing the adapter's three proposal/request JOINs with LEFT JOIN changes missing-binding singular/list/report behavior while leaving the confinement owner census and public shape instrument unchanged; the committed behavioral suite needs a mutation result to close this gap.",
+      "severity": "material",
+      "reproduction": "Mutation fixture: from e64baff replace the three adapter 'JOIN requests AS r' clauses with 'LEFT JOIN requests AS r', then run uv run python -m unittest discover -s tests -t . and record whether the 753-test gate survives.",
+      "acceptance_check": "The LEFT-JOIN mutant fails an independent behavioral test for get_proposal, proposal, proposals, and function_report orphan visibility/error class; the control gate remains green and the mutation result names its graded modules.",
+      "disposition": "CONFIRMED as a gate gap, and its SUBJECT INVERTED. The inner join was the defect rather than the behaviour to pin, so B34's two tests now assert the LEFT JOIN, IntegrityError on all five paths, and a NotFoundError control before and after corruption. Mutant M18 was inverted to outer-to-INNER and is killed, which is the independent pin the finding asked for."
     }
   ]
 }
