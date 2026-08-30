@@ -479,3 +479,22 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   existing per-unit validator is replaced by a schema declaration; every committed wave artifact grades to
   the SAME rc and the SAME `UNKNOWN-CELLS` count as its current validator produces today, proved by running
   both over each artifact; the all-unknown seed still exits 1 and a fully-filled control still exits 0.
+
+## M3.4 deferrals
+
+- `pri=3` `size=S` — `_ProposalIds` carries plural machinery no production caller reaches. It rejects a
+  duplicate identifier set, returns early on an empty selection without touching SQL, and builds dynamic
+  `?` placeholders, yet its only constructor is the singleton inside `_proposal_binding`
+  (`src/cement_runtime/system.py`), so every shipped call passes exactly one id. Ruled KEEP at M3.4 S3:
+  M3.6b's direct-column swap is expected to want the plural form, and deleting it now to re-add it there
+  is churn. What is missing is the pin — the standing rule is that an unforced mechanism ships only with
+  a probe that forces it, and no numbered battery obligation covers these three behaviours. The oracle's
+  probe corpus reaches them (`Z20` duplicates, `Z21` empty selection, `Z40` ordering of a multi-id
+  selection, `.agent/decisions/m3u4-probes.json`), so the substance is recorded and only the gate is
+  absent. Ordering is the open question the corpus raises: the oracle treats a unique id set as
+  MEMBERSHIP and returns table order for a reversed selection, and no obligation grants selection order,
+  so whichever answer is pinned must be stated rather than inherited. Acceptance: one committed test
+  constructs `_ProposalIds` directly with two ids and asserts the returned order against the documented
+  rule, one asserts a duplicate set raises `IntegrityError`, one asserts an empty selection issues zero
+  statements under a `set_trace_callback` spy, and deleting any one of the three production branches
+  turns exactly one of them red.

@@ -435,9 +435,10 @@ Measured gaps driving the arc:
     A SPIKE'S SHIPPED DIFF CARRIES DEFECTS ITS OWN TABLE NEVER MEASURED. Both spikes graded
     UNKNOWN-CELLS: 0; the ruling came from reading the two diffs. ALT-PROJECTION left two raw
     `UPDATE requests` in `review` (a read-only SQL constant cannot confine a write, and it built no
-    writer). ALT-BINDING confined in full but was a SIDE lookup that M3.6b's direct columns delete.
-    Choose the alternative that survives the NEXT unit, not the smaller diff: +181/-117 lost to
-    +433/-147 here.
+    writer). ALT-BINDING confined in full but was a SIDE lookup that M3.6b's direct columns are
+    PREDICTED to delete. Choose the alternative predicted to survive the NEXT unit, not the smaller
+    diff: +181/-117 lost to +433/-147 here. That prediction rests on Z50's COUPLING CENSUS, and a
+    census measures coupling, never survival - M3.6b is what tests it.
     THE ATTACK TABLE FALSIFIED A COMMITTED GROUND, which is the highest-value thing wave 2 produced.
     Y9 ran both shapes through `EXPLAIN QUERY PLAN` (SQLite 3.53.1) and got IDENTICAL plans, so the
     "ALT-PROJECTION materializes the partition before filtering by operation" ground is WITHDRAWN -

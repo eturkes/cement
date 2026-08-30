@@ -331,15 +331,27 @@ SHIPPED SHAPE, taking each alternative's winning property:
 1. ONE private read adapter `_proposal_bindings(connection, *, partition, selection)` issuing the
    COMPLETE statement per named selection — `_ProposalIds`, `_ProposalFeed(status, after_sequence,
    limit)`, `_PendingProposals(operation, limit)` — so a consumer supplies parameters and never SQL.
-   One statement per call, matching baseline cardinality (ALT-PROJECTION's property) with the
-   adapter owning every access (ALT-BINDING's property).
+   Baseline cardinality (ALT-PROJECTION's property) with the adapter owning every access
+   (ALT-BINDING's property). MEASURED statements naming `requests`, per selection, by
+   `sqlite3` trace over the whole channel: `_ProposalIds` 1, `_ProposalFeed` 1,
+   `_PendingProposals` 2. "One statement per call" is therefore FALSE as an unqualified
+   claim and is withdrawn. `_PendingProposals` issues a count statement and a bounded
+   detail statement, which is exactly the two request statements baseline issued for the
+   report, so the cardinality obligation is MET while the one-statement wording is not.
+   Whole-channel totals at the same measurement, for scale: `get_proposal` 8, `proposals`
+   8, `function_report` 20, `review` on accept 15 — the last carrying 2 request statements
+   because the adapter read is joined by `_write_proposal_request_status`'s write.
 2. `_proposal_binding(...)` = the singular wrapper over `_ProposalIds`, cardinality-checked.
 3. `_write_proposal_request_status(...)` taken from ALT-BINDING, unchanged in role: the sole writer
    of the private request row on the review path.
 4. `_ProposalBinding` = a frozen record carrying every value recovered from the request row
-   (`operation`, `operation_revision`, `input`, `input_hash`, `request_id`, `request_status`) plus
-   the proposal row itself for `p.*` fields. Consumers read request-derived values ONLY through the
-   record.
+   (`operation`, `operation_revision`, `input_json`, `input_hash`, `request_id`, `request_status`)
+   plus the proposal row itself for `p.*` fields. Consumers read request-derived values ONLY through
+   the record. The field is `input_json`, not `input`: it holds the stored TEXT and sits beside
+   `input_hash`, so this sentence is corrected against the shipped code rather than the code against
+   it. `partition` is also a field of the record, and it is the CALLER'S scope echoed back — the
+   adapter takes it as an argument and never reads `r.partition` into it, so it is not a recovered
+   value and the consumer gains no authority by reading it.
 
 D06 grounds for rejecting bare textual confinement: composing a join fragment into six consumers is
 the "builds SQL from fragments" case D06 names, and it passes the D02 instrument while the join is

@@ -35,7 +35,9 @@ PERMITTED_REQUEST_NAMERS = frozenset(
         # M3.3 storage plumbing: the private row a proposal's scope still lives on.
         "_persist_proposal",
         # M3.4's adapter. Its two members are the sole request access for the proposal
-        # read, review and report paths, so M3.6b rewrites them and no consumer moves.
+        # read, review and report paths, which this file's complement assertion proves.
+        # That M3.6b then rewrites these two and moves no consumer is a PREDICTION about
+        # a unit that has not run; the census establishes the coupling, never the swap.
         "_proposal_bindings",
         "_write_proposal_request_status",
         # handle-lifecycle owners. M3.5b removes the grammar; M3.6a deletes the methods.
@@ -93,6 +95,14 @@ def _definitions_naming_table(source: str, table: str) -> set[str]:
     instrument scoped to function bodies reports a clean set while the join is still
     composed into its consumers. A module-level constant is attributed to its own assigned
     name; every other string is attributed to the innermost function or method enclosing it.
+
+    LIMIT, stated because the assertion below reads like a proof and is not one. This is a
+    LEXICAL census of string constants in one module's AST. It sees a definition whose SQL
+    spells the table; it does not see SQL assembled at runtime from parts that never each
+    contain the token, SQL arriving from another module or from disk, or a read reaching the
+    table through a view. So an exact-equality pass means every LITERAL namer is permitted,
+    never that no other code path reaches the row. Obligation B06 owns that boundary and
+    pins both sides of it: a literal hidden namer is caught, runtime composition is not.
     """
 
     tree = ast.parse(source)
@@ -136,6 +146,14 @@ def _definitions_naming_table(source: str, table: str) -> set[str]:
 
 
 class RequestRowConfinementTests(unittest.TestCase):
+    """Lexical confinement of the private request row, with the emphasis on lexical.
+
+    What these tests establish: the set of definitions in ``system.py`` whose own string
+    constants name ``requests`` equals ``PERMITTED_REQUEST_NAMERS`` exactly. What they do
+    not establish: that nothing else can read the row. See ``_definitions_naming_table``
+    for the limit and who owns it.
+    """
+
     def setUp(self) -> None:
         self.source = Path(system.__file__).read_text(encoding="utf-8")
 
@@ -249,6 +267,48 @@ class FrozenPublicShapeTests(unittest.TestCase):
             tuple(PendingProposalGap.__dataclass_fields__),
             ("proposal_id", "operation_revision", "input_hash"),
         )
+        # D11 asks for the SAME depth on every frozen shape, and a field-name tuple alone
+        # is not it: retyping `input` from `JSONValue` to `str` keeps the tuple identical
+        # and passes. Annotation text and the no-default check close that on both shapes.
+        self.assertEqual(
+            dict(ProposalView.__annotations__),
+            {
+                "id": "str",
+                "partition": "str",
+                "operation": "str",
+                "operation_revision": "int",
+                "input": "JSONValue",
+                "proposed_output": "JSONValue",
+                "provenance": "JSONValue",
+                "created_at_us": "int",
+            },
+        )
+        self.assertEqual(
+            dict(PendingProposalGap.__annotations__),
+            {
+                "proposal_id": "str",
+                "operation_revision": "int",
+                "input_hash": "str",
+            },
+        )
+        proposal_hints = typing.get_type_hints(ProposalView)
+        self.assertEqual(proposal_hints["id"], str)
+        self.assertEqual(proposal_hints["operation_revision"], int)
+        gap_hints = typing.get_type_hints(PendingProposalGap)
+        self.assertEqual(gap_hints["proposal_id"], str)
+        self.assertEqual(gap_hints["operation_revision"], int)
+        self.assertEqual(gap_hints["input_hash"], str)
+        for shape in (ProposalView, PendingProposalGap):
+            with self.subTest(shape=shape.__name__):
+                self.assertEqual(
+                    [
+                        name
+                        for name, field in shape.__dataclass_fields__.items()
+                        if field.default is not dataclasses.MISSING
+                        or field.default_factory is not dataclasses.MISSING
+                    ],
+                    [],
+                )
         self.assertTrue(ProposalView.__dataclass_params__.frozen)
         self.assertTrue(PendingProposalGap.__dataclass_params__.frozen)
         # `slots=True` is invisible to every other assertion here: turning it off keeps the
