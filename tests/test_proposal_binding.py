@@ -154,6 +154,22 @@ class RequestRowConfinementTests(unittest.TestCase):
             set(),
         )
 
+    def test_binding_record_owns_every_request_derived_value(self) -> None:
+        self.assertEqual(
+            tuple(system._ProposalBinding.__dataclass_fields__),
+            (
+                "proposal_id",
+                "partition",
+                "operation",
+                "operation_revision",
+                "input_json",
+                "input_hash",
+                "request_id",
+                "request_status",
+                "row",
+            ),
+        )
+
     def test_the_instrument_detects_a_hidden_namer(self) -> None:
         # Positive control. Without it a broken tokenizer reports an empty set forever.
         planted = "def leaked():\n    return 'SELECT id FROM REQUESTS'\n"

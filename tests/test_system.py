@@ -339,6 +339,38 @@ class SystemTests(unittest.TestCase):
                 "tenant-a", pending.proposal_id, reviewer="alice", decision="accept"
             )
 
+    def test_proposal_paths_translate_malformed_persisted_json(self) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        pending = self.system.handle(
+            "tenant-a",
+            "echo",
+            {"malformed": True},
+            request_id="malformed-proposal-input",
+        )
+        with self.system.store.transaction(write=True) as connection:
+            connection.execute(
+                "UPDATE requests SET input_json = ? WHERE id = ?",
+                ("{", "malformed-proposal-input"),
+            )
+
+        invocations = {
+            "get_proposal": lambda: self.system.get_proposal(
+                "tenant-a", pending.proposal_id
+            ),
+            "proposal": lambda: self.system.proposal("tenant-a", pending.proposal_id),
+            "proposals": lambda: self.system.proposals("tenant-a"),
+            "review": lambda: self.system.review(
+                "tenant-a",
+                pending.proposal_id,
+                reviewer="alice",
+                decision="accept",
+            ),
+            "function_report": lambda: self.system.function_report("tenant-a", "echo"),
+        }
+        for path, invoke in invocations.items():
+            with self.subTest(path=path), self.assertRaises(IntegrityError):
+                invoke()
+
     def test_confirmed_request_cache_is_bound_to_immutable_example(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
         for request_id, corrupted in (
@@ -15035,6 +15067,20 @@ class SystemTests(unittest.TestCase):
             maximum.operation_now.pending_proposal_count,
             len(maximum_pending),
         )
+
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("PRAGMA foreign_keys = OFF")
+            connection.execute("DELETE FROM requests WHERE id = ?", ("req_tail_10000",))
+            connection.commit()
+        finally:
+            connection.close()
+        with self.assertRaises(IntegrityError):
+            self.system.function_report(
+                "tenant-a",
+                "echo",
+                projection_limit=10_000,
+            )
 
     def test_function_report_artifact_statuses_are_fixed_exact_newest_first_and_bounded(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)

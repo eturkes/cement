@@ -444,6 +444,7 @@ class _ProposalBinding:
     partition: str
     operation: str
     operation_revision: int
+    input_json: str
     input_hash: str
     request_id: str
     request_status: str
@@ -467,6 +468,7 @@ def _proposal_binding_from_row(row: sqlite3.Row, *, partition: str) -> _Proposal
             minimum=1,
         )
         input_hash = _digest(row["input_hash"], "proposal input_hash")
+        input_json = str(row["bound_input_json"])
     except (IndexError, KeyError, TypeError, ValidationError) as exc:
         raise IntegrityError("pending proposal row has invalid scalar fields") from exc
     # Cross-field binding consistency deliberately stays with each consumer, at the exact
@@ -478,6 +480,7 @@ def _proposal_binding_from_row(row: sqlite3.Row, *, partition: str) -> _Proposal
         partition=partition,
         operation=operation,
         operation_revision=operation_revision,
+        input_json=input_json,
         input_hash=input_hash,
         request_id=request_id,
         request_status=str(row["bound_request_status"]),
@@ -502,7 +505,7 @@ def _proposal_bindings(
         rows = connection.execute(
             f"""
             SELECT p.*, r.partition AS bound_request_partition, r.operation,
-                   r.operation_revision, r.input_json, r.input_hash,
+                   r.operation_revision, r.input_json AS bound_input_json, r.input_hash,
                    r.id AS bound_request_id, r.status AS bound_request_status,
                    r.proposal_id AS bound_proposal_id
             FROM proposals AS p
@@ -515,7 +518,7 @@ def _proposal_bindings(
         rows = connection.execute(
             """
             SELECT p.*, r.partition AS bound_request_partition, r.operation,
-                   r.operation_revision, r.input_json, r.input_hash,
+                   r.operation_revision, r.input_json AS bound_input_json, r.input_hash,
                    r.id AS bound_request_id, r.status AS bound_request_status,
                    r.proposal_id AS bound_proposal_id
             FROM proposals AS p
@@ -533,22 +536,33 @@ def _proposal_bindings(
             ),
         ).fetchall()
     elif type(selection) is _PendingProposals:
+        # One statement carries both numbers, so the pending selection keeps the two
+        # request statements baseline issued. `item_count` is the operation-scoped
+        # count the report publishes. `orphan_count` covers every pending proposal in
+        # the partition whose private request row is absent: the detail cap bounds
+        # RETURNED ROWS and never validation, so an orphan past the cap must fail
+        # closed instead of silently lowering the count an inner join would compute.
+        # An orphan has no recoverable operation, so it cannot be excluded by scope.
         count_row = connection.execute(
             """
-            SELECT COUNT(*) AS item_count
+            SELECT COUNT(*) FILTER (WHERE r.id IS NOT NULL AND r.operation = ?)
+                       AS item_count,
+                   COUNT(*) FILTER (WHERE r.id IS NULL) AS orphan_count
             FROM proposals AS p
-            JOIN requests AS r ON r.partition = p.partition AND r.id = p.request_id
-            WHERE p.partition = ? AND r.operation = ? AND p.status = 'pending'
+            LEFT JOIN requests AS r ON r.partition = p.partition AND r.id = p.request_id
+            WHERE p.partition = ? AND p.status = 'pending'
             """,
-            (partition, selection.operation),
+            (selection.operation, partition),
         ).fetchone()
         if count_row is None:
             raise IntegrityError("pending proposal count is missing")
+        if _stored_int(count_row["orphan_count"], "pending proposal orphan count"):
+            raise IntegrityError("pending proposal has no private request binding")
         total = _stored_int(count_row["item_count"], "pending proposal count")
         rows = connection.execute(
             """
             SELECT p.*, r.partition AS bound_request_partition, r.operation,
-                   r.operation_revision, r.input_json, r.input_hash,
+                   r.operation_revision, r.input_json AS bound_input_json, r.input_hash,
                    r.id AS bound_request_id, r.status AS bound_request_status,
                    r.proposal_id AS bound_proposal_id
             FROM proposals AS p
@@ -1457,12 +1471,20 @@ class System:
 
     @staticmethod
     def _proposal_content(
-        row: sqlite3.Row,
+        binding: _ProposalBinding,
     ) -> tuple[CanonicalJSON, CanonicalJSON, CanonicalJSON]:
-        input_json = parse_json(str(row["input_json"]))
-        proposed = parse_json(str(row["proposed_output_json"]))
-        provenance = parse_json(str(row["provenance_json"]), max_bytes=65_536)
-        if input_json.digest != row["input_hash"]:
+        # The request-derived input arrives through the binding record; every other
+        # column is the proposal's own. A stored value that will not parse is ledger
+        # corruption, so it reports as IntegrityError rather than escaping as the
+        # ValidationError that parse_json raises for caller input.
+        row = binding.row
+        try:
+            input_json = parse_json(binding.input_json)
+            proposed = parse_json(str(row["proposed_output_json"]))
+            provenance = parse_json(str(row["provenance_json"]), max_bytes=65_536)
+        except ValidationError as exc:
+            raise IntegrityError("stored proposal content is not valid JSON") from exc
+        if input_json.digest != binding.input_hash:
             raise IntegrityError("proposal request input digest mismatch")
         if proposed.digest != row["proposed_output_hash"]:
             raise IntegrityError("proposal output digest mismatch")
@@ -1536,7 +1558,7 @@ class System:
                 or row["bound_proposal_id"] != proposal_id
             ):
                 raise IntegrityError("pending proposal is not bound to a pending request")
-            input_json, proposed, provenance = self._proposal_content(row)
+            input_json, proposed, provenance = self._proposal_content(binding)
             return ProposalView(
                 id=proposal_id,
                 partition=partition,
@@ -1600,12 +1622,15 @@ class System:
     def _proposal_record(self, binding: _ProposalBinding) -> dict[str, JSONValue]:
         row = binding.row
         self._validate_proposal_shape(row)
-        input_json, proposed, provenance = self._proposal_content(row)
-        final_output = (
-            parse_json(str(row["final_output_json"]))
-            if row["final_output_json"] is not None
-            else None
-        )
+        input_json, proposed, provenance = self._proposal_content(binding)
+        try:
+            final_output = (
+                parse_json(str(row["final_output_json"]))
+                if row["final_output_json"] is not None
+                else None
+            )
+        except ValidationError as exc:
+            raise IntegrityError("stored proposal content is not valid JSON") from exc
         if final_output is not None and final_output.digest != row["final_output_hash"]:
             raise IntegrityError("proposal final output digest mismatch")
         return {
@@ -1672,7 +1697,7 @@ class System:
                 raise StateError(
                     "proposal belongs to an obsolete operation revision; reject it or use a new request"
                 )
-            input_json, proposed, _ = self._proposal_content(row)
+            input_json, proposed, _ = self._proposal_content(binding)
             if decision == "reject":
                 proposal_update = connection.execute(
                     """
@@ -2864,7 +2889,7 @@ class System:
             raise IntegrityError("pending proposal scope or request binding mismatch")
         try:
             self._validate_proposal_shape(row)
-            self._proposal_content(row)
+            self._proposal_content(binding)
         except ValidationError as exc:
             raise IntegrityError(f"pending proposal row is invalid: {exc}") from exc
         return PendingProposalGap(
