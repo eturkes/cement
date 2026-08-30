@@ -17,6 +17,13 @@ the kind's letter with a number above the seeded range.
 MAIN-owned columns are EXEMPT from grading and are printed on every run, because a
 teammate's completeness and MAIN's ruling are two different deliverables and only one
 of them is graded here.
+
+``--differential`` promotes the probes table's ``main_observed`` and ``differs`` into
+the graded set. Those two columns are OBSERVATIONS of MAIN's shipped code, so a
+re-derivation run delivers them and this grades that delivery; ``main_ruling`` stays
+exempt under every mode because it is judgment. An oracle corpus scored only on its own
+observations certifies the oracle, so the differential mode is what turns it into
+evidence about MAIN.
 """
 
 from __future__ import annotations
@@ -37,21 +44,26 @@ SPEC: dict[str, dict[str, object]] = {
         "path": DECISIONS / "m3u4-probes.json",
         "graded": ("probe", "observed"),
         "exempt": ("main_observed", "differs", "main_ruling"),
-        "prose": ("probe", "observed"),
+        "differential": ("main_observed", "differs"),
+        "prose": ("probe", "observed", "main_observed"),
     },
     "review": {
         "path": DECISIONS / "m3u4-review.json",
         "graded": ("finding", "severity", "reproduction", "acceptance_check"),
         "exempt": ("disposition",),
+        "differential": (),
         "prose": ("finding", "reproduction", "acceptance_check"),
     },
     "mutants": {
         "path": DECISIONS / "m3u4-mutants.json",
         "graded": ("anchor", "mutation", "expected_killer", "result"),
         "exempt": ("main_ruling",),
+        "differential": (),
         "prose": ("anchor", "mutation", "expected_killer"),
     },
 }
+
+DIFFERS = ("yes", "no", UNKNOWN)
 
 SEVERITY = ("blocking", "material", "minor", "cleared")
 RESULT = ("killed", "survived", "equivalent", "unreachable", UNKNOWN)
@@ -192,7 +204,7 @@ def emit_seed(kind: str) -> int:
     return 0
 
 
-def grade(path: Path) -> int:
+def grade(path: Path, *, differential: bool = False) -> int:
     try:
         document = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
@@ -208,7 +220,12 @@ def grade(path: Path) -> int:
         _fail("rows must be a nonempty list")
         return 2
 
-    graded = tuple(spec["graded"])
+    promoted = tuple(spec["differential"]) if differential else ()
+    if differential and not promoted:
+        _fail(f"kind {kind} has no differential columns; drop --differential")
+        return 2
+    graded = tuple(spec["graded"]) + promoted
+    exempt = tuple(column for column in spec["exempt"] if column not in promoted)
     prose = set(spec["prose"])
     unknown_cells = 0
     problems: list[str] = []
@@ -242,6 +259,10 @@ def grade(path: Path) -> int:
             result = row.get("result")
             if isinstance(result, str) and result not in RESULT:
                 problems.append(f"{identifier}.result: must be one of {RESULT}")
+        if "differs" in promoted:
+            differs = row.get("differs")
+            if isinstance(differs, str) and differs not in DIFFERS:
+                problems.append(f"{identifier}.differs: must be one of {DIFFERS}")
 
     seeded = {
         "probes": len(PROBE_SUBJECTS),
@@ -253,7 +274,10 @@ def grade(path: Path) -> int:
     print(f"KIND: {kind}")
     print(f"ROWS: {len(rows)} (seeded {seeded}, extension {max(0, len(rows) - seeded)})")
     print(f"GRADED-COLUMNS: {', '.join(graded)}")
-    print(f"EXEMPT-COLUMNS: {', '.join(spec['exempt'])} (MAIN-owned, never graded here)")
+    print(f"GRADED-MODE: {'differential' if differential else 'production'}")
+    print(
+        f"EXEMPT-COLUMNS: {', '.join(exempt) or '(none)'} (MAIN-owned, never graded here)"
+    )
     print(f"UNKNOWN-CELLS: {unknown_cells}")
     ok = not problems and unknown_cells == 0
     print("RESULT: PASS" if ok else "RESULT: FAIL")
@@ -263,13 +287,18 @@ def grade(path: Path) -> int:
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--emit-seed", choices=sorted(SPEC), help="write the all-unknown seed")
+    parser.add_argument(
+        "--differential",
+        action="store_true",
+        help="also grade the differential columns a re-derivation against MAIN's code fills",
+    )
     parser.add_argument("table", nargs="?", help="the table to grade")
     args = parser.parse_args(argv)
     if args.emit_seed:
         return emit_seed(args.emit_seed)
     if not args.table:
         parser.error("give a table to grade or --emit-seed <kind>")
-    return grade(Path(args.table))
+    return grade(Path(args.table), differential=args.differential)
 
 
 if __name__ == "__main__":

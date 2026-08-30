@@ -458,6 +458,15 @@ class _ProposalBindingSet:
 
 
 def _proposal_binding_from_row(row: sqlite3.Row, *, partition: str) -> _ProposalBinding:
+    # The complete statements LEFT JOIN so an EXISTING proposal whose private request row
+    # is absent stays VISIBLE here and fails closed. An inner join deletes that proposal
+    # from the result set instead, which makes an orphan indistinguishable from an absent
+    # proposal on the singular paths and silently drops it from the feed. What the fork
+    # ruling rejects is a LEFT JOIN that PUBLISHES the NULL binding columns; a LEFT JOIN
+    # whose validator refuses them is how absent and orphaned stay distinguishable in one
+    # statement.
+    if row["bound_request_id"] is None:
+        raise IntegrityError("proposal has no private request binding")
     try:
         proposal_id = _request_id(row["id"])
         request_id = _request_id(row["bound_request_id"])
@@ -470,7 +479,7 @@ def _proposal_binding_from_row(row: sqlite3.Row, *, partition: str) -> _Proposal
         input_hash = _digest(row["input_hash"], "proposal input_hash")
         input_json = str(row["bound_input_json"])
     except (IndexError, KeyError, TypeError, ValidationError) as exc:
-        raise IntegrityError("pending proposal row has invalid scalar fields") from exc
+        raise IntegrityError("proposal binding row has invalid scalar fields") from exc
     # Cross-field binding consistency deliberately stays with each consumer, at the exact
     # position it held before this adapter existed. Hoisting it here would pre-empt
     # _validate_proposal_shape and rewrite the class, message and precedence every corrupt
@@ -509,7 +518,7 @@ def _proposal_bindings(
                    r.id AS bound_request_id, r.status AS bound_request_status,
                    r.proposal_id AS bound_proposal_id
             FROM proposals AS p
-            JOIN requests AS r ON r.partition = p.partition AND r.id = p.request_id
+            LEFT JOIN requests AS r ON r.partition = p.partition AND r.id = p.request_id
             WHERE p.partition = ? AND p.id IN ({placeholders})
             """,
             (partition, *selection.values),
@@ -522,7 +531,7 @@ def _proposal_bindings(
                    r.id AS bound_request_id, r.status AS bound_request_status,
                    r.proposal_id AS bound_proposal_id
             FROM proposals AS p
-            JOIN requests AS r ON r.partition = p.partition AND r.id = p.request_id
+            LEFT JOIN requests AS r ON r.partition = p.partition AND r.id = p.request_id
             WHERE p.partition = ? AND (? IS NULL OR p.status = ?)
               AND p.status_sequence > ?
             ORDER BY p.status_sequence LIMIT ?

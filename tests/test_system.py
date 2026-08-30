@@ -371,6 +371,53 @@ class SystemTests(unittest.TestCase):
             with self.subTest(path=path), self.assertRaises(IntegrityError):
                 invoke()
 
+    def test_orphaned_binding_fails_closed_and_stays_distinct_from_an_absent_proposal(
+        self,
+    ) -> None:
+        self.register(confirmations=2, reviewers=1, span=0)
+        pending = self.system.handle(
+            "tenant-a", "echo", {"x": 1}, request_id="orphan-me"
+        )
+
+        # The control runs FIRST, on an intact ledger: a proposal that was never stored
+        # is NotFoundError. Without it the orphan assertions below pass just as well
+        # against an implementation that raises IntegrityError for every unknown id.
+        with self.assertRaises(NotFoundError):
+            self.system.get_proposal("tenant-a", "prop_absent")
+
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("PRAGMA foreign_keys = OFF")
+            connection.execute("DELETE FROM requests WHERE id = ?", ("orphan-me",))
+            connection.commit()
+        finally:
+            connection.close()
+
+        # The proposal row still EXISTS, so reporting its absence would be a lie and
+        # dropping it from the feed would be a silent one. An inner join produces both.
+        invocations = {
+            "get_proposal": lambda: self.system.get_proposal(
+                "tenant-a", pending.proposal_id
+            ),
+            "proposal": lambda: self.system.proposal("tenant-a", pending.proposal_id),
+            "proposals": lambda: self.system.proposals("tenant-a"),
+            "review": lambda: self.system.review(
+                "tenant-a",
+                pending.proposal_id,
+                reviewer="alice",
+                decision="accept",
+            ),
+            "function_report": lambda: self.system.function_report("tenant-a", "echo"),
+        }
+        for path, invoke in invocations.items():
+            with self.subTest(path=path), self.assertRaises(IntegrityError):
+                invoke()
+
+        # The absent proposal keeps answering NotFoundError after the corruption, so
+        # the two conditions stay separable rather than collapsing onto one class.
+        with self.assertRaises(NotFoundError):
+            self.system.get_proposal("tenant-a", "prop_absent")
+
     def test_confirmed_request_cache_is_bound_to_immutable_example(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
         for request_id, corrupted in (
