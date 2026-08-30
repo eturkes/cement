@@ -78,7 +78,7 @@ Measured gaps driving the arc:
   it; under this milestone's own fail-closed no-migration contract nobody does, so it would uniquely pay
   two disposable transient test families plus two mid-milestone rewrites for zero operator value.
 
-  Units - 13, 4 DONE + 9 remaining, executing as 7 waves. `depends` shows the DAG; same-wave units name the same
+  Units - 13, 5 DONE + 8 remaining, executing as 7 waves. `depends` shows the DAG; same-wave units name the same
   predecessor. Tier default `kernel`; `oracle` is kept only where an independent implementation can
   actually diverge, so deletion, forwarding and byte-preserving relocation carry none.
 
@@ -351,7 +351,7 @@ Measured gaps driving the arc:
     had finished, so a flat poll can mean a long tool call rather than a stall - the directive still
     cost nothing, but read a frozen gauge plus a frozen transcript mtime together before ruling a
     teammate stalled.
-  - M3.4 tier=kernel tags=oracle depends=M3.3 - freeze request-free proposal/read/review/report/event
+  - M3.4 DONE tier=kernel tags=oracle depends=M3.3 - freeze request-free proposal/read/review/report/event
     public seams behind one internal binding adapter, schema still v2. Budget FOUR MAIN sessions per
     the oracle estimator: contract, implementation, battery, closure.
     S1 DONE, contract session, `main=` 84% 203K/240K against the estimator's 84-86%; `mate=` 70%
@@ -518,11 +518,37 @@ Measured gaps driving the arc:
     was already withdrawn for the pending selection, whose pair is exactly what X32 and section 15
     require together. Both rulings are now in the contract, in `_proposal_bindings`' docstring, and
     in `docs/architecture.md`.
-    S4 ENTRY STATE, closure session. All three S3 tables grade PASS with zero unknown cells: probes
-    42, mutants 44, review 18. Every review finding is ruled and one is CARRIED: R15 moves contract
-    sections 7 and 12-15's wave chronology to `.agent/archive/`, now that its grounds have finished
-    serving the battery. The four surviving mutants stay survivors by ruling, and the polish row
-    names the command that must report them killed when the pin lands.
+    S4 DONE, closure session, R15 DISCHARGED and the unit CLOSED. `main=` 90% 217K/240K; no teammate
+    dispatched - the whole session is contract judgment, which is MAIN-retained work. Shipped at
+    `cd172b5`. Gate reruns from committed state: 811 tests / 0 failures / OK / 180.703 s · battery
+    grader 40 obligations / 55 tests / UNFILLED-TESTS 0 / OBLIGATIONS-UNCOVERED 0 / PASS ·
+    `m3u4-archive-validate.py` PASS.
+    Sections 7 and 12-15's wave chronology, dispatch history and worktree state moved to
+    `.agent/archive/m3u4-chronology.md`; every ruling, interpretive ground and measured number stayed
+    in the contract.
+    FOUR CLAIM DEFECTS SURFACED BY THE MOVE ITSELF, none caused by it. (1) Section 10 required "the
+    mutation sweep at zero survivors" while the decisive campaign leaves four RULED survivors - the
+    contract's own acceptance predicate contradicted its own recorded outcome, so it is WITHDRAWN for
+    the named survivor SET, under which a fifth survivor fails and these four do not. (2) Section 15
+    cited the attack table as 24 lenses; the committed table holds 39. (3) Battery obligation B32
+    grades against `SCHEMA_VERSION` 2, 14580 bytes and sha256 `5be3d79f...`, and the contract stated
+    none of them - section 1 now carries the freeze, re-derived from `store.SCHEMA`. (4) Tag
+    `m3u4-alt-projection` still asserted the materialization ground section 15 measured FALSE;
+    retagged with the two surviving grounds.
+    A CLOSURE SESSION MUST RE-GRADE THE CONTRACT'S OWN GATE TEXT against what the campaign actually
+    measured. Every one of the four is a claim MAIN wrote and no instrument was pointed at, because
+    each instrument grades the code against the contract and none grades the contract against the
+    instruments' results. Seventh consecutive unit whose closing findings are claim defects in MAIN's
+    own text.
+    THE MOVE IS GATED, not asserted: `m3u4-archive-validate.py`, six checks over DERIVED domains -
+    SECTIONS 15/15, OBLIGATIONS D01-D27, CITATIONS 332 resolved across six artifact tables, NUMBERS
+    70, IDENTIFIERS 164, BATTERY-NUMBERS 5. Its first draft graded by CONTAINMENT and passed
+    immediately; tightening to whole-token membership exposed two real losses it had certified as
+    fine, since `24` sits inside `243` and `_proposal_binding` inside `_proposal_bindings`. Graded
+    both ways on staged copies via `--root`, one seed per check.
+    Polish gains one row: all five M3.4 evidence tags are local-only and `origin` carries no tags, so
+    every clone resolves none of them. No claim depends on them - each ruling's grounds are restated
+    as measured facts - but publishing is the owner's call.
   - M3.5a tier=kernel tags=- depends=M3.2b,M3.4 - add `resolve` and `proposal submit` CLI channels with
     exact exit and payload contracts. The submission channel shape is an open fork - one spike compares an
     aggregate JSON envelope against direct flags, stdin and file, including framing bound and exact error
