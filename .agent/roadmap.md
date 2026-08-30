@@ -647,12 +647,46 @@ Measured gaps driving the arc:
     MAIN re-derived 6 of `m3u5a-map.json`'s 55 rows; the other 49 stay attention-directing and are
     recorded as a polish row, because a grade proves each anchor resolves and each cell is filled and
     never that a finding is true.
-    S3 ENTRY STATE, implementation session: contract sections 1-12 are binding; open by
-    dispositioning B02 (D27), not by reading 810 passed / 1 failed as a regression. Dispatch the
-    diff-blind `test` phase-1 verdict table BEFORE implementing - it is the instrument that has
-    indicted MAIN's own code before commit twice. Implement in the primary tree against the delivered
-    red suite. `.scratch/worktrees/` is empty and every S1 branch is gone, so S3's wave creates its
-    own.
+    S3 IN PROGRESS, implementation session. Shipped at `c8b82cd` (wave-2 seed) + `e6ba873`
+    (implementation + publication). Wave 2 = `test-m3u5a-1` (diff-blind verdict table, then the red
+    suite) + `rev-m3u5a-1` (contract attack), both in worktrees based at `c8b82cd`, both seeded by a
+    MAIN-committed validator (`m3u5a-wave2-validate.py`, kinds `verdicts`/`attack`, graded both ways
+    with 12 negative controls) plus all-`unknown` skeletons of 28 verdict loci and 20 attack lenses.
+    Contract sections 13-14 still PENDING; the wave fills them.
+    SHIPPED: `resolve` as a ROOT leaf placed second in the command list; `proposal submit`;
+    `system.PROVENANCE_MAX_BYTES` replacing three unexported literals; `SUBMISSION_MAX_BYTES`
+    computed as `2 * DEFAULT_MAX_BYTES + PROVENANCE_MAX_BYTES + framing` where framing is DERIVED
+    from `_SUBMISSION_KEYS` (34) rather than copied. Publication landed in README,
+    `architecture.md` and `threat-model.md`. Suite 811 -> 811.
+    A TRIPWIRE NO OBLIGATION NAMED, and the second one this unit has hit. D16's constant reaches a
+    site inside `System.handle`, whose byte span M3.3 froze on three tests, so a value-preserving
+    identifier substitution broke the freeze by exactly 14 bytes (12,866 -> 12,880). Re-anchored and
+    made STRICTLY STRONGER: each pin substitutes the identifier back and asserts M3.3's own three
+    convention numbers reproduce, which proves the substitution is the WHOLE delta. B02 (D27) was
+    named and cost nothing; P06 was not and cost a gate cycle. The S2 standing rule needs widening
+    from `roadmap-flagged tripwire` to `every freeze pin over a file the unit's obligations touch` -
+    B02 froze `cli.py` and was found; P06 froze a METHOD in a file the unit only meant to add a
+    constant to.
+    MAIN'S OWN SMOKE PROBE (`m3u5a-smoke.py`, tracked, 60 checks / 15 obligations, PASS) found one
+    contract-claim defect before any test existed: D01 states an option prefix answers `unrecognized
+    arguments`, but when the prefix IS the required option argparse reports the missing option first.
+    Both are exit 2 and neither is a silent alias, so the property holds and the wording is wrong.
+    Carried to the ruling pass.
+    A TRANSPORT-BOUND PAIR MUST BE FIELD-LEGAL. The probe's first at-cap frame spent the whole
+    2,162,722 bytes on ONE field, which the library's per-field limit rejects, so it pinned nothing
+    about the transport. The real pair puts input, output and provenance each at their own maximum
+    simultaneously - which is exactly the submission per-field flags can never carry, so the probe
+    now exhibits the fork ruling's own ground.
+    SEEDING, ninth datapoint, and the flush directive fired again: both teammates sat at 0 filled
+    across three polls with live transcripts, took ONE directive re-ordering fill-before-execute, and
+    moved within one poll (140 -> 125 and 60 -> 45 unknown cells, one commit). The directive is
+    cheap and the gauge-plus-mtime rule still says read them together before ruling a stall.
+    S4 ENTRY STATE: harvest both wave-2 tables, rule sections 13-14 through idempotent `--check`
+    patchers, run the diff-blind battery (`tests/test_cli_channels_battery.py` graded by
+    `m3u5a-battery-validate.py`, one test per D01-D30), the mutation sweep with its verdict module
+    list printed and its acceptance predicate written as a NAMED SURVIVOR SET, and re-run
+    `m3u5a-s2-probe.py` - section 2's parser census now reads 30 leaves / 37 nodes, so that probe's
+    own expectation moved and must be re-derived rather than read as a regression.
   - M3.5b tier=kernel tags=- depends=M3.5a - remove `handle`/`request`/source grammar, imports, fixtures,
     help and operator prose.
   - M3.6a tier=kernel tags=- depends=M3.5b - delete public lifecycle methods, leases, result models and
