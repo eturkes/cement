@@ -549,10 +549,58 @@ Measured gaps driving the arc:
     Polish gains one row: all five M3.4 evidence tags are local-only and `origin` carries no tags, so
     every clone resolves none of them. No claim depends on them - each ruling's grounds are restated
     as measured facts - but publishing is the owner's call.
-  - M3.5a tier=kernel tags=- depends=M3.2b,M3.4 - add `resolve` and `proposal submit` CLI channels with
-    exact exit and payload contracts. The submission channel shape is an open fork - one spike compares an
-    aggregate JSON envelope against direct flags, stdin and file, including framing bound and exact error
-    behavior - because the maps select explicit submission without measuring any channel.
+  - M3.5a IN-PROGRESS tier=kernel tags=- depends=M3.2b,M3.4 - add `resolve` and `proposal submit` CLI
+    channels with exact exit and payload contracts. Sessions: S1 wave 1, S2 fork ruling + contract,
+    S3 implementation, S4 battery + closure.
+    S1 DONE, wave-1 session, `main=` 85% 204K/240K; `mate=` 67% 161K/240K (`map-m3u5a`;
+    `spike-m3u5a-flags` 65% 157K, `spike-m3u5a-envelope` 57% 138K). Shipped at `773959f` (validator +
+    seeds) + `07c295d` (evidence). No contract line written - see the measurement below.
+    SEEDING, eighth datapoint, 3/3 AGAIN, and the M3.4 failure mode is CLOSED BY CONSTRUCTION. Every
+    artifact reached `UNKNOWN-CELLS: 0` and every one re-derives to PASS under MAIN's own run from the
+    primary tree. The fix for "a probe corpus answerable against baseline forces no implementation" is
+    mechanical, not exhortative: each spike row carries BOTH a `baseline` and an `alt` observation, the
+    validator requires >= 15 rows separating them, plus a resolvable probe driver and a `+N/-M` header
+    with >= 20 additions. Result 32 and 24 real deltas and TWO SHIPPED ALTERNATIVES, against M3.4's two
+    baseline censuses. Graded both ways at seed with 8 negative controls (stale anchor, absent symbol,
+    short prose, dropped seed row, unimplemented alternative, alt==baseline everywhere, bad verdict
+    token, absent driver); all 8 fire.
+    EXTENSIONS OUTNUMBERED SEEDS AGAIN: map 55 rows on a 25-row seed, envelope 32 on 20, flags 24 on 20.
+    EVIDENCE IS TRACKED, not a `wt/` branch or a local tag: `.agent/decisions/m3u5a-alt-envelope.patch`
+    and `m3u5a-alt-flags.patch` carry the two implementations, beside their tracked probe drivers, so
+    apply-plus-run re-derives either table in any clone. This is M3.4's polish row discharged in advance
+    for this unit rather than deferred.
+    THE FLAGS ADVOCATE RULED AGAINST ITS OWN ALTERNATIVE, second occurrence on this project, so the
+    council rule can close fork 1 without a third spike - but the ruling still gets made from the two
+    diffs, per M3.4's measured rule that a spike's shipped diff carries defects its own table never
+    measured. Its grounds, measured: real `execve` accepts 131,071 bytes and refuses 131,072 with
+    `E2BIG` against a 1,048,576-byte per-field contract, and only ONE field can leave argv through
+    stdin; every literal flag value is world-readable in `/proc/<pid>/cmdline`; repeated flags are
+    silently last-wins. Its counterweight is real: +23/-1 against the envelope's +97/-3, direct mapping
+    onto the landed API, and no candidate-source reach. Envelope measured a 2,162,722-byte aggregate
+    bound with an adjacent pair, exact-key rejection, and a provenance 65,536/65,537 pair.
+    B02 IS A FROZEN-FILE TRIPWIRE THIS UNIT MUST DISPOSITION, found independently by both spikes:
+    `tests.test_submission_battery` B02 asserts `cli.py` byte equality to `f9b9755`, so every gate run
+    in both worktrees was 810 passed / 1 failed on exactly that pin and nothing else. M3.5a edits that
+    file by definition. The contract states the new pin; a brief forbidding gate edits without naming
+    its tripwires would otherwise push the cost into production code.
+    ARGPARSE PREFIX LEAKAGE IS REAL HERE: the shipped `--out` abbreviates a new `--output`, and `--sub`
+    resolved to a new `--submission`. Both spikes hardened their own leaf. This bears directly on
+    M3.5b's removed-flag pins, which cannot be written as absence alone.
+    MEASUREMENT, binding on M3.5b..M3.9b. A `-`-tagged kernel unit with a 3-teammate wave 1 does NOT
+    reach its contract in S1: MAIN went 57% -> 85% (137K -> 204K, ~67K) buying validator authoring plus
+    both-ways grading, a 3-teammate dispatch, seven polls, worktree harvest, MAIN's own re-derivation of
+    all three grades and reruns of both drivers - with zero contract lines written. M3.2a's oracle wave 1
+    cost ~105K and DID include the contract, so the difference is not the oracle tag: it is that MAIN
+    entered at 57% against M3.2a's 31%, because M3 attached state plus this unit's ground-state read now
+    costs a third of the window before any dispatch. Two consequences: budget a wave-1 session at ~70K
+    of MAIN ON TOP of the entry cost, and treat the entry cost itself as the thing to cut.
+    S2 ENTRY STATE: rule fork 1 from the two TRACKED PATCHES plus the two tables, never from the reports
+    - `spike-m3u5a-envelope`'s report was cut mid-write, so its verdict exists only as its table. Rule
+    the `resolve` payload shape against the shipped `function eval` and `function verify` precedents
+    that map rows M01/M02 anchor. Then write the acceptance contract. All three worktrees are RETAINED
+    at `.scratch/worktrees/`; `map-m3u5a` holds no implementation, both spikes do. MAIN must validate
+    `m3u5a-map.json`'s 55 rows before crediting them: the grade proves each anchor resolves and each
+    cell is filled, never that a finding is true.
   - M3.5b tier=kernel tags=- depends=M3.5a - remove `handle`/`request`/source grammar, imports, fixtures,
     help and operator prose.
   - M3.6a tier=kernel tags=- depends=M3.5b - delete public lifecycle methods, leases, result models and
