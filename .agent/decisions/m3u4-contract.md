@@ -250,7 +250,10 @@ ZERO SURVIVORS IS THE WRONG PREDICATE HERE and is withdrawn. The decisive campai
 four RULED survivors — `M02`, `M03`, `M15` and `M26`, all unforced guards on `_ProposalIds` whose pin
 is deferred to `.agent/polish.md` together with the exact command that must report them killed once
 it lands. The acceptance predicate is the named survivor SET, so a fifth survivor fails the gate
-while these four do not.
+while these four do not. The harness's own EXIT CODE still encodes the withdrawn predicate: it exits 1
+on any survivor, so a closing run reports `SWEEP-RC=1` with `survivors=['M02', 'M03', 'M15', 'M26']`
+and `cmp=clean`, and that rc is the EXPECTED result rather than a failure. Read the survivor SET, never
+the status. The polish row that pins these four names the command that must report them killed.
 
 ## 11. Deferred to `.agent/polish.md`
 
