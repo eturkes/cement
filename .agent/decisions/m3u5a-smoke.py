@@ -253,6 +253,58 @@ def main_probe() -> int:
         check("depth maximum", "D17", DEFAULT_MAX_DEPTH + 1, 65)
         check("item maximum", "D17", 3 * DEFAULT_MAX_ITEMS + 3, 300_003)
 
+        # --- D03/D24: neither leaf reaches a candidate source ---
+        # The headline isolation predicate, measured on two channels at once:
+        # the source BUILDER must never run, and the `System` each leaf
+        # constructs must carry no source at all.
+        import cement_runtime.cli as cli_module
+
+        built: list[object] = []
+        source_calls: list[object] = []
+        original_system = cli_module.System
+        original_source = cli_module._source
+
+        def recording_source(value: object, **kwargs: object) -> object:
+            source_calls.append(value)
+            return original_source(value, **kwargs)  # type: ignore[arg-type]
+
+        def recording_system(path: str, **kwargs: object) -> object:
+            built.append(kwargs.get("candidate_source"))
+            return original_system(path, **kwargs)  # type: ignore[arg-type]
+
+        cli_module.System = recording_system  # type: ignore[assignment]
+        cli_module._source = recording_source  # type: ignore[assignment]
+        try:
+            run([*base, "resolve", "op", "--input", "1"])
+            check("resolve constructs with no source", "D03", built[-1], None)
+            status, _, _ = run([*base, "proposal", "submit", "op", "--submission", envelope])
+            check("submit exits 0", "D24", status, 0)
+            check("submit constructs with no source", "D24", built[-1], None)
+            check("neither leaf called the source builder", "D24", source_calls, [])
+            # Positive control: the spy is installed and does fire, so the two
+            # empty readings above are measurements rather than a dead patch.
+            run([*base, "handle", "control", "--input", "1"])
+            check("the source spy fires for handle", "D24", source_calls, [None])
+        finally:
+            cli_module.System = original_system  # type: ignore[assignment]
+            cli_module._source = original_source  # type: ignore[assignment]
+        check("no leaf built a source", "D24",
+              [value for value in built if value is not None], [])
+
+        # --- D06: resolve mutates no ledger byte and adds no event ---
+        digest_before = pathlib.Path(ledger).read_bytes()
+        _, events_before, _ = run([*base, "events"])
+        run([*base, "resolve", "op", "--input", "1"])
+        run([*base, "resolve", "op", "--input", '{"question":"x"}'])
+        _, events_after, _ = run([*base, "events"])
+        check("resolve leaves the ledger byte-identical", "D06",
+              pathlib.Path(ledger).read_bytes() == digest_before, True)
+        check("resolve adds no event", "D06", events_after, events_before)
+
+        # --- D26: preserved neighbours ---
+        check("CommandCandidateSource still imported", "D26",
+              getattr(cli_module, "CommandCandidateSource", None) is not None, True)
+
         # --- D25: the census is derived, never transcribed ---
         def census(parser: object) -> tuple[int, int]:
             children = [
