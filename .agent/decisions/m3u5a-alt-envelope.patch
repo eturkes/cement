@@ -1,0 +1,140 @@
+diff --git a/src/cement_runtime/cli.py b/src/cement_runtime/cli.py
+index d43b602..a965f0e 100644
+--- a/src/cement_runtime/cli.py
++++ b/src/cement_runtime/cli.py
+@@ -22,8 +22,15 @@ from .errors import (
+     ValidationError,
+ )
+ from .function import FUNCTION_MAX_BYTES, FunctionDocument, evaluate, parse_function
+-from .json_value import DEFAULT_MAX_BYTES, JSONValue, canonicalize, parse_json
+-from .models import CompilePolicy
++from .json_value import (
++    DEFAULT_MAX_BYTES,
++    DEFAULT_MAX_DEPTH,
++    DEFAULT_MAX_ITEMS,
++    JSONValue,
++    canonicalize,
++    parse_json,
++)
++from .models import Candidate, CompilePolicy
+ from .source import CommandCandidateSource
+ from .system import System, _name
+ 
+@@ -50,6 +57,13 @@ class _JSONArgumentParser(argparse.ArgumentParser):
+ 
+ 
+ _MISSING = object()
++_SUBMISSION_PROVENANCE_MAX_BYTES = 65_536
++_SUBMISSION_FRAMING_BYTES = len(b'{"input":,"output":,"provenance":}')
++_SUBMISSION_MAX_BYTES = 2 * DEFAULT_MAX_BYTES + _SUBMISSION_PROVENANCE_MAX_BYTES + _SUBMISSION_FRAMING_BYTES
++_SUBMISSION_MAX_DEPTH = DEFAULT_MAX_DEPTH + 1
++_SUBMISSION_MAX_ITEMS = 3 * DEFAULT_MAX_ITEMS + 3
++_SUBMISSION_KEYS = frozenset(("input", "output", "provenance"))
++_SUBMISSION_REQUIRED_KEYS = frozenset(("input", "output"))
+ 
+ 
+ @dataclass(frozen=True, slots=True)
+@@ -109,8 +123,22 @@ def _parser() -> argparse.ArgumentParser:
+     handle.add_argument("--source-id", default="command-adapter")
+     handle.add_argument("--source-timeout", type=float, default=60.0)
+ 
+-    proposal = commands.add_parser("proposal", help="inspect/review supervised proposals")
++    proposal = commands.add_parser(
++        "proposal", help="submit/inspect/review supervised proposals"
++    )
+     proposal_commands = proposal.add_subparsers(dest="proposal_command", required=True)
++    proposal_submit = proposal_commands.add_parser(
++        "submit", help="submit a supervised candidate", allow_abbrev=False
++    )
++    proposal_submit.add_argument("operation")
++    proposal_submit.add_argument(
++        "--submission",
++        required=True,
++        help=(
++            "JSON object with input, output, and optional provenance;"
++            " '-' reads stdin; '@PATH' reads a file"
++        ),
++    )
+     proposal_show = proposal_commands.add_parser("show")
+     proposal_show.add_argument("proposal_id")
+     proposal_list = proposal_commands.add_parser("list")
+@@ -265,6 +293,60 @@ def _input(value: str) -> JSONValue:
+     return parse_json(source).value
+ 
+ 
++def _submission(value: str) -> dict[str, JSONValue]:
++    if value == "-":
++        binary = getattr(sys.stdin, "buffer", None)
++        try:
++            source = (
++                binary.read(_SUBMISSION_MAX_BYTES + 1)
++                if binary is not None
++                else sys.stdin.read(_SUBMISSION_MAX_BYTES + 1)
++            )
++        except OSError as exc:
++            raise ValidationError("submission stdin could not be read") from exc
++        if len(source) > _SUBMISSION_MAX_BYTES:
++            unit = "bytes" if binary is not None else "characters"
++            raise ValidationError(f"submission stdin exceeds {_SUBMISSION_MAX_BYTES} {unit}")
++        if binary is not None:
++            try:
++                source = source.decode("utf-8")
++            except UnicodeDecodeError as exc:
++                raise ValidationError("submission stdin is not valid UTF-8") from exc
++    elif value.startswith("@"):
++        if value == "@":
++            raise ValidationError("submission file path is empty")
++        try:
++            with pathlib.Path(value[1:]).open("rb") as stream:
++                raw = stream.read(_SUBMISSION_MAX_BYTES + 1)
++        except OSError as exc:
++            raise ValidationError(f"submission file could not be read: {exc}") from exc
++        if len(raw) > _SUBMISSION_MAX_BYTES:
++            raise ValidationError(
++                f"submission file exceeds {_SUBMISSION_MAX_BYTES} bytes"
++            )
++        try:
++            source = raw.decode("utf-8")
++        except UnicodeDecodeError as exc:
++            raise ValidationError("submission file is not valid UTF-8") from exc
++    else:
++        source = value
++    submission = parse_json(
++        source,
++        max_bytes=_SUBMISSION_MAX_BYTES,
++        max_depth=_SUBMISSION_MAX_DEPTH,
++        max_items=_SUBMISSION_MAX_ITEMS,
++    ).value
++    if type(submission) is not dict:
++        raise ValidationError("submission must be a JSON object")
++    unexpected = sorted(set(submission) - _SUBMISSION_KEYS)
++    if unexpected:
++        raise ValidationError(f"submission has unknown keys: {', '.join(unexpected)}")
++    missing = sorted(_SUBMISSION_REQUIRED_KEYS - set(submission))
++    if missing:
++        raise ValidationError(f"submission is missing keys: {', '.join(missing)}")
++    return submission
++
++
+ def _source(value: str | None, *, source_id: str, timeout: float) -> CommandCandidateSource | None:
+     if value is None:
+         return None
+@@ -498,6 +580,18 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
+             retry_failed=args.retry_failed,
+         )
+     if args.command == "proposal":
++        if args.proposal_command == "submit":
++            submission = _submission(args.submission)
++            proposal_id = system.submit_proposal(
++                args.partition,
++                args.operation,
++                submission["input"],
++                candidate=Candidate(
++                    output=submission["output"],
++                    provenance=submission.get("provenance", {}),
++                ),
++            )
++            return {"proposal_id": proposal_id}
+         if args.proposal_command == "show":
+             return system.proposal(args.partition, args.proposal_id)
+         if args.proposal_command == "list":

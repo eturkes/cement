@@ -1,0 +1,49 @@
+diff --git a/src/cement_runtime/cli.py b/src/cement_runtime/cli.py
+index d43b602..1777fcb 100644
+--- a/src/cement_runtime/cli.py
++++ b/src/cement_runtime/cli.py
+@@ -23,7 +23,7 @@ from .errors import (
+ )
+ from .function import FUNCTION_MAX_BYTES, FunctionDocument, evaluate, parse_function
+ from .json_value import DEFAULT_MAX_BYTES, JSONValue, canonicalize, parse_json
+-from .models import CompilePolicy
++from .models import Candidate, CompilePolicy
+ from .source import CommandCandidateSource
+ from .system import System, _name
+ 
+@@ -111,6 +111,17 @@ def _parser() -> argparse.ArgumentParser:
+ 
+     proposal = commands.add_parser("proposal", help="inspect/review supervised proposals")
+     proposal_commands = proposal.add_subparsers(dest="proposal_command", required=True)
++    proposal_submit = proposal_commands.add_parser(
++        "submit",
++        allow_abbrev=False,
++        help="submit a caller-generated candidate for review",
++    )
++    proposal_submit.add_argument("operation")
++    proposal_submit.add_argument("--input", required=True, help="JSON text; '-' reads stdin")
++    proposal_submit.add_argument("--output", required=True, help="JSON text; '-' reads stdin")
++    proposal_submit.add_argument(
++        "--provenance", default="{}", help="JSON object; '-' reads stdin; defaults to {}"
++    )
+     proposal_show = proposal_commands.add_parser("show")
+     proposal_show.add_argument("proposal_id")
+     proposal_list = proposal_commands.add_parser("list")
+@@ -498,6 +509,17 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
+             retry_failed=args.retry_failed,
+         )
+     if args.command == "proposal":
++        if args.proposal_command == "submit":
++            proposal_id = system.submit_proposal(
++                args.partition,
++                args.operation,
++                _input(args.input),
++                candidate=Candidate(
++                    output=_input(args.output),
++                    provenance=_input(args.provenance),
++                ),
++            )
++            return {"proposal_id": proposal_id, "status": "review_required"}
+         if args.proposal_command == "show":
+             return system.proposal(args.partition, args.proposal_id)
+         if args.proposal_command == "list":
