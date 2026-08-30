@@ -169,9 +169,24 @@ class SubmissionBatteryTests(unittest.TestCase):
         self.assertEqual(SCHEMA_FINGERPRINT, digest)
 
     def test_b02_cli_py_command_supervisor_py_and(self) -> None:
-        """B02. Comparing each current byte stream to git object f9b9755 pins all three frozen files."""
+        """B02. Comparing each current byte stream to git object f9b9755 pins both frozen runtime files.
+
+        `src/cement_runtime/cli.py` was a third member and is retired here by
+        M3.5a contract D27, which adds two CLI leaves to that file by
+        definition. The property this pin carried for it - M3.3 added no CLI
+        channel and no CLI candidate-source reach - migrated to M3.5a's D24
+        (zero `_source`, `System.propose` and source calls from either new
+        leaf), D25 (the `_parser()`-derived census, 28 to 30 leaves and 35 to 37
+        nodes, with all 28 existing leaf paths unchanged) and D26 (cross-leaf
+        option isolation). Those three are strictly stronger: they constrain
+        what the new bytes may be rather than asserting there are none.
+
+        Re-pinning `cli.py` to a fresh baseline is rejected. The roadmap
+        schedules M3.5b to edit the same file again, so a per-unit re-pin passes
+        at the moment it is written and reports its next scheduled break as a
+        defect.
+        """
         paths = (
-            "src/cement_runtime/cli.py",
             "src/cement_runtime/_command_supervisor.py",
             "src/cement_runtime/example_adapter.py",
         )
@@ -255,7 +270,17 @@ class SubmissionBatteryTests(unittest.TestCase):
                 self.assertTrue(callable(getattr(System, name)))
 
     def test_p06_handle_is_12_866_b_1182130a2b3a(self) -> None:
-        """P06. The whole-line lineno..end_lineno span with trailing newlines stripped reproduces the byte pin."""
+        """P06. The whole-line lineno..end_lineno span with trailing newlines stripped reproduces the byte pin.
+
+        The name still states the pin this test proves. M3.5a's D16 routes every
+        provenance limit through the exported `PROVENANCE_MAX_BYTES`, and one of
+        the three literal sites sits inside `handle`, so the raw span now
+        measures 12,880 bytes. Substituting that one identifier back to its
+        literal reproduces 12,866 and `1182130a2b3a` exactly, which is a
+        STRONGER claim than either anchor alone: it proves the substitution is
+        the whole delta and every other byte of `handle` is the byte it carried
+        at `3b7769b`.
+        """
         source_path = Path(inspect.getsourcefile(System) or "")
         source = source_path.read_text(encoding="utf-8")
         module = ast.parse(source)
@@ -272,8 +297,17 @@ class SubmissionBatteryTests(unittest.TestCase):
         ).rstrip("\r\n")
         encoded = whole_line_span_trailing_newlines_stripped.encode("utf-8")
 
-        self.assertEqual(len(encoded), 12_866)
-        self.assertTrue(hashlib.sha256(encoded).hexdigest().startswith("1182130a2b3a"))
+        self.assertEqual(len(encoded), 12_880)
+        self.assertTrue(hashlib.sha256(encoded).hexdigest().startswith("eec7cb7c85f8"))
+
+        self.assertEqual(
+            whole_line_span_trailing_newlines_stripped.count("PROVENANCE_MAX_BYTES"), 1
+        )
+        restored = whole_line_span_trailing_newlines_stripped.replace(
+            "PROVENANCE_MAX_BYTES", "65_536"
+        ).encode("utf-8")
+        self.assertEqual(len(restored), 12_866)
+        self.assertTrue(hashlib.sha256(restored).hexdigest().startswith("1182130a2b3a"))
 
     def test_p06_three_slicing_conventions_are_distinct(self) -> None:
         """P06. Recomputing all three AST conventions proves only newline-stripped whole lines select the normative pin."""
@@ -300,6 +334,25 @@ class SubmissionBatteryTests(unittest.TestCase):
 
         self.assertEqual(
             measured,
+            (
+                (12_880, "eec7cb7c85f8"),
+                (12_881, "da24241f4628"),
+                (12_876, "8ce3957fc619"),
+            ),
+        )
+        # Substituting the one constant M3.5a exported back to its literal
+        # reproduces M3.3's table exactly, on all three conventions at once. The
+        # substitution is therefore the WHOLE delta, and the three conventions
+        # stay distinct across it.
+        restored = tuple(
+            (len(value.encode("utf-8")), hashlib.sha256(value.encode("utf-8")).hexdigest()[:12])
+            for value in (
+                text.replace("PROVENANCE_MAX_BYTES", "65_536")
+                for text in (stripped, kept, source_segment)
+            )
+        )
+        self.assertEqual(
+            restored,
             (
                 (12_866, "1182130a2b3a"),
                 (12_867, "cd60036faf5c"),

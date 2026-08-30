@@ -97,6 +97,14 @@ _UNSET = object()
 _RECEIPT_MAX_BYTES = 3 * DEFAULT_MAX_BYTES
 _MAX_SQLITE_INTEGER = 2**63 - 1
 
+PROVENANCE_MAX_BYTES = 65_536
+"""Canonical byte bound on one candidate's provenance mapping.
+
+Exported because a transport that must admit every submission the library
+accepts has to derive its own bound from this one. A copy in another module is
+a second source of truth that drifts silently.
+"""
+
 FUNCTION_PROMOTION_MANIFEST_ABI = "cement-function-promotion-manifest-v1"
 FUNCTION_PROMOTION_RECEIPT_ABI = "cement-function-promotion-v1"
 FUNCTION_MEMBERSHIP_ABI = "cement-function-membership-v1"
@@ -841,7 +849,7 @@ class System:
         # ``dict(Mapping)`` reads through ``keys()`` and ``__getitem__``. A direct
         # caller owns that object, so its own exception reaches it unchanged; the
         # source path contains the same failure with every other adapter defect.
-        provenance = canonicalize(dict(candidate.provenance), max_bytes=65_536)
+        provenance = canonicalize(dict(candidate.provenance), max_bytes=PROVENANCE_MAX_BYTES)
         return proposed, provenance
 
     def _submission_revision(self, partition: str, operation: str) -> int:
@@ -1243,7 +1251,7 @@ class System:
                 )
             )
             proposed = canonicalize(candidate.output)
-            provenance = canonicalize(dict(candidate.provenance), max_bytes=65_536)
+            provenance = canonicalize(dict(candidate.provenance), max_bytes=PROVENANCE_MAX_BYTES)
             if type(provenance.value) is not dict:
                 raise ValidationError("candidate provenance must be a JSON object")
         except CandidateSourceError:
@@ -1495,7 +1503,7 @@ class System:
         try:
             input_json = parse_json(binding.input_json)
             proposed = parse_json(str(row["proposed_output_json"]))
-            provenance = parse_json(str(row["provenance_json"]), max_bytes=65_536)
+            provenance = parse_json(str(row["provenance_json"]), max_bytes=PROVENANCE_MAX_BYTES)
         except ValidationError as exc:
             raise IntegrityError("stored proposal content is not valid JSON") from exc
         if input_json.digest != binding.input_hash:

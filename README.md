@@ -162,6 +162,90 @@ uv run cement function eval --bundle support.function.json \
 `matched`, and `output`. `function export --receipt-id` serves a historical receipt, including one from
 a superseded operation revision.
 
+### Answering one input from the ledger
+
+`cement resolve` verifies the promoted set and then answers one input from it. Use it where the ledger
+is available. Use `function eval` where it is not.
+
+```bash
+uv run cement --db demo.db --partition acme resolve support.reply \
+  --input '{"question":"Where is my invoice?"}'
+```
+
+The command takes one operation name and one required `--input`. `--input` accepts JSON text, or `-`
+to read standard input. Pass the optional `--expected-function-hash` to pin the answer to one set. The
+command then verifies and answers under one snapshot. `function verify` prints that digest.
+
+```bash
+uv run cement --db demo.db --partition acme function verify support.reply
+uv run cement --db demo.db --partition acme resolve support.reply \
+  --input '{"question":"Where is my invoice?"}' \
+  --expected-function-hash HASH_FROM_VERIFY
+```
+
+`resolve` writes nothing. It opens one read transaction. It creates no row, no event, and no example.
+It also refuses a `--db` path that does not exist, and it creates no ledger file there.
+
+The command prints the same seven keys in every state:
+
+| Key | Meaning |
+|---|---|
+| `passed` | The verification verdict over the promoted set. |
+| `entries` | The number of entries in the verified set. |
+| `function_hash` | The digest of the verified set. It survives a failed verdict as a diagnostic. |
+| `checks` | The six ordered checks, each with `key`, `passed`, and `detail`. |
+| `matched` | `true` for an answer, `false` for a verified absence, `null` for a failed verdict. |
+| `output` | The answer. It is `null` unless `matched` is `true`. |
+| `artifact_hash` | The digest of the answering artifact. It is `null` unless `matched` is `true`. |
+
+Status 0 means `matched` is `true`. Status 6 covers both other states, and `matched` separates them. A
+verified absence reports `false`, and a failed verdict reports `null`. An unregistered operation is
+status 3. An empty promoted set is not an error: it verifies and reports a verified absence.
+
+One resolve runs the full six-check verification, so it costs what `function verify` costs. Measured
+end to end through the shipped method: 5.7 ms for one entry, 613 ms for 1,000 entries, and 36,452 ms
+with 985,696 KiB peak resident memory at the 50,000-entry maximum
+(`.agent/decisions/m3u2b-resolve-bench.json`). The cost grows with the size of the set, not with the
+size of the input. Cement caches no verification between calls.
+
+### Submitting a candidate you already hold
+
+`cement proposal submit` writes one pending proposal from a candidate you supply. Use it instead of
+`handle` when you generate the candidate yourself. The command never runs a candidate source.
+
+```bash
+uv run cement --db demo.db --partition acme proposal submit support.reply \
+  --submission '{"input":{"question":"Where is my invoice?"},
+                 "output":{"kind":"reply","text":"candidate"},
+                 "provenance":{"model":"provider/model"}}'
+```
+
+The command takes one operation name and one required `--submission`. `--submission` carries the whole
+candidate in one JSON object. Pass `-` to read that object from standard input:
+
+```bash
+uv run cement --db demo.db --partition acme proposal submit support.reply --submission - < candidate.json
+```
+
+One frame carries every field at its maximum size. Separate flags cannot, because the operating system
+refuses an argument list above 131,071 bytes, and only one flag can read standard input. Inline text is
+also visible to any process that reads the process list. Prefer `-` for a candidate you must protect.
+
+The object takes three keys. `input` and `output` are required. `provenance` is optional and defaults to
+an empty object. Any other key is an error, and the message names every offending key. A repeated key is
+also an error, so the command never silently keeps one of two values.
+
+Success prints one key, `proposal_id`, at status 0. The command echoes no part of the candidate.
+
+Cement gives no idempotency here. Two identical submissions write two proposals and return two
+identifiers. Do not retry a failed submission. List the partition's pending proposals instead:
+
+```bash
+uv run cement --db demo.db --partition acme proposal list --status pending
+```
+
+Review a submitted proposal with the same `proposal review` command that the `handle` route uses.
+
 ## Library API
 
 ```python

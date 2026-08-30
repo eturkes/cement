@@ -79,7 +79,11 @@
   state. `submit_proposal` and `propose` give no idempotency. Each call writes a new proposal. Do not
   repeat those calls to recover. A `StateError` from either call does not prove that the proposal is
   absent, because a database commit can succeed and then fail. List the partition's pending proposals
-  and match your input before you act.
+  and match your input before you act. The `cement proposal submit` command inherits every sentence
+  above, because it calls `submit_proposal` directly.
+- Pass `cement proposal submit --submission -` for a candidate that must stay private. An inline
+  value is readable by any process that reads the process list, and it also enters shell history. The
+  same applies to `cement resolve --input`.
 - Keep provider wrappers pure. Model calls can repeat after timeout or lease recovery.
 - Monitor promoted scopes. When policy or expected behavior changes, challenge them. Revise the
   operation instead of overwriting contradictory history.

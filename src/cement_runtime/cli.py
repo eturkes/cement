@@ -11,7 +11,7 @@ import os
 import pathlib
 import stat
 import sys
-from typing import Any, Never
+from typing import Any, Never, cast
 
 from .errors import (
     CementError,
@@ -22,10 +22,17 @@ from .errors import (
     ValidationError,
 )
 from .function import FUNCTION_MAX_BYTES, FunctionDocument, evaluate, parse_function
-from .json_value import DEFAULT_MAX_BYTES, JSONValue, canonicalize, parse_json
-from .models import CompilePolicy
+from .json_value import (
+    DEFAULT_MAX_BYTES,
+    DEFAULT_MAX_DEPTH,
+    DEFAULT_MAX_ITEMS,
+    JSONValue,
+    canonicalize,
+    parse_json,
+)
+from .models import Candidate, CompilePolicy
 from .source import CommandCandidateSource
-from .system import System, _name
+from .system import PROVENANCE_MAX_BYTES, System, _name
 
 
 class _UsageError(Exception):
@@ -97,6 +104,19 @@ def _parser() -> argparse.ArgumentParser:
             action.add_argument("--actor", default="local-system")
     operation_commands.add_parser("list")
 
+    # Placed second because this is the operating verb: every other group
+    # administers the function object, and this one answers from it.
+    resolve = commands.add_parser(
+        "resolve",
+        help="verify the promoted function set, then answer one input from it",
+        allow_abbrev=False,
+    )
+    resolve.add_argument("operation")
+    resolve.add_argument("--input", required=True, help="JSON text; '-' reads stdin")
+    resolve.add_argument(
+        "--expected-function-hash", help="require the promoted set to hash to this digest"
+    )
+
     handle = commands.add_parser("handle", help="route or create an inert LLM proposal")
     handle.add_argument("operation")
     handle.add_argument("--input", required=True, help="JSON text; '-' reads stdin")
@@ -111,6 +131,13 @@ def _parser() -> argparse.ArgumentParser:
 
     proposal = commands.add_parser("proposal", help="inspect/review supervised proposals")
     proposal_commands = proposal.add_subparsers(dest="proposal_command", required=True)
+    proposal_submit = proposal_commands.add_parser("submit", allow_abbrev=False)
+    proposal_submit.add_argument("operation")
+    proposal_submit.add_argument(
+        "--submission",
+        required=True,
+        help="JSON object {input, output, provenance?}; '-' reads stdin",
+    )
     proposal_show = proposal_commands.add_parser("show")
     proposal_show.add_argument("proposal_id")
     proposal_list = proposal_commands.add_parser("list")
@@ -263,6 +290,78 @@ def _input(value: str) -> JSONValue:
         if len(source) > DEFAULT_MAX_BYTES:
             raise ValidationError(f"JSON stdin exceeds {DEFAULT_MAX_BYTES} characters")
     return parse_json(source).value
+
+
+_SUBMISSION_KEYS = ("input", "output", "provenance")
+_SUBMISSION_REQUIRED = ("input", "output")
+# `{` and `}`, one `,` between each adjacent pair, and `"<key>":` per key. The
+# transport bound must admit every submission the library accepts, so it is
+# DERIVED from the library's own two limits plus the exact cost of the envelope
+# that carries them. A copied number is a second source of truth that drifts.
+_SUBMISSION_FRAMING = (
+    2 + (len(_SUBMISSION_KEYS) - 1) + sum(len(key) + 3 for key in _SUBMISSION_KEYS)
+)
+SUBMISSION_MAX_BYTES = 2 * DEFAULT_MAX_BYTES + PROVENANCE_MAX_BYTES + _SUBMISSION_FRAMING
+
+
+def _submission_stdin() -> str:
+    """Read one aggregate frame, mirroring `_input`'s three failure families."""
+
+    binary = getattr(sys.stdin, "buffer", None)
+    if binary is None:
+        # StringIO and embedding hosts expose text-only streams; the parser's
+        # own UTF-8 check stays authoritative after this bounded char read.
+        try:
+            source = sys.stdin.read(SUBMISSION_MAX_BYTES + 1)
+        except OSError as exc:
+            raise ValidationError("submission stdin could not be read") from exc
+        if len(source) > SUBMISSION_MAX_BYTES:
+            raise ValidationError(
+                f"submission stdin exceeds {SUBMISSION_MAX_BYTES} characters"
+            )
+        return source
+    try:
+        raw = binary.read(SUBMISSION_MAX_BYTES + 1)
+    except OSError as exc:
+        raise ValidationError("submission stdin could not be read") from exc
+    if len(raw) > SUBMISSION_MAX_BYTES:
+        raise ValidationError(f"submission stdin exceeds {SUBMISSION_MAX_BYTES} bytes")
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValidationError("submission stdin is not valid UTF-8") from exc
+
+
+def _submission(value: str) -> dict[str, JSONValue]:
+    """Parse one aggregate submission envelope from inline text or stdin.
+
+    One frame carries all three fields at their library maxima. Per-field flags
+    cannot: `execve` refuses 131,072 argument bytes, and only one field can
+    leave argv through stdin because a second `-` read finds a drained stream,
+    so two of three fields would always be both truncated and world-readable in
+    `/proc/<pid>/cmdline`.
+
+    Strict parsing runs first, so a duplicate member fails inside the parser
+    before any exact-key check can silently collapse it to one.
+    """
+
+    source = _submission_stdin() if value == "-" else value
+    parsed = parse_json(
+        source,
+        max_bytes=SUBMISSION_MAX_BYTES,
+        # The envelope nests each field one level deeper and adds three members.
+        max_depth=DEFAULT_MAX_DEPTH + 1,
+        max_items=3 * DEFAULT_MAX_ITEMS + 3,
+    ).value
+    if type(parsed) is not dict:
+        raise ValidationError("submission must be a JSON object")
+    unknown = sorted(set(parsed) - set(_SUBMISSION_KEYS))
+    if unknown:
+        raise ValidationError("submission has unknown keys: " + ", ".join(unknown))
+    missing = sorted(set(_SUBMISSION_REQUIRED) - set(parsed))
+    if missing:
+        raise ValidationError("submission is missing required keys: " + ", ".join(missing))
+    return parsed
 
 
 def _source(value: str | None, *, source_id: str, timeout: float) -> CommandCandidateSource | None:
@@ -457,6 +556,18 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
         parser.error("--db or CEMENT_DB is required")
     if not args.partition:
         parser.error("--partition or CEMENT_PARTITION is required")
+    if args.command == "resolve" and not os.path.exists(args.db):
+        # Constructing `System` on an absent path creates a 208,896-byte ledger
+        # and then answers a read verb out of it. This forwards the library's
+        # own verdict for the same condition rather than inventing vocabulary.
+        # Stated as it behaves: a check, not a read-only construction mode. A
+        # path deleted between this check and construction is still recreated by
+        # `Store`, which is the shipped behaviour, so the check strictly
+        # improves and never worsens. It is also what makes the input ordering
+        # safe: on an absent ledger nothing is constructed, so a malformed
+        # `--input` rejected after construction can only ever touch a ledger
+        # that already existed.
+        raise IntegrityError("ledger file is missing or unreadable")
     source = None
     if args.command == "handle":
         source = _source(
@@ -489,6 +600,31 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
                 revised_by=args.actor,
             )
         return {"operation": args.operation, "revision": revision}
+    if args.command == "resolve":
+        resolution = system.resolve(
+            args.partition,
+            args.operation,
+            _input(args.input),
+            expected_function_hash=args.expected_function_hash,
+        )
+        verification = resolution.verification
+        match = resolution.match
+        # One fixed key set across all three states, so a verified miss and a
+        # failed verdict stay distinguishable under their shared exit 6. The
+        # nested FunctionDocument never reaches stdout.
+        matched = None if match is None else match.matched
+        return _Outcome(
+            {
+                "artifact_hash": None if match is None else match.artifact_hash,
+                "checks": [asdict(check) for check in verification.checks],
+                "entries": verification.entries,
+                "function_hash": verification.function_hash,
+                "matched": matched,
+                "output": None if match is None else match.output,
+                "passed": verification.passed,
+            },
+            status=0 if matched is True else 6,
+        )
     if args.command == "handle":
         return system.handle(
             args.partition,
@@ -498,6 +634,24 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
             retry_failed=args.retry_failed,
         )
     if args.command == "proposal":
+        if args.proposal_command == "submit":
+            envelope = _submission(args.submission)
+            # The bare identifier `submit_proposal` returns renders as a bare
+            # JSON string with no key to bind, so the acknowledgement names it.
+            # It echoes no candidate byte and carries no request identity.
+            return {
+                "proposal_id": system.submit_proposal(
+                    args.partition,
+                    args.operation,
+                    envelope["input"],
+                    candidate=Candidate(
+                        output=envelope["output"],
+                        # Provenance shape stays library-graded; no CLI-only
+                        # coercion is added.
+                        provenance=cast(Any, envelope.get("provenance", {})),
+                    ),
+                )
+            }
         if args.proposal_command == "show":
             return system.proposal(args.partition, args.proposal_id)
         if args.proposal_command == "list":

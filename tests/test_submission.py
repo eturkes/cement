@@ -668,11 +668,18 @@ class SubmissionTests(unittest.TestCase):
     # -- frozen shapes ------------------------------------------------------
 
     def test_handle_is_byte_identical_to_the_unit_baseline(self):
-        """P06: `handle` keeps the bytes it has carried since 3b7769b.
+        """P06: `handle` keeps the bytes it has carried since 3b7769b, less one constant.
 
         Convention: the whole-line span from `node.lineno` to `node.end_lineno`,
         which keeps the leading indentation, with trailing newlines stripped.
         A column-offset slice measures 4 bytes shorter and is a different claim.
+
+        M3.5a's D16 routes every provenance limit through the exported
+        `PROVENANCE_MAX_BYTES`, and one of the three literal sites sits inside
+        this method, so the freeze broke on a value-preserving identifier
+        substitution rather than on any behaviour change. The pin is re-anchored
+        with its delta asserted: substituting the literal back reproduces
+        M3.3's own numbers, so the substitution is the whole delta.
         """
 
         source = pathlib.Path(cement_runtime.system.__file__).read_text(encoding="utf-8")
@@ -684,9 +691,16 @@ class SubmissionTests(unittest.TestCase):
         ]
         self.assertEqual(len(spans), 1)
         payload = spans[0].encode("utf-8")
-        self.assertEqual(len(payload), 12_866)
+        self.assertEqual(len(payload), 12_880)
         self.assertTrue(
-            hashlib.sha256(payload).hexdigest().startswith("1182130a2b3a")
+            hashlib.sha256(payload).hexdigest().startswith("eec7cb7c85f8")
+        )
+
+        self.assertEqual(spans[0].count("PROVENANCE_MAX_BYTES"), 1)
+        restored = spans[0].replace("PROVENANCE_MAX_BYTES", "65_536").encode("utf-8")
+        self.assertEqual(len(restored), 12_866)
+        self.assertTrue(
+            hashlib.sha256(restored).hexdigest().startswith("1182130a2b3a")
         )
 
     def test_submission_adds_no_exported_symbol(self):
