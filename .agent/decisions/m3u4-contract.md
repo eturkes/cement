@@ -1,11 +1,15 @@
 # M3.4 acceptance contract — request-free public seams behind one internal binding adapter
 
 Unit `M3.4`, tier `kernel`, tags `oracle`, depends `M3.3`. Schema stays `SCHEMA_VERSION` 2.
-Session budget = the corrected oracle estimator's four: contract, implementation, battery, closure.
 
-Every section is RULED and binding. Sections 12 and 13 carry their rulings in S2 RULING blocks;
-sections 14 and 15 amend the numbered obligations and correct two grounds. Where a numbered
-obligation and a later ruling disagree, the ruling governs.
+Every section is RULED and binding. Sections 12 and 13 carry the two fork rulings; sections 14 and 15
+amend the numbered obligations and correct the grounds the contract attack falsified. Where a
+numbered obligation and a later ruling disagree, the ruling governs. Section numbers are FIXED —
+`m3u4-verdicts.json`, `m3u4-attack.json`, `m3u4-review.json`, `m3u4-probes.json`, `m3u4-map.json` and
+`m3u4-mutants.json` cite them, so a section may be rewritten but never renumbered or dropped.
+
+Wave history, dispatch record and spike-tree pointers live in `.agent/archive/m3u4-chronology.md` and
+bind nothing.
 
 ## 1. Scope
 
@@ -36,6 +40,11 @@ shows either is unreachable without a public request seam, it stays out and the 
 
 NOT IN SCOPE AT ALL: deleting the `requests` table, adding columns to `proposals`, adding a view,
 bumping `SCHEMA_VERSION`, or changing any CLI grammar. Those belong to M3.5a/M3.5b/M3.6a/M3.6b.
+
+SCHEMA FREEZE, stated with its numbers because the battery grades against them: `SCHEMA_VERSION`
+stays 2 and `store.SCHEMA` stays 14580 bytes with sha256
+`5be3d79fe1e21aca524f3937c8ce78521bcc7203bfe20b7352ef4b6dff468a77`, equal to `SCHEMA_FINGERPRINT`.
+An obligation whose number lives only in the test is invisible to a reader of this contract.
 
 ## 2. Premise correction, binding on every downstream artifact
 
@@ -172,38 +181,28 @@ D27. Qualifying a claim in the contract does not qualify it in the prose. The mo
 qualifier is introduced anywhere, grep every public surface for the unqualified form. A shared
 qualifier that reached the contract but not the README was the last unit's only real uncaught gap.
 
-## 7. Sizing ruling — no pre-open split, and the measurement behind it
+## 7. Sizing ruling — no pre-open split
 
 RULED: M3.4 ships as ONE unit. It does NOT get the pre-open split that M3.5b, M3.6a, M3.6b, M3.7 and
-M3.9a need.
+M3.9a need. Grounds = a MEASURED removal burden, produced by deleting the surface and letting the
+gate report the work list. Harness `.agent/decisions/m3u4-burden.py`, results `m3u4-burden.json`,
+three staged gate runs against fresh worktrees at `da63741`:
 
-The plan draft estimated `260 prod / 240 test` and set a trigger at "a query diff above 320
-production lines". The plan review's own L7 rejects that trigger as not pre-open measurable. So MAIN
-measured the burden directly instead of forecasting it, by DELETING the surface and letting the gate
-produce the work list — the standing rule after a token census mispredicted M3.1's break set.
+| stage | edit | broken of 744 | distinct frames |
+|---|---|---|---|
+| 1 | drop the two `request_id` fields | 252 | 3 |
+| 2 | plus the three production constructors repaired | 9 | 9 |
+| 3 | plus `review` returning `ReviewResult` | 112 | 13 |
 
-Harness = `.agent/decisions/m3u4-burden.py`, results = `m3u4-burden.json`, three staged gate runs
-against fresh worktrees at `da63741`:
+Work list = about 21 distinct test methods plus one fixture helper, against about 20 production lines
+outside the adapter plus the adapter itself.
 
-- stage 1, drop the two `request_id` fields only: 252 broken of 744, standing behind just THREE
-  frames — `system.py:1316` in `get_proposal` 227, `system.py:2676` in
-  `_pending_proposal_gap_from_row` 24, and one shape test.
-- stage 2, stage 1 plus the three production sites repaired (the `ProposalView` keyword, the
-  `_proposal_record` dict entry, the `PendingProposalGap` keyword): 9 broken across 9 frames. So 243
-  of stage 1's failures were a production cascade from two constructors, not test burden.
-- stage 3, stage 2 plus `review` returning `ReviewResult`: 112 broken across 13 frames, of which 100
-  stand behind ONE shared fixture helper, `tests/test_cli.py:245` in `confirm`.
-
-The gap between 252 and 9 is the whole reason this section exists. A break COUNT is not a work list
-until its shared frames are factored out, and the two numbers differ here by a factor of 28.
-
-Read as a work list rather than a failure count: roughly 21 distinct test methods plus one fixture
-helper, against about 20 production lines outside the adapter plus the adapter itself. That is an
-order of magnitude under the draft's estimate, and it comfortably fits one implementation session.
-
-This is also the standing caution about forecasts crossing a document boundary: the draft's
-`260 prod / 240 test` is an ESTIMATE and is labelled as one here, never carried forward as a
-measurement.
+A BREAK COUNT IS NOT A WORK LIST until its shared frames are factored out: stage 1's 252 and stage 2's
+9 differ by a factor of 28 because 243 of stage 1's failures are a production cascade from two
+constructors, and
+100 of stage 3's stand behind one shared fixture helper. The plan draft's `260 prod / 240 test` is an
+ESTIMATE, labelled as one here, and never carried forward as a measurement. Per-frame attribution and
+the rejected pre-open trigger: `.agent/archive/m3u4-chronology.md`.
 
 ## 8. Instruments
 
@@ -234,10 +233,24 @@ discriminate two implementations. Only probes aimed at RULED disagreements are e
 
 ## 10. Gate identity
 
-Sole configured gate: `uv run python -m unittest discover -s tests -t .`, 744 tests at `da63741`,
-about 175 s. Acceptance requires it green from committed state, plus every instrument in section 8
-reporting mechanically: confinement set equal, shape pins present, battery grader `UNFILLED 0`, and
-the mutation sweep at zero survivors against a green control with its verdict modules printed.
+Sole configured gate: `uv run python -m unittest discover -s tests -t .`. 744 tests at `da63741`
+opening the unit; 811 tests in about 181 s at closure. Acceptance requires it green from committed
+state, plus every instrument in section 8 reporting mechanically:
+
+- the confinement set EQUALS the permitted set, and every shape pin is present;
+- `m3u4-battery-validate.py` reports 40 obligations over 55 tests with `UNFILLED-TESTS` 0 and
+  `OBLIGATIONS-UNCOVERED` 0;
+- `m3u4-mutants.py` runs 44 mutants against a green control and PRINTS its verdict modules
+  (`tests.test_proposal_binding`, `tests.test_proposal_binding_battery`, `tests.test_system`,
+  `tests.test_cli`), because a survivor count is meaningless without them;
+- `m3u4-archive-validate.py` reports `RESULT: PASS`, holding the section-7/12-15 provenance split to
+  every citation the six artifact tables make against this contract.
+
+ZERO SURVIVORS IS THE WRONG PREDICATE HERE and is withdrawn. The decisive campaign leaves exactly
+four RULED survivors — `M02`, `M03`, `M15` and `M26`, all unforced guards on `_ProposalIds` whose pin
+is deferred to `.agent/polish.md` together with the exact command that must report them killed once
+it lands. The acceptance predicate is the named survivor SET, so a fifth survivor fails the gate
+while these four do not.
 
 ## 11. Deferred to `.agent/polish.md`
 
@@ -246,61 +259,31 @@ eight sites. Any `requests` site owned by a later unit.
 
 ## 12. FORK 1 — the binding adapter's shape (RULED, see also section 15)
 
-Two spikes, identical 14-probe corpus plus the `Z50` swap probe, each DEFENDING one alternative:
+Two alternatives, each defended by one spike:
 
-- ALT-BINDING (`spike-m3u4-binding`): a row-level private resolver returning a frozen binding record;
-  consumers stop writing joins entirely. Exposure: N+1 statements on the two list projections.
-- ALT-PROJECTION (`spike-m3u4-projection`): one canonical private SQL constant plus one row-to-record
-  validator, composed into consumer queries; list projections stay single-statement. Exposure:
-  confinement is textual, and the guarantee is weaker than one function owning every access.
+- ALT-BINDING (`m3u4-alt-binding`, `aa77d9f`, +433/-147): a row-level private resolver returning a
+  frozen binding record; consumers stop writing joins entirely. Exposure: N+1 statements on the two
+  list projections.
+- ALT-PROJECTION (`m3u4-alt-projection`, `cb0ef3e`, +181/-117): one canonical private SQL constant
+  plus one row-to-record validator, composed into consumer queries; list projections stay
+  single-statement. Exposure: confinement is textual, and the guarantee is weaker than one function
+  owning every access.
 
-DECIDING CRITERION, added by MAIN after the spikes opened and sent to both as probe `Z50`: M3.6b is
-defined as "the sole schema cut v2->v3: direct proposal columns, BINDING-ADAPTER SWAP, request table
-and index deletion" (`m3-plan-review.md:243`). The adapter M3.4 ships EXISTS IN ORDER TO BE REPLACED
-two units later. So the dominant question is not elegance or statement count but how much consumer
-code the M3.6b swap touches. An adapter whose consumers survive the swap untouched earns real cost
-now; one that forces every consumer to be re-edited at M3.6b has bought a rename.
+DECIDING CRITERION, sent to both spikes as probe `Z50`: M3.6b is defined as "the sole schema cut
+v2->v3: direct proposal columns, BINDING-ADAPTER SWAP, request table and index deletion"
+(`m3-plan-review.md:243`). The adapter M3.4 ships EXISTS IN ORDER TO BE REPLACED two units later, so
+the dominant question is not elegance or statement count but how much consumer code the M3.6b swap
+touches. An adapter whose consumers survive the swap untouched earns real cost now; one that forces
+every consumer to be re-edited at M3.6b has bought a rename. Diff size is NOT the criterion: the
+ruling went against the smaller diff.
 
-Both spikes were told to MEASURE the swap by performing it, not to argue it.
+BASELINE CENSUS, measured before the adapter landed and consumed directly by section 9's corpus and
+by the battery (`m3u4-spike-binding.json`, `m3u4-spike-projection.json`): SQL statements per read
+path, total/`requests`-naming — `get_proposal` 7/1, `proposals` 7/1, `function_report` 19/13 with 2
+request statements, `review` accept 14/8, correct 14/8, reject 12/6. Call-site census for `.review(`
+= 30 (24 tests, 5 examples, 1 production).
 
-WAVE-1 OUTCOME: THE FORK IS NOT RULED, and the reason is a defect in MAIN's dispatch rather than in
-either teammate. Both spikes filled all 14 probe rows and both reported `adapter_present=False` on
-every one: they answered the whole corpus against BASELINE, which is exactly what the brief ordered
-("fill the graded artifact first, implementation second"). Thirteen of the fourteen probes I wrote
-were answerable without an implementation, so the graded metric reached zero while measuring only the
-status quo. Neither `Z50` row was ever added.
-
-What survives is real and is not thrown away:
-
-- `m3u4-spike-binding.json` and `m3u4-spike-projection.json` are a thorough BASELINE census — exact
-  SQL statement counts per read path (`get_proposal` 7/1, `proposals` 7/1, `function_report` 19/13
-  with 2 request statements, `review` accept 14/8 correct 14/8 reject 12/6), the collider matrix,
-  middle-and-last corruption classes, the `.review(` call-site census (30 total: 24 tests, 5
-  examples, 1 production), the `PendingProposalGap` dependent-site split, and the verbatim CLI JSON
-  for all three decisions. Section 9's corpus and the battery both consume this directly.
-- `wt/spike-m3u4-binding` DOES carry a real ALT-BINDING implementation: +433/-147 across
-  `system.py`, `models.py` and `__init__.py`, adding `_ProposalBinding`, `_ProposalBindingSet`,
-  `_proposal_binding`, a BATCH `_proposal_bindings` answering the N+1 exposure, and
-  `_write_proposal_request_status`. Its own table never measured it, but the diff is evidence.
-- `wt/spike-m3u4-projection` ALSO carries a real ALT-PROJECTION implementation: +181/-117, adding
-  `_PROPOSAL_BINDING_SQL`, a `_ProposalBinding` record and a `_proposal_binding(row)` validator. It
-  was uncommitted when `TaskStop` landed and was preserved by the close order's per-worktree status
-  read, at `cb0ef3e`. Both spikes therefore built their alternative AFTER the flush directive
-  re-ordered their work — the corpus defect delayed the implementations, it did not prevent them.
-
-FIRST COMPARABLE NUMBER, and it favours ALT-PROJECTION: +181/-117 against ALT-BINDING's +433/-147,
-for the same eight sites. It is a size measurement only, taken from two trees of unequal maturity,
-and it settles nothing on its own — the deciding criterion remains `Z50`.
-
-S2 ENTRY STATE for this fork: both worktrees are RETAINED and both hold a shipped alternative. Rule
-by running the DIFFERENTIAL rows against the two committed diffs and by answering `Z50` on each,
-which is now cheap because neither side has to be built from nothing.
-
-DISPATCH CORRECTION, binding on every future spike: a probe corpus answerable against baseline does
-not force an implementation. Either write each probe as a DELTA that requires both sides, or make the
-implementation a separately graded deliverable the validator can see.
-
-### RULING (S2) — COMPOSE. Adapter owns the whole statement; neither alternative ships as written.
+### RULING — COMPOSE. Adapter owns the whole statement; neither alternative ships as written.
 
 Each spike's shipped diff carries a defect the other lacks, so the disposition is the composition,
 not either token. Measured from the two committed trees at `aa77d9f` and `cb0ef3e`:
@@ -364,9 +347,11 @@ Permitted-set delta for D03: add `_proposal_bindings`, `_proposal_binding` and
 
 ## 13. FORK 2 — the `ReviewResult` payload (RULED)
 
-`review` currently returns `Resolved(request_id, output, source="confirmed", example_id)` on
-accept/correct and `Rejected(request_id, proposal_id)` on reject, and `cli.py:520` returns that value
-straight to the operator channel.
+Before M3.4, `review` returned `Resolved(request_id, output, source="confirmed", example_id)` on
+accept/correct and `Rejected(request_id, proposal_id)` on reject, and `cli.py:520` returned that value
+straight to the operator channel. That payload is the `P08` BASELINE both spike artifacts record
+verbatim — CLI JSON, return classes and exit codes for all three decisions — and the ruling below is
+made against it rather than against the plan draft's prescription.
 
 - R1, the plan draft's prescription: `ReviewResult(proposal_id, status, example_id)`. Minimal, but it
   drops `output` from the operator's accept payload.
@@ -376,13 +361,7 @@ Evidence already in hand: dropping `output` is what makes 100 CLI tests fail thr
 (section 7 stage 3), which measures the payload's reach rather than settling it. The draft is a
 prescription with an expiry date and R1 carries no independent grounds beyond minimality.
 
-WAVE-1 OUTCOME: NOT RULED, same cause as section 12. But the baseline evidence needed to rule it is
-now in hand and is recorded in both spike artifacts under `P08` — the verbatim CLI JSON emitted today
-for accept, correct and reject, plus the return classes and exit codes. `wt/spike-m3u4-binding` has
-already committed a concrete `ReviewResult`; MAIN rules its field set at S2 against that payload
-rather than against the draft's prescription.
-
-### RULING (S2) — R2+, four fields. `ReviewResult(proposal_id, status, example_id, output)`
+### RULING — R2+, four fields. `ReviewResult(proposal_id, status, example_id, output)`
 
 ```python
 @dataclass(frozen=True, slots=True)
@@ -428,12 +407,12 @@ Reject emits both null-valued keys rather than omitting them: one frozen shape m
 a scripted operator testing `example_id is None` beats one testing for a missing key. Exit code stays
 0 on all three; no exit-class change is in this unit's scope.
 
-## 14. S2 RULINGS — the five conflicts the diff-blind verdict table surfaced
+## 14. RULINGS — the obligations that cannot be read literally
 
-`m3u4-verdicts.json` (57 rows, 22 seeded + 35 extension) reports five places where the shipped
-implementation and the contract's own text cannot both be read literally. Every one is a defect in the
-contract text, not in the shipped shape, because each obligation was written before the fork it
-constrains was ruled. The rulings below AMEND sections 3, 4 and 5 and bind the S3 battery.
+`m3u4-verdicts.json` (57 rows) reports the places where the shipped implementation and this
+contract's own text cannot both be read literally. Every one is a defect in the contract text, never
+in the shipped shape, because each obligation was written before the fork it constrains was ruled.
+The rulings below AMEND sections 3, 4 and 5 and bind the battery.
 
 D01 IS AMENDED: exactly one named private READER and at most one named private WRITER, not one
 surface. D01's "exactly ONE" was written while both spike alternatives were read-only, and section
@@ -505,12 +484,12 @@ request and its proposal while the request lifecycle is still public. The batter
 payloads above and asserts the `handle` payload UNCHANGED, so the exception is pinned rather than
 merely tolerated.
 
-## 15. S2 CORRECTIONS — grounds the contract attack falsified, and the claims that narrow
+## 15. CORRECTIONS — grounds the contract attack falsified, and the claims that narrow
 
-`m3u4-attack.json` (24 lenses, 18 seeded + 6 extension) attacked the S2 rulings themselves. Section
-14 answered the obligations that could not be read literally; this section corrects claims that were
-WRONG. A ruling can survive while one of its stated grounds does not, and a reader who inherits the
-false ground reasons from it later.
+`m3u4-attack.json` (39 lenses) attacked the rulings themselves. Section 14 answered the obligations
+that could not be read literally; this section corrects claims that were WRONG. A ruling can survive
+while one of its stated grounds does not, and a reader who inherits the false ground reasons from it
+later.
 
 THE D22 MATERIALIZATION GROUND IS WITHDRAWN. Section 12 said ALT-PROJECTION's `function_report` wraps
 the constant in a subquery and materializes the whole partition before filtering by operation.
@@ -565,12 +544,12 @@ past `projection_limit`, which is itself capped at 10,000, so row 10,001 is obse
 tail binding EXISTS (section 14, X32), never that a caller can read the row or that its content and
 cross-field consistency are checked.
 
-TWO FINDINGS CLOSED IN CODE THIS SESSION. `slots=True` was unpinned - turning it off keeps the
-constructor signature and resolved hints identical and only adds `__dict__` - so the shape test now
-asserts `__slots__` presence and `__dict__` absence on all three shapes. README published the new
-`accepted`/`corrected` vocabulary without saying the handle lifecycle still reports `resolved`, which
-made the prose read as a system-wide rename; README now contrasts the two vocabularies and states
-that Cement translates neither into the other.
+TWO OBLIGATIONS ADDED WHERE A PIN WAS MISSING. (1) `slots=True` is invisible to a signature pin -
+turning it off keeps the constructor signature and the resolved hints identical and only adds
+`__dict__` - so the shape test asserts `__slots__` PRESENCE and `__dict__` ABSENCE on all three
+shapes, beside the signature and hints. (2) README must CONTRAST the two status vocabularies: naming
+`accepted`/`corrected` without saying the handle lifecycle still reports `resolved` reads as a
+system-wide rename, so the prose states that Cement translates neither into the other.
 
 FIVE TEXT DEFECTS STAND CORRECTED. D03's permitted delta must EXCLUDE `_proposal_binding` (section 14
 rules attribution lexical, and the wrapper owns no SQL). D13 assigns the `request_id` deletion to
@@ -581,7 +560,9 @@ shared `now` across every provenance edge. The exact CLI triples in section 13 a
 in section 1 are OBLIGATIONS, not commentary, and the S3 battery owns one test each - an unnumbered
 contract paragraph is invisible to a one-test-per-obligation battery.
 
-THE CONTRACT CARRIES PROVENANCE IT SHOULD NOT. Sections 12 and 13 retain wave chronology, dispatch
+THE PROVENANCE SPLIT IS EXECUTED. Sections 7, 12, 13, 14 and 15 carried wave chronology, dispatch
 history and worktree state, which the project's authoring rule excludes from durable artifacts and
-which competes with the binding obligations for a reader's attention. The narrative moves to
-`.agent/archive/` at milestone close; the obligations stay.
+which competed with the binding obligations for a reader's attention. That narrative now lives in
+`.agent/archive/m3u4-chronology.md`; every ruling, every interpretive ground and every measured number
+stayed here. `m3u4-archive-validate.py` is the gate: it proves each retained section still resolves
+every citation the six artifact tables make against it, and that no line left the pair.

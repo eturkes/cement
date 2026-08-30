@@ -482,6 +482,19 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
 
 ## M3.4 deferrals
 
+- `pri=4` `size=S` — every spike/wave evidence pointer this milestone cites is a LOCAL-ONLY tag.
+  `m3u4-alt-binding` (`aa77d9f`), `m3u4-alt-projection` (`cb0ef3e`), `m3u4-map`,
+  `m3u4-verdicts-wave2` and `m3u4-attack-wave2` name commits that are unreachable from `main`, and
+  `git ls-remote --tags origin` returns nothing, so every clone resolves none of them and a
+  `git gc --prune` on this workstation can drop the objects. Same class as the `.scratch/` pointer
+  row: what a tracked file cites has to be true for every reader of it. Mitigated already — each
+  ruling's grounds are restated as measured facts in `.agent/decisions/m3u4-contract.md`, and
+  `.agent/archive/m3u4-chronology.md` states the lifetime explicitly, so no claim depends on the
+  tags. Owner action is the missing half, because pushing is the owner's call. Acceptance: either the
+  five tags are published to `origin` and a fresh clone resolves all five, or every tracked citation
+  is marked expired and the two spike diffs a later unit might want are captured as tracked patch
+  files under `.agent/archive/`.
+
 - `pri=3` `size=S` — `_ProposalIds` carries plural machinery no production caller reaches. It rejects a
   duplicate identifier set, returns early on an empty selection without touching SQL, and builds dynamic
   `?` placeholders, yet its only constructor is the singleton inside `_proposal_binding`
