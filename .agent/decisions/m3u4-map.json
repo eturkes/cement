@@ -8,7 +8,7 @@
       "finding": "JOIN selects eight request values: partition, operation, operation_revision, input_json/hash, id/status/proposal_id. ProposalView consumes operation, revision, parsed input and request id; status/proposal pin pending binding; selected request partition is unused.",
       "evidence": "AST measured get_proposal at 38 lines; targeted Read of system.py:1289-1326 traced all eight aliases through _proposal_content and the ProposalView constructor.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-by-rederivation: contract section 1 attributes all eight owned sites by AST at da63741, independently of this map"
     },
     {
       "id": "Q02",
@@ -17,7 +17,7 @@
       "finding": "proposal selects the same binding minus request partition: operation/revision, input_json/hash, id/status/proposal_id. It returns a 14-key JSON audit record for every status; get_proposal returns pending-only ProposalView after an extra pending-binding check.",
       "evidence": "Targeted Read of system.py:1328-1347 compared SQL and control flow; an AST key extractor measured _proposal_record's projection as 14 keys.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-by-rederivation: same AST attribution; the site table names the method and the role, not this row"
     },
     {
       "id": "Q03",
@@ -26,7 +26,7 @@
       "finding": "Exact partition, optional exact status, and status_sequence > cursor filter; ascending status_sequence then LIMIT 1..10,000. Each row projects created/final/id/input/operation/revision/proposed/provenance/request/review fields/sequence/status; M3.4 removes only public request_id.",
       "evidence": "Targeted Read covered SQL at system.py:1368-1390; AST extracted 14 ordered return keys from _proposal_record, including the sole request_id key.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-by-rederivation: same AST attribution"
     },
     {
       "id": "Q04",
@@ -35,7 +35,7 @@
       "finding": "Inside write=True, review selects eight request values. Operation/revision fence accept/correct; input_json/hash are digest-checked for every decision; bound id/status/proposal drive companion-update identity and rowcount atomicity, while selected request partition is unused.",
       "evidence": "Targeted Read of system.py:1422-1510 traced the JOIN through stale-revision, _proposal_content and rejection branches; request aliases occur at lines 1446-1449.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-by-rederivation: same AST attribution"
     },
     {
       "id": "Q05",
@@ -44,7 +44,7 @@
       "finding": "Sets request status=rejected and updated_at under partition/id/pending/proposal predicates; rowcount gates atomic review. It keeps request_status and repeated handle returning Rejected and keeps proposal()/proposals() cross-row validation sound. Under schema v2 it must move behind the adapter, not vanish as the expired draft says.",
       "evidence": "/usr/bin/rg traced _outcome callers at handle lines 824/848/1007/1025 and request_status:1285; _validate_proposal_shape consumes bound request status at 1266-1269.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-by-rederivation: same AST attribution; section 12's ruling re-read the write from ALT-PROJECTION's own diff"
     },
     {
       "id": "Q06",
@@ -53,7 +53,7 @@
       "finding": "Sets request resolved plus output_json, confirmed source, example_id and updated_at under the same four binding predicates; rowcount gates atomic review. request_status/repeated handle then validate the example and return confirmed Resolved; proposal history also requires request status=resolved. Preserve privately through the adapter at v2.",
       "evidence": "Targeted Read traced UPDATE at 1616-1625 into _outcome's confirmed branch at 1143-1186; /usr/bin/rg found both public _outcome entry paths and bound-state check at 1266-1269.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-by-rederivation: same AST attribution; same second reading"
     },
     {
       "id": "Q07",
@@ -62,7 +62,7 @@
       "finding": "Seed conflates two queries: the first JOIN is COUNT(*) only, filtered by exact proposal partition, request operation and pending proposal status, with no LIMIT. Its exact total checks that Q08 detail length equals min(count, projection_limit).",
       "evidence": "Targeted Read of system.py:2915-2957 separated the count and detail statements; test_function_report_pending_count_reaches_the_10001_tail_with_bounded_detail pins 10,001 versus 10,000.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-by-rederivation: same AST attribution"
     },
     {
       "id": "Q08",
@@ -71,7 +71,7 @@
       "finding": "Selects p.* plus request partition, operation/revision, input_json/hash, id/status/proposal_id; exact partition/operation/pending filters, opaque p.id order, bounded LIMIT. Projector validates both scopes, binding/state and all proposal content, then emits proposal/request IDs, revision and input hash; M3.4 drops emitted request ID only.",
       "evidence": "Targeted Reads covered SQL at 2931-2957 and projector at 2641-2682; memory.md:34 confirms p.id is opaque, while the projector has seven explicit binding predicates.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-by-rederivation: same AST attribution"
     },
     {
       "id": "Q09",
@@ -80,7 +80,7 @@
       "finding": "Validates status-dependent final/review presence, request proposal/status binding, input/proposed/provenance digests and optional final digest. Request supplies operation/revision/input/hash/id/status/proposal. Digest/state faults become IntegrityError, but invalid stored JSON leaks ValidationError; fabricated bad integer scalars leak TypeError/OverflowError.",
       "evidence": "AST extracted 14 output keys; a uv-run fabricated-row probe produced ValidationError for invalid input JSON, TypeError for NULL created_at, OverflowError for infinite sequence, and IntegrityError for digest mismatch. memory.md:46 bounds numeric reachability under STRICT.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-by-rederivation: section 15 re-derived the converter census and CORRECTED D13 against it"
     },
     {
       "id": "Q10",
@@ -89,7 +89,7 @@
       "finding": "Consumes six columns: request input_json/hash plus proposal proposed_output_json/hash and provenance_json/hash. Schema-v2 proposals contain no input binding, so a proposal row alone cannot serve it; a private adapter may enrich the row and hide the JOIN until M3.6b moves columns.",
       "evidence": "Targeted Read of _proposal_content found three parse/digest pairs; store.py:82-111 shows proposals lack input_json/input_hash while requests define both at lines 42-43.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-by-rederivation: section 15 established that _proposal_content never carried a request_id, which this row's census asked for"
     },
     {
       "id": "S01",
@@ -98,7 +98,7 @@
       "finding": "Exactly four direct reads, all in tests/test_submission_battery.py:445,447,827,1411; none in src, examples, docs, README, test_system or test_submission. Production only writes it in the get_proposal constructor. Remove the field and rewrite those privacy/interop assertions.",
       "evidence": "/usr/bin/rg over src tests examples docs README plus an AST Attribute-load census isolated the four get_proposal request_id reads; ProposalView itself has one constructor at system.py:1316.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-structurally: consumed by the burden harness, which measured the field's removal at 252 broken tests over three frames"
     },
     {
       "id": "S02",
@@ -107,7 +107,7 @@
       "finding": "Consumers are three direct reads (submission battery:1414; test_system:14911,16753), four expected constructors, one dataclass shape table, and CLI key/value assertions. After removal, proposal_id uniquely identifies the gap within report partition/operation; operation_revision and input_hash retain scope evidence.",
       "evidence": "AST counted three relevant request_id Attribute loads and four PendingProposalGap constructors; /usr/bin/rg found test_cli.py:84/642/647 plus the signature table at test_system.py:13352.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-structurally: consumed by the same harness; the gap's identity is ruled in D08"
     },
     {
       "id": "S03",
@@ -116,7 +116,7 @@
       "finding": "Across 24 test calls, direct/transitive reads are example_id six, reject status two, confirmed output one, removed request_id one, plus one Resolved type check; no test reads proposal_id/source/artifact_id. CLI serializes every field, then tests read source twice and example_id once. Five demo calls ignore the result.",
       "evidence": "AST classified all 24 test .review calls and traced the confirm helper; /usr/bin/rg found CLI payload reads at test_cli.py:245,425-426 and five ignored demo calls.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-structurally: consumed by fork 2; the field-by-field grounds were taken from the spikes' P08 payloads"
     },
     {
       "id": "S04",
@@ -125,7 +125,7 @@
       "finding": "Accept/correct emit sorted keys artifact_id:null, example_id, output, request_id, source:'confirmed', status:'resolved'; output is proposed versus corrected. Reject emits proposal_id, request_id, status:'rejected'. _emit serializes the returned dataclass wholesale, so ReviewResult fixes the CLI shape automatically.",
       "evidence": "Live .venv/bin/cement probes over three real ledgers captured all three pretty JSON payloads; cli.py:278-284 proves sorted asdict serialization with no leaf-specific filtering.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-structurally: the verbatim CLI JSON reached section 13 through the spikes' P08 rows, not through this map"
     },
     {
       "id": "S05",
@@ -134,7 +134,7 @@
       "finding": "One payload leaks request identity: legacy handle's proposal.created carries request_id. Direct submit/propose created payload is empty; rejected carries reviewer; accepted/corrected carry example_id, receipt_hash, reviewer and suspended_artifact_ids. M3.4 must empty the legacy created payload without changing its event identity/order.",
       "evidence": "AST extracted four proposal _event sites and payload keys at system.py:644,1026,1495,1626; current tests pin direct-created {} but no test pins removal from handle-created.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-structurally: superseded in substance by section 14's measured payload census, which found the handle-route leak this row's question could not"
     },
     {
       "id": "S06",
@@ -143,7 +143,7 @@
       "finding": "Outcome classes end in the Outcome alias, then ProposalView begins; place ReviewResult after that alias so it cannot accidentally join request Outcome. __init__ model imports and __all are alphabetical, so insert after ReviewRequired in both. Existing shape census covers PendingProposalGap but not ProposalView or ReviewResult.",
       "evidence": "AST measured model neighbors and counted 33 model imports plus 56 __all__ names; targeted Read found PendingProposalGap's shape table at test_system.py:13352 and no ProposalView test reference.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-structurally: consumed by D14 and by the export census"
     },
     {
       "id": "S07",
@@ -152,7 +152,7 @@
       "finding": "Two direct exposure claims need rewriting: README says existing proposal readers show the private identifier; architecture.md:63-64 says schema v2 keeps the row for existing readers. Keep the row/plumbing claim, but state proposal/read/review/report/event seams omit identity. Request-outcome and adapter-protocol request IDs remain later-unit scope.",
       "evidence": "Case-insensitive scripted census found 37 matched lines/39 request occurrences across README and docs; targeted reads classified only README:240-242 and architecture.md:63-64 as proposal-identity exposure claims.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-by-rederivation: D26 publishes its own mention counts: README 6, threat-model 1, adapter-protocol 3, architecture 1"
     },
     {
       "id": "P01",
@@ -161,7 +161,7 @@
       "finding": "Reject order: proposal status/provenance, private request rejected, proposal.rejected event, proposal status_sequence. Accept/correct order: proposal final/provenance, example insert, conflict quarantine/events, private request resolved, proposal accepted/corrected event, proposal status_sequence. Every transition is pending-only and one write transaction.",
       "evidence": "Targeted Read traced ordered execute/_event calls at 1480-1510 and 1541-1642; both branches require proposal and request rowcount=1 before emitting their proposal event.",
       "action": "unchanged",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-structurally: became D15; the S3 battery owns its re-derivation under lens A08"
     },
     {
       "id": "P02",
@@ -170,7 +170,7 @@
       "finding": "reviewer is nonempty, control-free valid Unicode, <=256 UTF-8 bytes; note may be empty but is control-free and <=2,048 bytes. One lease-safe now value becomes proposal reviewed_at, request updated_at, example/receipt confirmation time and event time; reviewer reaches proposal, example, receipt and proposal event, while note reaches proposal and receipt.",
       "evidence": "Targeted Read traced _text at system.py:160-172, _now at 438-446 and branch writes at 1480-1639; /usr/bin/rg found no reviewer/note boundary test.",
       "action": "unchanged",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-structurally: became D16, whose bounds section 15 then published as numbers"
     },
     {
       "id": "P03",
@@ -179,7 +179,7 @@
       "finding": "Accept/correct create exactly one example after proposal update, binding operation/revision, canonical input/final output plus hashes, reviewer, accepted/corrected origin, proposal_id, confirmation receipt/hash and time. Reject returns before ID/receipt/INSERT. Pending-only review plus immutable update/delete triggers prevents duplication or mutation.",
       "evidence": "Targeted Read traced the sole review INSERT at 1541-1580 and reject return at 1510; store.py:272-279 defines examples_no_update/no_delete, and test_candidate_never_appears... asserts rejection leaves examples empty.",
       "action": "unchanged",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-structurally: became D17; the S3 battery owns its re-derivation under lens A09"
     },
     {
       "id": "P04",
@@ -188,7 +188,7 @@
       "finding": "Every current-revision accept/correct reaches the conflict query after example insertion; reject never does. It selects promoted artifacts with exact partition, operation, revision, input hash+JSON and unequal final output. Matches become suspended with cleared promotion hash/reason, each emits artifact.counterexample, and IDs enter the proposal event.",
       "evidence": "Targeted Read traced all seven WHERE predicates and the nonempty-only UPDATE/event loop; test_late_review_counterexample_quarantines_promoted_scope exercises corrected review against a promoted conflicting scope.",
       "action": "unchanged",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-structurally: became D18; lens Y7 found the row's condition inventory missing and the battery owns it"
     },
     {
       "id": "P05",
@@ -197,7 +197,7 @@
       "finding": "Creation inserts proposal.created first and stores its AUTOINCREMENT event sequence in the proposal. Review writes state/evidence/request first, emits any artifact counterexample events, then emits proposal.rejected/accepted/corrected and replaces status_sequence with that event sequence. Feed cursors therefore follow audit order, not timestamps.",
       "evidence": "Targeted Read traced _event returns at 644,1495,1605,1626 and sequence updates; test_submit_proposal... asserts creation equality, while test_monotonic_feeds_survive_transitions_and_clock_rollback pins review ordering despite time rollback.",
       "action": "unchanged",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-structurally: became D19; the S3 battery owns its re-derivation under lens A10"
     },
     {
       "id": "P06",
@@ -206,7 +206,7 @@
       "finding": "Seed overstates operation filtering: get_proposal/proposal/review take partition+proposal_id, and proposals intentionally lists all operations in one partition. All four are exact-partition isolated. Only function_report is operation-scoped; both pending queries filter exact partition and bound request operation. Adapter must preserve those actual scopes.",
       "evidence": "AST signatures plus targeted SQL Reads established each caller scope; test_request_idempotency_and_partition_isolation pins cross-partition NotFound, and test_function_report_pending_proposals... pins operation/partition colliders.",
       "action": "unchanged",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-structurally: became D20, which section 14 then narrowed to scope-relative"
     },
     {
       "id": "P07",
@@ -215,7 +215,7 @@
       "finding": "All owned SQL uses '=' for proposal partition and, in function_report, bound operation. SQLite LIKE would make '_' a one-character wildcard and fold ASCII case, admitting tenantXa/TENANT_A or echoX1/ECHO_1. Current five-scope collider battery pins both report queries; adapted get/proposal/proposals/review still need equivalent path-specific pins.",
       "evidence": "memory.md:40 records four prior live =->LIKE mutants; test_function_report_pending_proposals_bind_partition_operation_request_and_revision drives target plus underscore and case colliders through count and detail.",
       "action": "unchanged",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-structurally: became D21; the collider requirement is this project's standing rule, not this row's finding"
     },
     {
       "id": "P08",
@@ -224,7 +224,7 @@
       "finding": "COUNT is unbounded; detail is min(count, projection_limit), with caller cap 10,000 and a proven 10,001 tail. Detail orders by opaque random p.id, stable only per ledger; public docs promise no canonical order. Both current INNER JOINs can omit the same orphan and evade length comparison, so the adapter must fail closed on missing bindings.",
       "evidence": "test_function_report_pending_count_reaches_the_10001_tail_with_bounded_detail pins 10,001/10,000; memory.md:34 records opaque-order semantics; targeted SQL comparison exposed identical orphan omission.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-structurally: became D22 and D23; section 15 corrected the tail to counted-not-reachable"
     },
     {
       "id": "P09",
@@ -233,7 +233,7 @@
       "finding": "Conversions cover proposal id/status/timestamps/review fields/final JSON, request id/operation/revision/input JSON+hash/status/proposal binding, current operation revision and pending COUNT. Report's _stored_int/_request_id/_digest path closes scalar faults; get_proposal/_proposal_record/review still leak ValidationError for bad JSON and raw int TypeError/ValueError/OverflowError.",
       "evidence": "AST emitted per-function persisted-field sets; fabricated-row probes measured ValidationError, TypeError and OverflowError leaks. test_function_report_pending_rows_validate_middle_and_last_scalars_and_bindings closes only report positions 1/2; memory.md:46 bounds real STRICT reachability.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-structurally: became D24, whose fabricated-only premise section 15 then falsified"
     },
     {
       "id": "P10",
@@ -242,7 +242,7 @@
       "finding": "handle still owns request reservation/generation, proposal INSERT and _outcome; request_status still SELECTs requests then delegates _outcome. M3.4 changes only handle's proposal.created payload to remove request identity and routes review companion transitions privately, preserving repeat/poll Resolved or Rejected behavior. M3.6a deletes both methods.",
       "evidence": "AST measured handle:793-1063 and request_status:1272-1285; _outcome has four handle callers plus request_status, while roadmap.md:360 assigns public lifecycle deletion to M3.6a.",
       "action": "later-unit",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-structurally: accepted as scoping; the out-of-scope site list in contract section 1 carries it"
     },
     {
       "id": "A01",
@@ -251,7 +251,7 @@
       "finding": "Twelve-column SQL union: id, partition, operation, operation_revision, input_json/hash, status, proposal_id, plus write-only updated_at_us/output_json/source_kind/example_id. Minimal frozen read binding has the first eight fields; reject/resolve adapter operations accept the four write values as arguments rather than bloating the record.",
       "evidence": "A scripted census over the eight settled line anchors derived 12 distinct request columns; direct comparison of four JOIN projections showed the same eight-field read union.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-structurally: the column union reached the shipped _ProposalBinding through the two spike diffs"
     },
     {
       "id": "A02",
@@ -260,7 +260,7 @@
       "finding": "proposals and function_report each project up to 10,000 rows; get_proposal/proposal/review are singleton. A row lookup changes proposal projection from 1 to N+1 statements and report's pending pair from 2 to N+2: 10,000 extra SQLite executions at the cap. The adapter needs set-based joined/bulk operations.",
       "evidence": "AST spans plus _bounded_int calls establish both 10,000 maxima; SQL census measured one list statement and two pending-report statements before factoring.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-by-rederivation: section 12's ruling measured the N+1 exposure directly from ALT-BINDING's committed diff"
     },
     {
       "id": "A03",
@@ -269,7 +269,7 @@
       "finding": "A module function or System method can centralize reads but needs a dispatcher or sibling names for bulk/count/reject/resolve. One private class in system.py groups those operations under one named owner without export. Pin with AST ownership of all eight request-SQL sites plus call-closure assertions from each owned public path; SQL rejection is impossible at v2.",
       "evidence": "Option analysis used the 8-site/12-column/2-cardinality census; the M3.3 AST closure pattern at test_submission_battery.py:1601-1626 already extracts method calls and can be extended to SQL-string owners.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "superseded: where the adapter may live was overtaken by the COMPOSE ruling, which sites it by statement ownership"
     },
     {
       "id": "A04",
@@ -278,7 +278,7 @@
       "finding": "proposals partition/request_id are NOT NULL, unique together, and FK to requests(partition,id); request operation/revision/input_json/hash/status are NOT NULL. requests.proposal_id is nullable structurally but status CHECK requires it for pending/rejected/confirmed-resolved. It is not a reverse FK, so adapter must still compare bound proposal_id.",
       "evidence": "Targeted schema Read covered requests:38-80 and proposals:82-111; /usr/bin/rg found PRAGMA foreign_keys=ON at store.py:608 and foreign_key_check at 529.",
       "action": "unchanged",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-structurally: schema facts consumed by D24; the STRICT and NOT NULL properties are re-derived in memory, not here"
     },
     {
       "id": "A05",
@@ -287,7 +287,7 @@
       "finding": "M3.4 does not own this site. It updates only status='generating' rows to failed operation_revised and clears their lease; schema requires generating rows to have proposal_id NULL, so it cannot touch a proposal binding. It belongs with request lifecycle deletion in M3.6a.",
       "evidence": "Targeted Read of revise_operation:496-570 found the exact generating predicate; requests CHECK at store.py:58-62 proves generating excludes proposal_id, and roadmap assigns lifecycle deletion to M3.6a.",
       "action": "later-unit",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-structurally: MAIN accepted the row's out-of-scope conclusion for revise_operation without an independent probe; it sits in D03's permitted set"
     },
     {
       "id": "G01",
@@ -296,7 +296,7 @@
       "finding": "M3.3 established one private writer: submit_proposal/propose delegate request INSERT, proposal.created event and proposal INSERT to _persist_proposal in one transaction. 'Private' meant storage role absent from those new signatures/returns, not absent from legacy projections; M3.4 now closes those projections.",
       "evidence": "git blame attributes all 74 lines system.py:599-672 to 4b96e4d; test_submission.py:699-777 pins sole-writer closure, :858-875 pins both routes, and battery D06 pins one call plus 1/1/1 footprint.",
       "action": "unchanged",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-structurally: precedent only; M3.3's plumbing rule reached this unit through the roadmap"
     },
     {
       "id": "G02",
@@ -305,7 +305,7 @@
       "finding": "Seed cites the wrong file. The AST instrument is test_submission.py: it walks self-method closures from both submission entries, finds request/proposal INSERT strings plus proposal.created calls, and requires _persist_proposal as sole writer with exact 1/1/1 profile. Battery D06 is only a runtime spy. Reuse the walker, extending owners/SQL verbs for the adapter.",
       "evidence": "Targeted AST-source Read measured lines 699-777; battery.py:472-505 contains mock.patch and table deltas but no call-closure traversal.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-structurally: the confinement instrument reuses the AST closure shape, extended to a complement assertion"
     },
     {
       "id": "G03",
@@ -314,7 +314,7 @@
       "finding": "The shipped analog added FunctionResolution plus System.resolve and export wiring: +56/-1 production lines across three files. Split is __init__ +2, models +15/-1, system +39. This prices ReviewResult/export/signature scaffolding only; M3.4's adapter and six query consumers are additional work.",
       "evidence": "git show --numstat b5916a9 over the three runtime files returned 2/0, 15/1 and 39/0, totaling +56/-1 exactly.",
       "action": "unchanged",
-      "main_verdict": "unknown"
+      "main_verdict": "superseded: section 7 replaced forecast-by-analog with the measured burden harness"
     },
     {
       "id": "G04",
@@ -323,7 +323,7 @@
       "finding": "M2.4b changed three runtime files: +776/-33, net +743, cumulative production churn 809. The draft's 776 is additions only, not changed-line churn; using it as total understates the analog by 33 lines.",
       "evidence": "git show --numstat 62e6d09 returned __init__ 18/0, models 83/0, system 675/33; git diff --numstat parent..commit independently totaled 776 additions, 33 deletions, 809 churn.",
       "action": "unchanged",
-      "main_verdict": "unknown"
+      "main_verdict": "superseded: same replacement; the analog churn number never entered the sizing ruling"
     },
     {
       "id": "G05",
@@ -332,7 +332,7 @@
       "finding": "Seven sites directly read changed-result fields: status twice, example_id three times, output once, request_id once. Two review calls are forwarded by confirm and feed three downstream example_id reads, so nine of 24 sites are semantic field consumers; the other 15 use only success/error/side effects. One consumer also asserts Resolved type.",
       "evidence": "AST counted 24 test .review calls across six files, classified parent use per enclosing function, then traced confirm callers; direct sites are system.py tests at 313,477,726,835,902,4516 plus battery:1415.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-structurally: the 24 .review( call sites were re-counted by the spikes' own census at 30 total"
     },
     {
       "id": "X01",
@@ -341,7 +341,7 @@
       "finding": "_proposal_record emits request_id once, so proposal(), proposals(), CLI proposal show and CLI proposal list all leak it. Only D23 directly reads the two public dictionary keys; later battery reads at 2215/2227/2249 inspect the storage column and must remain. Remove the projector key and pin both CLI payloads request-free.",
       "evidence": "/usr/bin/rg found public dictionary reads only at test_submission_battery.py:1412-1413; cli.py:501-509 forwards both dictionaries unchanged, while battery:2215-2249 queries proposals storage directly.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-structurally: became D10; lens Y20 found the compound obligation satisfiable on dataclasses alone and the battery owns the path matrix"
     },
     {
       "id": "X02",
@@ -350,7 +350,7 @@
       "finding": "Freeze SCHEMA_VERSION=2 and the exact schema payload: 14,580 UTF-8 bytes, sha256 5be3d79fe1e21aca524f3937c8ce78521bcc7203bfe20b7352ef4b6dff468a77, with SCHEMA_FINGERPRINT equal. M3.4 needs no store.py schema edit, view, proposal column or migration.",
       "evidence": "Live .venv Python imported store and measured version 2, 14,580 bytes, the full SHA-256, and fingerprint equality; roadmap.md:75 assigns the sole cut to M3.6b.",
       "action": "unchanged",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-by-rederivation: MAIN measured the freeze this session: SCHEMA_VERSION 2, 14,580 B, sha256 5be3d79f..., equal to SCHEMA_FINGERPRINT"
     },
     {
       "id": "X03",
@@ -359,7 +359,7 @@
       "finding": "An application proxy rejecting every requests statement is false under v2: the binding adapter and surviving lifecycle require the table. Current system.py has 22 request-SQL constants; M3.4 owns eight and leaves 14. Replace the draft gate with AST ownership: all eight move under one private adapter and no owned caller names requests directly.",
       "evidence": "AST string-owner census returned 22 exact sites and the settled owned eight at get/proposal/proposals/review/report; roadmap's schema-v2 ruling contradicts plan-review:144's old proxy requirement.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-by-rederivation: section 2 re-derived the expired predicate at HEAD and replaced it with confinement plus public shape"
     },
     {
       "id": "X04",
@@ -368,7 +368,7 @@
       "finding": "Each adapted public method currently opens exactly one transaction: review uses write=True, function_report write=False, and get/proposal/proposals use default reads. The adapter must consume or bind that supplied connection, never open a nested transaction; review's lookup and companion transition stay under the same write lock, while bulk reads remain one snapshot.",
       "evidence": "AST found one transaction call in each of five public methods at lines 1292,1333,1371,1443,2772 and none in their proposal projectors; spike probe P05 independently targets in_transaction/count.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-structurally: became lens Y16 rather than a numbered obligation, which is the gap the lens reported; the battery owns it"
     },
     {
       "id": "X05",
@@ -377,7 +377,7 @@
       "finding": "Current INNER JOINs turn a known proposal with a missing request into NotFound or silent list/report omission; count and detail can omit the same orphan and still agree. FK enforcement prevents supported creation, but post-open corruption with foreign_keys off is reachable. Adapter lookup must distinguish absent proposal from absent/mismatched binding and raise IntegrityError.",
       "evidence": "Comparison of all six JOIN queries showed identical inner-join omission; store.py enables FK/checks at open, while tests already use post-open PRAGMA foreign_keys=OFF mutations, proving the corruption route is testable.",
       "action": "ships-in-m3u4",
-      "main_verdict": "unknown"
+      "main_verdict": "credited-by-rederivation: the attack table re-derived the JOIN behaviour with EXPLAIN QUERY PLAN, sharpening it into section 15's LEFT JOIN ground"
     }
   ]
 }
