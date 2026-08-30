@@ -34,17 +34,18 @@ from pathlib import Path
 
 UNKNOWN = "unknown"
 PROSE_MIN = 40
-# One contract citation: a decision/predicate/requirement id, or a numbered section. `§13`
-# and `Section 13` are the same locus and both spellings are accepted. A citation may carry
-# up to three trailing qualifier words, so the two `§13` ruling blocks and a named section
-# fragment stay distinguishable. EVERY comma-joined element must OPEN with a citation; the
-# seeded form accepted any non-space token after a comma, which admitted free prose.
-_CITATION = (
-    r"(?:§\s?|Section\s|D|P|R)[0-9]{1,2}"
-    r"(?:[.\-][0-9A-Za-z]{1,3})?"
-    r"(?:\s[0-9A-Za-z]{1,9}){0,3}"
-)
-SECTION = re.compile(rf"{_CITATION}(?:,\s*{_CITATION})*\Z")
+# A `section` value is a POINTER, and the check is exactly the two things a pointer can be
+# checked for: it resolves somewhere, and it stays short enough to be a pointer rather than
+# an argument. Whether it points at the RIGHT place is MAIN's judgment at ruling time and
+# no regex reaches it.
+#
+# Parsing the value as a citation LIST was tried and abandoned. Real tables cite ranges
+# ("Sections 8.3, 9 and 12 S2 RULING"), whose internal commas collide with the element
+# separator, and a locus with no number at all ("Contract preface, Sections 12 and 13").
+# Each spelling costs a teammate round-trip while its table sits ungradeable, and the
+# grammar never converges. Search for citations instead of parsing the whole string.
+CITATION = re.compile(r"(?:§\s?|Sections?\s|\b[DPR])[0-9]{1,2}(?:[.\-][0-9A-Za-z]{1,3})?")
+SECTION_MAX = 60
 VERDICT_EXTENSION = re.compile(r"X[0-9]{1,3}")
 ATTACK_EXTENSION = re.compile(r"Y[0-9]{1,3}")
 
@@ -143,8 +144,17 @@ def _common(identifier: str, row: dict, fields: tuple[str, ...], seeded: str | N
     section = row["section"]
     if not isinstance(section, str):
         _fail(f"{identifier}.section must be a string")
-    if section != UNKNOWN and SECTION.fullmatch(section) is None:
-        _fail(f"{identifier}.section {section!r} must cite contract ids, e.g. 'D12' or 'D07, D11'")
+    if section != UNKNOWN:
+        if CITATION.search(section) is None:
+            _fail(
+                f"{identifier}.section {section!r} cites no contract locus; name at least one, "
+                "e.g. 'D12', 'D07, D11', '§13 S2 RULING' or 'Sections 8.3 and 12'"
+            )
+        if len(section) > SECTION_MAX:
+            _fail(
+                f"{identifier}.section is {len(section)} chars, over {SECTION_MAX}; it is a "
+                "pointer, so put the argument in the row's own prose fields"
+            )
 
 
 def _validate_verdicts(payload: dict) -> int:
