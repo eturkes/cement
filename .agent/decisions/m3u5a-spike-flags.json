@@ -1,0 +1,209 @@
+{
+  "kind": "spike",
+  "alternative": "flags",
+  "head_sha": "unknown",
+  "diff_stat": "unknown",
+  "driver": "unknown",
+  "rows": [
+    {
+      "id": "Z01",
+      "locus": "valid submission, happy path: exit, stdout payload keys, rows and events written",
+      "command": "unknown",
+      "baseline": "unknown",
+      "alt": "unknown",
+      "delta": "unknown",
+      "verdict": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Z02",
+      "locus": "the identical submission repeated: proposal count, ids, whether anything dedupes",
+      "command": "unknown",
+      "baseline": "unknown",
+      "alt": "unknown",
+      "delta": "unknown",
+      "verdict": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Z03",
+      "locus": "required channel argument omitted entirely: exit, channel, exact message",
+      "command": "unknown",
+      "baseline": "unknown",
+      "alt": "unknown",
+      "delta": "unknown",
+      "verdict": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Z04",
+      "locus": "syntactically malformed JSON on the channel: exit, channel, exact message",
+      "command": "unknown",
+      "baseline": "unknown",
+      "alt": "unknown",
+      "delta": "unknown",
+      "verdict": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Z05",
+      "locus": "an unknown/surplus key or flag supplied beside a valid submission: accept or reject",
+      "command": "unknown",
+      "baseline": "unknown",
+      "alt": "unknown",
+      "delta": "unknown",
+      "verdict": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Z06",
+      "locus": "provenance omitted: defaulted to empty mapping, or rejected",
+      "command": "unknown",
+      "baseline": "unknown",
+      "alt": "unknown",
+      "delta": "unknown",
+      "verdict": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Z07",
+      "locus": "provenance present but not a JSON object (`[]`, `5`, `\"t\"`): exact class and message",
+      "command": "unknown",
+      "baseline": "unknown",
+      "alt": "unknown",
+      "delta": "unknown",
+      "verdict": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Z08",
+      "locus": "output is JSON `null`, and separately `[]`: accepted as a legal JSON value or not",
+      "command": "unknown",
+      "baseline": "unknown",
+      "alt": "unknown",
+      "delta": "unknown",
+      "verdict": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Z09",
+      "locus": "`-` on the channel: exact stdin bytes consumed, and what a second `-` flag would do",
+      "command": "unknown",
+      "baseline": "unknown",
+      "alt": "unknown",
+      "delta": "unknown",
+      "verdict": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Z10",
+      "locus": "a file-borne submission (`--...-file` or `@path`): supported, absent, or emulated",
+      "command": "unknown",
+      "baseline": "unknown",
+      "alt": "unknown",
+      "delta": "unknown",
+      "verdict": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Z11",
+      "locus": "framing bound: the exact total cap this channel imposes and where it is enforced",
+      "command": "unknown",
+      "baseline": "unknown",
+      "alt": "unknown",
+      "delta": "unknown",
+      "verdict": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Z12",
+      "locus": "framing bound adjacent pair: max accepted and max+1 rejected, with the exact message",
+      "command": "unknown",
+      "baseline": "unknown",
+      "alt": "unknown",
+      "delta": "unknown",
+      "verdict": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Z13",
+      "locus": "composition with the library's per-field DEFAULT_MAX_BYTES: which bound bites first",
+      "command": "unknown",
+      "baseline": "unknown",
+      "alt": "unknown",
+      "delta": "unknown",
+      "verdict": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Z14",
+      "locus": "unknown operation name: exit, channel, message, and whether any row is written",
+      "command": "unknown",
+      "baseline": "unknown",
+      "alt": "unknown",
+      "delta": "unknown",
+      "verdict": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Z15",
+      "locus": "absent ledger file: exit, message, and whether the invocation CREATES the database",
+      "command": "unknown",
+      "baseline": "unknown",
+      "alt": "unknown",
+      "delta": "unknown",
+      "verdict": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Z16",
+      "locus": "repeated channel flag: last-wins, error, or accumulate",
+      "command": "unknown",
+      "baseline": "unknown",
+      "alt": "unknown",
+      "delta": "unknown",
+      "verdict": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Z17",
+      "locus": "argv size: the largest submission this channel can launch as a real process",
+      "command": "unknown",
+      "baseline": "unknown",
+      "alt": "unknown",
+      "delta": "unknown",
+      "verdict": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Z18",
+      "locus": "acknowledgement content: whether candidate output bytes are echoed back to stdout",
+      "command": "unknown",
+      "baseline": "unknown",
+      "alt": "unknown",
+      "delta": "unknown",
+      "verdict": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Z19",
+      "locus": "cross-leaf flag isolation: the new flag(s) rejected on every other leaf, both ways",
+      "command": "unknown",
+      "baseline": "unknown",
+      "alt": "unknown",
+      "delta": "unknown",
+      "verdict": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "Z20",
+      "locus": "`proposal submit --help` and root `--help`: exact new lines and their register",
+      "command": "unknown",
+      "baseline": "unknown",
+      "alt": "unknown",
+      "delta": "unknown",
+      "verdict": "unknown",
+      "main_verdict": "unknown"
+    }
+  ]
+}

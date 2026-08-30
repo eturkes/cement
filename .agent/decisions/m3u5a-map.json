@@ -1,0 +1,230 @@
+{
+  "kind": "map",
+  "rows": [
+    {
+      "id": "M01",
+      "locus": "cli.py `_run` function-eval branch: payload keys, status 0/6, ledger-free dispatch",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "M02",
+      "locus": "cli.py `_run` function-verify branch: projection that keeps FunctionDocument off stdout",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "M03",
+      "locus": "cli.py `_run` function-inspect branch: manifest projection and dropped `text`/`document`",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "M04",
+      "locus": "cli.py `main`: ordered except clauses, exception class -> exit code, stream per class",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "M05",
+      "locus": "cli.py `_Outcome`: exactly-one-channel invariant and exact-int status assertion",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "M06",
+      "locus": "cli.py `_emit`: asdict expansion, sort_keys, indent, ensure_ascii, trailing newline",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "M07",
+      "locus": "cli.py `_input`: stdin bound, buffer-vs-text branch, its three exact messages",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "M08",
+      "locus": "cli.py `challenge` leaf: the shipped precedent for two JSON-bearing flags on one leaf",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "M09",
+      "locus": "system.py `System.resolve`: exact signature, argument validation order, raised classes",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "M10",
+      "locus": "system.py `System.submit_proposal`: exact signature, return type, absent revision arg",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "M11",
+      "locus": "system.py `System.propose`: signature and why the core CLI must reach no source",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "M12",
+      "locus": "models.py `Candidate`: field set, provenance mapping contract, canonicalization site",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "M13",
+      "locus": "models.py `FunctionResolution`: field set and the `match is None` domain qualifier",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "M14",
+      "locus": "function.py `FunctionVerification`: field set incl. the document that must not ship",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "M15",
+      "locus": "function.py `FunctionMatch` and `FunctionCheck`: field sets reaching a resolve payload",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "M16",
+      "locus": "argparse abbreviation on `_parser()`: whether a prefix of a flag or leaf still parses",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "M17",
+      "locus": "tests/test_cli.py: how the leaf census is derived from `_parser()` and what it asserts",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "M18",
+      "locus": "System construction against an absent ledger path: does it create the file, and when",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "M19",
+      "locus": "tests/test_cli.py shared fixture helpers: names, line anchors, caller counts",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "M20",
+      "locus": "exit-6 census across shipped leaves: which object, which channel, which payload shape",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "M21",
+      "locus": "README.md + docs/: every sentence naming CLI submission or resolution grammar",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "M22",
+      "locus": "cli.py `proposal review` leaf: `--output` JSON handling and its stdin interaction",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "M23",
+      "locus": "cli.py `_source` + `CommandCandidateSource` import: the reach M3.5a must not extend",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "M24",
+      "locus": "json_value `DEFAULT_MAX_BYTES` / `parse_json`: bytes-vs-chars bound and its messages",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "M25",
+      "locus": "System.events + proposal.created event payload produced by a direct submission",
+      "anchor": "unknown",
+      "symbol": "unknown",
+      "finding": "unknown",
+      "bearing": "unknown",
+      "main_verdict": "unknown"
+    }
+  ]
+}
