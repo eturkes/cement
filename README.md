@@ -238,8 +238,27 @@ partition with `System.proposals`. Then read each candidate with `System.get_pro
 own input.
 
 The request row stays internal to this route. The two signatures neither accept nor return its
-identifier. Schema v2 keeps the row, and the existing request and proposal readers still show that
-identifier.
+identifier. Schema v2 keeps the row as internal storage, and no proposal, review, or report value
+shows it. Only the `handle` and `request` route still carries a request identifier, because the
+caller supplies that identifier itself.
+
+### Reviewing a proposal
+
+`System.review` returns a `ReviewResult`. It carries four fields and no request identity:
+
+| Field | Meaning |
+|---|---|
+| `proposal_id` | The reviewed proposal. It is the only identity in the value. |
+| `status` | `accepted`, `corrected`, or `rejected`. It equals the proposal's own status, so `proposal show` reports the same word. |
+| `example_id` | The confirmed example that accept and correct create. It is `null` after a rejection, which creates no example. |
+| `output` | The confirmed output. It is the proposed output after accept and your supplied output after correct. It is `null` after a rejection. |
+
+Accept and correct each create exactly one confirmed example. Reject creates none. The three
+decisions return the same four keys, so a script can test `example_id` for null instead of testing
+for a missing key.
+
+`System.get_proposal`, `System.proposal`, `System.proposals`, and `function_report` also expose no
+request identifier. Use `proposal_id` to name a proposal on every surface.
 
 ## Request outcomes
 

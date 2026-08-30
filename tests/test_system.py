@@ -52,6 +52,7 @@ from cement_runtime import (
     ReconciliationRequired,
     Resolved,
     ReviewRequired,
+    ReviewResult,
     StaleRevisionAnomaly,
     StateError,
     System,
@@ -4519,8 +4520,8 @@ class SystemTests(unittest.TestCase):
             reviewer="alice",
             decision="accept",
         )
-        self.assertIsInstance(resolved, Resolved)
-        assert isinstance(resolved, Resolved)
+        self.assertIsInstance(resolved, ReviewResult)
+        assert isinstance(resolved, ReviewResult)
         added = resolved.example_id
         self.assertIsNotNone(added)
         newer = self.system.compile("tenant-a", "echo").created[0]
@@ -13350,10 +13351,9 @@ class SystemTests(unittest.TestCase):
                 },
             ),
             PendingProposalGap: (
-                ("proposal_id", "request_id", "operation_revision", "input_hash"),
+                ("proposal_id", "operation_revision", "input_hash"),
                 {
                     "proposal_id": str,
-                    "request_id": str,
                     "operation_revision": int,
                     "input_hash": str,
                 },
@@ -13652,7 +13652,6 @@ class SystemTests(unittest.TestCase):
             (
                 PendingProposalGap(
                     proposal_id=pending.proposal_id,
-                    request_id="function-report-pending",
                     operation_revision=1,
                     input_hash=canonicalize({"x": 40}).digest,
                 ),
@@ -14907,14 +14906,11 @@ class SystemTests(unittest.TestCase):
         target_ids = tuple(sorted(item.proposal_id for item in target))
         self.assertEqual(report.operation_now.pending_proposal_count, 4)
         self.assertEqual(tuple(item.proposal_id for item in gaps), target_ids)
-        self.assertEqual(
-            {item.proposal_id: item.request_id for item in gaps},
-            {item.proposal_id: request_id for item, request_id in zip(
-                target,
-                ("shared_request", "target_middle", "target_last", "target_current"),
-                strict=True,
-            )},
-        )
+        # The gap no longer carries request identity, so the surviving projected
+        # fields are what bind a gap to its proposal.
+        for item in gaps:
+            self.assertRegex(item.input_hash, r"\A[0-9a-f]{64}\Z")
+            self.assertGreaterEqual(item.operation_revision, 1)
         self.assertEqual(
             sorted(item.operation_revision for item in gaps),
             [1, 1, 1, 2],
@@ -15001,7 +14997,6 @@ class SystemTests(unittest.TestCase):
             (
                 PendingProposalGap(
                     proposal_id="prop_tail_00000",
-                    request_id="req_tail_00000",
                     operation_revision=1,
                     input_hash=input_hashes[0],
                 ),
@@ -15024,7 +15019,6 @@ class SystemTests(unittest.TestCase):
             maximum_pending[0],
             PendingProposalGap(
                 proposal_id="prop_tail_00000",
-                request_id="req_tail_00000",
                 operation_revision=1,
                 input_hash=input_hashes[0],
             ),
@@ -15033,7 +15027,6 @@ class SystemTests(unittest.TestCase):
             maximum_pending[-1],
             PendingProposalGap(
                 proposal_id="prop_tail_09999",
-                request_id="req_tail_09999",
                 operation_revision=1,
                 input_hash=input_hashes[9_999],
             ),
@@ -16272,8 +16265,8 @@ class SystemTests(unittest.TestCase):
                 reviewer=reviewer,
                 input_value={"revoked": True},
             )
-            self.assertIsInstance(resolved, Resolved)
-            assert isinstance(resolved, Resolved)
+            self.assertIsInstance(resolved, ReviewResult)
+            assert isinstance(resolved, ReviewResult)
             self.assertIsNotNone(resolved.example_id)
             assert resolved.example_id is not None
             revoked_ids.append(resolved.example_id)
@@ -16749,15 +16742,11 @@ class SystemTests(unittest.TestCase):
         self.assertEqual(report.operation_now.pending_proposal_count, 5)
         self.assertEqual(len(report.operation_now.pending_proposals), 5)
         self.assertEqual(
-            {
-                gap.proposal_id: gap.request_id
-                for gap in report.operation_now.pending_proposals
-            },
-            {
-                pending.proposal_id: request_id
-                for request_id, pending in pending_by_request.items()
-            },
+            {gap.proposal_id for gap in report.operation_now.pending_proposals},
+            {pending.proposal_id for pending in pending_by_request.values()},
         )
+        for gap in report.operation_now.pending_proposals:
+            self.assertRegex(gap.input_hash, r"\A[0-9a-f]{64}\Z")
 
     def test_function_report_promoted_count_rejects_a_coercible_aggregate(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)

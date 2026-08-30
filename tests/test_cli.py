@@ -81,7 +81,7 @@ _SCOPE_KEYS = {
     "input_hash",
     "reasons",
 }
-_PENDING_KEYS = {"input_hash", "operation_revision", "proposal_id", "request_id"}
+_PENDING_KEYS = {"input_hash", "operation_revision", "proposal_id"}
 _ARTIFACT_STATUS_KEYS = {"artifacts", "count", "status"}
 _ARTIFACT_KEYS = {
     "artifact_id",
@@ -242,7 +242,7 @@ class CLITests(unittest.TestCase):
                     "accept",
                 )
             )
-            self.assertEqual(reviewed["source"], "confirmed")
+            self.assertEqual(reviewed["status"], "accepted")
 
     def handle_once(
         self, operation: str, value: int, tag: str, *, review: bool
@@ -275,8 +275,8 @@ class CLITests(unittest.TestCase):
                         "--decision",
                         "accept",
                     )
-                )["source"],
-                "confirmed",
+                )["status"],
+                "accepted",
             )
 
     def promote_set(self, operation: str) -> str:
@@ -422,7 +422,7 @@ class CLITests(unittest.TestCase):
                     "accept",
                 )
             )
-            self.assertEqual(resolved["source"], "confirmed")
+            self.assertEqual(resolved["status"], "accepted")
             polled = self.payload(self.run_cli("request", f"cli-{number}"))
             self.assertEqual(polled["example_id"], resolved["example_id"])
 
@@ -642,13 +642,13 @@ class CLITests(unittest.TestCase):
         self.assertEqual(set(pending), _PENDING_KEYS)
         # Pending proposals project in opaque proposal-id order, so a truncated
         # page is an arbitrary — though per-ledger stable — subset.
-        self.assertEqual(
-            sorted(
-                proposal["request_id"]
-                for proposal in whole["pending_proposals"]
-            ),
-            ["pending-0", "pending-1", "pending-2"],
+        pending_ids = sorted(
+            str(proposal["proposal_id"]) for proposal in whole["pending_proposals"]
         )
+        self.assertEqual(len(pending_ids), 3)
+        self.assertEqual(len(set(pending_ids)), 3)
+        for pending_id in pending_ids:
+            self.assertTrue(pending_id.startswith("prop_"))
         self.assertEqual(pending["operation_revision"], 1)
         # The same ledger projects the same page every time.
         self.assertEqual(

@@ -56,6 +56,7 @@ from .models import (
     Rejected,
     Resolved,
     ReviewRequired,
+    ReviewResult,
     StaleRevisionAnomaly,
     VerificationReport,
 )
@@ -110,6 +111,7 @@ __all__ = [
     "Rejected",
     "Resolved",
     "ReviewRequired",
+    "ReviewResult",
     "StaleRevisionAnomaly",
     "StateError",
     "System",

@@ -442,9 +442,11 @@ class SubmissionBatteryTests(unittest.TestCase):
         view = system.get_proposal(PARTITION, proposal_id)
 
         self.assertTrue(proposal_id.startswith("prop_"))
-        self.assertTrue(view.request_id.startswith("req_"))
+        self.assertNotIn("request_id", view.__dataclass_fields__)
         self.assertNotEqual(proposal_id, domain_candidate.output["proposal_id"])
-        self.assertNotEqual(view.request_id, domain_input["request_id"])
+        # The domain's own request_id key survives inside the stored input verbatim; only
+        # Cement's request identity left the public shape.
+        self.assertEqual(view.input["request_id"], domain_input["request_id"])
         self.assertEqual(view.input, domain_input)
         self.assertEqual(view.proposed_output, domain_candidate.output)
         self.assertEqual(view.provenance, domain_candidate.provenance)
@@ -824,7 +826,7 @@ class SubmissionBatteryTests(unittest.TestCase):
         self.assertTrue(request.request_id.startswith("req_"))
         self.assertEqual(request.input, caller_input)
         self.assertIsNot(request.input, caller_input)
-        self.assertEqual(system.get_proposal(PARTITION, proposal_id).request_id, request.request_id)
+        self.assertEqual(system.get_proposal(PARTITION, proposal_id).input, caller_input)
 
     def test_d15_a_failed_submission_mutates_nothing_of_1(self) -> None:
         """D15. Request and proposal counts after the source's committed revision equal counts after rejection returns."""
@@ -1399,6 +1401,10 @@ class SubmissionBatteryTests(unittest.TestCase):
             for gap in report.operation_now.pending_proposals
             if gap.proposal_id == proposal_id
         )
+        # M3.4 split this seam census in two. The handle lifecycle still carries the
+        # caller's own request identity; the proposal, review and report seams no longer
+        # expose any. Both halves are asserted, so readmitting one member to the wrong
+        # half fails here.
         exposed = {
             "CandidateRequest": source_request.request_id,
             "handle": system.handle(
@@ -1408,21 +1414,27 @@ class SubmissionBatteryTests(unittest.TestCase):
                 request_id=request_id,
             ).request_id,
             "request_status": system.request_status(PARTITION, request_id).request_id,
-            "get_proposal": system.get_proposal(PARTITION, proposal_id).request_id,
-            "proposal": system.proposal(PARTITION, proposal_id)["request_id"],
-            "proposals": system.proposals(PARTITION)[0]["request_id"],
-            "function_report": gap.request_id,
-            "review": system.review(
-                PARTITION,
-                proposal_id,
-                reviewer="reviewer_23",
-                decision="reject",
-                note="rejected_23",
-            ).request_id,
         }
+        view = system.get_proposal(PARTITION, proposal_id)
+        record = system.proposal(PARTITION, proposal_id)
+        feed = system.proposals(PARTITION)[0]
+        result = system.review(
+            PARTITION,
+            proposal_id,
+            reviewer="reviewer_23",
+            decision="reject",
+            note="rejected_23",
+        )
 
-        self.assertEqual(len(exposed), 8)
+        self.assertEqual(len(exposed), 3)
         self.assertEqual(set(exposed.values()), {request_id})
+        self.assertNotIn("request_id", view.__dataclass_fields__)
+        self.assertNotIn("request_id", record)
+        self.assertNotIn("request_id", feed)
+        self.assertNotIn("request_id", gap.__dataclass_fields__)
+        self.assertNotIn("request_id", result.__dataclass_fields__)
+        self.assertEqual(result.proposal_id, proposal_id)
+        self.assertEqual(result.status, "rejected")
         self.assertEqual(len(source.calls), 1)
 
     def test_d24_private_means_a_storage_role_the(self) -> None:
@@ -1471,11 +1483,13 @@ class SubmissionBatteryTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertIn("schema v2", paragraph)
                 self.assertTrue("keeps" in paragraph or "retains" in paragraph)
-                self.assertIn("reader", paragraph)
+                self.assertIn("internal storage", paragraph)
         readme = " ".join(
             (ROOT / "README.md").read_text(encoding="utf-8").lower().split()
         )
-        self.assertIn("existing request and proposal readers still show that identifier", readme)
+        self.assertIn(
+            "no proposal, review, or report value shows it", readme
+        )
 
     def test_d26_the_battery_module_declares_no_skips(self) -> None:
         """D26. AST inspection finds zero skip decorators here, while the contract carries its measured close totals."""
@@ -1715,7 +1729,7 @@ class SubmissionBatteryTests(unittest.TestCase):
             ROOT / "docs/architecture.md": (
                 "steps 1 to 3 describe `handle`, the request lifecycle",
                 "two methods enter the same pipeline at step 3 alone",
-                "schema v2 keeps it for the existing readers",
+                "schema v2 keeps it as internal storage",
             ),
             ROOT / "docs/threat-model.md": (
                 "`submit_proposal` and `propose` give no idempotency",
@@ -2163,7 +2177,7 @@ class SubmissionBatteryTests(unittest.TestCase):
         self.assertIn("cement gives no idempotency here", combined)
         self.assertIn("that error carries no detail from the source", combined)
         self.assertIn("schema v2 keeps the row", combined)
-        self.assertIn("existing request and proposal readers still show that identifier", combined)
+        self.assertIn("no proposal, review, or report value shows it", combined)
 
     def test_d42_the_proposal_row_shape_including_status(self) -> None:
         """D42. Full-row comparison on both routes pins canonical content, pending defaults, shared time, request FK, and event sequence."""

@@ -11,7 +11,9 @@ Cement is a pure decision-plan router, a local control plane, and a portable fun
 3. Otherwise reserve the idempotent request, call the candidate source outside the SQLite transaction,
    and store a pending proposal.
 4. A separate review action accepts, corrects, or rejects the candidate. Accept/correct creates an
-   immutable replay fixture; reject remains audit evidence only.
+   immutable replay fixture; reject remains audit evidence only. Review returns a `ReviewResult`,
+   which names the proposal, the decision, the created example, and the confirmed output. It carries
+   no request identifier, and neither does any proposal read or report value.
 5. A scheduled compiler groups active fixtures by exact scope. It requires the operation's configured
    support, distinct-reviewer, time-span, and zero-conflict gates.
 6. The compiler emits `cement-exact-lookup-v1`, a capability-free JSON document with only `exact` and
@@ -61,7 +63,7 @@ one time, outside every transaction that the call holds, and stores the result. 
 write one request row, one proposal row, and one `proposal.created` event in one transaction. They
 return the new proposal identifier. Neither method resolves an artifact, reserves an idempotent
 request, or takes a generation lease. Review at step 4 receives their proposals unchanged. The
-request row stays internal to this route, and schema v2 keeps it for the existing readers.
+request row stays internal to this route, and schema v2 keeps it as internal storage.
 
 The LLM proposes instance behavior. It never chooses scope, confirms examples, runs verification, or
 activates artifacts.

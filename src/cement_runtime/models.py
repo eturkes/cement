@@ -123,12 +123,27 @@ Outcome: TypeAlias = (
 
 
 @dataclass(frozen=True, slots=True)
+class ReviewResult:
+    """The outcome of reviewing one proposal, identified by the proposal alone.
+
+    ``status`` mirrors the reviewed proposal's own status, so accept and correct are
+    distinguishable without comparing outputs. ``example_id`` and ``output`` are the
+    confirmed example and its output on accept and correct, and are ``None`` on reject,
+    where no example is created.
+    """
+
+    proposal_id: str
+    status: Literal["accepted", "corrected", "rejected"]
+    example_id: str | None
+    output: JSONValue | None
+
+
+@dataclass(frozen=True, slots=True)
 class ProposalView:
     id: str
     partition: str
     operation: str
     operation_revision: int
-    request_id: str
     input: JSONValue
     proposed_output: JSONValue
     provenance: JSONValue
@@ -244,7 +259,6 @@ class CompileScope:
 @dataclass(frozen=True, slots=True)
 class PendingProposalGap:
     proposal_id: str
-    request_id: str
     operation_revision: int
     input_hash: str
 

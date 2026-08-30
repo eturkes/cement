@@ -84,6 +84,7 @@ from .models import (
     Rejected,
     Resolved,
     ReviewRequired,
+    ReviewResult,
     StaleRevisionAnomaly,
     VerificationReport,
 )
@@ -399,6 +400,235 @@ def _policy_from_text(text: str) -> CompilePolicy:
         return CompilePolicy.from_json(value)
     except ValidationError as exc:
         raise IntegrityError("stored policy is invalid") from exc
+
+
+# -- private proposal binding adapter ---------------------------------------
+#
+# A proposal row carries no scope of its own at SCHEMA_VERSION 2: its operation, operation
+# revision and canonical input live on a private request row that no public value names.
+# These three functions are the ONLY definitions allowed to reach that row on behalf of the
+# proposal read, review and report paths, so M3.6b's schema cut rewrites their statements and
+# leaves every consumer untouched. Consumers supply parameters through a named selection and
+# never SQL; a consumer that composes its own join has inverted the confinement gate even
+# though the complement assertion still passes.
+
+
+@dataclass(frozen=True, slots=True)
+class _ProposalIds:
+    values: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _ProposalFeed:
+    status: str | None
+    after_sequence: int
+    limit: int
+
+
+@dataclass(frozen=True, slots=True)
+class _PendingProposals:
+    operation: str
+    limit: int
+
+
+@dataclass(frozen=True, slots=True)
+class _ProposalBinding:
+    """One proposal joined to the private request row that carries its scope.
+
+    ``row`` holds the proposal's own columns and is what the row-to-shape converters
+    consume; every field beside it was recovered from the request row and is the only
+    supported way for a consumer to read a request-derived value.
+    """
+
+    proposal_id: str
+    partition: str
+    operation: str
+    operation_revision: int
+    input_hash: str
+    request_id: str
+    request_status: str
+    row: sqlite3.Row
+
+
+@dataclass(frozen=True, slots=True)
+class _ProposalBindingSet:
+    total: int
+    rows: tuple[_ProposalBinding, ...]
+
+
+def _proposal_binding_from_row(row: sqlite3.Row, *, partition: str) -> _ProposalBinding:
+    try:
+        proposal_id = _request_id(row["id"])
+        request_id = _request_id(row["bound_request_id"])
+        operation = _name(row["operation"], "operation")
+        operation_revision = _stored_int(
+            row["operation_revision"],
+            "proposal operation revision",
+            minimum=1,
+        )
+        input_hash = _digest(row["input_hash"], "proposal input_hash")
+    except (IndexError, KeyError, TypeError, ValidationError) as exc:
+        raise IntegrityError("pending proposal row has invalid scalar fields") from exc
+    # Cross-field binding consistency deliberately stays with each consumer, at the exact
+    # position it held before this adapter existed. Hoisting it here would pre-empt
+    # _validate_proposal_shape and rewrite the class, message and precedence every corrupt
+    # ledger reports, which is a behaviour change no consumer asked for.
+    return _ProposalBinding(
+        proposal_id=proposal_id,
+        partition=partition,
+        operation=operation,
+        operation_revision=operation_revision,
+        input_hash=input_hash,
+        request_id=request_id,
+        request_status=str(row["bound_request_status"]),
+        row=row,
+    )
+
+
+def _proposal_bindings(
+    connection: sqlite3.Connection,
+    *,
+    partition: str,
+    selection: _ProposalIds | _ProposalFeed | _PendingProposals,
+) -> _ProposalBindingSet:
+    """Resolve proposals with their private request binding, one statement per selection."""
+
+    if type(selection) is _ProposalIds:
+        if not selection.values:
+            return _ProposalBindingSet(total=0, rows=())
+        if len(set(selection.values)) != len(selection.values):
+            raise IntegrityError("proposal binding selection contains duplicate identifiers")
+        placeholders = ", ".join("?" for _ in selection.values)
+        rows = connection.execute(
+            f"""
+            SELECT p.*, r.partition AS bound_request_partition, r.operation,
+                   r.operation_revision, r.input_json, r.input_hash,
+                   r.id AS bound_request_id, r.status AS bound_request_status,
+                   r.proposal_id AS bound_proposal_id
+            FROM proposals AS p
+            JOIN requests AS r ON r.partition = p.partition AND r.id = p.request_id
+            WHERE p.partition = ? AND p.id IN ({placeholders})
+            """,
+            (partition, *selection.values),
+        ).fetchall()
+    elif type(selection) is _ProposalFeed:
+        rows = connection.execute(
+            """
+            SELECT p.*, r.partition AS bound_request_partition, r.operation,
+                   r.operation_revision, r.input_json, r.input_hash,
+                   r.id AS bound_request_id, r.status AS bound_request_status,
+                   r.proposal_id AS bound_proposal_id
+            FROM proposals AS p
+            JOIN requests AS r ON r.partition = p.partition AND r.id = p.request_id
+            WHERE p.partition = ? AND (? IS NULL OR p.status = ?)
+              AND p.status_sequence > ?
+            ORDER BY p.status_sequence LIMIT ?
+            """,
+            (
+                partition,
+                selection.status,
+                selection.status,
+                selection.after_sequence,
+                selection.limit,
+            ),
+        ).fetchall()
+    elif type(selection) is _PendingProposals:
+        count_row = connection.execute(
+            """
+            SELECT COUNT(*) AS item_count
+            FROM proposals AS p
+            JOIN requests AS r ON r.partition = p.partition AND r.id = p.request_id
+            WHERE p.partition = ? AND r.operation = ? AND p.status = 'pending'
+            """,
+            (partition, selection.operation),
+        ).fetchone()
+        if count_row is None:
+            raise IntegrityError("pending proposal count is missing")
+        total = _stored_int(count_row["item_count"], "pending proposal count")
+        rows = connection.execute(
+            """
+            SELECT p.*, r.partition AS bound_request_partition, r.operation,
+                   r.operation_revision, r.input_json, r.input_hash,
+                   r.id AS bound_request_id, r.status AS bound_request_status,
+                   r.proposal_id AS bound_proposal_id
+            FROM proposals AS p
+            JOIN requests AS r ON r.partition = p.partition AND r.id = p.request_id
+            WHERE p.partition = ? AND r.operation = ? AND p.status = 'pending'
+            ORDER BY p.id LIMIT ?
+            """,
+            (partition, selection.operation, selection.limit),
+        ).fetchall()
+        return _ProposalBindingSet(
+            total=total,
+            rows=tuple(
+                _proposal_binding_from_row(row, partition=partition) for row in rows
+            ),
+        )
+    else:
+        raise IntegrityError("proposal binding selection is invalid")
+    bindings = tuple(_proposal_binding_from_row(row, partition=partition) for row in rows)
+    return _ProposalBindingSet(total=len(bindings), rows=bindings)
+
+
+def _proposal_binding(
+    connection: sqlite3.Connection,
+    *,
+    partition: str,
+    proposal_id: str,
+) -> _ProposalBinding | None:
+    """Resolve one proposal, or ``None`` when the partition holds no bound row for it."""
+
+    result = _proposal_bindings(
+        connection,
+        partition=partition,
+        selection=_ProposalIds((proposal_id,)),
+    )
+    if not result.rows:
+        return None
+    if result.total != 1:
+        raise IntegrityError("proposal binding lookup returned the wrong cardinality")
+    return result.rows[0]
+
+
+def _write_proposal_request_status(
+    connection: sqlite3.Connection,
+    *,
+    binding: _ProposalBinding,
+    status: Literal["rejected", "resolved"],
+    final: CanonicalJSON | None,
+    example_id: str | None,
+    now_us: int,
+) -> int:
+    """Carry a review decision onto the private request row. Returns the rowcount."""
+
+    if status == "rejected":
+        return connection.execute(
+            """
+            UPDATE requests SET status = 'rejected', updated_at_us = ?
+            WHERE partition = ? AND id = ? AND status = 'pending'
+              AND proposal_id = ?
+            """,
+            (now_us, binding.partition, binding.request_id, binding.proposal_id),
+        ).rowcount
+    if final is None or example_id is None:
+        raise IntegrityError("a resolved request needs its confirmed output and example")
+    return connection.execute(
+        """
+        UPDATE requests
+        SET status = 'resolved', output_json = ?, source_kind = 'confirmed',
+            example_id = ?, updated_at_us = ?
+        WHERE partition = ? AND id = ? AND status = 'pending'
+          AND proposal_id = ?
+        """,
+        (
+            final.text,
+            example_id,
+            now_us,
+            binding.partition,
+            binding.request_id,
+            binding.proposal_id,
+        ),
+    ).rowcount
 
 
 class System:
@@ -1290,25 +1520,19 @@ class System:
         partition = _name(partition, "partition")
         proposal_id = _request_id(proposal_id)
         with self.store.transaction() as connection:
-            row = connection.execute(
-                """
-                SELECT p.*, r.partition, r.operation, r.operation_revision,
-                       r.input_json, r.input_hash, r.id AS bound_request_id,
-                       r.status AS bound_request_status,
-                       r.proposal_id AS bound_proposal_id
-                FROM proposals AS p
-                JOIN requests AS r ON r.partition = p.partition AND r.id = p.request_id
-                WHERE p.id = ? AND p.partition = ?
-                """,
-                (proposal_id, partition),
-            ).fetchone()
-            if row is None:
+            binding = _proposal_binding(
+                connection,
+                partition=partition,
+                proposal_id=proposal_id,
+            )
+            if binding is None:
                 raise NotFoundError("proposal does not exist in this partition")
+            row = binding.row
             self._validate_proposal_shape(row)
             if row["status"] != "pending":
                 raise StateError(f"proposal is already {row['status']}")
             if (
-                row["bound_request_status"] != "pending"
+                binding.request_status != "pending"
                 or row["bound_proposal_id"] != proposal_id
             ):
                 raise IntegrityError("pending proposal is not bound to a pending request")
@@ -1316,9 +1540,8 @@ class System:
             return ProposalView(
                 id=proposal_id,
                 partition=partition,
-                operation=str(row["operation"]),
-                operation_revision=int(row["operation_revision"]),
-                request_id=str(row["bound_request_id"]),
+                operation=binding.operation,
+                operation_revision=binding.operation_revision,
                 input=input_json.value,
                 proposed_output=proposed.value,
                 provenance=provenance.value,
@@ -1331,20 +1554,14 @@ class System:
         partition = _name(partition, "partition")
         proposal_id = _request_id(proposal_id)
         with self.store.transaction() as connection:
-            row = connection.execute(
-                """
-                SELECT p.*, r.operation, r.operation_revision, r.input_json, r.input_hash,
-                       r.id AS bound_request_id, r.status AS bound_request_status,
-                       r.proposal_id AS bound_proposal_id
-                FROM proposals AS p
-                JOIN requests AS r ON r.partition = p.partition AND r.id = p.request_id
-                WHERE p.id = ? AND p.partition = ?
-                """,
-                (proposal_id, partition),
-            ).fetchone()
-            if row is None:
+            binding = _proposal_binding(
+                connection,
+                partition=partition,
+                proposal_id=proposal_id,
+            )
+            if binding is None:
                 raise NotFoundError("proposal does not exist in this partition")
-            return self._proposal_record(row)
+            return self._proposal_record(binding)
 
     def proposals(
         self,
@@ -1369,28 +1586,19 @@ class System:
         _bounded_int(limit, "limit", minimum=1, maximum=10_000)
         selected_status = None if status == "all" else status
         with self.store.transaction() as connection:
-            rows = connection.execute(
-                """
-                SELECT p.*, r.operation, r.operation_revision, r.input_json, r.input_hash,
-                       r.id AS bound_request_id, r.status AS bound_request_status,
-                       r.proposal_id AS bound_proposal_id
-                FROM proposals AS p
-                JOIN requests AS r ON r.partition = p.partition AND r.id = p.request_id
-                WHERE p.partition = ? AND (? IS NULL OR p.status = ?)
-                  AND p.status_sequence > ?
-                ORDER BY p.status_sequence LIMIT ?
-                """,
-                (
-                    partition,
-                    selected_status,
-                    selected_status,
-                    after_sequence,
-                    limit,
+            bindings = _proposal_bindings(
+                connection,
+                partition=partition,
+                selection=_ProposalFeed(
+                    status=selected_status,
+                    after_sequence=after_sequence,
+                    limit=limit,
                 ),
-            ).fetchall()
-            return [self._proposal_record(row) for row in rows]
+            )
+            return [self._proposal_record(binding) for binding in bindings.rows]
 
-    def _proposal_record(self, row: sqlite3.Row) -> dict[str, JSONValue]:
+    def _proposal_record(self, binding: _ProposalBinding) -> dict[str, JSONValue]:
+        row = binding.row
         self._validate_proposal_shape(row)
         input_json, proposed, provenance = self._proposal_content(row)
         final_output = (
@@ -1405,11 +1613,10 @@ class System:
             "final_output": final_output.value if final_output is not None else None,
             "id": str(row["id"]),
             "input": input_json.value,
-            "operation": str(row["operation"]),
-            "operation_revision": int(row["operation_revision"]),
+            "operation": binding.operation,
+            "operation_revision": binding.operation_revision,
             "proposed_output": proposed.value,
             "provenance": provenance.value,
-            "request_id": str(row["bound_request_id"]),
             "review_note": str(row["review_note"]) if row["review_note"] is not None else None,
             "reviewed_at_us": (
                 int(row["reviewed_at_us"]) if row["reviewed_at_us"] is not None else None
@@ -1428,7 +1635,7 @@ class System:
         decision: str,
         corrected_output: object = _UNSET,
         note: str = "",
-    ) -> Outcome:
+    ) -> ReviewResult:
         partition = _name(partition, "partition")
         proposal_id = _request_id(proposal_id)
         reviewer = _text(reviewer, "reviewer", maximum=256)
@@ -1441,38 +1648,31 @@ class System:
             raise ValidationError("corrected_output is valid only with decision='correct'")
         now = self._now()
         with self.store.transaction(write=True) as connection:
-            row = connection.execute(
-                """
-                SELECT p.*, r.partition, r.operation, r.operation_revision,
-                       r.input_json, r.input_hash, r.id AS bound_request_id,
-                       r.status AS bound_request_status,
-                       r.proposal_id AS bound_proposal_id
-                FROM proposals AS p
-                JOIN requests AS r ON r.partition = p.partition AND r.id = p.request_id
-                WHERE p.id = ? AND p.partition = ?
-                """,
-                (proposal_id, partition),
-            ).fetchone()
-            if row is None:
+            binding = _proposal_binding(
+                connection,
+                partition=partition,
+                proposal_id=proposal_id,
+            )
+            if binding is None:
                 raise NotFoundError("proposal does not exist in this partition")
+            row = binding.row
             if row["status"] != "pending":
                 raise StateError(f"proposal is already {row['status']}")
             current = connection.execute(
                 "SELECT revision FROM operations WHERE partition = ? AND name = ?",
-                (partition, row["operation"]),
+                (partition, binding.operation),
             ).fetchone()
             if (
                 decision != "reject"
                 and (
                     current is None
-                    or int(current["revision"]) != int(row["operation_revision"])
+                    or int(current["revision"]) != binding.operation_revision
                 )
             ):
                 raise StateError(
                     "proposal belongs to an obsolete operation revision; reject it or use a new request"
                 )
             input_json, proposed, _ = self._proposal_content(row)
-            request_id = str(row["bound_request_id"])
             if decision == "reject":
                 proposal_update = connection.execute(
                     """
@@ -1482,15 +1682,15 @@ class System:
                     """,
                     (reviewer, note, now, proposal_id),
                 )
-                request_update = connection.execute(
-                    """
-                    UPDATE requests SET status = 'rejected', updated_at_us = ?
-                    WHERE partition = ? AND id = ? AND status = 'pending'
-                      AND proposal_id = ?
-                    """,
-                    (now, partition, request_id, proposal_id),
+                request_update_count = _write_proposal_request_status(
+                    connection,
+                    binding=binding,
+                    status="rejected",
+                    final=None,
+                    example_id=None,
+                    now_us=now,
                 )
-                if proposal_update.rowcount != 1 or request_update.rowcount != 1:
+                if proposal_update.rowcount != 1 or request_update_count != 1:
                     raise IntegrityError("proposal rejection transition lost its state binding")
                 status_sequence = _event(
                     connection,
@@ -1507,7 +1707,12 @@ class System:
                 )
                 if sequence_update.rowcount != 1:
                     raise IntegrityError("proposal rejection sequence was not bound")
-                return Rejected(request_id=request_id, proposal_id=proposal_id)
+                return ReviewResult(
+                    proposal_id=proposal_id,
+                    status="rejected",
+                    example_id=None,
+                    output=None,
+                )
 
             final = (
                 canonicalize(corrected_output)
@@ -1515,6 +1720,9 @@ class System:
                 else proposed
             )
             example_id = _new_id("ex")
+            proposal_status: Literal["accepted", "corrected"] = (
+                "corrected" if decision == "correct" else "accepted"
+            )
             receipt_value: dict[str, JSONValue] = {
                 "confirmed_at_us": now,
                 "example_id": example_id,
@@ -1526,11 +1734,10 @@ class System:
                 "output": final.value,
                 "partition": partition,
                 "proposal_id": proposal_id,
-                "resolution": "corrected" if decision == "correct" else "accepted",
+                "resolution": proposal_status,
                 "reviewer": reviewer,
             }
             receipt = canonicalize(receipt_value, max_bytes=_RECEIPT_MAX_BYTES)
-            proposal_status = "corrected" if decision == "correct" else "accepted"
             proposal_update = connection.execute(
                 """
                 UPDATE proposals
@@ -1560,8 +1767,8 @@ class System:
                 (
                     example_id,
                     partition,
-                    row["operation"],
-                    row["operation_revision"],
+                    binding.operation,
+                    binding.operation_revision,
                     input_json.text,
                     input_json.digest,
                     final.text,
@@ -1583,8 +1790,8 @@ class System:
                 """,
                 (
                     partition,
-                    row["operation"],
-                    row["operation_revision"],
+                    binding.operation,
+                    binding.operation_revision,
                     input_json.digest,
                     input_json.text,
                     final.text,
@@ -1611,17 +1818,15 @@ class System:
                         payload={"example_id": example_id, "proposal_id": proposal_id},
                         now_us=now,
                     )
-            request_update = connection.execute(
-                """
-                UPDATE requests
-                SET status = 'resolved', output_json = ?, source_kind = 'confirmed',
-                    example_id = ?, updated_at_us = ?
-                WHERE partition = ? AND id = ? AND status = 'pending'
-                  AND proposal_id = ?
-                """,
-                (final.text, example_id, now, partition, request_id, proposal_id),
+            request_update_count = _write_proposal_request_status(
+                connection,
+                binding=binding,
+                status="resolved",
+                final=final,
+                example_id=example_id,
+                now_us=now,
             )
-            if proposal_update.rowcount != 1 or request_update.rowcount != 1:
+            if proposal_update.rowcount != 1 or request_update_count != 1:
                 raise IntegrityError("proposal confirmation transition lost its state binding")
             status_sequence = _event(
                 connection,
@@ -1643,11 +1848,11 @@ class System:
             )
             if sequence_update.rowcount != 1:
                 raise IntegrityError("proposal confirmation sequence was not bound")
-        return Resolved(
-            request_id=request_id,
-            output=final.value,
-            source="confirmed",
+        return ReviewResult(
+            proposal_id=proposal_id,
+            status=proposal_status,
             example_id=example_id,
+            output=final.value,
         )
 
     # -- deterministic compiler ---------------------------------------------
@@ -2639,33 +2844,22 @@ class System:
 
     def _pending_proposal_gap_from_row(
         self,
-        row: sqlite3.Row,
+        binding: _ProposalBinding,
         *,
         partition: str,
         operation: str,
     ) -> PendingProposalGap:
-        try:
-            proposal_id = _request_id(row["id"])
-            request_id = _request_id(row["bound_request_id"])
-            operation_revision = _stored_int(
-                row["operation_revision"],
-                "pending proposal operation revision",
-                minimum=1,
-            )
-            input_hash = _digest(
-                row["input_hash"],
-                "pending proposal input_hash",
-            )
-        except (IndexError, KeyError, TypeError, ValidationError) as exc:
-            raise IntegrityError("pending proposal row has invalid scalar fields") from exc
+        row = binding.row
+        # Every term reads the row rather than the binding record, so this check keeps the
+        # exact fields, order, class and message it had before the adapter existed.
         if (
             row["partition"] != partition
             or row["bound_request_partition"] != partition
             or row["operation"] != operation
-            or row["request_id"] != request_id
+            or row["request_id"] != binding.request_id
             or row["status"] != "pending"
             or row["bound_request_status"] != "pending"
-            or row["bound_proposal_id"] != proposal_id
+            or row["bound_proposal_id"] != binding.proposal_id
         ):
             raise IntegrityError("pending proposal scope or request binding mismatch")
         try:
@@ -2674,10 +2868,9 @@ class System:
         except ValidationError as exc:
             raise IntegrityError(f"pending proposal row is invalid: {exc}") from exc
         return PendingProposalGap(
-            proposal_id=proposal_id,
-            request_id=request_id,
-            operation_revision=operation_revision,
-            input_hash=input_hash,
+            proposal_id=binding.proposal_id,
+            operation_revision=binding.operation_revision,
+            input_hash=binding.input_hash,
         )
 
     def _operation_report_artifact(
@@ -2913,46 +3106,24 @@ class System:
             except (TypeError, ValidationError, ValueError, OverflowError) as exc:
                 raise IntegrityError(f"current build projection is invalid: {exc}") from exc
 
-            pending_count_row = connection.execute(
-                """
-                SELECT COUNT(*) AS item_count
-                FROM proposals AS p
-                JOIN requests AS r
-                  ON r.partition = p.partition AND r.id = p.request_id
-                WHERE p.partition = ? AND r.operation = ? AND p.status = 'pending'
-                """,
-                (partition, operation),
-            ).fetchone()
-            if pending_count_row is None:
-                raise IntegrityError("pending proposal count is missing")
-            pending_count = _stored_int(
-                pending_count_row["item_count"],
-                "pending proposal count",
+            pending_bindings = _proposal_bindings(
+                connection,
+                partition=partition,
+                selection=_PendingProposals(
+                    operation=operation,
+                    limit=projection_limit,
+                ),
             )
-            pending_rows = connection.execute(
-                """
-                SELECT p.*, r.partition AS bound_request_partition,
-                       r.operation, r.operation_revision, r.input_json, r.input_hash,
-                       r.id AS bound_request_id,
-                       r.status AS bound_request_status,
-                       r.proposal_id AS bound_proposal_id
-                FROM proposals AS p
-                JOIN requests AS r
-                  ON r.partition = p.partition AND r.id = p.request_id
-                WHERE p.partition = ? AND r.operation = ? AND p.status = 'pending'
-                ORDER BY p.id LIMIT ?
-                """,
-                (partition, operation, projection_limit),
-            ).fetchall()
-            if len(pending_rows) != min(pending_count, projection_limit):
+            pending_count = pending_bindings.total
+            if len(pending_bindings.rows) != min(pending_count, projection_limit):
                 raise IntegrityError("pending proposal projection count mismatch")
             pending_proposals = tuple(
                 self._pending_proposal_gap_from_row(
-                    row,
+                    binding,
                     partition=partition,
                     operation=operation,
                 )
-                for row in pending_rows
+                for binding in pending_bindings.rows
             )
 
             artifact_status_order = (
