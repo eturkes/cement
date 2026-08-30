@@ -257,6 +257,11 @@ Accept and correct each create exactly one confirmed example. Reject creates non
 decisions return the same four keys, so a script can test `example_id` for null instead of testing
 for a missing key.
 
+The proposal vocabulary and the request vocabulary stay separate. `ReviewResult.status` and
+`proposal show` report `accepted` or `corrected`. The older `System.request_status` and
+`System.handle` lifecycle values still report `resolved` for the same decision. Cement does not
+translate one vocabulary into the other.
+
 `System.get_proposal`, `System.proposal`, `System.proposals`, and `function_report` also expose no
 request identifier. Use `proposal_id` to name a proposal on every surface.
 

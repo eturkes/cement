@@ -3,7 +3,9 @@
 Unit `M3.4`, tier `kernel`, tags `oracle`, depends `M3.3`. Schema stays `SCHEMA_VERSION` 2.
 Session budget = the corrected oracle estimator's four: contract, implementation, battery, closure.
 
-Sections 12 and 13 are PENDING wave-1 harvest. Every other section is ruled and binding.
+Every section is RULED and binding. Sections 12 and 13 carry their rulings in S2 RULING blocks;
+sections 14 and 15 amend the numbered obligations and correct two grounds. Where a numbered
+obligation and a later ruling disagree, the ruling governs.
 
 ## 1. Scope
 
@@ -242,7 +244,7 @@ the mutation sweep at zero survivors against a green control with its verdict mo
 Pending-proposal ordering by a meaningful documented key (D23). Any adapter generalization beyond the
 eight sites. Any `requests` site owned by a later unit.
 
-## 12. FORK 1 — the binding adapter's shape (PENDING wave 1)
+## 12. FORK 1 — the binding adapter's shape (RULED, see also section 15)
 
 Two spikes, identical 14-probe corpus plus the `Z50` swap probe, each DEFENDING one alternative:
 
@@ -348,7 +350,7 @@ Permitted-set delta for D03: add `_proposal_bindings`, `_proposal_binding` and
 `_write_proposal_request_status`. `_ProposalBinding`, `_ProposalIds`, `_ProposalFeed` and
 `_PendingProposals` hold no SQL and stay out.
 
-## 13. FORK 2 — the `ReviewResult` payload (PENDING wave 1)
+## 13. FORK 2 — the `ReviewResult` payload (RULED)
 
 `review` currently returns `Resolved(request_id, output, source="confirmed", example_id)` on
 accept/correct and `Rejected(request_id, proposal_id)` on reject, and `cli.py:520` returns that value
@@ -482,3 +484,82 @@ Stripping it here edits a method this unit does not own and destroys the only au
 request and its proposal while the request lifecycle is still public. The battery asserts the six
 payloads above and asserts the `handle` payload UNCHANGED, so the exception is pinned rather than
 merely tolerated.
+
+## 15. S2 CORRECTIONS — grounds the contract attack falsified, and the claims that narrow
+
+`m3u4-attack.json` (24 lenses, 18 seeded + 6 extension) attacked the S2 rulings themselves. Section
+14 answered the obligations that could not be read literally; this section corrects claims that were
+WRONG. A ruling can survive while one of its stated grounds does not, and a reader who inherits the
+false ground reasons from it later.
+
+THE D22 MATERIALIZATION GROUND IS WITHDRAWN. Section 12 said ALT-PROJECTION's `function_report` wraps
+the constant in a subquery and materializes the whole partition before filtering by operation.
+MEASURED, THAT IS FALSE. Both shapes were run through `EXPLAIN QUERY PLAN` on the shipped schema
+under SQLite 3.53.1, and the plans are IDENTICAL:
+
+```
+SEARCH r USING INDEX requests_scope (partition=? AND operation=?)
+SEARCH p USING INDEX sqlite_autoindex_proposals_3 (partition=? AND request_id=?)
+USE TEMP B-TREE FOR ORDER BY
+```
+
+SQLite flattens the wrapper and pushes the operation predicate down into `requests_scope`. The outer
+`WHERE binding_operation = ?` additionally strength-reduces the spike's LEFT JOIN to an inner join on
+this path. FORK 1'S RULING IS UNCHANGED, because it never depended on this ground: ALT-PROJECTION
+fails D03 with two raw `UPDATE requests` left in `review`, which a read-only SQL constant cannot
+confine, and its LEFT JOIN changes orphan visibility under D12. That third ground is now SHARPER, not
+weaker - strength reduction applies only where the outer query constrains the right table, so the
+singular read path keeps the LEFT JOIN and returns an orphan proposal with NULL binding columns
+instead of failing closed. NEVER ASSERT A QUERY PLAN WITHOUT RUNNING `EXPLAIN QUERY PLAN`; a subquery
+is not a materialization.
+
+Z50 IS A COUPLING CENSUS, NOT A PERFORMED SWAP. Z50 established that all six consumer `WHERE` clauses
+name `p.` columns or the constant's own `binding_*` aliases and never `r.`, so an M3.6b rewrite of the
+join touches no consumer. It did NOT perform a v3 schema swap, and no artifact contains one. The
+ruling's claim is exactly the census: consumers are not coupled to the join's shape. "The adapter
+survives the swap untouched" is a PREDICTION this unit does not verify, and M3.6b owns its proof.
+
+SECTION 1'S "NO CONSUMER LOSES INFORMATION" IS NARROWED. Public consumers plainly do lose access:
+accept and correct results lose `request_id`, `source` and `artifact_id`, proposal readers lose
+`request_id`, and `status` changes value. The true claim is that NO STORED SCHEMA OR ROW INFORMATION
+IS DELETED - schema v2 keeps every byte, and the cut happens once at M3.6b. The public losses are
+intentional and enumerated here.
+
+D12'S BYTE-IDENTITY RULE EXEMPTS `status`, EXPLICITLY. D12 requires every remaining projected value to
+keep its baseline value; section 13 keeps `status` while CHANGING it from `resolved` to
+`accepted`/`corrected`. Both cannot hold silently. The exemption is named and bounded: `status` alone
+is transformed, with grounds in section 13, and every other kept value stays byte-identical.
+
+D24'S "FABRICATED ONLY" PREMISE IS FALSE, and two real-ledger paths disprove it. (1) Malformed JSON:
+a supported pending proposal whose TEXT `input_json` is rewritten to malformed JSON is a schema-valid
+STRICT row, and `parse_json` raises `ValidationError`, which subclasses `ValueError`, straight out of
+a real ledger. (2) Legitimately NULL columns: `final_output_json`, `final_output_hash`, `reviewer`,
+`review_note` and `reviewed_at_us` are nullable by schema, so a mutant dropping a `None` guard yields
+a raw `TypeError` from a real ledger. D24 must therefore ENUMERATE nullable versus non-null converted
+fields, translate real-ledger malformed JSON to `IntegrityError` on all five paths, and reserve the
+word "fabricated" for proxy-injected storage classes alone.
+
+D22'S TAIL IS COUNTED, NOT REACHABLE. The API exposes no cursor past `projection_limit`, so row 10,001
+is observable only through `pending_proposal_count`. The obligation is that the tail CONTRIBUTES TO
+THE EXACT COUNT and is still VALIDATED (section 14, X32), never that a caller can read it.
+
+TWO FINDINGS CLOSED IN CODE THIS SESSION. `slots=True` was unpinned - turning it off keeps the
+constructor signature and resolved hints identical and only adds `__dict__` - so the shape test now
+asserts `__slots__` presence and `__dict__` absence on all three shapes. README published the new
+`accepted`/`corrected` vocabulary without saying the handle lifecycle still reports `resolved`, which
+made the prose read as a system-wide rename; README now contrasts the two vocabularies and states
+that Cement translates neither into the other.
+
+FIVE TEXT DEFECTS STAND CORRECTED. D03's permitted delta must EXCLUDE `_proposal_binding` (section 14
+rules attribution lexical, and the wrapper owns no SQL). D13 assigns the `request_id` deletion to
+`_proposal_record` ALONE, because `_proposal_content` never carried one and its only permitted change
+is its argument source. D16's "unchanged bounds" publishes its numbers: reviewer nonempty,
+control-free, at most 256 UTF-8 bytes; note empty-allowed, control-free, at most 2048 bytes; one
+shared `now` across every provenance edge. The exact CLI triples in section 13 and the schema freeze
+in section 1 are OBLIGATIONS, not commentary, and the S3 battery owns one test each - an unnumbered
+contract paragraph is invisible to a one-test-per-obligation battery.
+
+THE CONTRACT CARRIES PROVENANCE IT SHOULD NOT. Sections 12 and 13 retain wave chronology, dispatch
+history and worktree state, which the project's authoring rule excludes from durable artifacts and
+which competes with the binding obligations for a reader's attention. The narrative moves to
+`.agent/archive/` at milestone close; the obligations stay.

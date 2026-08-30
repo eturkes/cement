@@ -235,6 +235,13 @@ class FrozenPublicShapeTests(unittest.TestCase):
         )
         self.assertTrue(ProposalView.__dataclass_params__.frozen)
         self.assertTrue(PendingProposalGap.__dataclass_params__.frozen)
+        # `slots=True` is invisible to every other assertion here: turning it off keeps the
+        # constructor signature and the resolved hints identical and only gives instances a
+        # `__dict__`, so the shape breaks while the pin stays green.
+        for shape in (ReviewResult, ProposalView, PendingProposalGap):
+            with self.subTest(shape=shape.__name__):
+                self.assertTrue(hasattr(shape, "__slots__"))
+                self.assertNotIn("__dict__", dir(shape))
 
     def test_no_proposal_shape_carries_request_identity(self) -> None:
         for shape in (ReviewResult, ProposalView, PendingProposalGap):
