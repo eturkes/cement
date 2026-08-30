@@ -1,0 +1,203 @@
+{
+  "kind": "attack",
+  "rows": [
+    {
+      "id": "A01",
+      "section": "unknown",
+      "locus": "D12's no-other-projected-value rule applied to the ReviewResult ruling's own removals",
+      "claim": "unknown",
+      "attack": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A02",
+      "section": "unknown",
+      "locus": "the ruled status change from resolved to accepted/corrected: every surface that still says resolved",
+      "claim": "unknown",
+      "attack": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A03",
+      "section": "unknown",
+      "locus": "D01's exactly ONE named private surface against the shipped adapter's actual member count",
+      "claim": "unknown",
+      "attack": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A04",
+      "section": "unknown",
+      "locus": "D02's complement assertion: how a conforming-looking instrument could pass while an access hides",
+      "claim": "unknown",
+      "attack": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A05",
+      "section": "unknown",
+      "locus": "D06's fragment-composition prohibition against the shipped adapter's own parameter handling",
+      "claim": "unknown",
+      "attack": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A06",
+      "section": "unknown",
+      "locus": "D11's single shape test: what a shape it does not enumerate would look like when it breaks",
+      "claim": "unknown",
+      "attack": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A07",
+      "section": "unknown",
+      "locus": "D13's design-smell clause: whether _proposal_record or _proposal_content actually grew",
+      "claim": "unknown",
+      "attack": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A08",
+      "section": "unknown",
+      "locus": "D15's exact row writes and their order under the adapter's writer helper",
+      "claim": "unknown",
+      "attack": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A09",
+      "section": "unknown",
+      "locus": "D17's exactly-one-example claim against every path through review, including quarantine",
+      "claim": "unknown",
+      "attack": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A10",
+      "section": "unknown",
+      "locus": "D19's event sequencing and status_sequence binding under a changed return type",
+      "claim": "unknown",
+      "attack": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A11",
+      "section": "unknown",
+      "locus": "D21's = versus LIKE isolation: whether the shipped fixtures actually carry the colliders",
+      "claim": "unknown",
+      "attack": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A12",
+      "section": "unknown",
+      "locus": "D22's bounded detail and reachable tail against the adapter's own LIMIT handling",
+      "claim": "unknown",
+      "attack": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A13",
+      "section": "unknown",
+      "locus": "D23's preserved-not-fixed ordering: an assertion that passes twice and fails on the third run",
+      "claim": "unknown",
+      "attack": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A14",
+      "section": "unknown",
+      "locus": "D24's fail-closed scalars: which probes are fabricated and whether any is cited as a real-ledger repro",
+      "claim": "unknown",
+      "attack": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A15",
+      "section": "unknown",
+      "locus": "D25 and D26 publication: whether prose alone teaches ReviewResult and the lost request identity",
+      "claim": "unknown",
+      "attack": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A16",
+      "section": "unknown",
+      "locus": "D27's unqualified-form sweep for every qualifier the S2 rulings introduce",
+      "claim": "unknown",
+      "attack": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A17",
+      "section": "unknown",
+      "locus": "section 7's work-list measurement: whether the shipped diff stayed inside it and what moved",
+      "claim": "unknown",
+      "attack": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": "unknown"
+    },
+    {
+      "id": "A18",
+      "section": "unknown",
+      "locus": "the fork-1 ruling's Z50 grounds: whether the shipped adapter really survives the M3.6b swap untouched",
+      "claim": "unknown",
+      "attack": "unknown",
+      "severity": "unknown",
+      "reproduction": "unknown",
+      "acceptance_check": "unknown",
+      "disposition": "unknown"
+    }
+  ]
+}

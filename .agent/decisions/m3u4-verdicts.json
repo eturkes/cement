@@ -1,0 +1,247 @@
+{
+  "kind": "verdicts",
+  "rows": [
+    {
+      "id": "V01",
+      "section": "unknown",
+      "locus": "ReviewResult on reject: whether example_id and output are emitted as null keys or omitted",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "divergent": "unknown",
+      "expected": "unknown",
+      "test_name": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "V02",
+      "section": "unknown",
+      "locus": "ReviewResult.status vocabulary: accepted/corrected/rejected against the baseline's resolved/rejected",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "divergent": "unknown",
+      "expected": "unknown",
+      "test_name": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "V03",
+      "section": "unknown",
+      "locus": "review's return on accept versus correct: which fields differ and which must be byte-identical",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "divergent": "unknown",
+      "expected": "unknown",
+      "test_name": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "V04",
+      "section": "unknown",
+      "locus": "ProposalView without request_id: whether every remaining field keeps its baseline value exactly",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "divergent": "unknown",
+      "expected": "unknown",
+      "test_name": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "V05",
+      "section": "unknown",
+      "locus": "PendingProposalGap without request_id: identity of a gap when two proposals share an input_hash",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "divergent": "unknown",
+      "expected": "unknown",
+      "test_name": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "V06",
+      "section": "unknown",
+      "locus": "the confinement complement set: which definitions may name requests immediately after M3.4",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "divergent": "unknown",
+      "expected": "unknown",
+      "test_name": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "V07",
+      "section": "unknown",
+      "locus": "whether a module-level SQL constant counts as a definition naming requests, and under whose name",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "divergent": "unknown",
+      "expected": "unknown",
+      "test_name": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "V08",
+      "section": "unknown",
+      "locus": "case folding and identifier tokenizing: FROM REQUESTS, requests_scope, and a quoted \"requests\"",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "divergent": "unknown",
+      "expected": "unknown",
+      "test_name": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "V09",
+      "section": "unknown",
+      "locus": "get_proposal's error precedence: missing row, wrong partition, non-pending status, broken request binding",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "divergent": "unknown",
+      "expected": "unknown",
+      "test_name": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "V10",
+      "section": "unknown",
+      "locus": "proposals feed ordering and the status filter under the adapter: exact rows for status=all",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "divergent": "unknown",
+      "expected": "unknown",
+      "test_name": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "V11",
+      "section": "unknown",
+      "locus": "function_report pending count versus detail projection past the projection limit",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "divergent": "unknown",
+      "expected": "unknown",
+      "test_name": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "V12",
+      "section": "unknown",
+      "locus": "function_report pending detail ORDER: what may be asserted about the page and what may not",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "divergent": "unknown",
+      "expected": "unknown",
+      "test_name": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "V13",
+      "section": "unknown",
+      "locus": "review's stale-revision refusal: which decisions it applies to and what it raises",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "divergent": "unknown",
+      "expected": "unknown",
+      "test_name": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "V14",
+      "section": "unknown",
+      "locus": "review's conflict quarantine: artifacts suspended, events emitted, and their payload keys",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "divergent": "unknown",
+      "expected": "unknown",
+      "test_name": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "V15",
+      "section": "unknown",
+      "locus": "the private request-status write on reject versus accept/correct: rowcount checks and failure class",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "divergent": "unknown",
+      "expected": "unknown",
+      "test_name": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "V16",
+      "section": "unknown",
+      "locus": "adapter use inside review's write transaction: statement count and connection.in_transaction",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "divergent": "unknown",
+      "expected": "unknown",
+      "test_name": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "V17",
+      "section": "unknown",
+      "locus": "a proposal whose private request row is missing or mismatched: class, message, and which paths see it",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "divergent": "unknown",
+      "expected": "unknown",
+      "test_name": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "V18",
+      "section": "unknown",
+      "locus": "partition and operation colliders through every adapted read: tenant_a beside tenantXa, case variants",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "divergent": "unknown",
+      "expected": "unknown",
+      "test_name": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "V19",
+      "section": "unknown",
+      "locus": "scalar corruption of the MIDDLE and the LAST of three proposals read through the adapter",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "divergent": "unknown",
+      "expected": "unknown",
+      "test_name": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "V20",
+      "section": "unknown",
+      "locus": "cross-partition and cross-operation proposals: invisibility in every adapted read path",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "divergent": "unknown",
+      "expected": "unknown",
+      "test_name": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "V21",
+      "section": "unknown",
+      "locus": "the CLI proposal show and list payload key sets once request_id leaves the record",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "divergent": "unknown",
+      "expected": "unknown",
+      "test_name": "unknown",
+      "main_verdict": "unknown"
+    },
+    {
+      "id": "V22",
+      "section": "unknown",
+      "locus": "whether any surviving public value reachable from a proposal, read, review or report carries request identity",
+      "reading_a": "unknown",
+      "reading_b": "unknown",
+      "divergent": "unknown",
+      "expected": "unknown",
+      "test_name": "unknown",
+      "main_verdict": "unknown"
+    }
+  ]
+}
