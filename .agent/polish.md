@@ -524,12 +524,17 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   `function eval --bun`/`--in` resolve to `--bundle`/`--input`, while abbreviated LEAF names
   (`function ev`, `proposal sho`) are rejected. M3.5a scopes `allow_abbrev=False` to its two new
   nodes alone, because disabling it globally is a public grammar change outside this unit's mandate
-  and the weakness bites on REMOVAL predicates, which M3.5b owns: a deleted flag stays reachable
-  through any unambiguous prefix of a surviving one, so an absence predicate written as an exact
-  spelling is weaker than the grammar actually accepts. Acceptance: every parser node constructed in
-  `_parser()` sets `allow_abbrev=False`, and one census-derived test walking `_parser()` asserts
-  `--part`, `--bun` and `--in` each return exit 2 with `unrecognized arguments`, alongside at least
-  one removed-flag prefix from M3.5b's own deletion set.
+  and the weakness bites on REMOVAL predicates: a deleted flag stays reachable through any
+  unambiguous prefix of a surviving one, so an absence predicate written as an exact spelling is
+  weaker than the grammar actually accepts. M3.5b DECLINED the global change and closed the removal
+  half locally instead — D06 refuses every proper prefix of a removed flag, exercised over all 112
+  removed-flag/leaf combinations plus a generated proper-prefix matrix, while D10 exempts prefixes a
+  surviving flag legitimately claims. So the removal predicates are sound and the OPEN residue is the
+  public-grammar change alone, which no unit owns yet: disabling abbreviation repo-wide breaks
+  `--part`, `--bun` and `--in` for existing callers and needs its own mandate. Acceptance: every
+  parser node constructed in `_parser()` sets `allow_abbrev=False`, one census-derived test walking
+  `_parser()` asserts `--part`, `--bun` and `--in` each return exit 2 with `unrecognized arguments`,
+  and the break is stated in `README.md` where the grammar is described.
 - No public existing-only or read-only `System` construction exists. `Store.__init__` opens an absent
   path with `O_CREAT|O_EXCL` and `_initialize` then opens a WRITABLE connection, begins IMMEDIATE and
   commits even for an existing ledger (`m3u5a-map.json` `X02`); a probe measured ordinary
@@ -554,15 +559,33 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   `System.__init__` 1, `sqlite3.connect` >= 1 and a ~208 KiB ledger left behind, with
   `Store.transaction` 0 and `System.submit_proposal` 0. Fold this case into the same ruling; the
   acceptance test per leaf must use a malformed argument value as well as a misspelled path.
-- `cli.py:370` holds a bare `65_536` literal bounding `--source-command`, unrelated to provenance
-  and sharing the value by coincidence. M3.5a exported `PROVENANCE_MAX_BYTES` and rewired
-  `system.py`'s three provenance sites plus the new `SUBMISSION_MAX_BYTES` derivation, so this is
-  now the only bare copy of that number in the runtime, and the coincidence invites a future edit to
-  bind it to provenance by mistake. Verdict row `X11` had to be narrowed for it. Acceptance: the
-  source-command bound becomes its own named constant with a docstring stating it is unrelated to
-  provenance, and one test asserts `cli.py` holds zero bare `65_536` literals.
 - 49 of `m3u5a-map.json`'s 55 rows are attention-directing only. MAIN re-derived six findings in
   `m3u5a-s2-probe.py` and consumed the rest as pointers; a validator grade proves each anchor
   resolves and each cell is filled, never that a finding is true. Acceptance: any row promoted to a
   durable claim in a contract, doc or roadmap line is re-derived against HEAD first, and the
   re-derivation is committed beside the claim.
+
+## M3.5b deferrals
+
+- `pri=2` `size=S` — gate 4's `parser_shape` digest instruments only part of what B02's retired
+  `cli.py` pin used to carry, and three facets have NO instrument anywhere in the repo. It digests each
+  action's dest, option strings, default, required flag, nargs and class, plus each node's
+  `allow_abbrev`. It digests no help text, no `choices` and no `type`. Measured: M3.5b rewrote the root
+  description and the `proposal` group help, and the digest held at 151 actions and
+  `ebd2ac811bd9776d`. So a mutant that rewrites a leaf's help into a lie, narrows `choices`, or swaps
+  `type=int` for `type=str` survives the full suite, gate 4 and gate 5 together. B02's docstring claimed
+  the digest closed that remainder; M3.5b corrected the claim, which converts a false assurance into a
+  named gap but adds no coverage. Acceptance: the shape payload carries help, `choices` and `type` per
+  action, gate 4 pins the new digest, and three seeded mutants — a changed help string, a narrowed
+  `choices`, and `type=int` to `type=str` — each move it while the leaf/node census and every existing
+  D24, D25 and D26 assertion stay green.
+
+- `pri=4` `size=S` — no shipped prose names `cement_runtime.example_adapter`. Its only mention was the
+  README quick start's `--source-command '["python3","-m","cement_runtime.example_adapter"]'`, which
+  left with the CLI candidate-source route at M3.5b D22. The module still ships and is still reachable
+  from the library route through `CommandCandidateSource`, which `docs/adapter-protocol.md` documents
+  without naming the bundled stub. A reader following that protocol has no pointer to the working
+  example beside it. M3.7 owns `docs/adapter-protocol.md`, so the fix belongs there rather than in the
+  README. Acceptance: `docs/adapter-protocol.md` names the shipped stub and shows one runnable
+  invocation of it, and one check asserts every runtime module under `src/cement_runtime/` that ships
+  as an operator-facing example is named in at least one shipped document.

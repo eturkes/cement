@@ -184,9 +184,17 @@ class SubmissionBatteryTests(unittest.TestCase):
         set difference in both directions (M3.5b D02, D12, D17). Those three
         cover source reach, leaf names and option isolation alone, and none of
         them notices an old leaf's changed default, help string, payload or
-        dispatch. Gate 4's `parser_shape` digest carries that remainder:
+        dispatch. Gate 4's `parser_shape` digest carries PART of that remainder
+        and no more. It digests each action's dest, option strings, default,
+        required flag, nargs and class, plus each node's `allow_abbrev`, so
         mutating `events --limit` from 1000 to 7 moves the digest while the
         28/35 census and every D24, D25 and D26 assertion stay green.
+
+        It digests no help text, no payload and no dispatch. M3.5b rewrote the
+        root description and the `proposal` group help, then re-derived the
+        digest unchanged at 151 actions and `ebd2ac811bd9776d`. A help, choices
+        or type mutant therefore survives every gate this repo owns. Naming that
+        gap is the point: the earlier wording claimed the digest closed it.
 
         Re-pinning `cli.py` to a fresh baseline stays rejected (M3.5b D28). The
         roadmap schedules M3.6a and M3.7 to edit the same file again, so a
