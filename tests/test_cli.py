@@ -214,28 +214,47 @@ class CLITests(unittest.TestCase):
         )
         self.assertEqual(run.status, 0)
 
-    def confirm(self, operation: str, value: int, tag: str) -> None:
-        adapter = pathlib.Path("examples/echo_adapter.py").resolve()
-        source = json.dumps([sys.executable, str(adapter)])
-        for number in (1, 2):
-            handled = self.payload(
-                self.run_cli(
-                    "handle",
-                    operation,
-                    "--input",
-                    json.dumps({"x": value}),
-                    "--request-id",
-                    f"{tag}-{number}",
-                    "--source-command",
-                    source,
-                )
+    def submission(self, value: object) -> str:
+        # M3.5b removed the `handle` CLI route, so every fixture seeds through
+        # `proposal submit`. This envelope mirrors `examples/echo_adapter.py`
+        # exactly - same output shape, same provenance - so the proposal content
+        # the consuming assertions read is identical to the content the adapter
+        # used to produce.
+        return json.dumps(
+            {
+                "input": value,
+                "output": {"kind": "echo", "value": value},
+                "provenance": {"adapter": "example-stub", "model": None},
+            }
+        )
+
+    def submit(self, operation: str, value: object) -> str:
+        submitted = self.payload(
+            self.run_cli(
+                "proposal",
+                "submit",
+                operation,
+                "--submission",
+                self.submission(value),
             )
-            self.assertEqual(handled["status"], "review_required")
+        )
+        # `handle` answered `review_required`; `submit` acknowledges the id alone.
+        # Pinning the key set here keeps the "seeded proposal is pending" property
+        # the removed status assertion carried.
+        self.assertEqual(set(submitted), {"proposal_id"})
+        return str(submitted["proposal_id"])
+
+    def confirm(self, operation: str, value: int, tag: str) -> None:
+        # `tag` was the `handle` request identity. Submission has no idempotency
+        # key, and two byte-identical submissions yield two proposals, so the
+        # parameter survives for its 100+ call sites and steers nothing.
+        del tag
+        for _ in (1, 2):
             reviewed = self.payload(
                 self.run_cli(
                     "proposal",
                     "review",
-                    str(handled["proposal_id"]),
+                    self.submit(operation, {"x": value}),
                     "--reviewer",
                     "operator",
                     "--decision",
@@ -249,27 +268,15 @@ class CLITests(unittest.TestCase):
     ) -> None:
         # One confirmation only: reviewed leaves a policy-blocked compile scope,
         # unreviewed leaves a pending proposal.
-        adapter = pathlib.Path("examples/echo_adapter.py").resolve()
-        source = json.dumps([sys.executable, str(adapter)])
-        handled = self.payload(
-            self.run_cli(
-                "handle",
-                operation,
-                "--input",
-                json.dumps({"x": value}),
-                "--request-id",
-                tag,
-                "--source-command",
-                source,
-            )
-        )
+        del tag  # see `confirm`: submission carries no request identity
+        proposal_id = self.submit(operation, {"x": value})
         if review:
             self.assertEqual(
                 self.payload(
                     self.run_cli(
                         "proposal",
                         "review",
-                        str(handled["proposal_id"]),
+                        proposal_id,
                         "--reviewer",
                         "operator",
                         "--decision",
@@ -391,31 +398,17 @@ class CLITests(unittest.TestCase):
         )
         self.assertEqual(registered["revision"], 1)
 
-        adapter = pathlib.Path("examples/echo_adapter.py").resolve()
-        source = json.dumps([sys.executable, str(adapter)])
-        for number in (1, 2):
-            pending = self.payload(
-                self.run_cli(
-                    "handle",
-                    "echo",
-                    "--input",
-                    '{"x":1}',
-                    "--request-id",
-                    f"cli-{number}",
-                    "--source-command",
-                    source,
-                )
-            )
-            self.assertEqual(pending["status"], "review_required")
+        for _ in (1, 2):
+            proposal_id = self.submit("echo", {"x": 1})
             queue = self.run_cli("proposal", "list").stdout_json
             self.assertIsInstance(queue, list)
             queue = typing.cast(list[dict[str, typing.Any]], queue)
-            self.assertIn(pending["proposal_id"], {item["id"] for item in queue})
+            self.assertIn(proposal_id, {item["id"] for item in queue})
             resolved = self.payload(
                 self.run_cli(
                     "proposal",
                     "review",
-                    str(pending["proposal_id"]),
+                    proposal_id,
                     "--reviewer",
                     "operator",
                     "--decision",
@@ -423,8 +416,10 @@ class CLITests(unittest.TestCase):
                 )
             )
             self.assertEqual(resolved["status"], "accepted")
-            polled = self.payload(self.run_cli("request", f"cli-{number}"))
-            self.assertEqual(polled["example_id"], resolved["example_id"])
+            # `handle`'s request poll bound the accepted proposal to its example.
+            # M3.5b removes that operator route, so the binding is read off the
+            # review acknowledgement, which is the surviving CLI witness.
+            self.assertTrue(str(resolved["example_id"]).startswith("ex_"))
 
         compiled = self.payload(self.run_cli("compile", "echo"))
         artifact_id = compiled["created"][0]
@@ -444,12 +439,29 @@ class CLITests(unittest.TestCase):
             )
         )
         self.assertEqual(promotion["artifact_id"], artifact_id)
-        hit = self.payload(
+        # `handle` answered a promoted input straight off the artifact. `resolve`
+        # is the surviving deterministic route and it reads the promoted FUNCTION
+        # SET, so the operator lifecycle now runs the three function leaves that
+        # build that set. Every step below is a shipped CLI leaf.
+        self.assertTrue(
+            self.payload(
+                self.run_cli("function", "verify-drafts", "echo", "--actor", "verifier")
+            )["passed"]
+        )
+        manifest = self.payload(self.run_cli("function", "inspect", "echo"))
+        self.payload(
             self.run_cli(
-                "handle", "echo", "--input", '{"x":1}', "--request-id", "cli-hit"
+                "function",
+                "promote",
+                "echo",
+                "--expected-function-hash",
+                str(manifest["function_hash"]),
+                "--actor",
+                "release-manager",
             )
         )
-        self.assertEqual(hit["source"], "artifact")
+        hit = self.payload(self.run_cli("resolve", "echo", "--input", '{"x":1}'))
+        self.assertIs(hit["matched"], True)
         self.assertEqual(hit["output"], {"kind": "echo", "value": {"x": 1}})
 
     def test_machine_readable_error(self) -> None:
@@ -466,13 +478,20 @@ class CLITests(unittest.TestCase):
         self.assertEqual(run.stdout_bytes, b"")
         self.assertEqual(self.error(run)["error"], "invalid")
 
+        # `resolve` checks the ledger exists BEFORE it parses `--input`
+        # (M3.5a D13), so the ledger has to exist or exit 5 pre-empts the cap.
+        self.register("echo")
+
         stdout = io.StringIO()
         stderr_stream = io.StringIO()
         original_stdin = sys.stdin
         try:
             sys.stdin = io.StringIO(" " * 1_048_577)
             with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr_stream):
-                status = main([*self.base, "handle", "echo", "--input", "-"])
+                # `handle --input -` was the oversized-stdin witness. `resolve`
+                # is its successor: same `_input` helper, same DEFAULT_MAX_BYTES
+                # cap, and the read precedes any ledger work on both leaves.
+                status = main([*self.base, "resolve", "echo", "--input", "-"])
         finally:
             sys.stdin = original_stdin
         self.assertEqual(status, 2)
@@ -2954,25 +2973,12 @@ class CLITests(unittest.TestCase):
     def confirm_text(self, operation: str, value: str, tag: str) -> None:
         # `confirm` hardcodes integer inputs; the byte-exactness pins need a
         # corpus whose canonical text is non-ASCII.
-        adapter = pathlib.Path("examples/echo_adapter.py").resolve()
-        source = json.dumps([sys.executable, str(adapter)])
-        for number in (1, 2):
-            handled = self.payload(
-                self.run_cli(
-                    "handle",
-                    operation,
-                    "--input",
-                    json.dumps({"x": value}),
-                    "--request-id",
-                    f"{tag}-{number}",
-                    "--source-command",
-                    source,
-                )
-            )
+        del tag  # see `confirm`: submission carries no request identity
+        for _ in (1, 2):
             self.run_cli(
                 "proposal",
                 "review",
-                str(handled["proposal_id"]),
+                self.submit(operation, {"x": value}),
                 "--reviewer",
                 "operator",
                 "--decision",
@@ -4765,7 +4771,10 @@ class CLITests(unittest.TestCase):
         self.assertTrue(actions["bundle"].required)
         self.assertTrue(actions["input"].required)
         self.assertFalse(actions["expected_function_hash"].required)
-        self.assertEqual(actions["input"].help, options("handle")["input"].help)
+        # M3.5b removed `handle`, the original reference leaf. `resolve` is the
+        # surviving leaf carrying the same `--input` channel, so the register
+        # claim is re-based onto it rather than dropped.
+        self.assertEqual(actions["input"].help, options("resolve")["input"].help)
         for name in ("bundle", "input", "expected_function_hash"):
             with self.subTest(option=name):
                 text = str(actions[name].help)

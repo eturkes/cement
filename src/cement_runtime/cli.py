@@ -31,7 +31,6 @@ from .json_value import (
     parse_json,
 )
 from .models import Candidate, CompilePolicy
-from .source import CommandCandidateSource
 from .system import PROVENANCE_MAX_BYTES, System, _name
 
 
@@ -117,18 +116,6 @@ def _parser() -> argparse.ArgumentParser:
         "--expected-function-hash", help="require the promoted set to hash to this digest"
     )
 
-    handle = commands.add_parser("handle", help="route or create an inert LLM proposal")
-    handle.add_argument("operation")
-    handle.add_argument("--input", required=True, help="JSON text; '-' reads stdin")
-    handle.add_argument("--request-id")
-    handle.add_argument("--retry-failed", action="store_true")
-    handle.add_argument(
-        "--source-command",
-        help='JSON argv, e.g. \'["python","adapter.py"]\'; Cement runs it without a shell',
-    )
-    handle.add_argument("--source-id", default="command-adapter")
-    handle.add_argument("--source-timeout", type=float, default=60.0)
-
     proposal = commands.add_parser("proposal", help="inspect/review supervised proposals")
     proposal_commands = proposal.add_subparsers(dest="proposal_command", required=True)
     proposal_submit = proposal_commands.add_parser("submit", allow_abbrev=False)
@@ -152,9 +139,6 @@ def _parser() -> argparse.ArgumentParser:
     proposal_review.add_argument("--decision", choices=("accept", "correct", "reject"), required=True)
     proposal_review.add_argument("--output", help="corrected JSON; required for correct")
     proposal_review.add_argument("--note", default="")
-
-    request = commands.add_parser("request", help="poll a request without resupplying input")
-    request.add_argument("request_id")
 
     compile_command = commands.add_parser("compile", help="build eligible exact lookup drafts")
     compile_command.add_argument("operation")
@@ -388,16 +372,6 @@ def _absent_ledger(value: str) -> bool:
         return False
 
 
-def _source(value: str | None, *, source_id: str, timeout: float) -> CommandCandidateSource | None:
-    if value is None:
-        return None
-    parsed = parse_json(value, max_bytes=65_536).value
-    if type(parsed) is not list or not parsed or any(type(item) is not str for item in parsed):
-        raise ValidationError("--source-command must be a non-empty JSON array of strings")
-    argv = [str(item) for item in parsed]
-    return CommandCandidateSource(argv, source_id=source_id, timeout_seconds=timeout)
-
-
 def _emit(value: Any, *, stream: Any = None) -> None:
     if stream is None:
         stream = sys.stdout
@@ -593,14 +567,7 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
         # so a malformed `--input` rejected after construction can only ever
         # touch a ledger that already existed.
         raise IntegrityError("ledger file is missing or unreadable")
-    source = None
-    if args.command == "handle":
-        source = _source(
-            args.source_command,
-            source_id=args.source_id,
-            timeout=args.source_timeout,
-        )
-    system = System(args.db, candidate_source=source)
+    system = System(args.db)
 
     if args.command == "operation":
         if args.operation_command == "list":
@@ -650,14 +617,6 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
             },
             status=0 if matched is True else 6,
         )
-    if args.command == "handle":
-        return system.handle(
-            args.partition,
-            args.operation,
-            _input(args.input),
-            request_id=args.request_id,
-            retry_failed=args.retry_failed,
-        )
     if args.command == "proposal":
         if args.proposal_command == "submit":
             envelope = _submission(args.submission)
@@ -697,8 +656,6 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
         if corrected is not _MISSING:
             kwargs["corrected_output"] = corrected
         return system.review(args.partition, args.proposal_id, **kwargs)
-    if args.command == "request":
-        return system.request_status(args.partition, args.request_id)
     if args.command == "compile":
         return system.compile(args.partition, args.operation, compiled_by=args.actor)
     if args.command == "verify":

@@ -280,11 +280,16 @@ EXPECTED: dict[str, dict[str, object]] = {
         "message": "ledger file is missing or unreadable",
         "path_absent_after": True,
     },
-    "parser_census": {"leaves": 30, "nodes": 37},
-    # 126 action lines + one `<node>` line per parser node, which is exactly the census's
-    # 37. The node line carries `allow_abbrev`, so disabling it on an existing leaf moves
-    # the digest (`proposal review` -> `515b30796c61d189`) while the census stays 30/37.
-    "parser_shape": {"actions": 163, "digest": "8b58b465c08aa693"},
+    # Re-based by M3.5b D17: `handle` and `request` leave the grammar, so 30/37 -> 28/35.
+    # The count alone cannot separate this state from pre-M3.5a `c8b82cd`, which is also
+    # 28/35 over the exact INVERSE set, so the name-set grade below carries the claim.
+    "parser_census": {"leaves": 28, "nodes": 35},
+    # 116 action lines + one `<node>` line per parser node, which is exactly the census's
+    # 35. The node line carries `allow_abbrev`, so disabling it on an existing leaf moves
+    # the digest (`proposal review` -> `515b30796c61d189`) while the census stays 28/35.
+    # M3.5b D21: `c8b82cd` reads 154 / `af19339c3995c97d` under THIS algorithm, so the
+    # digest separates the two 28/35 states the census collides.
+    "parser_shape": {"actions": 151, "digest": "ebd2ac811bd9776d"},
     "bare_string_emit": {"bytes": '"prop_probe"\n'},
     "provenance_literal": {
         "exported_constant": True,
@@ -308,12 +313,15 @@ def _grade(report: dict[str, object]) -> list[str]:
             if got != want:
                 failures.append(f"{probe}.{fact}: want {want!r}, got {got!r}")
 
-    # D25 is a NAME claim, so the census pin above is graded a second way.
+    # D25 is a NAME claim, so the census pin above is graded a second way. M3.5b D17
+    # moves the EXPECTATION, never `BASELINE_LEAVES`: the frozenset records `c8b82cd`,
+    # which is history. "Nothing is lost" becomes "exactly these two are lost", which is
+    # what makes the pin discriminate a landed removal from an unlanded one.
     names = set(report["parser_census"]["leaf_names"])  # type: ignore[index,call-overload]
     lost = sorted(BASELINE_LEAVES - names)
     added = sorted(names - BASELINE_LEAVES)
     for label, got, want in (
-        ("parser_census.lost_baseline_leaves", lost, []),
+        ("parser_census.lost_baseline_leaves", lost, ["handle", "request"]),
         ("parser_census.added_leaves", added, ["proposal submit", "resolve"]),
     ):
         verdict = "ok" if got == want else "FAIL"
