@@ -86,6 +86,14 @@ class _FailingBinaryStdin(io.StringIO):
         self.buffer = _FailingBuffer()
 
 
+class _FailingTextStdin(io.StringIO):
+    """Text-only host whose read fails; `StringIO` exposes no `.buffer` (A18)."""
+
+    def read(self, size: int | None = -1) -> str:
+        del size
+        raise OSError("planted stdin failure")
+
+
 class _ExplodingSource:
     def __getattribute__(self, name: str) -> object:
         if name.startswith("__"):
@@ -153,6 +161,26 @@ def _leaf_parsers(
 
     visit(parser, ())
     return leaves
+
+
+def _help_surfaces(parser: argparse.ArgumentParser) -> str:
+    """Every help screen an operator can render, root and intermediates included.
+
+    A subcommand's `help=` string renders in its PARENT's listing and nowhere in
+    its own `format_help()`, so a leaf-only scan sees no `add_parser` help text.
+    """
+
+    screens: list[str] = []
+
+    def visit(node: argparse.ArgumentParser) -> None:
+        screens.append(node.format_help())
+        for action in node._actions:
+            if isinstance(action, argparse._SubParsersAction):
+                for child in action.choices.values():
+                    visit(child)
+
+    visit(parser)
+    return "\n".join(screens)
 
 
 def _parser_census(parser: argparse.ArgumentParser) -> tuple[set[str], int]:
@@ -1036,6 +1064,9 @@ class ObligationBatteryTests(unittest.TestCase):
 
         _, hit_stdout, _ = _invoke([*base, '{"n":12}'])
         _, miss_stdout, _ = _invoke([*base, '{"n":99}'])
+        # Null-ness alone cannot tell the two non-null projections apart, so the
+        # hit is also pinned value-wise against the library's own `FunctionMatch`.
+        hit_match = system.resolve(PARTITION, OPERATION, {"n": 12}).match
         system.suspend_artifact(
             PARTITION,
             artifact_ids[0],
@@ -1077,6 +1108,11 @@ class ObligationBatteryTests(unittest.TestCase):
         )
         self.assertEqual(
             len({json.dumps(body, sort_keys=True) for body in payloads.values()}), 3
+        )
+        self.assertNotEqual(hit_match.output, hit_match.artifact_hash)
+        self.assertEqual(
+            (payloads["hit"]["output"], payloads["hit"]["artifact_hash"]),
+            (hit_match.output, hit_match.artifact_hash),
         )
 
         inconsistent = FunctionResolution(
@@ -1664,6 +1700,7 @@ class ObligationBatteryTests(unittest.TestCase):
                 io.StringIO("x" * (cap + 1)),
                 f"submission stdin exceeds {cap} characters",
             ),
+            (_FailingTextStdin(), "submission stdin could not be read"),
         )
         for stdin_value, message in failures:
             with self.subTest(message=message):
@@ -1673,6 +1710,35 @@ class ObligationBatteryTests(unittest.TestCase):
                 self.assertEqual((status, stdout), (2, ""))
                 self.assertEqual(_payload(stderr)["message"], message)
                 fake.submit_proposal.assert_not_called()
+
+        # `cap` itself is admitted on both branches; only `cap + 1` is oversize.
+        # At the boundary the frame reaches the parser, whose failure is what
+        # surfaces, which is how an accepting reader stays distinguishable from
+        # one that rejects its own limit.
+        fake.reset_mock()
+        with mock.patch.object(cement_cli, "System", return_value=fake):
+            status, stdout, stderr = _invoke(
+                [*base, "-"], stdin=io.StringIO("x" * cap)
+            )
+        self.assertEqual((status, stdout), (2, ""))
+        self.assertEqual(
+            _payload(stderr)["message"],
+            "invalid JSON: Expecting value: line 1 column 1 (char 0)",
+        )
+        fake.submit_proposal.assert_not_called()
+
+        # The binary branch decodes UTF-8, so every non-ASCII frame the library
+        # accepts survives transport.
+        unicode_envelope = '{"input":{"n":12},"output":{"answer":"é"}}'
+        fake.reset_mock()
+        fake.submit_proposal.return_value = "prop_unicode"
+        with mock.patch.object(cement_cli, "System", return_value=fake):
+            status, stdout, stderr = _invoke(
+                [*base, "-"], stdin=_BinaryStdin(unicode_envelope.encode("utf-8"))
+            )
+        self.assertEqual((status, stderr), (0, ""))
+        self.assertEqual(_payload(stdout), {"proposal_id": "prop_unicode"})
+        fake.submit_proposal.assert_called_once()
 
         for option in ("--input", "--output", "--provenance"):
             with self.subTest(option=option):
@@ -3323,6 +3389,13 @@ class ObligationBatteryTests(unittest.TestCase):
         )
         self.assertIn("Cement caches no verification between calls", operator_prose)
         self.assertNotRegex(operator_prose.lower(), r"\b(?:fast|cheap)\b")
+        # Docs may write `cached output` and `Quick start` about other subjects;
+        # a help screen has no such room, so the whole cost vocabulary is banned
+        # across every parser rather than only the two words the prose can spare.
+        self.assertNotRegex(
+            _help_surfaces(cement_cli._parser()).lower(),
+            r"\b(?:cached|cheap|cheaply|fast|instant|instantly|quick|quickly)\b",
+        )
         self.assertNotRegex(
             operator_prose.lower(),
             r"\bresolve\b[^.]{0,100}\b(?:is|stays|uses|returns)\s+cached\b",
