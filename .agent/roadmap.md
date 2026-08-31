@@ -710,16 +710,45 @@ Measured gaps driving the arc:
     suite, script - as the real deliverable. Teammate-written `.md` files under `tests/` or
     `src/` are unaffected; the ban is on report/summary/findings prose.
 
-    S3 REMAINING, resume here: `test-m3u5a-2` is filling `tests/test_cli_channels.py` in
-    `.scratch/worktrees/test-m3u5a-1` (branch `wt/test-m3u5a-1`, seeded at `e9f73dd`), graded by
-    `m3u5a-suite-validate.py` (`UNFILLED-TESTS`/`ROWS-UNCOVERED`/`ORPHAN-TESTS`/`ASSERTIONLESS` all
-    zero for PASS). It was at 8/60 filled and 70% context, so expect two or three successors
-    (`test-m3u5a-3`, ...), each inheriting that worktree and its filled tests. The suite is
-    diff-blind: its `src/` sits at `c8b82cd`, so it can only be proven RED there and MAIN owns the
-    run against the implementation. Then: `git merge --squash wt/test-m3u5a-1`, run the suite green,
-    correct verdict table -> red suite -> code in that order for any legitimate red, and apply the
-    close order (stop all, prove quiescence, per-worktree status in its own call, remove worktrees +
-    `wt/` branches, decisive rerun, commit).
+    S3 DONE, implementation session, ran past two compaction boundaries. `main=` 52% 125K/240K at
+    close; `mate=` 97% 232K/240K (`test-m3u5a-2`). Phase 2 landed: `tests/test_cli_channels.py`
+    60/60 filled and GREEN against the shipped implementation, `m3u5a-suite-validate.py` PASS
+    (unfilled/uncovered/orphan/assertionless all 0). Gate 1 = 871 tests OK in 183s (811 baseline
+    + 60), gate 4 = rc 0 over 19 CHECK lines. Gates 2 and 3 remain S4's.
+    Harvest was a TARGETED CHECKOUT, not `git merge --squash`: `wt/test-m3u5a-1` was based at
+    `c8b82cd`, which PREDATES the implementation commit `e6ba873`, so a squash merge would have
+    reverted `cli.py`, `system.py`, README, both docs and four `.agent/` files. `git diff
+    --name-status main..wt/<name>` showed the branch's only new content was one file (3173
+    insertions), harvested by `git checkout wt/test-m3u5a-1 -- tests/test_cli_channels.py` and
+    proven byte-identical by sha256. Always read the branch's name-status before choosing a merge
+    verb; a worktree older than the primary tree makes squash-merge a silent revert.
+    FIRST CONTACT: 58/60 green with zero code changes. Both reds were INSTRUMENT defects, corrected
+    verdict table -> red suite, code untouched.
+    X19 asserted `stderr.count("\n") == 1` for "exactly one JSON stderr object". `cli.py:382` emits
+    every envelope as `json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n"`,
+    byte-identical at `c8b82cd`, so a one-object failure carries 4 newlines. One object is not one
+    line. Replaced by an exact round-trip assertion on that framing, which is strictly stronger:
+    it also rejects a second object and any trailing byte. It was the only newline-count assertion
+    in the file.
+    X28's ruling said README ships "the exit-class table"; the classes ship as PROSE, so its
+    markdown numeric-cell regex matched ZERO rows across the whole publication union. Behind that
+    failure sat a second latent one: the ruling quoted `resolve writes nothing` unbackticked while
+    README:186 ships ``resolve` writes nothing.` and architecture.md:78 seconds it with `The leaf
+    writes nothing`. DURABLE RULE, cost both reds: a ruling that quotes shipped prose must quote it
+    BYTE-EXACT or name the token search that must match it. Now encoded in X28's own ruling text.
+    Negative controls on both corrections, every mutated file restored to a clean `git diff --stat`:
+    `indent=2`->`indent=None` turns X19 red (6 subtests); deleting the backticked write-freedom
+    sentence turns X28 red; erasing every `exit 5` witness across the union turns X28 red. Deleting
+    README's `exit 3` alone SURVIVES, correctly - A6 rules the union and exit 3 has two witnesses
+    there, so a per-file mutation cannot falsify a union-scoped obligation.
+    `test-m3u5a-2` filled 60/60 across ten six-test checkpoints, reported inline, STOPPED at 97%.
+    Its rate went 18 rows in its first 176K then 42 rows in the next 37K: the flush directive that
+    named the exact stop condition and the exact report shape was worth more than any added
+    context. DIFF-BLINDNESS AUDITED over its transcript - zero reads under the primary tree's
+    `src/`, zero `git show main:`, zero `git diff main`; its two `e6ba873` mentions are MAIN's own
+    ruling text quoted inside the verdict table it was entitled to read.
+    Worktree and branch REMOVED; `git worktree list` is the primary tree alone and zero `wt/`
+    branches remain.
 
     S4 ENTRY STATE: fill the attack table's per-row `disposition`/`main_note` columns through an
     idempotent `--check` patcher asserting the id set (pattern `m3u5a-rule-verdicts.py`; every
@@ -730,6 +759,11 @@ Measured gaps driving the arc:
     verdict module list printed, its acceptance predicate written as a NAMED SURVIVOR SET, and its
     UNMUTATED control run reported GREEN on the same control line. The 33 `material` attack rows are
     battery-design constraints and are the battery's specification, not S3 defects.
+    The battery is diff-blind, so its worktree branches from `c8b82cd` - the last commit before
+    `e6ba873` - and MAIN alone runs it against the implementation. Seed `m3u5a-battery-validate.py`
+    and the stub it grades BEFORE dispatch, grade the seed both ways, and brief the report as
+    inline final-message content. `tests/test_cli_channels.py` is already green in the primary tree
+    and is NOT the battery: it encodes the 60 verdict rows, while the battery encodes D01-D30.
   - M3.5b tier=kernel tags=- depends=M3.5a - remove `handle`/`request`/source grammar, imports, fixtures,
     help and operator prose.
   - M3.6a tier=kernel tags=- depends=M3.5b - delete public lifecycle methods, leases, result models and

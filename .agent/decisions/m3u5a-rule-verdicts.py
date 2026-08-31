@@ -394,7 +394,10 @@ RULINGS: dict[str, tuple[str, str]] = {
     "X19": (
         "CONFIRMED. Six classes, each with empty stdout and exactly one JSON stderr object. The "
         "empty-stdout half matters as much as the status: a leaf that printed a partial payload "
-        "before failing would still exit correctly.",
+        "before failing would still exit correctly. Encoding note: one object is NOT one line. "
+        "cli.py emits every envelope as `json.dumps(value, ensure_ascii=False, sort_keys=True, "
+        "indent=2) + \"\\n\"`, unchanged since c8b82cd, so the stderr of a single-object failure "
+        "holds 4 newlines. Assert the exact round-trip of that framing, never a newline count.",
         "ENCODE",
     ),
     "X20": (
@@ -458,10 +461,20 @@ RULINGS: dict[str, tuple[str, str]] = {
     ),
     "X28": (
         "CONFIRMED, verified against shipped prose. README ships both grammars in runnable blocks, "
-        "the seven-key payload table, `proposal_id` at status 0, the exit-class table, `Cement "
-        "gives no idempotency here` and `resolve writes nothing`. One battery note: the shipped "
-        "blocks spell the invocation `uv run cement ... resolve` while prose says `cement "
-        "resolve`, so a token search must accept both spellings.",
+        "the seven-key payload table, `proposal_id` at status 0, every exit class, `Cement gives "
+        "no idempotency here` and the write-freedom sentence. Three spellings the battery must "
+        "honour, each measured against the shipped bytes. First, the runnable blocks spell the "
+        "invocation `uv run cement ... resolve` while prose says `cement resolve`, so a token "
+        "search must accept both. Second, the exit classes ship as PROSE, not as table cells: "
+        "`Exit 6 is the negative-verdict class`, then `Exit 2 covers usage and validation. Exit 3 "
+        "means an absent object, exit 4 a state conflict, and exit 5 an integrity failure.`, with "
+        "exit 0 named where root `verify` reports a failed verification. A markdown numeric-cell "
+        "regex over the publication set matches ZERO rows, so scan `exit N`/`status N` tokens and "
+        "require {0,2,3,4,5,6} while 1 stays absent. Third, README:186 ships the write-freedom "
+        "sentence as ``resolve` writes nothing.` with the identifier backticked, seconded by "
+        "`The leaf writes nothing` at architecture.md:78; an unbackticked literal search for "
+        "`resolve writes nothing` matches nothing. Quote shipped prose byte-exact in a ruling or "
+        "name the token search that must match it.",
         "ENCODE",
     ),
     "X29": (
