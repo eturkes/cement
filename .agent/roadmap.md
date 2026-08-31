@@ -784,6 +784,42 @@ Measured gaps driving the arc:
     Brief the report as inline final-message content. `tests/test_cli_channels.py` is already green
     in the primary tree and is NOT the battery: it encodes the 60 verdict rows, D01-D30 is a
     different axis, and the battery must be authored without reading it.
+
+    S4 CHECKPOINT 1, `main=` 84% 201K/240K. Shipped at `75f0678` (gate-3 harness + 50-site seed) +
+    `8f091fe` (Y08 code fix + A10 gate-4 extension). Gate 1 = 871 tests / 0 failures / OK /
+    175.813 s; gate 4 = rc 0 over 19 CHECK lines.
+    TWO TEAMMATES LIVE, both worktree-isolated, both seeded by a MAIN-committed both-ways-graded
+    validator: `test-m3u5a-3` (`.scratch/worktrees/test-m3u5a-3`, branch at `c8b82cd` + current
+    `.agent/decisions/`, marker `TEST-M3U5A-3-DONE-1`) filling the 30-test diff-blind obligation
+    battery; `gate-m3u5a-1` (`.scratch/worktrees/gate-m3u5a-1`, branch at `75f0678`, marker
+    `GATE-M3U5A-1-DONE-1`) filling the 50-row mutant catalogue and running the PRE-BATTERY baseline
+    sweep against `tests.test_cli_channels` alone.
+    THE ATTACK TABLE FOUND A REAL CODE DEFECT, which the roadmap's own S4 entry state had ruled out
+    in advance: it recorded the 33 `material` rows as "battery-design constraints, not S3 defects",
+    and `Y08` is a shipped defect. `os.path.exists` follows the link, so a dangling symlink, a
+    missing parent and an embedded NUL all fired D13's precheck at exit 5 where the identical paths
+    on a precheck-free leaf answer exit 2 with a precise diagnosis — D12 freezes that map and calls
+    it untouched, so two obligations contradicted each other in shipped code. STANDING RULE: a
+    severity label assigned by the reviewer is a sorting hint, never a disposition; MAIN re-derives
+    every row before recording one, and a whole-severity-class ruling written before the rows are
+    read is a claim, not a triage.
+    A DIGEST OVER ACTIONS CANNOT SEE A PARSER-LEVEL FLAG. `A10` measured gate 4's `parser_shape`
+    blind to `allow_abbrev`, which is exactly the property D25 claims to preserve. The fix is one
+    `<node>` line per parser node; 126 -> 163 lines, and the negative control (disable it on
+    `proposal review`) moves the digest while the 30/37 census stays put. Generalize: when a pin
+    digests a collection, check which attributes live on the CONTAINER and are therefore invisible
+    to it.
+    S4 REMAINING: rule all 50 attack rows through an idempotent `--check` patcher; land the new
+    amendments (A9+) in a contract section 15 — MAIN's re-derivation upheld `A04 A07 A08 A10 A11
+    A17 Y07 Y08 Y10 Y15 Y16 Y17 Y19 Y20 Y24 Y25` as contract-text defects, so the battery arrives
+    written against A1-A8 and MAIN applies the amendment deltas at harvest, which is the designed
+    flow and not a re-dispatch; fix `m3u5a-battery-validate.py`'s `A\d` amendment regex, which
+    silently drops `A10` and every later id; harvest both teammates; run the DECISIVE sweep with
+    both verdict modules; close.
+    M41 IS ALREADY A RULED SURVIVOR AND ITS RULING PRE-DATES THE SWEEP, which is `Y12`'s own demand:
+    `FunctionMatch.matched` is `bool` and the CLI binds `None if match is None else match.matched`,
+    so identity and truthiness agree over the whole `{True, False, None}` domain. `6` -> `7` on the
+    same line is killed by six tests, which is the harness's positive control.
   - M3.5b tier=kernel tags=- depends=M3.5a - remove `handle`/`request`/source grammar, imports, fixtures,
     help and operator prose.
   - M3.6a tier=kernel tags=- depends=M3.5b - delete public lifecycle methods, leases, result models and
