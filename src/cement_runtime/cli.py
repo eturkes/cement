@@ -77,8 +77,9 @@ def _parser() -> argparse.ArgumentParser:
     parser = _JSONArgumentParser(
         prog="cement",
         description=(
-            "Supervised LLM fallback that compiles confirmed behavior"
-            " into exact deterministic artifacts"
+            "Supervised proposal capture that compiles confirmed behavior into"
+            " exact deterministic artifacts, then answers inputs from the"
+            " promoted function set"
         ),
     )
     parser.add_argument("--db", default=os.environ.get("CEMENT_DB"), help="SQLite ledger path")
@@ -116,7 +117,9 @@ def _parser() -> argparse.ArgumentParser:
         "--expected-function-hash", help="require the promoted set to hash to this digest"
     )
 
-    proposal = commands.add_parser("proposal", help="inspect/review supervised proposals")
+    proposal = commands.add_parser(
+        "proposal", help="submit/inspect/review supervised proposals"
+    )
     proposal_commands = proposal.add_subparsers(dest="proposal_command", required=True)
     proposal_submit = proposal_commands.add_parser("submit", allow_abbrev=False)
     proposal_submit.add_argument("operation")

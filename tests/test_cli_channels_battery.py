@@ -2504,6 +2504,14 @@ class ObligationBatteryTests(unittest.TestCase):
         recovery prose is deleted (`A08`). The predicate is positive: the corpus must state
         pending-proposal ENUMERATION as the recovery route, and must contain no
         `retry|resubmit|run again|repeat` advice.
+
+        M3.5b D22 re-scopes A11's positive control. The CLI `handle` leaf is gone, so README's
+        retry advice moved onto the surviving library route and now reads `call `System.handle`
+        again with `retry_failed=True``. The control asserts that NEW spelling. Its role is
+        unchanged: it proves the README still carries retry advice OUTSIDE the submission
+        corpus, which is what keeps the scoped absence assertion above non-vacuous. Deleting
+        the control instead of moving it would leave that assertion passing on a README with no
+        retry prose at all, which is exactly the A08 failure A11 was written to prevent.
         """
         # BASELINE c8b82cd: red — no CLI submission can demonstrate non-idempotency.
         _leaf_parser(self, cement_cli._parser(), ("proposal", "submit"))
@@ -2577,7 +2585,7 @@ class ObligationBatteryTests(unittest.TestCase):
             r"\b(?:should|must|can|may|please)\s+(?:retry|resubmit|run again|repeat)\b"
             r"|(?:^|[.!?:;]\s+)(?:retry|resubmit|run again|repeat)\b",
         )
-        self.assertIn("retry `handle` with `--retry-failed`", readme)
+        self.assertIn("call `System.handle` again with `retry_failed=True`", readme)
 
     def test_d24_zero_source_calls_zero_system_propose_calls_and_zero_sourc(
         self,

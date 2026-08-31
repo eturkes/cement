@@ -171,24 +171,27 @@ class SubmissionBatteryTests(unittest.TestCase):
     def test_b02_cli_py_command_supervisor_py_and(self) -> None:
         """B02. Comparing each current byte stream to git object f9b9755 pins both frozen runtime files.
 
-        `src/cement_runtime/cli.py` was a third member and is retired here by
-        M3.5a contract D27, which adds two CLI leaves to that file by
+        `src/cement_runtime/cli.py` was a third member, retired by M3.5a
+        contract D27 because that unit added two CLI leaves to the file by
         definition. The property this pin carried for it - M3.3 added no CLI
         channel and no CLI candidate-source reach - migrated to M3.5a's D24
         (zero `_source`, `System.propose` and source calls from either new
-        leaf), D25 (the `_parser()`-derived census, 28 to 30 leaves and 35 to 37
-        nodes, with all 28 existing leaf paths unchanged) and D26 (cross-leaf
-        option isolation). Those three cover source reach, leaf names and option
-        isolation alone, and none of them notices an old leaf's changed default,
-        help string, payload or dispatch. Gate 4's `parser_shape` digest carries
-        that remainder: mutating `events --limit` from 1000 to 7 moves the
-        digest while the 30/37 census and every D24, D25 and D26 assertion stay
-        green.
+        leaf), D25 (the `_parser()`-derived census) and D26 (cross-leaf option
+        isolation). M3.5b D27 supersedes the first two. `_source` no longer
+        exists, so D24's zero-call clause is an absence assertion (M3.5b D08),
+        and the census migration reverses, because M3.5b removes the `handle`
+        and `request` leaves - 30 to 28 leaves and 37 to 35 nodes, pinned as a
+        set difference in both directions (M3.5b D02, D12, D17). Those three
+        cover source reach, leaf names and option isolation alone, and none of
+        them notices an old leaf's changed default, help string, payload or
+        dispatch. Gate 4's `parser_shape` digest carries that remainder:
+        mutating `events --limit` from 1000 to 7 moves the digest while the
+        28/35 census and every D24, D25 and D26 assertion stay green.
 
-        Re-pinning `cli.py` to a fresh baseline is rejected. The roadmap
-        schedules M3.5b to edit the same file again, so a per-unit re-pin passes
-        at the moment it is written and reports its next scheduled break as a
-        defect.
+        Re-pinning `cli.py` to a fresh baseline stays rejected (M3.5b D28). The
+        roadmap schedules M3.6a and M3.7 to edit the same file again, so a
+        per-unit re-pin passes at the moment it is written and reports its next
+        scheduled break as a defect.
         """
         paths = (
             "src/cement_runtime/_command_supervisor.py",

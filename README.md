@@ -34,7 +34,7 @@ handle(request)
 ## Guarantees
 
 - LLM output is inert until an explicit supervisor accepts or corrects it.
-- The ordinary `handle` result exposes a proposal ID, never the proposed output. Review uses a
+- A proposal-creating call returns a proposal ID, never the proposed output. Review uses a
   separate surface.
 - Confirmed examples bind partition, operation revision, canonical input, final output, reviewer,
   resolution, time, and receipt digest.
@@ -86,17 +86,16 @@ uv run cement --db demo.db --partition acme operation register support.reply \
 The relaxed thresholds above are for a local demonstration. Defaults require three confirmations,
 two recorded reviewers, and a seven-day observation span.
 
-Ask the registered operation to handle JSON. The bundled adapter is a deterministic protocol stub,
-not an LLM. Replace its command with your provider wrapper.
+Generate a candidate with your own model or tooling. Then submit it. Cement stores it as one
+pending proposal.
 
 ```bash
-uv run cement --db demo.db --partition acme handle support.reply \
-  --request-id ticket-001 \
-  --input '{"question":"Where is my invoice?"}' \
-  --source-command '["python3","-m","cement_runtime.example_adapter"]'
+uv run cement --db demo.db --partition acme proposal submit support.reply \
+  --submission '{"input":{"question":"Where is my invoice?"},
+                 "output":{"kind":"reply","text":"Your invoice is in the billing portal."}}'
 ```
 
-A miss returns `review_required` and a proposal ID. Only the review surface reveals the suggestion:
+The command returns a proposal ID and nothing else. Only the review surface reveals the candidate:
 
 ```bash
 uv run cement --db demo.db --partition acme proposal list
@@ -105,8 +104,8 @@ uv run cement --db demo.db --partition acme proposal review prop_REPLACE_ME \
   --reviewer operator-1 --decision accept
 ```
 
-Repeat with a distinct request ID until the confirmations satisfy the operation policy. Then run the
-independently gated lifecycle:
+Repeat the submit and review steps until the confirmations satisfy the operation policy. Then run
+the independently gated lifecycle:
 
 ```bash
 uv run cement --db demo.db --partition acme compile support.reply
@@ -210,8 +209,8 @@ size of the input. Cement caches no verification between calls.
 
 ### Submitting a candidate you already hold
 
-`cement proposal submit` writes one pending proposal from a candidate you supply. Use it instead of
-`handle` when you generate the candidate yourself. The command never runs a candidate source.
+`cement proposal submit` writes one pending proposal from a candidate you supply. It is the only
+command that creates a proposal. No command runs a candidate source.
 
 ```bash
 uv run cement --db demo.db --partition acme proposal submit support.reply \
@@ -245,7 +244,8 @@ identifiers. Do not retry a failed submission. List the partition's pending prop
 uv run cement --db demo.db --partition acme proposal list --status pending
 ```
 
-Review a submitted proposal with the same `proposal review` command that the `handle` route uses.
+Review a submitted proposal with the `proposal review` command. Every route that writes a proposal
+shares that one review surface.
 
 ## Library API
 
@@ -324,8 +324,8 @@ own input.
 
 The request row stays internal to this route. The two signatures neither accept nor return its
 identifier. Schema v2 keeps the row as internal storage, and no proposal, review, or report value
-shows it. Only the `handle` and `request` route still carries a request identifier, because the
-caller supplies that identifier itself.
+shows it. Only the `System.handle` and `System.request_status` library route still carries a request
+identifier, because the caller supplies that identifier itself.
 
 ### Reviewing a proposal
 
@@ -352,14 +352,15 @@ request identifier. Use `proposal_id` to name a proposal on every surface.
 
 ## Request outcomes
 
-`handle` and `request` return explicit states:
+`System.handle` and `System.request_status` return explicit states. No command reaches them. The
+request lifecycle is a library route.
 
 | Status | Meaning | Caller action |
 |---|---|---|
 | `resolved` | Current promoted artifact or still-valid confirmed fixture produced the output. | Re-run live authorization/policy. Then apply the plan idempotently. |
 | `review_required` | A hidden candidate awaits supervision. | Inspect the named proposal on the separate review surface. |
-| `in_progress` | This partition's generation lease is active. | Poll `request REQUEST_ID`. While the lease is active, the input needs no resubmission. |
-| `fallback_failed` | The candidate source failed, or its generation lease expired, and Cement stored no output. | For a stored source failure, retry `handle` with `--retry-failed` or use a new ID. For `generation_lease_expired`, resubmit the original `handle` input and request ID to reclaim the lease. |
+| `in_progress` | This partition's generation lease is active. | Poll `System.request_status`. While the lease is active, the input needs no resubmission. |
+| `fallback_failed` | The candidate source failed, or its generation lease expired, and Cement stored no output. | For a stored source failure, call `System.handle` again with `retry_failed=True`, or use a new ID. For `generation_lease_expired`, resubmit the original `System.handle` input and request ID to reclaim the lease. |
 | `rejected` | A supervisor rejected the proposal. | Use a new request ID to request another candidate. |
 | `reconciliation_required` | A previously returned source lost validity through revocation, suspension, a failed integrity check, or an obsolete operation revision. Cement returns no cached output. | Reconcile any effects already attempted. Then submit a new request ID. |
 
@@ -440,7 +441,7 @@ and reads the bundle path, and importing `cement_runtime` still loads `sqlite3`.
 Every library call and every CLI command assumes that your service already authorized access to the
 exact partition. That applies to operation registration and revision, proposal review, compilation,
 verification, promotion, challenge, evidence revocation, and artifact suspension. It applies equally to
-`handle` and to all reads. `operation revise`
+`System.handle` and to all reads. `operation revise`
 always creates a semantic revision and retires older builds, even when threshold values stay unchanged.
 Linux is the strongest command-adapter deployment target: Cement uses a subreaper supervisor there to
 kill and reap detached descendants. This is lifecycle containment for a trusted provider wrapper, not

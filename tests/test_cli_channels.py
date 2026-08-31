@@ -3004,6 +3004,10 @@ class CliChannelTests(unittest.TestCase):
         `README` as placeholders, and placeholders inside inline code in prose - `request
         REQUEST_ID`, `events --after SEQUENCE` - are outside D29's scope. The battery must walk
         fences line by line and consider shipped command blocks only.
+
+        M3.5b D22 removed `request REQUEST_ID` from README with the CLI route it named. The
+        rule and the extractor are unchanged; `events --after SEQUENCE` remains as the live
+        illustration.
         """
         markdown = (ROOT / "README.md", *sorted((ROOT / "docs").glob("*.md")))
         shell_languages = {"bash", "sh", "shell", "console"}
