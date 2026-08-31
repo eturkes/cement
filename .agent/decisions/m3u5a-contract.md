@@ -335,11 +335,77 @@ Each entry carries its acceptance check, written now while the evidence is fresh
 - **`m3u5a-map.json` rows not re-derived by MAIN.** Section 2 credits six findings. The remaining
   49 rows are attention-directing and were consumed as pointers only. Check: any row promoted to a
   durable claim is re-derived first.
+- **`cli.py:370`'s coincidental `65_536`.** It bounds `--source-command` and is unrelated to
+  provenance, but it is now the only bare copy of that number in the runtime and forced `X11` to be
+  narrowed. Check: it becomes a named constant documented as provenance-unrelated, and one test
+  asserts `cli.py` holds zero bare `65_536` literals.
 
 ## 13. Verdict table — MAIN-final
 
-PENDING. Filled at S3 from the diff-blind `test` teammate's phase-1 table, ruled by MAIN before
-implementation, and written by an idempotent `--check` patcher that asserts the id set.
+Table = `.agent/decisions/m3u5a-verdicts.json`, 60 rows (28 seeded, 32 extension), produced
+diff-blind at `wt/test-m3u5a-1` and graded `PASS` with `UNKNOWN-CELLS 0` and
+`CONCRETE-EXPECTATIONS 60` by `uv run python .agent/decisions/m3u5a-wave2-validate.py
+.agent/decisions/m3u5a-verdicts.json`.
+
+MAIN's `main_verdict` and `action` columns are written by
+`uv run python .agent/decisions/m3u5a-rule-verdicts.py [--check]`, idempotent and asserting the id
+set, so a later row addition fails loudly rather than going unruled. Ruled distribution:
+**58 CONFIRMED, 2 SCOPED; 53 ENCODE, 7 ENCODE-SCOPED**. `ENCODE-SCOPED` rows are
+`X01, X02, X06, X11, X16, X20, X29` — each carries a narrowing the battery must apply, because the
+literal row would go red against correct code.
+
+Ten rows are `divergent: yes`: `V12, V19, V22, X01, X02, X05, X06, X12, X16, X29`. Six forced the
+amendments below; `V19`, `V22` and `X12` were wording forks the contract left open and the ruling
+now closes on the shipped sentences; `X05` proved a suspected conflict is not one.
+
+Five expectations were corrected against MAIN's live measurement before ruling — `V18`, `V22`,
+`X11`, `X16` and `X16`'s divergence flag. Each would have gone red against correct code.
+
+### Amendments — binding, superseding the cited section text
+
+- **A1 (D01, D14)** The guarantee is that no option prefix ever BINDS: every prefix invocation
+  exits 2 with empty stdout. The message is `unrecognized arguments: <prefix> <value>` only when
+  the required option is separately supplied. A prefix standing IN PLACE of the required option
+  answers `the following arguments are required: --input` (or `--submission`), because argparse
+  runs its required check inside `parse_known_args`, ahead of the leftover check in `parse_args`.
+  D01's "every other prefix is `unrecognized arguments`" named one of the two messages as if it
+  were the property.
+- **A2 (D05)** The library owns precedence AMONG library validations —
+  `partition → operation → expected hash → input` holds for every value that reaches
+  `System.resolve`. CLI value-parsing necessarily precedes all of it, because `--input` must become
+  a value before the call exists: `--input '{bad' --expected-function-hash bad` is exit 2
+  `invalid JSON: …`, while `--input 1 --expected-function-hash bad` is the library's
+  `expected_function_hash must be a SHA-256 hex digest`. Duplicating `_digest` in the CLI to
+  restore the literal edge is REJECTED — it puts a second copy of a library validator on the
+  surface D05 exists to keep thin.
+- **A3 (D06)** One `Store.transaction(write=False)` per invocation that REACHES THE LEDGER. A
+  rejected invocation opens zero. Observable: `{valid: 1, invalid: 0}`.
+- **A4 (D09)** The biconditional binds `matched` ALONE. `output` and `artifact_hash` are null
+  whenever no artifact is projected, which includes the verified miss where `matched` is `false`.
+  Measured `(matched is None, output is None, artifact_hash is None)`: hit `(F,F,F)`, miss
+  `(F,T,T)`, failed `(T,T,T)`. The domain narrows to values `System.resolve` computes through the
+  SHIPPED `verify_function`. The defensive guard at `system.py:3835` returns `match=None` whenever
+  `not verification.passed or document is None`, so an overridden `verify_function` yielding a
+  passing verification with no document produces `(passed: true, matched: null)`. The CLI does not
+  normalize that pair, and normalizing it is REJECTED: mapping it to `matched: false` would launder
+  an internal inconsistency into an ordinary miss, and the null is exactly the signal that should
+  stay visible.
+- **A5 (D18)** `before any transaction opens` is TRUE as written at the `Store.transaction` seam
+  and is retained. Added, because D18 omitted it: envelope validation runs in the dispatch branch,
+  AFTER `System(...)`, so a writing leaf creates its ledger and initialises the schema before
+  rejecting a malformed envelope. Measured on all four envelope failures: `System.__init__` 1,
+  `sqlite3.connect` ≥ 1, `Store.transaction` 0, `System.submit_proposal` 0, ledger present
+  afterwards at ~208 KiB. Giving `proposal submit` a D13-style precheck is REJECTED: creating the
+  ledger is a legitimate first use of a writing leaf. The residual — an invalid argument value
+  creating the ledger on ANY writing leaf — is CLI-wide, pre-existing, and deferred (section 12).
+- **A6 (D28)** The mechanical grep is a UNION over `README.md`, `docs/architecture.md` and
+  `docs/threat-model.md`: each spelling appears at least once in that union, and README carries
+  both. `docs/adapter-protocol.md` is OUTSIDE the union — it documents the adapter protocol and
+  names no CLI leaf. Measured cells for (`cement resolve`, `cement proposal submit`): README
+  `(1,1)`, architecture `(1,1)`, threat-model `(1,2)`, adapter-protocol `(0,0)`. The per-file
+  reading is rejected on merits: it forces redundant grammar transcription into documents whose job
+  is not teaching invocation, and duplicated grammar is what goes stale. Shipped blocks spell the
+  invocation `uv run cement … resolve`, so a token search must accept both spellings.
 
 ## 14. Review dispositions, differential and attack results
 

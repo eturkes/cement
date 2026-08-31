@@ -548,6 +548,19 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   because changing every write leaf is a cross-cutting behaviour change M3.5a does not own.
   Acceptance: one ruling applied uniformly to all write leaves, with a test per leaf asserting the
   absent-path invocation creates no file and reports the path rather than its consequence.
+  The same root cause reaches a second surface, measured at S3 under contract amendment A5: an
+  INVALID ARGUMENT VALUE on a writing leaf also creates the ledger, because value parsing runs in
+  the dispatch branch after `System(...)`. All four `proposal submit` envelope failures report
+  `System.__init__` 1, `sqlite3.connect` >= 1 and a ~208 KiB ledger left behind, with
+  `Store.transaction` 0 and `System.submit_proposal` 0. Fold this case into the same ruling; the
+  acceptance test per leaf must use a malformed argument value as well as a misspelled path.
+- `cli.py:370` holds a bare `65_536` literal bounding `--source-command`, unrelated to provenance
+  and sharing the value by coincidence. M3.5a exported `PROVENANCE_MAX_BYTES` and rewired
+  `system.py`'s three provenance sites plus the new `SUBMISSION_MAX_BYTES` derivation, so this is
+  now the only bare copy of that number in the runtime, and the coincidence invites a future edit to
+  bind it to provenance by mistake. Verdict row `X11` had to be narrowed for it. Acceptance: the
+  source-command bound becomes its own named constant with a docstring stating it is unrelated to
+  provenance, and one test asserts `cli.py` holds zero bare `65_536` literals.
 - 49 of `m3u5a-map.json`'s 55 rows are attention-directing only. MAIN re-derived six findings in
   `m3u5a-s2-probe.py` and consumed the rest as pointers; a validator grade proves each anchor
   resolves and each cell is filled, never that a finding is true. Acceptance: any row promoted to a
