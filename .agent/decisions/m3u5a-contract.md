@@ -304,21 +304,30 @@ green when a behaviour and its pin vanish together).
 2. A diff-blind obligation battery, one test per obligation D01-D30, in
    `tests/test_cli_channels_battery.py`, graded by `m3u5a-battery-validate.py`
    (`--emit-stub` = the seed's single source of truth). `UNFILLED-TESTS 0` and
-   `OBLIGATIONS-UNCOVERED 0` are both required.
+   `OBLIGATIONS-UNCOVERED 0` are both required, and so are `ASSERTIONLESS 0` and `SKIPPED 0`:
+   a covered-but-empty body and a `skipTest` body both satisfy a coverage count while asserting
+   nothing, which is the cheapest way to turn this gate vacuous. The phase-2 suite validator
+   `m3u5a-suite-validate.py` already carries the `ASSERTIONLESS` half and is the pattern to copy.
 3. A mutation sweep over every predicate the two leaves add — the payload projections, the status
    selectors, the envelope validators, the ledger precheck — reporting **its verdict module list on
    the control line**, with the acceptance predicate written as the NAMED SURVIVOR SET rather than
-   "zero survivors", so a survivor outside that set fails while ruled ones do not.
+   "zero survivors", so a survivor outside that set fails while ruled ones do not. The UNMUTATED
+   control run must be reported GREEN on the same control line: without it a sweep whose harness is
+   broken reports every mutant killed and passes, which is the same vacuity gate 4 was carrying.
 4. `uv run python .agent/decisions/m3u5a-s2-probe.py` — section 2's six ground probes, graded
-   against **15 pinned facts**, exit 1 on any mismatch. Re-anchored at S3: the probe previously
+   against **16 pinned facts**, exit 1 on any mismatch. Re-anchored at S3: the probe previously
    printed its findings and returned 0 unconditionally, so it could not fail, and its pins as
    written contradicted this unit's own obligations. Two pins now carry POST-implementation
    values — `parser_census` at 30 leaves / 37 nodes and `provenance_literal` at one declaration
    site with `exported_constant` true — because D25 and D16 move them by design. `parser_census`
    is additionally graded by NAME: all 28 `c8b82cd` leaf paths survive and the added set is exactly
    `{proposal submit, resolve}`, which the count alone cannot assert. Legacy option abbreviation
-   stays pinned ACCEPTED, so the M3.5b deferral closing is visible rather than silent. Verified at
-   seed with 9 negative controls, all firing.
+   stays pinned ACCEPTED, so the M3.5b deferral closing is visible rather than silent. The
+   fresh-ledger BYTE SIZE is reported but not graded: it is a function of the host SQLite build's
+   page size and layout, and D13 needs creation versus non-creation. What the gate grades instead
+   is `bytes_positive` and `bytes_deterministic` — two independently constructed fresh ledgers must
+   have the same non-zero size — which is falsifiable without being host-fragile. Verified at seed
+   with 11 negative controls, all firing.
 5. Re-derivation of both spike tables from their tracked patches and drivers is NOT a gate; it is
    the fork ruling's evidence and was run at S1.
 

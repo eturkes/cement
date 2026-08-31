@@ -44,15 +44,30 @@ from cement_runtime.system import System  # noqa: E402
 
 
 def probe_absent_path_construction() -> dict[str, object]:
-    """M18/X02: does ordinary `System` construction create an absent ledger?"""
+    """M18/X02: does ordinary `System` construction create an absent ledger?
+
+    The graded facts are creation and DETERMINISM, never the byte size. A fresh v2
+    ledger's size is a function of the host SQLite build's page size and storage layout,
+    so pinning it would fail on a library upgrade that changes nothing this unit claims.
+    `bytes_after` stays REPORTED because the deferral entries cite it; `bytes_positive`
+    and `bytes_deterministic` are what the gate grades.
+    """
     with tempfile.TemporaryDirectory() as root:
         target = pathlib.Path(root) / "typo.db"
         before = target.exists()
         System(str(target))
+        size = target.stat().st_size if target.exists() else None
+
+        sibling = pathlib.Path(root) / "twin.db"
+        System(str(sibling))
+        twin = sibling.stat().st_size if sibling.exists() else None
+
         return {
             "exists_before": before,
             "exists_after": target.exists(),
-            "bytes_after": target.stat().st_size if target.exists() else None,
+            "bytes_after": size,
+            "bytes_positive": bool(size),
+            "bytes_deterministic": size is not None and size == twin,
         }
 
 
@@ -187,7 +202,8 @@ EXPECTED: dict[str, dict[str, object]] = {
     "absent_path_construction": {
         "exists_before": False,
         "exists_after": True,
-        "bytes_after": 208_896,
+        "bytes_positive": True,
+        "bytes_deterministic": True,
     },
     "deleted_ledger_resolve": {
         "raised": "IntegrityError",
