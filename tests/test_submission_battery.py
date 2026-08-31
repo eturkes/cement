@@ -178,8 +178,12 @@ class SubmissionBatteryTests(unittest.TestCase):
         (zero `_source`, `System.propose` and source calls from either new
         leaf), D25 (the `_parser()`-derived census, 28 to 30 leaves and 35 to 37
         nodes, with all 28 existing leaf paths unchanged) and D26 (cross-leaf
-        option isolation). Those three are strictly stronger: they constrain
-        what the new bytes may be rather than asserting there are none.
+        option isolation). Those three cover source reach, leaf names and option
+        isolation alone, and none of them notices an old leaf's changed default,
+        help string, payload or dispatch. Gate 4's `parser_shape` digest carries
+        that remainder: mutating `events --limit` from 1000 to 7 moves the
+        digest while the 30/37 census and every D24, D25 and D26 assertion stay
+        green.
 
         Re-pinning `cli.py` to a fresh baseline is rejected. The roadmap
         schedules M3.5b to edit the same file again, so a per-unit re-pin passes

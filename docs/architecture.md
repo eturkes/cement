@@ -68,7 +68,7 @@ request, or takes a generation lease. Review at step 4 receives their proposals 
 request row stays internal to this route, and schema v2 keeps it as internal storage.
 
 Two CLI channels reach these seams directly. `cement proposal submit OPERATION --submission VALUE`
-calls `System.submit_proposal`, so an operator can enter the pipeline at step 3 with a candidate the
+calls `System.submit_proposal`. An operator enters the pipeline at step 3 with a candidate that the
 operator already holds. The leaf never runs a candidate source. `--submission` carries `input`,
 `output`, and an optional `provenance` in one JSON object, because separate flags cannot carry three
 maximum-size fields through one argument list. The command inherits the method's non-idempotency: two
@@ -76,8 +76,8 @@ identical submissions write two proposals.
 
 `cement resolve OPERATION --input VALUE` calls `System.resolve`, which runs `verify_function` and then
 evaluates the verified document under that one snapshot. The leaf writes nothing and opens one read
-transaction. It prints seven fixed keys in every state, and `matched` carries the distinction that the
-shared status 6 cannot: `false` is a verified absence inside a verified set, and `null` is a failed
+transaction. It prints seven fixed keys in every state. `matched` carries the distinction that the
+shared status 6 cannot. `false` is a verified absence inside a verified set. `null` is a failed
 verdict that answers nothing. A caller must not collapse the two.
 
 The LLM proposes instance behavior. It never chooses scope, confirms examples, runs verification, or
