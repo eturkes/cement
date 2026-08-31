@@ -879,7 +879,7 @@ Measured gaps driving the arc:
   - M3.5b tier=kernel tags=- depends=M3.5a - remove `handle`/`request`/source grammar, imports, fixtures,
     help and operator prose. THREE sessions, not four: S1 contract, S2 implementation, S3 battery +
     closure.
-    S1 DONE, contract session, `main=` 76% 183K/240K. NO teammate dispatched. Shipped
+    S1 DONE, contract session, `main=` 80% 191K/240K at close. NO teammate dispatched. Shipped
     `.agent/decisions/m3u5b-contract.md` (11 sections, 29 obligations D01-D29 gapless, sections 10-11
     PENDING), `m3u5b-burden.py` + `m3u5b-burden.json`.
     NO WAVE 1, and the grounds are the roadmap's own M3.5a sizing correction: budget FOUR sessions for a
