@@ -511,3 +511,127 @@ to D27, which A8 supersedes.
 The per-row `disposition` and `main_note` columns are filled at S4 by an idempotent `--check`
 patcher asserting the id set, following `m3u5a-rule-verdicts.py`. Every blocking row's ruling is
 already binding here; the patcher records it per row rather than deciding it.
+
+## 15. Amendments A9-A23 — S4, from MAIN's re-derivation of the non-blocking rows
+
+Section 14 recorded all 33 `material` rows as battery-design constraints and not S3 defects. That
+whole-class triage was written before the rows were read, and MAIN's own probes falsify it: `Y08`
+is a defect in shipped code and `A10` is a gate blind to the property it grades. **A severity
+label filed by a reviewer is a sorting hint, never a disposition.** Fifteen rows are upheld as
+defects in text MAIN wrote; each lands as a numbered amendment below, superseding the section it
+cites, on the same footing as A1-A8. All twenty-three are one set.
+
+Per-row dispositions live in `m3u5a-attack.json`, written by
+`uv run python .agent/decisions/m3u5a-rule-attack.py [--check]`.
+
+- **A9 (D16)** The framing term is **34 bytes**, DERIVED and never written down: two braces, one
+  comma between each adjacent pair, and `"<key>":` per key, over `_SUBMISSION_KEYS`. It equals
+  `len('{"input":,"output":,"provenance":}')`. D16 gave the total `2,162,722` while naming no
+  byte template, so a copied total satisfied the numeric pin with nothing deriving it (`A04`).
+- **A10 (D20)** D20's premise `every successful submission is pending by construction` is FALSE and
+  is replaced by **every proposal is INSERTED pending**. Measured: a reviewer transitioning the
+  committed row inside the post-commit, pre-return window yields
+  `returned_id=True status_at_return=rejected` (`A07`). The `"status": "review_required"` key stays
+  REJECTED, on the corrected ground — the constant can already be stale when it is emitted, not
+  that status cannot vary.
+- **A11 (D23)** The no-retry-advice predicate is scoped to a SUBMISSION-OWNED corpus: the
+  `proposal submit` help and docstrings, and the submission sections of README and the normative
+  docs. A repository-wide `retry` grep is invalid in both directions — legacy `handle` legitimately
+  advises retry at `README.md:277`, and an absence grep passes when the recovery prose is deleted
+  (`A08`). The predicate is positive: the corpus must state pending-proposal ENUMERATION as the
+  recovery route, and must contain no `retry|resubmit|run again|repeat` advice.
+- **A12 (D26)** `store.py` byte-identity names its ORACLE: git object
+  `4783eed:src/cement_runtime/store.py`, blob `b870dacbaf2718b7cba3567b59d69a994ca4ca42`, 27,951
+  bytes, sha256 `2b2650144d4b384af4d8bfe67e1f9de0e186b609f3bb2632e2f81b53536770f7`. A test-local
+  digest or a self-comparison pins nothing, because it divorces the claim from its referent
+  (`A11`).
+- **A13 (D12)** `unchanged and untouched` names its object and its SLICING CONVENTION: `main`'s
+  whole-line AST span (`lineno`..`end_lineno`, trailing newlines stripped), 1,306 bytes, sha256
+  `973b7ee6605f93641a87051626fce53856d219d6763c069b7242da545f406ee1`, equal at `4783eed` and at
+  HEAD. Same discipline as P06's three-convention table: a lens on the wrong convention reports
+  correct code as stale (`A17`). One planted exception per mapped class is driven through `main`
+  beside the span pin, because a span is not a behaviour.
+- **A14 (D13)** The precheck fires ONLY for a path `Store` would create — absent target under an
+  existing directory — and is implemented by `_absent_ledger`, not `os.path.exists`. `exists`
+  follows the link, so a DANGLING SYMLINK, a MISSING PARENT and an EMBEDDED NUL all read as absent
+  and all answered exit 5 `ledger file is missing or unreadable`, where the identical paths on a
+  precheck-free leaf answer exit 2 with a precise diagnosis (`database path must not be a symbolic
+  link`, `database parent directory does not exist`, `database path must not contain NUL`). D12
+  freezes `ValidationError` → 2, so two obligations contradicted each other in shipped code. Every
+  path shape `System` already diagnoses stays `System`'s, including a denied ancestor and a
+  non-regular file (`Y08`).
+- **A15 (D21)** `No candidate byte is echoed` is scoped to the **status-0 acknowledgement**. Read
+  across the whole leaf it is false: strict parsing quotes the offending token, measured as
+  `cement-json-v1 rejects decimal/exponent number '12345.678901'` at exit 2. No error-redaction
+  boundary is added — the echo is the diagnosis (`Y10`).
+- **A16 (D30)** Two corrections. The published figures are **`System.resolve` METHOD latency**: the
+  harness constructs `System` before starting its timer, so interpreter startup, argparse, the
+  ledger precheck, schema initialisation and CLI JSON projection are all outside them, and at the
+  one-entry `5.7 ms` point that overhead is not negligible (`Y15`). And `costs what
+  verify_function costs` is WITHDRAWN as an equality claim: the two artifacts were measured at
+  different commits (`23ec5717…` vs `019d0409…`), which the project's own per-point provenance rule
+  makes non-evidentiary, and the cold ratios span 1.393 / 0.995 / 1.025 (`Y16`). What ships is the
+  true and cheaper statement — one resolve performs one full six-check verification — beside
+  resolve's OWN measured cost.
+- **A17 (D01, D14)** The prefix rejection is scoped to prefixes of the LEAF'S OWN options. Root
+  options are parsed by the root parser before the child is reached, so `--d` and `--part` keep
+  resolving under a hardened child — which is what D25 preserves. Measured: `--d x.sqlite --part p
+  resolve op --input 1` retains `db=x.sqlite partition=p`. Unscoped, D01 and D25 demand opposite
+  results for one invocation (`Y24`).
+- **A18 (D15)** The byte wording is scoped to BINARY stdin. A text-only host (`StringIO`, an
+  embedding runtime) exposes no `.buffer`; that branch reads at most `cap + 1` CHARACTERS, reports
+  `characters` in its oversize message, and has no invalid-UTF-8 family of its own because the
+  parser's own encoded-byte check stays authoritative after it (`Y19`).
+- **A19 (D28)** Publication enumerates BOTH schemas, which D28 collapsed into one phrase: the
+  SUBMISSION ENVELOPE's required `input` and `output` plus optional `provenance`, and the
+  ACKNOWLEDGEMENT's single `proposal_id`. A reader who learns every output key and no input key
+  cannot construct `--submission` (`Y20`).
+- **A20 (D16)** `must admit every submission the library accepts` is WITHDRAWN as unconditional and
+  replaced by the value-level guarantee: for every field triple the library accepts, its COMPACT
+  CANONICAL envelope fits under the cap. Insignificant whitespace and escapes are unbounded, so no
+  transport bound can admit every serialization — measured, a 2,162,723-byte whitespace-padded
+  envelope semantically equal to `{input:0, output:0, provenance:{}}` is rejected by the cap while
+  `submit_proposal` accepts the same values directly (`Y25`).
+- **A21 (section 12)** The write-leaf deferral carries `.agent/polish.md`'s observable rather than a
+  decision: one test per write leaf asserting that a typo'd `--db` creates NO file and that the
+  error diagnoses the PATH. `one ruling applied uniformly` is not an acceptance check (`A20`).
+- **A22 (section 3.1, G1)** `under any invocation` is scoped to the MEASURED DEPLOYMENT REGIME and
+  carries its provenance: `Linux 7.2.0-1-cachyos-gcc`, page size 4,096, `ARG_MAX` 4,194,304. The
+  131,071/131,072 adjacent pair is a host result and Linux's per-string ceiling tracks page size,
+  while this project requires Python and SQLite rather than a kernel configuration. G1's
+  conditional-capacity argument is unaffected: the asymmetry of relief holds on any host with a
+  finite argv wall (`Y17`).
+- **A23 (D25)** `Option abbreviation elsewhere is unchanged` names its instrument, because the
+  census cannot carry it. Disabling `allow_abbrev` on an existing leaf leaves every action
+  attribute, the 30/37 census and all three section-2 abbreviation probes unchanged. Gate 4's
+  `parser_shape` digest now emits one `<node>` line per parser node carrying `allow_abbrev`: 163
+  lines = 126 actions + 37 nodes, digest `8b58b465c08aa693`, and the control mutation on
+  `proposal review` moves it to `515b30796c61d189` while the census holds at 30/37 (`A10`, `A16`).
+
+### Rows upheld without an amendment
+
+- `A02 A09 A13 A18 A19 Y11 Y14 Y29` are BATTERY-DESIGN constraints: each states how a pin must be
+  written so it cannot pass vacuously. They bind the battery's assertions, not the contract's text.
+  The sharpest are `A02` (a `set(payload) <= EXPECTED` pin plus cross-state identity accepts `{}`
+  everywhere — assert set EQUALITY per state), `A09` (two named-method spies plus a `None` source
+  make D24's three counters vacuous — inject a CONFIGURED source whose every attribute access
+  raises) and `Y14` (D26 and D28 are compound, so one filled body can cover one clause and mark the
+  whole obligation covered — one `subTest` per clause, with the mutation sweep as the complementary
+  instrument since each clause carries its own mutant).
+- `Y12` and `Y13` are upheld against gate 3 and are already answered by its shipped form: every
+  survivor ruling must PRE-DATE the decisive sweep (`M41`'s does, committed at `75f0678` before
+  dispatch), and the catalogue is contract-owned with all 50 sites named and mapped to obligations.
+  The residual `Y13` names — a generator deriving the catalogue from AST branches rather than from
+  a written list — is NOT built, and is recorded rather than claimed.
+- `A16` is SCOPED: no obligation compares old-leaf behaviour to base `4783eed`, and section 1's
+  `preservation` claim narrows to what is actually instrumented — gate 4's `parser_shape` digest
+  over the whole CLI grammar surface, plus D26's enumerated invariants. Behaviour outside the
+  parser surface is covered by the full suite alone, which is not a preservation oracle.
+- `Y07` is SCOPED: G3's strict-duplicate ground narrows to duplicate JSON object MEMBERS. Repeated
+  `--submission` is argparse last-wins, and so is every repeated option on all 30 leaves, so
+  hardening two leaves against repetition would be the asymmetry — the same ruling section 14
+  already made for `Y28`.
+- `Y09` is DISCHARGED by A5, which already states that `System(...)` runs before envelope
+  validation and that `_initialize` transacts. `Y22`, `Y23`, `Y26`, `Y27` and `Y30` are discharged
+  by gate 4, gate 2, gate 3 and A8 as section 14 records. `A05`, `A06`, `A14` and `A15` stay
+  `cleared` as filed. `Y28` stays REJECTED.

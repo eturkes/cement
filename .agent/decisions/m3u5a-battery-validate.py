@@ -46,7 +46,9 @@ ASSERTING = re.compile(r"\bself\.(assert|fail)\w*\(")
 SKIPPING = re.compile(r"\bself\.skipTest\(|@unittest\.skip|@skip(?:If|Unless)?\b")
 
 OBLIGATION = re.compile(r"^- \*\*(D\d{2})\*\* (.*)$")
-AMENDMENT = re.compile(r"^- \*\*(A\d)\ \(([^)]+)\)\*\* (.*)$")
+# `A\d+`, not `A\d`: a single-digit class silently drops `A10` and every later amendment,
+# which is the same fail-open shape as a forbidden-list grep.
+AMENDMENT = re.compile(r"^- \*\*(A\d+)\ \(([^)]+)\)\*\* (.*)$")
 BULLET = re.compile(r"^- \*\*[DA]")
 
 
