@@ -128,10 +128,16 @@ def probe_parser_shape() -> dict[str, object]:
     from 1000 to 7 left all of them green while operator-visible behaviour changed. This
     digest is what makes D27's migration claim true: every leaf's option strings,
     destinations, defaults, required flags and nargs, canonically ordered.
+
+    A per-NODE line carries `allow_abbrev`, because that flag belongs to the parser and
+    not to any action: without it, disabling abbreviation on an existing leaf leaves every
+    action attribute, the 30/37 census and all three section-2 probes unchanged, so D25's
+    `option abbreviation elsewhere is unchanged` had no instrument at all.
     """
     shape: list[str] = []
 
     def visit(node: argparse.ArgumentParser, path: tuple[str, ...]) -> None:
+        shape.append("|".join((" ".join(path), "<node>", repr(bool(node.allow_abbrev)))))
         children = [
             action
             for action in node._actions
@@ -275,7 +281,10 @@ EXPECTED: dict[str, dict[str, object]] = {
         "path_absent_after": True,
     },
     "parser_census": {"leaves": 30, "nodes": 37},
-    "parser_shape": {"actions": 126, "digest": "89dfa3d982d8c54b"},
+    # 126 action lines + one `<node>` line per parser node, which is exactly the census's
+    # 37. The node line carries `allow_abbrev`, so disabling it on an existing leaf moves
+    # the digest (`proposal review` -> `515b30796c61d189`) while the census stays 30/37.
+    "parser_shape": {"actions": 163, "digest": "8b58b465c08aa693"},
     "bare_string_emit": {"bytes": '"prop_probe"\n'},
     "provenance_literal": {
         "exported_constant": True,

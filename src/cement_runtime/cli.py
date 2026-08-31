@@ -364,6 +364,30 @@ def _submission(value: str) -> dict[str, JSONValue]:
     return parsed
 
 
+def _absent_ledger(value: str) -> bool:
+    """Report whether `value` is a path `Store` would CREATE: absent, under a directory.
+
+    Deliberately narrower than `os.path.exists`, which follows the link and so reports a
+    DANGLING SYMLINK as absent. Every path shape `System` already diagnoses precisely —
+    dangling symlink, embedded NUL, missing parent, denied ancestor, non-regular file —
+    returns False here and keeps its own `ValidationError` at exit 2, so this check never
+    converts one of those verdicts into the caller-visible integrity class.
+    """
+
+    try:
+        os.lstat(value)
+    except FileNotFoundError:
+        pass
+    except (OSError, ValueError):
+        return False
+    else:
+        return False
+    try:
+        return stat.S_ISDIR(os.stat(os.path.dirname(value) or ".").st_mode)
+    except (OSError, ValueError):
+        return False
+
+
 def _source(value: str | None, *, source_id: str, timeout: float) -> CommandCandidateSource | None:
     if value is None:
         return None
@@ -556,17 +580,18 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
         parser.error("--db or CEMENT_DB is required")
     if not args.partition:
         parser.error("--partition or CEMENT_PARTITION is required")
-    if args.command == "resolve" and not os.path.exists(args.db):
+    if args.command == "resolve" and _absent_ledger(args.db):
         # Constructing `System` on an absent path creates a 208,896-byte ledger
         # and then answers a read verb out of it. This forwards the library's
         # own verdict for the same condition rather than inventing vocabulary.
         # Stated as it behaves: a check, not a read-only construction mode. A
         # path deleted between this check and construction is still recreated by
-        # `Store`, which is the shipped behaviour, so the check strictly
-        # improves and never worsens. It is also what makes the input ordering
-        # safe: on an absent ledger nothing is constructed, so a malformed
-        # `--input` rejected after construction can only ever touch a ledger
-        # that already existed.
+        # `Store`, which is the shipped behaviour, so the check improves for a
+        # stably absent path; in the inverse race a ledger appearing between the
+        # two turns a would-be success into this exit 5. It is also what makes
+        # the input ordering safe: on an absent ledger nothing is constructed,
+        # so a malformed `--input` rejected after construction can only ever
+        # touch a ledger that already existed.
         raise IntegrityError("ledger file is missing or unreadable")
     source = None
     if args.command == "handle":
