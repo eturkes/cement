@@ -1,0 +1,1470 @@
+{
+  "head": "36f78906932ec766c18e12ee48dcc9cfbe43b70a",
+  "stages": [
+    {
+      "broken": 113,
+      "distinct_frames": 11,
+      "edits_applied": [
+        "src/cement_runtime/cli.py:    handle = commands.add_parser(\"handle\", help=\"route or create an iner",
+        "src/cement_runtime/cli.py:    request = commands.add_parser(\"request\", help=\"poll a request withou"
+      ],
+      "failures": [
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_help_reuses_the_shipped_flag_register",
+          "frame": "tests/test_cli.py:4754 in options",
+          "kind": "ERROR",
+          "test": "test_function_eval_help_reuses_the_shipped_flag_register"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_full_operator_lifecycle",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_full_operator_lifecycle"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_binds_the_parsed_document_to_the_evaluator",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_binds_the_parsed_document_to_the_evaluator"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_constructs_no_system",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_constructs_no_system"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_detects_a_flipped_embedded_hash",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_detects_a_flipped_embedded_hash"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_detects_entry_tamper_at_every_position",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_detects_entry_tamper_at_every_position"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_exit_six_names_the_miss_and_nothing_else",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_exit_six_names_the_miss_and_nothing_else"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_expected_hash_binds_caller_held_identity",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_expected_hash_binds_caller_held_identity"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_expected_hash_must_be_a_digest",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_expected_hash_must_be_a_digest"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_expected_hash_rejects_another_identity",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_expected_hash_rejects_another_identity"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_failure_precedence_is_a_matrix",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_failure_precedence_is_a_matrix"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_follows_a_symlink_to_a_regular_bundle",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_follows_a_symlink_to_a_regular_bundle"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_forwards_the_expected_hash_unvalidated",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_forwards_the_expected_hash_unvalidated"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_grades_only_the_last_repeated_flag",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_grades_only_the_last_repeated_flag"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_grades_the_input_before_reading_the_bundle",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_grades_the_input_before_reading_the_bundle"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_hit_reports_the_output_and_the_answering_identity",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_hit_reports_the_output_and_the_answering_identity"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_ignores_supplied_ledger_globals",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_ignores_supplied_ledger_globals"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_input_depth_bound_is_an_adjacent_pair",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_input_depth_bound_is_an_adjacent_pair"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_input_keeps_the_default_channel_bounds",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_input_keeps_the_default_channel_bounds"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_lookup_is_canonical_not_textual",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_lookup_is_canonical_not_textual"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_maps_a_stdin_read_failure_on_both_hosts",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_maps_a_stdin_read_failure_on_both_hosts"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_miss_is_exit_six_with_the_same_identity",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_miss_is_exit_six_with_the_same_identity"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_never_reaches_the_ledger_globals",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_never_reaches_the_ledger_globals"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_null_output_hit_is_not_a_miss",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_null_output_hit_is_not_a_miss"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_opens_no_store_or_connection",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_opens_no_store_or_connection"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_payload_covers_every_match_field",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_payload_covers_every_match_field"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_payload_key_set_is_frozen_on_both_verdicts",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_payload_key_set_is_frozen_on_both_verdicts"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_reader_materializes_exactly_one_byte_past_the_bound",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_reader_materializes_exactly_one_byte_past_the_bound"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_reads_a_file_named_dash",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_reads_a_file_named_dash"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_reads_input_from_either_stdin_host",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_reads_input_from_either_stdin_host"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_rejects_decimal_input_before_lookup",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_rejects_decimal_input_before_lookup"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_rejects_malformed_bundles",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_rejects_malformed_bundles"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_requires_both_channels",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_requires_both_channels"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_translates_injected_reader_failures",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_translates_injected_reader_failures"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_bounds_the_receipt_id_grammar",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_bounds_the_receipt_id_grammar"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_cross_checks_the_receipt_operation_exactly",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_cross_checks_the_receipt_operation_exactly"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_emits_non_ascii_literally",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_emits_non_ascii_literally"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_exports_one_historical_receipt",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_exports_one_historical_receipt"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_forwards_the_operator_scope_exactly",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_forwards_the_operator_scope_exactly"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_grades_the_operation_by_grammar_on_both_sources",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_grades_the_operation_by_grammar_on_both_sources"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_and_stdout_carry_identical_bytes",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_and_stdout_carry_identical_bytes"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_bounds_the_target_name_at_the_filesystem_maximum",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_bounds_the_target_name_at_the_filesystem_maximum"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_checks_the_destination_with_one_stat_each_time",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_checks_the_destination_with_one_stat_each_time"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_exports_one_historical_receipt",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_exports_one_historical_receipt"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_keeps_mode_0600_under_a_permissive_umask",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_keeps_mode_0600_under_a_permissive_umask"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_never_exposes_a_partial_destination",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_never_exposes_a_partial_destination"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_never_writes_through_the_destination_name",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_never_writes_through_the_destination_name"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_path_fault_preempts_a_corrupt_receipt",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_path_fault_preempts_a_corrupt_receipt"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_path_faults_preempt_source_verdicts",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_path_faults_preempt_source_verdicts"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_rechecks_the_destination_before_replacing",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_rechecks_the_destination_before_replacing"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_rejects_unusable_destinations",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_rejects_unusable_destinations"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_replaces_an_existing_destination",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_replaces_an_existing_destination"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_reports_the_resolved_destination",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_reports_the_resolved_destination"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_resolves_a_relative_destination_against_the_cwd",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_resolves_a_relative_destination_against_the_cwd"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_round_trips_through_parse_function",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_round_trips_through_parse_function"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_translates_write_failures_and_keeps_the_old_bytes",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_translates_write_failures_and_keeps_the_old_bytes"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_treats_a_bare_dash_as_a_filename",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_treats_a_bare_dash_as_a_filename"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_writes_non_ascii_as_exact_utf8",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_writes_non_ascii_as_exact_utf8"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_writes_nothing_when_the_source_fails",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_writes_nothing_when_the_source_fails"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_writes_the_exact_bundle_and_reports_it",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_writes_the_exact_bundle_and_reports_it"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_refuses_a_drifted_set_with_the_whole_check_vector",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_refuses_a_drifted_set_with_the_whole_check_vector"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_rejects_an_unregistered_or_foreign_operation",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_rejects_an_unregistered_or_foreign_operation"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_reports_a_corrupt_receipt_as_integrity",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_reports_a_corrupt_receipt_as_integrity"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_reports_a_missing_receipt_row_separately",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_reports_a_missing_receipt_row_separately"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_round_trips_through_parse_function",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_round_trips_through_parse_function"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_serves_a_receipt_from_a_superseded_revision",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_serves_a_receipt_from_a_superseded_revision"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_sources_never_mix",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_sources_never_mix"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_writes_the_live_document_bytes_exactly",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_writes_the_live_document_bytes_exactly"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_inspect_corruption_maps_to_integrity",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_inspect_corruption_maps_to_integrity"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_inspect_ignores_unverified_drafts",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_inspect_ignores_unverified_drafts"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_inspect_is_byte_deterministic",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_inspect_is_byte_deterministic"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_inspect_projects_three_candidates_with_exact_schema",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_inspect_projects_three_candidates_with_exact_schema"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_inspect_reports_retained_and_displacing_candidate",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_inspect_reports_retained_and_displacing_candidate"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_inspect_reports_superseded_verified_build_verbatim",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_inspect_reports_superseded_verified_build_verbatim"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_promote_after_revision_reports_empty_set_message",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_promote_after_revision_reports_empty_set_message"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_promote_corruption_maps_to_integrity",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_promote_corruption_maps_to_integrity"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_promote_keeps_hash_after_nonqualifying_change",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_promote_keeps_hash_after_nonqualifying_change"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_promote_rejects_stale_hash_after_qualifying_change",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_promote_rejects_stale_hash_after_qualifying_change"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_promote_round_trips_the_inspected_hash_and_exact_schema",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_promote_round_trips_the_inspected_hash_and_exact_schema"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_receipts_accepts_a_zero_before_sequence",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_receipts_accepts_a_zero_before_sequence"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_receipts_bounds_are_pinned_as_adjacent_pairs",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_receipts_bounds_are_pinned_as_adjacent_pairs"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_receipts_empty_pages_do_not_distinguish_scope",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_receipts_empty_pages_do_not_distinguish_scope"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_receipts_enumerates_newest_first",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_receipts_enumerates_newest_first"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_receipts_filters_by_operation_revision",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_receipts_filters_by_operation_revision"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_receipts_pages_through_the_exclusive_cursor",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_receipts_pages_through_the_exclusive_cursor"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_receipts_scope_matches_exactly",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_receipts_scope_matches_exactly"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_receipts_truncation_is_visible_without_a_flag",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_receipts_truncation_is_visible_without_a_flag"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_show_projection_limit_truncates_visibly",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_show_projection_limit_truncates_visibly"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_show_projects_every_detail_family_under_limit",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_show_projects_every_detail_family_under_limit"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_show_projects_stale_revision_anomalies",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_show_projects_stale_revision_anomalies"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_show_receipt_id_misses_are_not_found",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_show_receipt_id_misses_are_not_found"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_show_receipt_id_pins_a_historical_anchor",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_show_receipt_id_pins_a_historical_anchor"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_show_receipt_id_reaches_a_superseded_revision",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_show_receipt_id_reaches_a_superseded_revision"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_show_receipt_id_still_bounds_members",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_show_receipt_id_still_bounds_members"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_show_reports_promoted_membership",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_show_reports_promoted_membership"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_verify_accepts_the_matching_expected_function_hash",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_verify_accepts_the_matching_expected_function_hash"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_verify_drafts_commits_the_failed_report_and_event_before_exit_six",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_verify_drafts_commits_the_failed_report_and_event_before_exit_six"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_verify_drafts_emits_every_passing_entry_and_exits_zero",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_verify_drafts_emits_every_passing_entry_and_exits_zero"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_verify_drafts_exits_six_when_the_middle_of_three_entries_fails",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_verify_drafts_exits_six_when_the_middle_of_three_entries_fails"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_verify_drafts_repeats_a_negative_verdict_for_the_same_corrupt_ledger",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_verify_drafts_repeats_a_negative_verdict_for_the_same_corrupt_ledger"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_verify_drafts_reports_a_superseded_build_as_a_benign_skip",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_verify_drafts_reports_a_superseded_build_as_a_benign_skip"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_verify_exits_six_with_a_diagnostic_hash_for_a_different_valid_digest",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_verify_exits_six_with_a_diagnostic_hash_for_a_different_valid_digest"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_verify_fails_only_the_receipt_check_without_a_function_checkpoint",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_verify_fails_only_the_receipt_check_without_a_function_checkpoint"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_verify_projects_a_passing_promoted_set_without_document_content",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_verify_projects_a_passing_promoted_set_without_document_content"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_usage_errors_and_oversized_stdin_are_machine_readable",
+          "frame": "tests/test_cli.py:480 in test_usage_errors_and_oversized_stdin_are_machine_readable",
+          "kind": "FAIL",
+          "test": "test_usage_errors_and_oversized_stdin_are_machine_readable"
+        },
+        {
+          "dotted": "tests.test_cli_channels.CliChannelTests.test_v27_the_parser_census_moves_28_to_30_leaves_and_35_to_37_nodes",
+          "frame": "tests/test_cli_channels.py:1395 in test_v27_the_parser_census_moves_28_to_30_leaves_and_35_to_37_nodes",
+          "kind": "FAIL",
+          "test": "test_v27_the_parser_census_moves_28_to_30_leaves_and_35_to_37_nodes"
+        },
+        {
+          "dotted": "tests.test_cli_channels.CliChannelTests.test_v28_cross_leaf_option_isolation_holds_in_both_directions_for_b",
+          "frame": "tests/test_cli_channels.py:1458 in test_v28_cross_leaf_option_isolation_holds_in_both_directions_for_b",
+          "kind": "FAIL",
+          "test": "test_v28_cross_leaf_option_isolation_holds_in_both_directions_for_b"
+        },
+        {
+          "dotted": "tests.test_cli_channels.CliChannelTests.test_x22_all_twenty_eight_baseline_leaf_paths_survive_by_identity_r",
+          "frame": "tests/test_cli_channels.py:2643 in test_x22_all_twenty_eight_baseline_leaf_paths_survive_by_identity_r",
+          "kind": "FAIL",
+          "test": "test_x22_all_twenty_eight_baseline_leaf_paths_survive_by_identity_r"
+        },
+        {
+          "dotted": "tests.test_cli_channels.CliChannelTests.test_x26_commandcandidatesource_remains_imported_and_the_existing_h",
+          "frame": "tests/test_cli_channels.py:2811 in test_x26_commandcandidatesource_remains_imported_and_the_existing_h",
+          "kind": "FAIL",
+          "test": "test_x26_commandcandidatesource_remains_imported_and_the_existing_h"
+        },
+        {
+          "dotted": "tests.test_cli_channels_battery.ObligationBatteryTests.test_d24_zero_source_calls_zero_system_propose_calls_and_zero_sourc",
+          "frame": "tests/test_cli_channels_battery.py:2667 in test_d24_zero_source_calls_zero_system_propose_calls_and_zero_sourc",
+          "kind": "FAIL",
+          "test": "test_d24_zero_source_calls_zero_system_propose_calls_and_zero_sourc"
+        },
+        {
+          "dotted": "tests.test_cli_channels_battery.ObligationBatteryTests.test_d25_the_parser_census_moves_28_30_leaves_and_35_37_nodes_deriv",
+          "frame": "tests/test_cli_channels_battery.py:2733 in test_d25_the_parser_census_moves_28_30_leaves_and_35_37_nodes_deriv",
+          "kind": "FAIL",
+          "test": "test_d25_the_parser_census_moves_28_30_leaves_and_35_37_nodes_deriv"
+        },
+        {
+          "dotted": "tests.test_cli_channels_battery.ObligationBatteryTests.test_d26_preserved_and_asserted_independently_store_py_byte_identic",
+          "frame": "tests/test_cli_channels_battery.py:139 in _leaf_parser",
+          "kind": "FAIL",
+          "test": "test_d26_preserved_and_asserted_independently_store_py_byte_identic"
+        },
+        {
+          "dotted": "tests.test_cli_channels_battery.ObligationBatteryTests.test_d27_b02_drops_cli_py_from_its_frozen_tuple_and_keeps_command_s",
+          "frame": "tests/test_cli_channels_battery.py:3059 in test_d27_b02_drops_cli_py_from_its_frozen_tuple_and_keeps_command_s",
+          "kind": "FAIL",
+          "test": "test_d27_b02_drops_cli_py_from_its_frozen_tuple_and_keeps_command_s"
+        }
+      ],
+      "frames": {
+        "tests/test_cli.py:193 in payload": 103,
+        "tests/test_cli.py:4754 in options": 1,
+        "tests/test_cli.py:480 in test_usage_errors_and_oversized_stdin_are_machine_readable": 1,
+        "tests/test_cli_channels.py:1395 in test_v27_the_parser_census_moves_28_to_30_leaves_and_35_to_37_nodes": 1,
+        "tests/test_cli_channels.py:1458 in test_v28_cross_leaf_option_isolation_holds_in_both_directions_for_b": 1,
+        "tests/test_cli_channels.py:2643 in test_x22_all_twenty_eight_baseline_leaf_paths_survive_by_identity_r": 1,
+        "tests/test_cli_channels.py:2811 in test_x26_commandcandidatesource_remains_imported_and_the_existing_h": 1,
+        "tests/test_cli_channels_battery.py:139 in _leaf_parser": 1,
+        "tests/test_cli_channels_battery.py:2667 in test_d24_zero_source_calls_zero_system_propose_calls_and_zero_sourc": 1,
+        "tests/test_cli_channels_battery.py:2733 in test_d25_the_parser_census_moves_28_30_leaves_and_35_37_nodes_deriv": 1,
+        "tests/test_cli_channels_battery.py:3059 in test_d27_b02_drops_cli_py_from_its_frozen_tuple_and_keeps_command_s": 1
+      },
+      "gate_returncode": 1,
+      "modules": {
+        "test_cli": 105,
+        "test_cli_channels": 4,
+        "test_cli_channels_battery": 4
+      },
+      "stage": 1,
+      "tests_ran": 901
+    },
+    {
+      "broken": 119,
+      "distinct_frames": 17,
+      "edits_applied": [
+        "src/cement_runtime/cli.py:    handle = commands.add_parser(\"handle\", help=\"route or create an iner",
+        "src/cement_runtime/cli.py:    request = commands.add_parser(\"request\", help=\"poll a request withou",
+        "src/cement_runtime/cli.py:def _source(value: str | None, *, source_id: str, timeout: float) -> Com",
+        "src/cement_runtime/cli.py:    source = None",
+        "src/cement_runtime/cli.py:    if args.command == \"handle\":",
+        "src/cement_runtime/cli.py:    if args.command == \"request\":",
+        "src/cement_runtime/cli.py:from .source import CommandCandidateSource"
+      ],
+      "failures": [
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_help_reuses_the_shipped_flag_register",
+          "frame": "tests/test_cli.py:4754 in options",
+          "kind": "ERROR",
+          "test": "test_function_eval_help_reuses_the_shipped_flag_register"
+        },
+        {
+          "dotted": "tests.test_cli_channels.CliChannelTests.test_v05_a_configured_candidate_source_is_never_called_by_either_ne",
+          "frame": "tests/test_cli_channels.py:445 in test_v05_a_configured_candidate_source_is_never_called_by_either_ne",
+          "kind": "ERROR",
+          "test": "test_v05_a_configured_candidate_source_is_never_called_by_either_ne"
+        },
+        {
+          "dotted": "tests.test_cli_channels.CliChannelTests.test_x04_each_completed_resolve_dispatch_calls_system_resolve_once",
+          "frame": "tests/test_cli_channels.py:1647 in test_x04_each_completed_resolve_dispatch_calls_system_resolve_once",
+          "kind": "ERROR",
+          "test": "test_x04_each_completed_resolve_dispatch_calls_system_resolve_once"
+        },
+        {
+          "dotted": "tests.test_cli_channels.CliChannelTests.test_x11_the_aggregate_transport_cap_is_derived_from_one_exported_p",
+          "frame": "tests/test_cli_channels.py:1989 in test_x11_the_aggregate_transport_cap_is_derived_from_one_exported_p",
+          "kind": "ERROR",
+          "test": "test_x11_the_aggregate_transport_cap_is_derived_from_one_exported_p"
+        },
+        {
+          "dotted": "tests.test_cli_channels.CliChannelTests.test_x21_both_new_parser_nodes_omit_every_source_option_as_well_as",
+          "frame": "tests/test_cli_channels.py:2605 in test_x21_both_new_parser_nodes_omit_every_source_option_as_well_as",
+          "kind": "ERROR",
+          "test": "test_x21_both_new_parser_nodes_omit_every_source_option_as_well_as"
+        },
+        {
+          "dotted": "tests.test_cli_channels.CliChannelTests.test_x26_commandcandidatesource_remains_imported_and_the_existing_h",
+          "frame": "tests/test_cli_channels.py:2801 in test_x26_commandcandidatesource_remains_imported_and_the_existing_h",
+          "kind": "ERROR",
+          "test": "test_x26_commandcandidatesource_remains_imported_and_the_existing_h"
+        },
+        {
+          "dotted": "tests.test_cli_channels_battery.ObligationBatteryTests.test_d03_dispatch_calls_system_resolve_exactly_once_and_reaches_no",
+          "frame": "tests/test_cli_channels_battery.py:571 in test_d03_dispatch_calls_system_resolve_exactly_once_and_reaches_no",
+          "kind": "ERROR",
+          "test": "test_d03_dispatch_calls_system_resolve_exactly_once_and_reaches_no"
+        },
+        {
+          "dotted": "tests.test_cli_channels_battery.ObligationBatteryTests.test_d24_zero_source_calls_zero_system_propose_calls_and_zero_sourc",
+          "frame": "tests/test_cli_channels_battery.py:2608 in test_d24_zero_source_calls_zero_system_propose_calls_and_zero_sourc",
+          "kind": "ERROR",
+          "test": "test_d24_zero_source_calls_zero_system_propose_calls_and_zero_sourc"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_full_operator_lifecycle",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_full_operator_lifecycle"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_binds_the_parsed_document_to_the_evaluator",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_binds_the_parsed_document_to_the_evaluator"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_constructs_no_system",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_constructs_no_system"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_detects_a_flipped_embedded_hash",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_detects_a_flipped_embedded_hash"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_detects_entry_tamper_at_every_position",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_detects_entry_tamper_at_every_position"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_exit_six_names_the_miss_and_nothing_else",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_exit_six_names_the_miss_and_nothing_else"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_expected_hash_binds_caller_held_identity",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_expected_hash_binds_caller_held_identity"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_expected_hash_must_be_a_digest",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_expected_hash_must_be_a_digest"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_expected_hash_rejects_another_identity",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_expected_hash_rejects_another_identity"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_failure_precedence_is_a_matrix",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_failure_precedence_is_a_matrix"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_follows_a_symlink_to_a_regular_bundle",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_follows_a_symlink_to_a_regular_bundle"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_forwards_the_expected_hash_unvalidated",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_forwards_the_expected_hash_unvalidated"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_grades_only_the_last_repeated_flag",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_grades_only_the_last_repeated_flag"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_grades_the_input_before_reading_the_bundle",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_grades_the_input_before_reading_the_bundle"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_hit_reports_the_output_and_the_answering_identity",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_hit_reports_the_output_and_the_answering_identity"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_ignores_supplied_ledger_globals",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_ignores_supplied_ledger_globals"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_input_depth_bound_is_an_adjacent_pair",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_input_depth_bound_is_an_adjacent_pair"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_input_keeps_the_default_channel_bounds",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_input_keeps_the_default_channel_bounds"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_lookup_is_canonical_not_textual",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_lookup_is_canonical_not_textual"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_maps_a_stdin_read_failure_on_both_hosts",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_maps_a_stdin_read_failure_on_both_hosts"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_miss_is_exit_six_with_the_same_identity",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_miss_is_exit_six_with_the_same_identity"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_never_reaches_the_ledger_globals",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_never_reaches_the_ledger_globals"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_null_output_hit_is_not_a_miss",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_null_output_hit_is_not_a_miss"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_opens_no_store_or_connection",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_opens_no_store_or_connection"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_payload_covers_every_match_field",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_payload_covers_every_match_field"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_payload_key_set_is_frozen_on_both_verdicts",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_payload_key_set_is_frozen_on_both_verdicts"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_reader_materializes_exactly_one_byte_past_the_bound",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_reader_materializes_exactly_one_byte_past_the_bound"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_reads_a_file_named_dash",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_reads_a_file_named_dash"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_reads_input_from_either_stdin_host",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_reads_input_from_either_stdin_host"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_rejects_decimal_input_before_lookup",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_rejects_decimal_input_before_lookup"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_rejects_malformed_bundles",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_rejects_malformed_bundles"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_requires_both_channels",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_requires_both_channels"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_eval_translates_injected_reader_failures",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_eval_translates_injected_reader_failures"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_bounds_the_receipt_id_grammar",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_bounds_the_receipt_id_grammar"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_cross_checks_the_receipt_operation_exactly",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_cross_checks_the_receipt_operation_exactly"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_emits_non_ascii_literally",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_emits_non_ascii_literally"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_exports_one_historical_receipt",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_exports_one_historical_receipt"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_forwards_the_operator_scope_exactly",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_forwards_the_operator_scope_exactly"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_grades_the_operation_by_grammar_on_both_sources",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_grades_the_operation_by_grammar_on_both_sources"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_and_stdout_carry_identical_bytes",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_and_stdout_carry_identical_bytes"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_bounds_the_target_name_at_the_filesystem_maximum",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_bounds_the_target_name_at_the_filesystem_maximum"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_checks_the_destination_with_one_stat_each_time",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_checks_the_destination_with_one_stat_each_time"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_exports_one_historical_receipt",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_exports_one_historical_receipt"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_keeps_mode_0600_under_a_permissive_umask",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_keeps_mode_0600_under_a_permissive_umask"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_never_exposes_a_partial_destination",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_never_exposes_a_partial_destination"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_never_writes_through_the_destination_name",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_never_writes_through_the_destination_name"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_path_fault_preempts_a_corrupt_receipt",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_path_fault_preempts_a_corrupt_receipt"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_path_faults_preempt_source_verdicts",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_path_faults_preempt_source_verdicts"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_rechecks_the_destination_before_replacing",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_rechecks_the_destination_before_replacing"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_rejects_unusable_destinations",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_rejects_unusable_destinations"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_replaces_an_existing_destination",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_replaces_an_existing_destination"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_reports_the_resolved_destination",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_reports_the_resolved_destination"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_resolves_a_relative_destination_against_the_cwd",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_resolves_a_relative_destination_against_the_cwd"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_round_trips_through_parse_function",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_round_trips_through_parse_function"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_translates_write_failures_and_keeps_the_old_bytes",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_translates_write_failures_and_keeps_the_old_bytes"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_treats_a_bare_dash_as_a_filename",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_treats_a_bare_dash_as_a_filename"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_writes_non_ascii_as_exact_utf8",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_writes_non_ascii_as_exact_utf8"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_writes_nothing_when_the_source_fails",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_writes_nothing_when_the_source_fails"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_out_writes_the_exact_bundle_and_reports_it",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_out_writes_the_exact_bundle_and_reports_it"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_refuses_a_drifted_set_with_the_whole_check_vector",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_refuses_a_drifted_set_with_the_whole_check_vector"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_rejects_an_unregistered_or_foreign_operation",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_rejects_an_unregistered_or_foreign_operation"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_reports_a_corrupt_receipt_as_integrity",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_reports_a_corrupt_receipt_as_integrity"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_reports_a_missing_receipt_row_separately",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_reports_a_missing_receipt_row_separately"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_round_trips_through_parse_function",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_round_trips_through_parse_function"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_serves_a_receipt_from_a_superseded_revision",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_serves_a_receipt_from_a_superseded_revision"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_sources_never_mix",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_sources_never_mix"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_export_writes_the_live_document_bytes_exactly",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_export_writes_the_live_document_bytes_exactly"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_inspect_corruption_maps_to_integrity",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_inspect_corruption_maps_to_integrity"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_inspect_ignores_unverified_drafts",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_inspect_ignores_unverified_drafts"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_inspect_is_byte_deterministic",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_inspect_is_byte_deterministic"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_inspect_projects_three_candidates_with_exact_schema",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_inspect_projects_three_candidates_with_exact_schema"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_inspect_reports_retained_and_displacing_candidate",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_inspect_reports_retained_and_displacing_candidate"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_inspect_reports_superseded_verified_build_verbatim",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_inspect_reports_superseded_verified_build_verbatim"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_promote_after_revision_reports_empty_set_message",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_promote_after_revision_reports_empty_set_message"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_promote_corruption_maps_to_integrity",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_promote_corruption_maps_to_integrity"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_promote_keeps_hash_after_nonqualifying_change",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_promote_keeps_hash_after_nonqualifying_change"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_promote_rejects_stale_hash_after_qualifying_change",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_promote_rejects_stale_hash_after_qualifying_change"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_promote_round_trips_the_inspected_hash_and_exact_schema",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_promote_round_trips_the_inspected_hash_and_exact_schema"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_receipts_accepts_a_zero_before_sequence",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_receipts_accepts_a_zero_before_sequence"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_receipts_bounds_are_pinned_as_adjacent_pairs",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_receipts_bounds_are_pinned_as_adjacent_pairs"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_receipts_empty_pages_do_not_distinguish_scope",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_receipts_empty_pages_do_not_distinguish_scope"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_receipts_enumerates_newest_first",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_receipts_enumerates_newest_first"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_receipts_filters_by_operation_revision",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_receipts_filters_by_operation_revision"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_receipts_pages_through_the_exclusive_cursor",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_receipts_pages_through_the_exclusive_cursor"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_receipts_scope_matches_exactly",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_receipts_scope_matches_exactly"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_receipts_truncation_is_visible_without_a_flag",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_receipts_truncation_is_visible_without_a_flag"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_show_projection_limit_truncates_visibly",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_show_projection_limit_truncates_visibly"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_show_projects_every_detail_family_under_limit",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_show_projects_every_detail_family_under_limit"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_show_projects_stale_revision_anomalies",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_show_projects_stale_revision_anomalies"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_show_receipt_id_misses_are_not_found",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_show_receipt_id_misses_are_not_found"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_show_receipt_id_pins_a_historical_anchor",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_show_receipt_id_pins_a_historical_anchor"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_show_receipt_id_reaches_a_superseded_revision",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_show_receipt_id_reaches_a_superseded_revision"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_show_receipt_id_still_bounds_members",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_show_receipt_id_still_bounds_members"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_show_reports_promoted_membership",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_show_reports_promoted_membership"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_verify_accepts_the_matching_expected_function_hash",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_verify_accepts_the_matching_expected_function_hash"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_verify_drafts_commits_the_failed_report_and_event_before_exit_six",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_verify_drafts_commits_the_failed_report_and_event_before_exit_six"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_verify_drafts_emits_every_passing_entry_and_exits_zero",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_verify_drafts_emits_every_passing_entry_and_exits_zero"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_verify_drafts_exits_six_when_the_middle_of_three_entries_fails",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_verify_drafts_exits_six_when_the_middle_of_three_entries_fails"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_verify_drafts_repeats_a_negative_verdict_for_the_same_corrupt_ledger",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_verify_drafts_repeats_a_negative_verdict_for_the_same_corrupt_ledger"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_verify_drafts_reports_a_superseded_build_as_a_benign_skip",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_verify_drafts_reports_a_superseded_build_as_a_benign_skip"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_verify_exits_six_with_a_diagnostic_hash_for_a_different_valid_digest",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_verify_exits_six_with_a_diagnostic_hash_for_a_different_valid_digest"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_verify_fails_only_the_receipt_check_without_a_function_checkpoint",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_verify_fails_only_the_receipt_check_without_a_function_checkpoint"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_function_verify_projects_a_passing_promoted_set_without_document_content",
+          "frame": "tests/test_cli.py:193 in payload",
+          "kind": "FAIL",
+          "test": "test_function_verify_projects_a_passing_promoted_set_without_document_content"
+        },
+        {
+          "dotted": "tests.test_cli.CLITests.test_usage_errors_and_oversized_stdin_are_machine_readable",
+          "frame": "tests/test_cli.py:480 in test_usage_errors_and_oversized_stdin_are_machine_readable",
+          "kind": "FAIL",
+          "test": "test_usage_errors_and_oversized_stdin_are_machine_readable"
+        },
+        {
+          "dotted": "tests.test_cli_channels.CliChannelTests.test_v27_the_parser_census_moves_28_to_30_leaves_and_35_to_37_nodes",
+          "frame": "tests/test_cli_channels.py:1395 in test_v27_the_parser_census_moves_28_to_30_leaves_and_35_to_37_nodes",
+          "kind": "FAIL",
+          "test": "test_v27_the_parser_census_moves_28_to_30_leaves_and_35_to_37_nodes"
+        },
+        {
+          "dotted": "tests.test_cli_channels.CliChannelTests.test_v28_cross_leaf_option_isolation_holds_in_both_directions_for_b",
+          "frame": "tests/test_cli_channels.py:1458 in test_v28_cross_leaf_option_isolation_holds_in_both_directions_for_b",
+          "kind": "FAIL",
+          "test": "test_v28_cross_leaf_option_isolation_holds_in_both_directions_for_b"
+        },
+        {
+          "dotted": "tests.test_cli_channels.CliChannelTests.test_x22_all_twenty_eight_baseline_leaf_paths_survive_by_identity_r",
+          "frame": "tests/test_cli_channels.py:2643 in test_x22_all_twenty_eight_baseline_leaf_paths_survive_by_identity_r",
+          "kind": "FAIL",
+          "test": "test_x22_all_twenty_eight_baseline_leaf_paths_survive_by_identity_r"
+        },
+        {
+          "dotted": "tests.test_cli_channels_battery.ObligationBatteryTests.test_d16_the_aggregate_cap_is_2_default_max_bytes_provenance_max_by",
+          "frame": "tests/test_cli_channels_battery.py:1799 in test_d16_the_aggregate_cap_is_2_default_max_bytes_provenance_max_by",
+          "kind": "FAIL",
+          "test": "test_d16_the_aggregate_cap_is_2_default_max_bytes_provenance_max_by"
+        },
+        {
+          "dotted": "tests.test_cli_channels_battery.ObligationBatteryTests.test_d25_the_parser_census_moves_28_30_leaves_and_35_37_nodes_deriv",
+          "frame": "tests/test_cli_channels_battery.py:2733 in test_d25_the_parser_census_moves_28_30_leaves_and_35_37_nodes_deriv",
+          "kind": "FAIL",
+          "test": "test_d25_the_parser_census_moves_28_30_leaves_and_35_37_nodes_deriv"
+        },
+        {
+          "dotted": "tests.test_cli_channels_battery.ObligationBatteryTests.test_d26_preserved_and_asserted_independently_store_py_byte_identic",
+          "frame": "tests/test_cli_channels_battery.py:2861 in test_d26_preserved_and_asserted_independently_store_py_byte_identic",
+          "kind": "FAIL",
+          "test": "test_d26_preserved_and_asserted_independently_store_py_byte_identic"
+        },
+        {
+          "dotted": "tests.test_cli_channels_battery.ObligationBatteryTests.test_d27_b02_drops_cli_py_from_its_frozen_tuple_and_keeps_command_s",
+          "frame": "tests/test_cli_channels_battery.py:3059 in test_d27_b02_drops_cli_py_from_its_frozen_tuple_and_keeps_command_s",
+          "kind": "FAIL",
+          "test": "test_d27_b02_drops_cli_py_from_its_frozen_tuple_and_keeps_command_s"
+        }
+      ],
+      "frames": {
+        "tests/test_cli.py:193 in payload": 103,
+        "tests/test_cli.py:4754 in options": 1,
+        "tests/test_cli.py:480 in test_usage_errors_and_oversized_stdin_are_machine_readable": 1,
+        "tests/test_cli_channels.py:1395 in test_v27_the_parser_census_moves_28_to_30_leaves_and_35_to_37_nodes": 1,
+        "tests/test_cli_channels.py:1458 in test_v28_cross_leaf_option_isolation_holds_in_both_directions_for_b": 1,
+        "tests/test_cli_channels.py:1647 in test_x04_each_completed_resolve_dispatch_calls_system_resolve_once": 1,
+        "tests/test_cli_channels.py:1989 in test_x11_the_aggregate_transport_cap_is_derived_from_one_exported_p": 1,
+        "tests/test_cli_channels.py:2605 in test_x21_both_new_parser_nodes_omit_every_source_option_as_well_as": 1,
+        "tests/test_cli_channels.py:2643 in test_x22_all_twenty_eight_baseline_leaf_paths_survive_by_identity_r": 1,
+        "tests/test_cli_channels.py:2801 in test_x26_commandcandidatesource_remains_imported_and_the_existing_h": 1,
+        "tests/test_cli_channels.py:445 in test_v05_a_configured_candidate_source_is_never_called_by_either_ne": 1,
+        "tests/test_cli_channels_battery.py:1799 in test_d16_the_aggregate_cap_is_2_default_max_bytes_provenance_max_by": 1,
+        "tests/test_cli_channels_battery.py:2608 in test_d24_zero_source_calls_zero_system_propose_calls_and_zero_sourc": 1,
+        "tests/test_cli_channels_battery.py:2733 in test_d25_the_parser_census_moves_28_30_leaves_and_35_37_nodes_deriv": 1,
+        "tests/test_cli_channels_battery.py:2861 in test_d26_preserved_and_asserted_independently_store_py_byte_identic": 1,
+        "tests/test_cli_channels_battery.py:3059 in test_d27_b02_drops_cli_py_from_its_frozen_tuple_and_keeps_command_s": 1,
+        "tests/test_cli_channels_battery.py:571 in test_d03_dispatch_calls_system_resolve_exactly_once_and_reaches_no": 1
+      },
+      "gate_returncode": 1,
+      "modules": {
+        "test_cli": 105,
+        "test_cli_channels": 8,
+        "test_cli_channels_battery": 6
+      },
+      "stage": 2,
+      "tests_ran": 901
+    }
+  ]
+}

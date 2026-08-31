@@ -877,7 +877,66 @@ Measured gaps driving the arc:
     so identity and truthiness agree over the whole `{True, False, None}` domain. `6` -> `7` on the
     same line is killed by six tests, which is the harness's positive control.
   - M3.5b tier=kernel tags=- depends=M3.5a - remove `handle`/`request`/source grammar, imports, fixtures,
-    help and operator prose.
+    help and operator prose. THREE sessions, not four: S1 contract, S2 implementation, S3 battery +
+    closure.
+    S1 DONE, contract session, `main=` 76% 183K/240K. NO teammate dispatched. Shipped
+    `.agent/decisions/m3u5b-contract.md` (11 sections, 29 obligations D01-D29 gapless, sections 10-11
+    PENDING), `m3u5b-burden.py` + `m3u5b-burden.json`.
+    NO WAVE 1, and the grounds are the roadmap's own M3.5a sizing correction: budget FOUR sessions for a
+    unit that OPENS a spike wave regardless of tag, and budget a unit with NO fork to rule WITHOUT S1 and
+    S2. M3.5b has no material design fork - the pin shapes already ship, the removal mechanics are settled
+    by prior units, and every open quantity was directly measurable. The prose corpus is 1,080 lines with
+    56 vocabulary-hit lines, and the last two `map` dispatches returned rows MAIN had to re-derive before
+    acting (6 of 55 on M3.5a). Teammate budget moves to wave 2. MAIN spent ~110K deriving ground state and
+    reached a complete contract in one window against M3.5a's S1+S2 pair.
+    BURDEN MEASURED, never counted: `m3u5b-burden.py` stages the source-only deletion in throwaway
+    worktrees with per-edit occurrence assertions and groups every failure by its deepest `tests/` frame.
+    Stage 1 (grammar) = 113 broken / 901, 11 frames. Stage 2 (+ `_source`, construction, both dispatch
+    branches, the import) = 119 broken, 17 frames. 103 of stage 1's 113 stand behind ONE frame,
+    `tests/test_cli.py:193 in payload`, fed by three fixture helpers - `confirm` (:217), `handle_once`
+    (:247), `confirm_text` (:2954) - that seed state through the `handle` CLI route. The work list is 17
+    frames. M3.4's 28x lesson reproduces exactly, and the plan draft's "three shared CLI fixture helpers
+    shield 102 callers" is one of the few draft predicates that survives re-derivation at HEAD: measured 103.
+    THE CENSUS COLLIDES AND THE DIGEST DISCRIMINATES, which is S1's sharpest find and it changes a gate
+    design. Post-M3.5b is 28 leaves / 35 nodes - numerically EQUAL to pre-M3.5a `c8b82cd` over the exact
+    INVERSE set. A leaf/node count pin cannot distinguish "M3.5a and M3.5b both landed" from "neither
+    landed". `parser_shape` does separate them (154 `af19339c3995c97d` at `c8b82cd`, 151
+    `ebd2ac811bd9776d` after), so census and digest are NOT redundant: the census names which leaf moved,
+    the digest is the only one of the pair that notices the state at all. Every census obligation asserts
+    the leaf-name SET.
+    A ROADMAP NUMBER WAS CARRIED INTO THE CONTRACT AS A MEASUREMENT AND WAS WRONG. The recorded
+    `126` / `89dfa3d982d8c54b` is the PRE-A23 algorithm over the POST-M3.5a parser; MAIN wrote it into the
+    ground-state table as the pre-M3.5a baseline, then measured `c8b82cd` under the current probe and got
+    154 / `af19339c3995c97d`. Two axes, not one. A digest is only comparable against its own algorithm -
+    state the algorithm beside every recorded digest, exactly as P06's slicing-convention table does.
+    GATE 4 RE-BASE MEASURED, five failing checks against the stage-2 tree: `parser_census.leaves` 30->28,
+    `.nodes` 37->35, `parser_shape.actions` 163->151, `.digest` `8b58b465c08aa693`->`ebd2ac811bd9776d`,
+    and `parser_census.lost_baseline_leaves` `[]`->`['handle','request']`. `BASELINE_LEAVES` KEEPS both
+    members: the frozenset records `c8b82cd` history and does not move; the EXPECTATION moves from
+    "nothing is lost" to "exactly these two are lost". Every tripwire this session predicted fired by
+    name, which is what a measured burden buys over a map dispatch.
+    TWO PINS INVERT RATHER THAN MOVE, the class M3.4 named. `x26` asserts `CommandCandidateSource` REMAINS
+    imported; `d24` spies `cli._source` through `mock.patch.object`, which RAISES rather than fails once
+    the symbol is deleted. A pin left asserting the pre-removal property tests nothing afterwards, and a
+    spy on a deleted symbol is an error, not a verdict.
+    ARGPARSE MEASURED, and flag removal has two distinct pin shapes. Subcommand names are EXACT-MATCH at
+    both levels, so a removed LEAF raises `_UsageError` `invalid choice` whose message ENUMERATES the
+    survivors - a complement assertion for free. A removed FLAG on a surviving leaf reports `unrecognized
+    arguments`. Legacy leaves still abbreviate (`compile --act` -> `--actor`, and `handle --request` ->
+    `--request-id` today), so removal is NOT pinnable as absence: D10 requires every removed spelling AND
+    every proper prefix to be refused, derived over `_parser()`.
+    THE PROSE SPLITS BY ROUTE AND BOTH ERROR DIRECTIONS ARE DEFECTS (D22). CLI-route prose names commands
+    that cease to exist and must change; library-API prose names `System.handle`, which survives until
+    M3.6a, and must NOT change here. `examples/hospital_ocr/run_demo.py` and its README drive the LIBRARY
+    method, so the demo is untouched by this unit. Deleting library prose would pre-empt M3.6a's own doc
+    pass and break the track order.
+    S2 ENTRY STATE: contract sections 1-9 are binding; open with the anchored `EDITS` table in
+    `m3u5b-burden.py` (7 occurrence-asserted edits, re-runnable) rather than hand edits, then the three
+    fixture helpers, then the 16 named instrument frames, then gate 4, then the D22 prose table. Dispatch
+    wave 2 (`test-m3u5b-1` diff-blind verdict table, `rev-m3u5b-1` contract attack) against the
+    pre-implementation commit, both seeded by a MAIN-committed both-ways-graded validator plus an
+    all-`unknown` skeleton naming each row's SUBJECT, both reporting INLINE with the marker as the final
+    line.
   - M3.6a tier=kernel tags=- depends=M3.5b - delete public lifecycle methods, leases, result models and
     exports; retain only the private v2 binding plumbing.
   - M3.6b tier=kernel tags=prod depends=M3.6a - the sole schema cut v2->v3: direct proposal columns,
