@@ -10,8 +10,8 @@
       "attack": "Counterexample: an override of `verify_function` returns `FunctionVerification(passed=True, document=None)`; unmodified `System.resolve` then returns `match=None`. D09 says every value `System.resolve` returns obeys `matched is null` iff `passed is false`, but the implementation guards on `not passed or document is None`. Narrow the domain to unmodified `System.verify_function` outputs, matching the model docstring, or enforce the invariant.",
       "evidence": "Ran `uv run python -c <patch System.verify_function to passed=True/document=None; call resolve>`; output was `returned=FunctionResolution passed=True matched_is_none=True`. Anchors: `src/cement_runtime/models.py:371`, `src/cement_runtime/system.py:3827-3828`.",
       "severity": "blocking",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-AMENDED",
+      "main_note": "A4 narrows D09's biconditional to `matched` alone over the values `System.resolve` computes. Same finding as verdict X02; two lenses, accepted without adjudication."
     },
     {
       "id": "A02",
@@ -20,8 +20,8 @@
       "attack": "A pin that checks `set(payload) <= EXPECTED` in each state plus identical sets across states accepts `{}` everywhere. It looks like a closed-key-set and fixed-shape test, yet forces none of the seven required keys. The acceptance test must assert equality to the literal seven-key set independently for hit, verified miss, and failed verdict.",
       "evidence": "Ran a three-state proof with empty payloads: `subset_all=True identical=True exact_all=False`; `EXPECTED` held all seven D07 names.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "BATTERY-CONSTRAINT",
+      "main_note": "D07's test asserts set EQUALITY to the literal seven keys INDEPENDENTLY in each of the three states. Measured: subset plus cross-state identity accepts `{}` everywhere."
     },
     {
       "id": "A03",
@@ -30,8 +30,8 @@
       "attack": "D13 acknowledges deletion after the check but says the check `never worsens`. The inverse race falsifies that unconditional claim: the path can be absent when checked, then a valid Cement ledger can appear before construction; the check returns exit 5 where baseline construction succeeds. Scope the improvement to a stable absent path and record both disappearance and appearance races.",
       "evidence": "Ran `System(staged); target.exists(); os.replace(staged, target); System(target)` in one temporary directory. Output: `precheck_exists=False`, then `construction_after_appearance=success bytes=208896`.",
       "severity": "blocking",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-AMENDED",
+      "main_note": "A7 withdraws D13's unconditional `never worsens`: the inverse race turns a would-be success into exit 5. No code change; the sentence was the defect."
     },
     {
       "id": "A04",
@@ -40,8 +40,8 @@
       "attack": "The total is arithmetically correct only with an unstated `framing=34`. D16 neither names the byte template nor gives the term, so a copied total can satisfy the numeric pin while no implementation derives it. Bind framing to `len(b'{\"input\":,\"output\":,\"provenance\":}') == 34` and require the cap expression to use that derived constant.",
       "evidence": "Ran `uv run python -c <derive constants>`: `DEFAULT_MAX_BYTES=1048576`, `PROVENANCE_MAX_BYTES=65536`, `framing=34`, `total=2162722`. The tracked spike expression is `.agent/decisions/m3u5a-alt-envelope.patch:28-29`.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-AMENDED",
+      "main_note": "A9 states framing = 34 and derives it from `_SUBMISSION_KEYS`. D16 gave the total while naming no byte template, so a copied total satisfied the pin with nothing deriving it."
     },
     {
       "id": "A05",
@@ -50,8 +50,8 @@
       "attack": "No defensible alternative: the channel begins with text, `parse_json` installs `object_pairs_hook`, and any duplicate at the envelope or nested level raises before a dict returns to top-level type or key checks. Keep one spy or planted duplicate proving the exact-key validator is not called after parser failure.",
       "evidence": "Ran `parse_json` on duplicate top-level `input` and duplicate nested `x`; both raised `ValidationError` with `duplicate JSON object key` before return. Anchors: `src/cement_runtime/json_value.py:157-176`.",
       "severity": "cleared",
-      "disposition": null,
-      "main_note": null
+      "disposition": "CLEARED",
+      "main_note": "No defensible alternative. `parse_json` installs `object_pairs_hook`, so any duplicate raises before a dict reaches the type or key checks. Kept as filed."
     },
     {
       "id": "A06",
@@ -60,8 +60,8 @@
       "attack": "No defensible alternative if the pin reads the committed proposal row rather than only the `Candidate` argument. An omitted provenance must round-trip as canonical text `{}` and remain `{}` after the caller mutates its original mapping; this forces both detachment and durability.",
       "evidence": "Ran direct submission with `provenance={}`, then mutated the caller mapping after return and queried SQLite. Output: `stored='{}' caller_after={'late': 3}`. Canonicalization anchor: `src/cement_runtime/system.py:844`; persistence anchor: `src/cement_runtime/system.py:913-916`.",
       "severity": "cleared",
-      "disposition": null,
-      "main_note": null
+      "disposition": "CLEARED",
+      "main_note": "No defensible alternative. The pin reads the COMMITTED row, so an omitted provenance must round-trip as `{}` and stay `{}` after the caller mutates its original mapping — forcing detachment and durability together."
     },
     {
       "id": "A07",
@@ -70,8 +70,8 @@
       "attack": "`pending` is the creation state, not necessarily the state when success returns or stdout is emitted. A concurrent reviewer can transition the committed row in the post-commit/pre-return window. Replace `every successful submission is pending` with `every proposal is inserted pending`; reject the constant status because it can already be stale, not because status cannot vary.",
       "evidence": "Wrapped the write transaction to run a real `review(..., decision='reject')` after commit but before `submit_proposal` returned. Output: `returned_id=True status_at_return=rejected`. Insert/return anchors: `src/cement_runtime/system.py:913-930`.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-AMENDED",
+      "main_note": "A10 replaces `every successful submission is pending` with `every proposal is INSERTED pending`. Measured: a reviewer in the post-commit, pre-return window returns `rejected`. The key stays rejected on the corrected ground."
     },
     {
       "id": "A08",
@@ -80,8 +80,8 @@
       "attack": "No binding mechanical predicate covers retry advice. A global `retry` grep is invalid because legacy `handle` legitimately advises retry, while an absence grep passes if submission recovery prose is deleted or rephrased as `run again`. Enumerate submission-owned prose/help/docstrings, require `do not retry` plus pending-proposal enumeration, and reject positive `retry|resubmit|run again|repeat` advice in that scoped corpus.",
       "evidence": "Ran `/usr/bin/rg -n -i` over README, docs, CLI, and system: ten retry-family hits include correct submission warnings and legitimate legacy advice at `README.md:277`; therefore raw presence or absence cannot grade D23.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-AMENDED",
+      "main_note": "A11 scopes the no-retry corpus to submission-owned prose and states it positively. A repository-wide grep fails both ways: legacy `handle` advises retry legitimately, and absence passes when the recovery prose is deleted."
     },
     {
       "id": "A09",
@@ -90,8 +90,8 @@
       "attack": "Mocks on `_source` and `System.propose` can both record zero while the new branch calls `system.candidate_source.propose` directly, or while the fixture leaves `candidate_source=None`. Force the protocol boundary: inject a configured source whose every attribute access/call raises, execute a valid submit through `_run`, require success plus one direct write, and mutation-test a source-call insertion.",
       "evidence": "Explicit derivation from D24's three named counters: two named-method spies do not cover direct `candidate_source` reach, and a `None` source makes all zero counts vacuous. The shipped source-bearing field is assigned on `System` construction and remains reachable to CLI dispatch.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "BATTERY-CONSTRAINT",
+      "main_note": "D24's test injects a CONFIGURED source whose every attribute access raises, then requires success plus one write. Two named-method spies miss direct `candidate_source` reach, and a `None` source makes all three counters vacuous."
     },
     {
       "id": "A10",
@@ -100,8 +100,8 @@
       "attack": "Yes. The 28/35 census and the three section-2 probes can stay unchanged while another old leaf disables abbreviation. D25's broad `option abbreviation elsewhere is unchanged` needs a derived baseline map of accepted prefixes for all 28 existing leaves, or it must narrow preservation to `--part`, `--bun`, and `--in`.",
       "evidence": "Set only `proposal review.allow_abbrev=False` in a baseline parser. The probe printed `root=accepted`, `leaves=28 nodes=35`, yet baseline-valid `proposal review ... --rev r` became `required: --reviewer`. Thus the stated pins do not force the broad claim.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-FIXED",
+      "main_note": "A23 + gate 4. `parser_shape` digested ACTIONS, and `allow_abbrev` belongs to the PARSER, so the property D25 claims to preserve had no instrument. One `<node>` line per node: 126 -> 163 lines, digest `89dfa3d982d8c54b` -> `8b58b465c08aa693`; the control mutation moves it to `515b30796c61d189` while the census holds at 30/37."
     },
     {
       "id": "A11",
@@ -110,8 +110,8 @@
       "attack": "The current bytes equal contract base `4783eed`, but D26 does not name that object locally. A test-local digest or self-comparison can appear to pin identity while divorcing the claim from its referent. State `git show 4783eed:src/cement_runtime/store.py` as the oracle, or pin its blob id and derive byte equality from Git.",
       "evidence": "Derived against `4783eed`: current/base blob `b870dacbaf2718b7cba3567b59d69a994ca4ca42`, bytes `27951/27951`, sha256 `2b2650144d4b384af4d8bfe67e1f9de0e186b609f3bb2632e2f81b53536770f7`, `cmp_rc=0`, `SCHEMA_VERSION=2`.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-AMENDED",
+      "main_note": "A12 names the oracle: git object `4783eed:src/cement_runtime/store.py`, blob `b870dacbaf2718b7cba3567b59d69a994ca4ca42`, 27,951 bytes. A self-comparison divorces the claim from its referent."
     },
     {
       "id": "A12",
@@ -120,8 +120,8 @@
       "attack": "The migration loses B02's broad `CLI is untouched` preservation. D24 covers source reach; D25 covers leaf paths, counts, and a few prefixes; D26 covers option isolation. None prevents changing an old default, help string, payload, error, or dispatch. D27's claim that these are `strictly stronger` is false. Add a baseline differential over all 28 old leaves or narrow the retired property honestly.",
       "evidence": "Mutated only the in-memory `events --limit` default from `1000` to `7`: output remained `leaves=28 nodes=35 paths_unique=28 abbreviation_probes=accepted`, while old CLI behavior changed. Original B02 scope is `.agent/decisions/m3u3-contract.md:20-40`.",
       "severity": "blocking",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-AMENDED",
+      "main_note": "A8 withdraws `strictly stronger`. D24/D25/D26 miss an old leaf's changed default; gate 4's `parser_shape` digest carries what B02 lost."
     },
     {
       "id": "A13",
@@ -130,8 +130,8 @@
       "attack": "All published numbers currently derive correctly, but gate identity names no artifact-to-prose link. `m3u2b-validate.py` validates the JSON and prints raw values; it never inspects M3.5a prose. A hard-coded doc assertion therefore passes today and stays green after remeasurement. The D30 test must load the artifact and compute each formatted token at runtime.",
       "evidence": "Ran the committed validator: n1 `5.736265`, n1000 `613.171690`, n50000 `36452.212317`, peak `985696 KiB`. Runtime formatting derived `5.7`, `613`, `36,452`, `985,696`, `36.5 s`, and `963 MiB` exactly.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "BATTERY-CONSTRAINT",
+      "main_note": "D30's test LOADS `m3u2b-resolve-bench.json` and formats each published token at runtime. A hard-coded assertion passes today and stays green after remeasurement."
     },
     {
       "id": "A14",
@@ -140,8 +140,8 @@
       "attack": "No defensible alternative if resolve returns an `_Outcome` and `_Unverified` plus `main` remain byte-unchanged. The seams are disjoint: `_Unverified` emits stderr at 6, while an `_Outcome` emits its payload on stdout and returns its own status. Existing export regression tests force the old channel.",
       "evidence": "Ran two targeted tests: `test_function_export_refuses_a_drifted_set_with_the_whole_check_vector` and `test_unverified_stays_outside_the_cement_error_hierarchy`; `Ran 2 tests ... OK`. Anchors: `src/cement_runtime/cli.py:717-729`, `tests/test_cli.py:3058`.",
       "severity": "cleared",
-      "disposition": null,
-      "main_note": null
+      "disposition": "CLEARED",
+      "main_note": "No defensible alternative. The seams are disjoint: `_Unverified` emits stderr at 6 while an `_Outcome` emits its payload on stdout with its own status, and existing export regressions force the old channel."
     },
     {
       "id": "A15",
@@ -150,8 +150,8 @@
       "attack": "No defensible alternative: wrap the real instance's `store.transaction`, preserving the context manager, and assert `call_args_list == [call(write=False)]` for each ledger-reaching CLI state. Patch the CLI `System` factory to return that instrumented instance; a mock method with no wrapped body would not observe nested work.",
       "evidence": "Ran `tests.test_resolve_battery.ResolveBatteryTests.test_b25`; `Ran 1 test ... OK`. Its `wraps=system.store.transaction` instrument and exact call-list assertion are at `tests/test_resolve_battery.py:946-972`.",
       "severity": "cleared",
-      "disposition": null,
-      "main_note": null
+      "disposition": "CLEARED",
+      "main_note": "No defensible alternative. Wrap the real instance's `store.transaction` preserving the context manager and assert `call_args_list == [call(write=False)]`; a bare mock observes no nested work."
     },
     {
       "id": "A16",
@@ -160,8 +160,8 @@
       "attack": "No. D24 mechanically targets source reach, while D25-D26 preserve only selected structure and options. The full suite is not a preservation oracle: an untested old default, help line, payload, error, or dispatch can change while every numbered obligation passes. Add a baseline differential over the 28 existing leaves or replace the broad `preservation` scope claim with the enumerated invariants actually pinned.",
       "evidence": "Explicit obligation census: D01-D23 concern new leaves; D24 source reach; D25 path/count/prefix samples; D26 store/import/row footprint/options; D27 tripwire; D28-D30 publication. No obligation compares old-leaf behavior to base `4783eed`.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "SCOPED",
+      "main_note": "Upheld: no obligation compares old-leaf behaviour to base `4783eed`. Section 1's `preservation` narrows to what is instrumented — gate 4's `parser_shape` digest over the whole CLI grammar surface plus D26's enumerated invariants. Behaviour outside the parser surface has the full suite alone, which is not a preservation oracle."
     },
     {
       "id": "A17",
@@ -170,8 +170,8 @@
       "attack": "The baseline claim is currently true, but D12 names neither an object nor a slicing convention. Dynamic class probes can preserve outputs while exception ordering or the residual hierarchy changes. Pin the whole-line AST span of `main` against `4783eed`, and separately drive one planted exception of each mapped class through `main`.",
       "evidence": "Derived whole-line AST span: current/base `main` lines `697-731`, `1306/1306` bytes, sha256 `973b7ee6605f93641a87051626fce53856d219d6763c069b7242da545f406ee1`, `equal=True` against `4783eed`.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-AMENDED",
+      "main_note": "A13 names D12's object and slicing convention — `main`'s whole-line AST span, 1,306 bytes, sha256 `973b7ee6...` — plus one planted exception per mapped class, because a span is not a behaviour."
     },
     {
       "id": "A18",
@@ -180,8 +180,8 @@
       "attack": "Appending one sentence that merely names `cement resolve` and `cement proposal submit` makes the stated grep pass while publishing no flags, payload keys, exits, idempotency, or purity. The gate can also pass on comments or code-only mentions. Require an anchored human-visible section per command and assert every listed grammar token, key, exit class, and invariant inside that section.",
       "evidence": "Rechecked the four-file corpus: `cement proposal submit`, `System.resolve`, and `cement resolve` each had `rc=1 count=0`; positive control `System.submit_proposal` had `rc=0`. Two bare command-name lines would flip the mechanical predicate without meeting D28's reader claim.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "BATTERY-CONSTRAINT",
+      "main_note": "D28's grep is necessary and not sufficient. The test asserts every grammar token, envelope key, payload key, exit class and invariant inside an anchored human-visible section, so two bare command-name lines cannot satisfy it."
     },
     {
       "id": "A19",
@@ -190,8 +190,8 @@
       "attack": "`placeholder` and `producing command` have no grammar. Uppercase-only detection misses `hash_from_verify`; treating every symbolic argument as a placeholder makes operator-supplied JSON and operation names impossible to produce. Define shell variables as the sole placeholders, require an earlier assignment or command substitution in the same fence, and distinguish supplied example literals from produced identities.",
       "evidence": "Current precedent shows the ambiguity: `README.md:113-117` uses `HASH_FROM_INSPECT` after an inspect command, while the same block uses externally supplied `support.reply`, `demo.db`, and actor text. Only one token is intended as produced, but D29 supplies no machine rule separating them.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "BATTERY-CONSTRAINT",
+      "main_note": "D29's placeholder grammar = shell variables alone, each needing an earlier assignment or command substitution in the same fence. Uppercase detection misses `hash_from_verify`; treating every symbolic argument as a placeholder makes operator-supplied JSON unproducible."
     },
     {
       "id": "A20",
@@ -200,8 +200,8 @@
       "attack": "Section 12 says every entry carries its acceptance check, but the write-leaf entry only asks for `one ruling ... applied uniformly`; that is a decision, not an observable. `.agent/polish.md` is stronger: one test per write leaf must assert no file and a path diagnosis. Copy that predicate and an owner into the binding contract; inventory every human-facing file for the stated ASD register.",
       "evidence": "Compared contract section 12 with `.agent/polish.md:544-550`. The contract omits the polish row's per-leaf test, absent-path no-file result, and path-focused error observable. The other three deferrals name executable checks and two name owners.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-AMENDED",
+      "main_note": "A21 copies `.agent/polish.md`'s observable into the section 12 deferral: one test per write leaf asserting NO file and a path-focused diagnosis. `one ruling applied uniformly` is a decision, not an acceptance check."
     },
     {
       "id": "Y01",
@@ -210,8 +210,8 @@
       "attack": "The exact file size is a SQLite build property, not a Cement semantic invariant. This host creates 51 pages at a compile-time default page size of 4096, yielding 208896 bytes; another supported SQLite build can choose another default. D13 only needs absent-versus-created. Drop the byte equality or bind it to recorded SQLite provenance without making other hosts defective.",
       "evidence": "Ran a fresh construction and queried SQLite: `sqlite=3.53.1 bytes=208896 page_size=4096 page_count=51`, compile options `DEFAULT_PAGE_SIZE=4096` and `MAX_DEFAULT_PAGE_SIZE=8192`. README supports SQLite 3.37+, not this exact build.",
       "severity": "blocking",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-FIXED",
+      "main_note": "Gate 4 stopped grading the fresh-ledger byte size, which is a host SQLite page-size property, and grades `bytes_positive` + `bytes_deterministic` instead."
     },
     {
       "id": "Y02",
@@ -220,8 +220,8 @@
       "attack": "Gate 4 is unsatisfiable as written. D25 intentionally changes parser census `28/35` to `30/37`; D16 intentionally replaces three unexported `65_536` literals with one exported constant used at three sites. Section 11 nevertheless requires section 2's six facts to `still hold`. Split stable facts from ruled deltas and assert each expected post-unit value.",
       "evidence": "Direct contract comparison: section 2 reports `28 leaves / 35 nodes` and `3 unexported` literals; D25 requires `30 / 37`, while D16 requires `PROVENANCE_MAX_BYTES` exported and all literal sites replaced.",
       "severity": "blocking",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-FIXED",
+      "main_note": "Gate 4 re-anchored: two pins carried S1 pre-implementation values that D25 and D16 move by design, so the gate was unsatisfiable as written."
     },
     {
       "id": "Y03",
@@ -230,8 +230,8 @@
       "attack": "`m3u5a-s2-probe.py` is not a gate: `main` serializes whatever six probes return and unconditionally returns 0. Every fact can drift and gate 4 still succeeds. Add a post-unit expected document or make the script compare stable values plus D16/D25's intentional deltas and exit nonzero on mismatch.",
       "evidence": "Read `.agent/decisions/m3u5a-s2-probe.py:106-117`: the report is assembled, dumped, and followed by unconditional `return 0`; no expected object or assertion exists.",
       "severity": "blocking",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-FIXED",
+      "main_note": "`m3u5a-s2-probe.py` printed its findings and returned 0 unconditionally. It now grades 19 pinned facts and exits 1 on any mismatch."
     },
     {
       "id": "Y04",
@@ -240,8 +240,8 @@
       "attack": "D02 requires shipped `_input`, but Python evaluates `_input(args.input)` before entering `System.resolve`. A malformed CLI JSON value therefore preempts an invalid expected hash, while the library validates the hash before canonicalizing input. D05's whole precedence cannot remain library-owned unless the API accepts raw JSON or the CLI duplicates hash validation; rule one design explicitly.",
       "evidence": "Ran adjacent calls: direct library output was `expected_function_hash must be a SHA-256 hex digest`; CLI-shaped `resolve(..., _input('{'), expected_function_hash='bad')` output was `invalid JSON: Expecting property name enclosed in double quotes...`.",
       "severity": "blocking",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-AMENDED",
+      "main_note": "A2 scopes D05's precedence to library validations; CLI value-parsing necessarily precedes the call. Same finding as verdict X01."
     },
     {
       "id": "Y05",
@@ -250,8 +250,8 @@
       "attack": "D06's `per invocation` quantifier is false. Invalid partition/hash/input calls stop before ledger access, and D13's absent-ledger precheck deliberately stops before `System` construction. The existing library battery already expects zero transactions for rejected calls. Qualify D06 as exactly one transaction for an invocation that reaches `verify_function`.",
       "evidence": "`tests/test_resolve_battery.py:946-972` asserts `[call(write=False)]` for a ledger-reaching resolve and `assert_not_called()` for rejected input; D13 separately mandates no construction on an absent path.",
       "severity": "blocking",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-AMENDED",
+      "main_note": "A3 scopes D06 to invocations that REACH the ledger; a rejected invocation opens zero transactions. Same finding as verdict X06."
     },
     {
       "id": "Y06",
@@ -260,8 +260,8 @@
       "attack": "Argparse checks a required option before reporting surplus tokens. Using `--in` instead of required `--input`, or `--sub` instead of required `--submission`, reports the required full option as missing, not `unrecognized arguments`. D14 contradicts its own cited Y07 result. Either contract the real two-case precedence or add custom parsing and stop attributing it to `allow_abbrev=False`.",
       "evidence": "Toy parsers using the shipped `_JSONArgumentParser` printed: replacement `--in` → `the following arguments are required: --input`; replacement `--sub` → required `--submission`; only a surplus prefix beside the full option was `unrecognized arguments`.",
       "severity": "blocking",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-AMENDED",
+      "main_note": "A1 restates D01/D14 as `no option prefix ever BINDS`; a prefix standing in place of the required option answers the required-argument message. Same finding as V02/V18."
     },
     {
       "id": "Y07",
@@ -270,8 +270,8 @@
       "attack": "The ruled envelope still lets an operator name two complete submissions: repeated `--submission` is argparse last-wins. That recreates the silent write-input selection G3 uses to reject repeated field flags. Either reject a repeated aggregate option with a custom action or narrow G3 to duplicate object members and justify argv-level last-wins explicitly.",
       "evidence": "Ran the shipped parser class with required `--submission` twice; output was `selected=second`. The tracked envelope spike records the same behavior in Z16, while G3 says a committing leaf earns strict duplicate rejection.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "SCOPED",
+      "main_note": "G3's strict-duplicate ground narrows to duplicate JSON object MEMBERS. Repeated `--submission` is argparse last-wins, uniformly across all 30 leaves, so hardening two leaves against repetition would be the asymmetry — the same ruling section 14 made for Y28."
     },
     {
       "id": "Y08",
@@ -280,8 +280,8 @@
       "attack": "A broad `exists()` or `is_file()` precheck classifies a dangling symlink as absent and can classify directories, NUL paths, missing parents, or inaccessible ancestors itself. That changes baseline `ValidationError` exit 2 into D13's integrity exit 5, contrary to D12. Require an `lstat`-based exact ENOENT check and defer every other path shape to `System`.",
       "evidence": "Direct `System` probes produced four distinct exit-2 classes: directory `must identify a regular file`, dangling symlink `must not be a symbolic link`, NUL `must not contain NUL`, missing parent `parent directory does not exist`.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-FIXED",
+      "main_note": "A14 + `_absent_ledger` at `8f091fe`. THE ONLY CODE DEFECT THIS TABLE FOUND. `os.path.exists` follows the link, so a dangling symlink, a missing parent and an embedded NUL all fired D13's precheck at exit 5 where the same paths answer exit 2 elsewhere — and D12 freezes that map, so two obligations contradicted each other in shipped code."
     },
     {
       "id": "Y09",
@@ -290,8 +290,8 @@
       "attack": "`System(args.db)` runs `_initialize`, which issues `BEGIN IMMEDIATE` and commits even for an existing ledger. Therefore D18 requires envelope type/key validation before `System` construction, not merely before `submit_proposal` opens its write context. State that ordering and trace SQLite BEGIN; a `Store.transaction` call-count spy passes while initialization already transacted.",
       "evidence": "Source derivation: `src/cement_runtime/store.py:628-663` opens a writable connection, executes `BEGIN IMMEDIATE`, validates, commits, and sets journal policy during every `Store` construction.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "DISCHARGED",
+      "main_note": "A5 already states that `System(...)` runs before envelope validation and that `_initialize` transacts, so a `Store.transaction` spy passing is expected rather than evasive."
     },
     {
       "id": "Y10",
@@ -300,8 +300,8 @@
       "attack": "Read literally across the leaf, D21 is false: strict parser errors can quote candidate bytes. A decimal candidate output is repeated in the exit-2 message. Scope the claim to the status-0 acknowledgement, or define and test an error-redaction boundary; Z18 proves only successful stdout.",
       "evidence": "Parsed output token `12345.678901` and emitted the normal validation payload. Result: `token_echoed=True` with message `cement-json-v1 rejects decimal/exponent number '12345.678901'`; the candidate bytes reached the JSON error.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-AMENDED",
+      "main_note": "A15 scopes D21 to the status-0 acknowledgement. Read across the leaf it is false: strict parsing quotes the offending token (`... rejects decimal/exponent number '12345.678901'`). No redaction boundary is added; the echo IS the diagnosis."
     },
     {
       "id": "Y11",
@@ -310,8 +310,8 @@
       "attack": "A test that walks current `_parser()` but asserts literal `(30, 37)` transcribes exactly the numbers D25 says are never transcribed. Deriving actual counts is not deriving the oracle. Load and execute `_parser` from Git base `4783eed`, compare its full path set to current minus the two named additions, and derive both count deltas from those sets.",
       "evidence": "The committed live probe derives only current values and printed `28 leaves / 35 nodes`; D25 supplies literal expected `30 / 37`. No gate command names a base-parser execution or a generated expected artifact.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "BATTERY-CONSTRAINT",
+      "main_note": "The census test asserts the NAME sets gate 4 already grades — `lost_baseline_leaves` empty and `added_leaves` exactly `{proposal submit, resolve}` — and derives 30/37 from them. Deriving current counts is not deriving the oracle."
     },
     {
       "id": "Y12",
@@ -320,8 +320,8 @@
       "attack": "Gate 3 permits any observed survivor to become a `ruled` member of the named survivor set, so closure can be achieved by naming the result. Require each survivor ruling to pre-exist the decisive rerun, cite an independently demonstrated equivalence or unreachable domain, and fail on any new survivor or changed witness module.",
       "evidence": "Explicit acceptance derivation: for any survivor output set `S`, writing `S` as the named set makes `survivor outside that set` false. The contract supplies no precommit timing, equivalence predicate, or maximum set.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "SCOPED",
+      "main_note": "Upheld and already satisfied in gate 3's shipped form: a survivor ruling must PRE-DATE the decisive sweep, and `M41`'s equivalence proof is committed at `75f0678` before dispatch. The harness compares observed survivors against the catalogue's declared `expect: equivalent` set, so a post-hoc member fails."
     },
     {
       "id": "Y13",
@@ -330,8 +330,8 @@
       "attack": "A harness can omit an envelope branch, payload selector, or ledger precheck and still report every mutant killed, because `every predicate` has no enumerable oracle. Generate the catalogue from named production sites or AST branches, print its complete ids, and have a validator compare that set to the contract-owned catalogue before any verdict is credited.",
       "evidence": "Section 11 names four examples after an em dash but no exhaustive ids, source anchors, count, or generator. The control line's verdict-module list proves which tests ran, not which production predicates were mutated.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "SCOPED",
+      "main_note": "Partly closed: the catalogue is contract-owned with all 50 sites named and mapped to obligations, and the harness prints every id. The residual — a generator deriving the catalogue from AST branches rather than from a written list — is NOT built and is recorded rather than claimed."
     },
     {
       "id": "Y14",
@@ -340,8 +340,8 @@
       "attack": "The battery's 30-test floor is not an atomic coverage model. D26 alone combines store bytes, schema, three-row footprint, an import, and bidirectional isolation; D28 combines grammar, keys, exits, idempotency, and purity. One non-placeholder test can exercise one clause and let the validator mark the whole obligation covered. Seed and grade sub-obligation ids or a predicate checklist.",
       "evidence": "Contract census: 30 obligation labels, but D01-D30 contain substantially more than 30 independently falsifiable claims. The validator plan grades one test name per D-id and states no clause-level mapping.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "BATTERY-CONSTRAINT",
+      "main_note": "A compound obligation carries one `subTest` per clause; D26 and D28 each hold five. One filled body otherwise covers one clause and marks the whole obligation covered. The mutation sweep is the complementary instrument, since each clause carries its own mutant."
     },
     {
       "id": "Y15",
@@ -350,8 +350,8 @@
       "attack": "The benchmark constructs `System` before starting the timer, and it excludes interpreter startup, argparse, the absent-path check, ledger initialization, and CLI JSON projection. At 50,000 entries that overhead is small; at the published one-entry `5.7 ms` it can dominate. Label the figures as `System.resolve` method latency or add a subprocess CLI benchmark before calling them operator cost.",
       "evidence": "Read `.agent/decisions/m3u2b-resolve-benchmark.py:138-143`: `system = System(database)` precedes `perf_counter_ns()`, and only `system.resolve(...)` is timed. D30 places the result where an operator meets the CLI.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-AMENDED",
+      "main_note": "A16 labels the figures `System.resolve` METHOD latency. The harness constructs `System` before its timer, so startup, argparse, the precheck, schema init and JSON projection sit outside them — material at the 5.7 ms point."
     },
     {
       "id": "Y16",
@@ -360,8 +360,8 @@
       "attack": "Resolve necessarily adds input canonicalization, a branch, and evaluation around `verify_function`. The two committed benchmark artifacts were measured at different commits, so their ratios cannot establish cost equality. Say that resolve includes one full verification and publish resolve's own measured cost; if an equality claim remains, remeasure both paths in one harness and provenance block.",
       "evidence": "Derived artifacts: resolve commit `23ec5717...`, verify commit `019d0409...`; resolve/verify cold ratios were `1.393` at 1, `0.995` at 1,000, and `1.025` at 50,000. Different provenance makes that comparison non-evidentiary by the project's own rule.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-AMENDED",
+      "main_note": "A16 withdraws `costs what verify_function costs`. The two artifacts were measured at different commits, which the project's own per-point provenance rule makes non-evidentiary; cold ratios span 1.393 / 0.995 / 1.025."
     },
     {
       "id": "Y17",
@@ -370,8 +370,8 @@
       "attack": "The measured 131071/131072 adjacent pair is host evidence, not a portable CLI invariant. Linux's per-string ceiling depends on page size, and other supported hosts have different argv limits. Preserve the ruling's conditional-capacity argument but record the measurement provenance and replace `under any invocation` with a bound scoped to the measured deployment regime.",
       "evidence": "Captured this host: `Linux 7.2.0-1-cachyos-gcc`, page size `4096`, `ARG_MAX=4194304`; the spike's 131072-byte per-string wall is therefore a host result, while the project requires Python/SQLite rather than this kernel configuration.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-AMENDED",
+      "main_note": "A22 scopes G1's `under any invocation` to the measured host regime and records its provenance. The asymmetry-of-relief argument is unaffected: it holds on any host with a finite argv wall."
     },
     {
       "id": "Y18",
@@ -380,8 +380,8 @@
       "attack": "G2 is false as an unconditional disclosure claim. `/proc/<pid>/cmdline` is Linux-specific and can be access-restricted; process viewers obey identity and host policy; shell history can be disabled, filtered, or bypassed by direct exec. The defensible invariant is that literal fields enter argv and can be exposed to same-host observers, unlike stdin framing.",
       "evidence": "Explicit platform derivation: the contract names Linux `/proc` as evidence while project docs describe non-Linux hosts, and no shell-history mechanism is part of Cement. Neither world readability nor history recording is under the CLI's control.",
       "severity": "blocking",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-FIXED",
+      "main_note": "The argv disclosure claim was platform- and policy-unconditional. Scoped in `docs/threat-model.md` and `README.md`."
     },
     {
       "id": "Y19",
@@ -390,8 +390,8 @@
       "attack": "A `StringIO` or embedding host has no `.buffer`; the shipped pattern reads `cap + 1` characters, then lets `parse_json` enforce UTF-8 bytes. D15's unconditional byte-read and invalid-UTF-8 taxonomy do not exist on that branch. Scope the byte wording to binary stdin and state the text-host character/read plus encoded-byte verdict separately.",
       "evidence": "Current `_input` documents and implements the split at `src/cement_runtime/cli.py:238-266`; the tracked envelope patch mirrors it and emits `characters` when `binary is None` at patch lines 70-79.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-AMENDED",
+      "main_note": "A18 scopes the byte wording to binary stdin. A text-only host has no `.buffer`, reads CHARACTERS, and has no invalid-UTF-8 family of its own because the parser's encoded-byte check stays authoritative."
     },
     {
       "id": "Y20",
@@ -400,8 +400,8 @@
       "attack": "D28 requires grammar and `payload keys`, but does not distinguish the submission envelope's required `input`/`output` and optional `provenance` from the acknowledgement's `proposal_id`. A reader can learn every output key and still be unable to construct `--submission`. Enumerate both input-envelope and output-payload schemas in the publication obligation.",
       "evidence": "Contract cross-read: D14's grammar ends at `--submission VALUE`; D18 alone defines the three envelope members; D20 defines the one acknowledgement member. D28 uses one undifferentiated phrase for both surfaces.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-AMENDED",
+      "main_note": "A19 makes publication enumerate BOTH schemas. A reader who learns every output key and no input key cannot construct `--submission`."
     },
     {
       "id": "Y21",
@@ -410,8 +410,8 @@
       "attack": "The evidence does not support the sentence `--submission - ... measured accepting exactly 2162722 bytes`. Z09 measures only 41 stdin bytes; Z11 and Z12 carry the cap pair through `@PATH`, which the ruling removes. Re-run the adjacent maximum pair through binary stdin in the ruled implementation before crediting stdin capacity.",
       "evidence": "Driver anchors: stdin appears in `_probe_z09` at lines `425-438`; `_probe_z11` and `_probe_z12` pass `@{path}` at lines `476-520`. The table's max rows likewise name files, not stdin.",
       "severity": "blocking",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-FIXED",
+      "main_note": "The cap pair was cited to spike probes carrying it through the `@PATH` route the fork ruling REMOVED. Re-cited to `m3u5a-smoke.py`, which drives the shipped `main`."
     },
     {
       "id": "Y22",
@@ -420,8 +420,8 @@
       "attack": "`source.count('65_536')` is not a literal-site census, and substring membership is not an exported-symbol check. A comment can create either result; spelling the same integer `65536` hides a real copy. Parse the AST, count integer constants in executable nodes, verify one module assignment named `PROVENANCE_MAX_BYTES`, and enumerate its three use sites.",
       "evidence": "Read `.agent/decisions/m3u5a-s2-probe.py:129-130`: the two reported facts are raw substring operations over the complete source text, with no AST or symbol resolution.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "DISCHARGED",
+      "main_note": "Gate 4 replaced substring counting with an AST literal census plus an imported-symbol check: `literal_sites` 1, `reference_sites` 4."
     },
     {
       "id": "Y23",
@@ -430,8 +430,8 @@
       "attack": "The contract says six probes, while the script's module docstring says five wave-1 findings. The report actually contains six keys. Update the durable artifact's count so a reader does not infer that one ground is uncredited or newly appended outside the claimed derivation.",
       "evidence": "Exact anchors: `.agent/decisions/m3u5a-s2-probe.py:2` says `five`; `.agent/decisions/m3u5a-contract.md:38` says `six`; the script's report object contains six probe entries.",
       "severity": "minor",
-      "disposition": null,
-      "main_note": null
+      "disposition": "DISCHARGED",
+      "main_note": "Gate 4's docstring probe count now agrees with the contract."
     },
     {
       "id": "Y24",
@@ -440,8 +440,8 @@
       "attack": "A child parser with `allow_abbrev=False` still receives root options only after the root parser has accepted their prefixes. D25 explicitly preserves root `--part`; `--d` also abbreviates `--db`. Scope D01's rejection to prefixes of resolve-owned options, otherwise D01 and D25 demand opposite results for the same invocation.",
       "evidence": "Added an in-memory hardened `resolve` child to the shipped parser and parsed `--d x.sqlite --part p resolve op --input 1`; output retained `db=x.sqlite partition=p`, proving parent prefixes survive child hardening.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-AMENDED",
+      "main_note": "A17 scopes the prefix rejection to the leaf's OWN options. Root options are parsed before the child is reached, so `--d`/`--part` keep resolving — which D25 requires. Unscoped, D01 and D25 demand opposite results for one invocation."
     },
     {
       "id": "Y25",
@@ -450,8 +450,8 @@
       "attack": "The cap guarantees that one compact canonical envelope exists for every accepted field triple; it cannot admit every valid JSON serialization because insignificant whitespace or escapes are unbounded. Replace `admit every submission the library accepts` with the value-level canonical-envelope guarantee.",
       "evidence": "Constructed a 2162723-byte whitespace-padded envelope semantically equal to compact `{input:0, output:0, provenance:{}}`. JSON semantics matched and direct `submit_proposal` succeeded, while aggregate `parse_json` rejected `JSON source exceeds 2162722 bytes`.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "ACCEPTED-AMENDED",
+      "main_note": "A20 replaces `admits every submission the library accepts` with the canonical-envelope guarantee. Insignificant whitespace is unbounded, so no transport bound can admit every serialization."
     },
     {
       "id": "Y26",
@@ -460,8 +460,8 @@
       "attack": "Unittest treats skips as success. The source grader can see filled test bodies while decorators or `skipTest` prevent every obligation from executing. Require zero skips in `tests.test_cli_channels_battery` and have the battery validator reject skip decorators and unconditional skip calls.",
       "evidence": "Ran an in-memory skipped failing test: `successful=True failures=0 errors=0 skipped=1`. Gate 1 requires only zero failures and zero errors, so this evasion satisfies its stated predicate.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "DISCHARGED",
+      "main_note": "Gate 2 counts `SKIPPED` over both `self.skipTest` and the decorator list, and `ASSERTIONLESS` over filled bodies that assert nothing."
     },
     {
       "id": "Y27",
@@ -470,8 +470,8 @@
       "attack": "A failing baseline test makes every mutant look killed. Naming verdict modules on a `control line` does not itself require success. State that the exact module set must pass with zero failures, errors, and skips before mutation; abort without writing mutant verdicts if the control is not green.",
       "evidence": "Explicit harness derivation: mutation classification is differential only when baseline verdict is success. Section 11 item 3 specifies the printed module list and survivor predicate, but no control exit/status acceptance.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "DISCHARGED",
+      "main_note": "Gate 3 runs the UNMUTATED control first, prints `CONTROL: GREEN`, and ABORTS without writing verdicts when it is red."
     },
     {
       "id": "Y28",
@@ -480,8 +480,8 @@
       "attack": "The grammar defines one action for each option but does not define occurrence multiplicity. Repeating `--input` or `--expected-function-hash` silently selects the last value. State last-wins as preserved read-leaf precedent, or reject repetition; otherwise `exactly one` can support opposite batteries.",
       "evidence": "Added an in-memory hardened resolve parser and supplied both options twice. Parse output was `input=second hash=b`, with no usage error.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "REJECTED",
+      "main_note": "Not a defect. Repeated options are argparse last-wins uniformly across all 30 leaves — measured, `--input 1 --input 2` resolves against `2` — and D01/D14 fix the option SET rather than repetition arity, so making two leaves differ would be the asymmetry."
     },
     {
       "id": "Y29",
@@ -490,8 +490,8 @@
       "attack": "D06 is a CLI contract, while the existing resolve battery snapshots after `System` already exists. The new test must hash the database and journal state around full `_run` dispatch with a fresh `System` construction, then separately retain the method-level transaction, clock, event, and ID spies.",
       "evidence": "Ran full baseline `events` dispatch through `_run`: `bytes=208896 hash_equal=True journal_exists=False`. That confirms the current constructor path but also shows the observable D06's acceptance must surround the CLI, not only `System.resolve`.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "BATTERY-CONSTRAINT",
+      "main_note": "D06's acceptance surrounds full `_run` dispatch INCLUDING `System` construction — hash the database and journal around it — with the method-level transaction, clock, event and ID spies retained. A3 supplies the scoping."
     },
     {
       "id": "Y30",
@@ -500,8 +500,8 @@
       "attack": "The ruling can still prefer behavioral pins, but its rationale is self-contradictory. B02 was known to break when M3.5a edited `cli.py`, yet that expected break caught a missing obligation. Distinguish broad byte identity from behavior-specific preservation; do not claim that planned future breakage alone makes a pin noise.",
       "evidence": "Contract section 9 calls B02 a valuable expected tripwire, then rejects a fresh pin because M3.5b is scheduled to edit the same file. Both pins share the exact planned-break property.",
       "severity": "minor",
-      "disposition": null,
-      "main_note": null
+      "disposition": "DISCHARGED",
+      "main_note": "A8 supersedes D27's rationale, so the self-contradiction the row names is gone with the sentence."
     }
   ]
 }
