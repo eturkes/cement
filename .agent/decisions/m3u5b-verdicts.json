@@ -12,8 +12,8 @@
       "baseline": "At 4e33cc6 the parser accepts handle; an unregistered operation reaches dispatch and exits 3 with error=not_found and message='operation is not registered in this partition'.",
       "expected": "Exit 2; stderr JSON has error='invalid' and message beginning \"argument command: invalid choice: 'handle'\"; no System.handle call occurs.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. `handle` is no longer a choice of the `command` subparser, so argparse refuses it before any dispatch code runs. Routing through `_UsageError` rather than a dispatch branch is the whole point: a dispatch-branch refusal would mean the leaf still exists and merely declines.",
+      "action": "ENCODE"
     },
     {
       "id": "V02",
@@ -24,8 +24,8 @@
       "baseline": "At 4e33cc6 the parser accepts request; a missing request reaches dispatch and exits 3 with error=not_found and message='request does not exist in this partition'.",
       "expected": "Exit 2; stderr JSON has error='invalid' and message beginning \"argument command: invalid choice: 'request'\"; no System.request_status call occurs.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. Same channel as V01 with no positional of its own. The message must name `command` as the offending argument, which distinguishes a removed ROOT command from a removed leaf under a surviving group.",
+      "action": "ENCODE"
     },
     {
       "id": "V03",
@@ -36,8 +36,8 @@
       "baseline": "At 4e33cc6 an invalid root token enumerates 14 choices: operation, resolve, proposal, compile, verify, promote, challenge, handle, request, example, artifact, report, function, events.",
       "expected": "Exit 2 and the invalid-choice message enumerates exactly 12 choices in parser order: operation, resolve, proposal, compile, verify, promote, challenge, example, artifact, report, function, events.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. D05's complement is free: argparse's invalid-choice text enumerates the twelve survivors, so one assertion pins both the refusal and the survivor set. Encode the enumeration as a set comparison against the census, never as a substring of the message.",
+      "action": "ENCODE"
     },
     {
       "id": "V04",
@@ -48,8 +48,8 @@
       "baseline": "At 4e33cc6 the AST result is ['_source']; the helper parses source-command JSON and constructs CommandCandidateSource.",
       "expected": "The AST probe prints []; cli.py defines zero FunctionDef or AsyncFunctionDef nodes named '_source'.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. Decide over the module AST, not a text grep. A grep matches `_source` inside a docstring or a comment and reports a symbol that no longer exists; the AST answers the question actually asked.",
+      "action": "ENCODE"
     },
     {
       "id": "V05",
@@ -60,8 +60,8 @@
       "baseline": "At 4e33cc6 the AST probe prints ['CommandCandidateSource'] for `from .source import CommandCandidateSource`.",
       "expected": "The AST probe prints []; cli.py contains no ImportFrom node with level=1 and module='source'.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. `from .source import CommandCandidateSource` left with the helper. Decide over import nodes so a re-import under an alias cannot pass.",
+      "action": "ENCODE"
     },
     {
       "id": "V06",
@@ -72,8 +72,8 @@
       "baseline": "At 4e33cc6 the _run AST contains 2 comparisons to 'handle' (source setup and dispatch) and 1 comparison to 'request' (dispatch).",
       "expected": "The _run AST count is exactly {'handle': 0, 'request': 0}; no removed-command Compare node survives.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. Both dispatch branches went with the seven EDITS. Decide over `_run`'s AST for the same reason as V04.",
+      "action": "ENCODE"
     },
     {
       "id": "V07",
@@ -84,8 +84,8 @@
       "baseline": "At 4e33cc6 the probe returns exactly [('candidate_source',)] from one System(args.db, candidate_source=source) call.",
       "expected": "The probe returns exactly [()]: 1 System call, 0 keywords, 0 ** expansions, and 0 'candidate_source' occurrences.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. The `source = None` construction collapsed to `System(args.db)`. Every reachable CLI path now constructs with the database alone, which is the property D09 actually needs \u2014 a `candidate_source=None` keyword would satisfy a weaker reading.",
+      "action": "ENCODE"
     },
     {
       "id": "V08",
@@ -96,8 +96,8 @@
       "baseline": "At 4e33cc6 the same 28 survivor leaves already refuse the flag; handle alone accepts it, while `--request` abbreviates to request_id.",
       "expected": "Exactly 28/28 probes return exit 2, empty stdout, error='invalid', and message='unrecognized arguments: --request-id probe'.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. `--request-id` must be refused by every one of the 28 surviving leaves, with the exact message and exit recorded per leaf rather than asserted uniformly.",
+      "action": "ENCODE"
     },
     {
       "id": "V09",
@@ -108,8 +108,8 @@
       "baseline": "At 4e33cc6 the 28 future survivors refuse all 4 flags; handle alone accepts them, including abbreviations --source-c and --retry.",
       "expected": "Exactly 112/112 probes exit 2 with error='invalid': 28 each say 'unrecognized arguments: --source-command probe', '--source-id probe', '--source-timeout probe', or '--retry-failed'.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. Same shape as V08 over the four source flags. The four-by-28 matrix is the assertion; a spot check on one leaf is not.",
+      "action": "ENCODE"
     },
     {
       "id": "V10",
@@ -120,8 +120,8 @@
       "baseline": "At 4e33cc6 --request, --source-c and --retry bind on handle; --r is ambiguous between request-id/retry-failed and --s among the three source flags.",
       "expected": "All unclaimed cells say 'unrecognized arguments'. Collisions are --r/--re with reviewer, reason or receipt-id on 6 leaves; --s binds status on proposal list and scope-hash on promote, while proposal submit rejects --s because allow_abbrev=False. Under reading B, the 12 retry-failed --r/--re cells instead reject with 'expected one argument'.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED, reading A. The exemption is whatever the LIVE parser resolves to a surviving option, not whatever the removed flag's original arity would have accepted. Reading B asserts `expected one argument` for the twelve `--r`/`--re` retry-failed cells, which would pin a message produced by an arity that no longer exists anywhere in the parser. Encode the measured collision map: `--r`/`--re` bind reviewer, reason or receipt-id on 6 leaves; `--s` binds status on `proposal list` and scope-hash on `promote`, while `proposal submit` rejects `--s` because it sets `allow_abbrev=False`. Every unclaimed cell says `unrecognized arguments`.",
+      "action": "ENCODE-SCOPED"
     },
     {
       "id": "V11",
@@ -132,8 +132,8 @@
       "baseline": "At 4e33cc6, 37 nodes yield hits at <root> ('handle','request'), handle ('handle','request','retry' plus source options), and request ('request').",
       "expected": "Exactly 35 parser nodes are scanned and the forbidden-hit mapping is {}; root and every intermediate or leaf help string contribute 0 hits.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. Walk every node, not the root. The ban covers help strings at all 35 nodes, and X10's normalization ruling binds how the spellings are compared.",
+      "action": "ENCODE"
     },
     {
       "id": "V12",
@@ -144,8 +144,8 @@
       "baseline": "At 4e33cc6 the derived terminal set has 30 members and includes both handle and request.",
       "expected": "The set has exactly 28 members: {'artifact list','artifact show','artifact suspend','challenge','compile','events','example list','example revoke','function eval','function export','function inspect','function promote','function receipts','function show','function verify','function verify-drafts','operation list','operation register','operation revise','promote','proposal list','proposal review','proposal show','proposal submit','report list','report show','resolve','verify'}.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. Set equality in both directions, never cardinality. MAIN measured 28 leaves and 35 nodes from `_parser()` after the removal, and parser_shape re-derived to 151 actions and `ebd2ac811bd9776d`. ",
+      "action": "ENCODE"
     },
     {
       "id": "V13",
@@ -156,8 +156,8 @@
       "baseline": "The current 4e33cc6 parser is 30 leaves/37 nodes; c8b82cd is 28/35 with handle and request but without resolve and proposal submit.",
       "expected": "Post-removal is also 28 leaves/35 nodes; c8b82cd-only={'handle','request'} and post-only={'proposal submit','resolve'}, while digests differ 154/'af19339c3995c97d' versus 151/'ebd2ac811bd9776d'.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED, and this is the row the census design rests on. The teammate re-derived the c8b82cd collision independently: 28 leaves and 35 nodes there too, with INVERSE two-leaf sets and shape `154 / af19339c3995c97d`. A count-only census therefore cannot separate 'both M3.5a leaves landed and both M3.5b leaves left' from 'neither happened'. Exhibit the collision in the battery so the set-difference assertions read as load-bearing.",
+      "action": "ENCODE"
     },
     {
       "id": "V14",
@@ -168,8 +168,8 @@
       "baseline": "At 4e33cc6 the root action has 14 choices, including handle and request between the surviving commands.",
       "expected": "Exactly 12 root choices remain: {'operation','resolve','proposal','compile','verify','promote','challenge','example','artifact','report','function','events'}.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. Derive the twelve root commands from `_parser()`. A transcribed list passes against a parser that lost a command.",
+      "action": "ENCODE"
     },
     {
       "id": "V15",
@@ -180,8 +180,8 @@
       "baseline": "At 4e33cc6 all 28 future-survivor fingerprints are available beside 2 removed leaves; parser_shape is 163/'8b58b465c08aa693'.",
       "expected": "Direct comparison reports shared=28, equal=28, different=[]; however choices, type, and help control mutants each remain 151/'ebd2ac811bd9776d', proving the digest does not carry those 3 promised facets.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED, reading A. Direct full-facet baseline comparison, measured shared=28, equal=28, different=[]. Reading B is UNSOUND and its own controls prove it: D14 claims the parser_shape digest carries choices, types and help, and independent choices, type and help mutants each leave 151/`ebd2ac811bd9776d` unmoved. Delegating leaf preservation to a digest that omits three of the facets it is trusted for would make this obligation pass on a leaf whose help had been rewritten into a lie. See X26 for the same defect in B02's docstring, corrected at 75f92b2.",
+      "action": "ENCODE-SCOPED"
     },
     {
       "id": "V16",
@@ -192,8 +192,8 @@
       "baseline": "At 4e33cc6 probe_parser_shape returns {'actions': 163, 'digest': '8b58b465c08aa693'}.",
       "expected": "After all seven edits it returns exactly {'actions': 151, 'digest': 'ebd2ac811bd9776d'}.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. MAIN measured 28 leaves and 35 nodes from `_parser()` after the removal, and parser_shape re-derived to 151 actions and `ebd2ac811bd9776d`. The digest is re-derived, never transcribed from the contract.",
+      "action": "ENCODE"
     },
     {
       "id": "V17",
@@ -204,8 +204,8 @@
       "baseline": "At 4e33cc6 all 6 named modules and 12 tracked examples files match 36f7890 byte-for-byte; git diff returns 0 and changed=[].",
       "expected": "Exactly 18 protected paths compare equal, with added=[], deleted=[], changed=[], and aggregate comparison exit 0.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. Assert against the named git object, not against a second copy of the bytes. The teammate verified 18 protected paths: 6 runtime modules and 12 example files.",
+      "action": "ENCODE"
     },
     {
       "id": "V18",
@@ -216,8 +216,8 @@
       "baseline": "M3.5a specifies submit status 0 with {'proposal_id'} and resolve status 0|6 with 7 keys; it specifies 0 exit/key-set contracts for proposal show, list, or review.",
       "expected": "Reading A reports unresolved_contract_oracles=3 for show/list/review. Reading B requires mismatches=0 across all 5 leaves, retaining submit {'proposal_id'} and resolve {'artifact_hash','checks','entries','function_hash','matched','output','passed'}.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED, reading B. The M3.5a SHIPPED git object is the preservation oracle. Reading A takes 'from M3.5a's contract' literally and leaves `proposal show`, `proposal list` and `proposal review` with unresolved_contract_oracles=3, which makes the obligation uncheckable for three of its five leaves. Reading B requires mismatches=0 across all five, retaining submit `{'proposal_id'}` and resolve `{'artifact_hash','checks','entries','function_hash','matched','output','passed'}`.",
+      "action": "ENCODE-SCOPED"
     },
     {
       "id": "V19",
@@ -228,8 +228,8 @@
       "baseline": "At 4e33cc6 Gate 4 emits 19 CHECK lines and passes; source-only removal emits 19 checks, exactly 5 FAIL, and 'FAIL 5 of 19 pinned facts moved'.",
       "expected": "Reading B exits 0 with 19 CHECK, 0 FAIL, leaves=28, nodes=35, actions=151, digest='ebd2ac811bd9776d', lost_baseline_leaves=['handle','request']; reading A instead demands 16 checks without naming 3 removals.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CORRECTED against the contract, reading B. Gate 4 has NINETEEN checks, not the sixteen D17 claims; the roadmap already recorded 19. MAIN's rerun: rc 0 over 19 CHECK lines, leaves=28, nodes=35, actions=151, digest `ebd2ac811bd9776d`, lost_baseline_leaves `['handle','request']`. Exactly five checks were re-based and no others. `BASELINE_LEAVES` keeps both members because the frozenset records c8b82cd history; the EXPECTATION is what moved. Second contract-claim defect of this unit.",
+      "action": "ENCODE-SCOPED"
     },
     {
       "id": "V20",
@@ -240,8 +240,8 @@
       "baseline": "At 4e33cc6 all 3 helpers call handle; source-only removal breaks 119/901 tests, including 103 failures at test_cli.py:193 in payload.",
       "expected": "The 3 helpers contain 0 handle invocations and 3 proposal-submit setup routes; source+helper-only gate broken count falls from 119 to 16, clearing exactly 103, with dependent_assertion_changes=0.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. The shared `submission()` builder mirrors `examples/echo_adapter.py` byte for byte, and `submit()` asserts the acknowledgement key set is exactly `{'proposal_id'}` \u2014 which carries the property the removed `review_required` status assertion held. Re-basing the three helpers cleared 102 of 105 `test_cli` failures together. Landed this session as part of the frame re-base; the suite is green at 901 tests. ",
+      "action": "ENCODE"
     },
     {
       "id": "V21",
@@ -252,8 +252,8 @@
       "baseline": "At 4e33cc6 x26 observes import_count=1, helper_count=1, handle source destinations={'source_command','source_id','source_timeout'}, and a constructed CommandCandidateSource instance.",
       "expected": "Rewritten x26 observes import_count=0, helper_count=0, handle_node_count=0, hasattr(cli,'CommandCandidateSource')=False, and hasattr(cli,'_source')=False.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. `x26` is fully INVERTED to the post-removal property rather than deleted. Landed this session as part of the frame re-base; the suite is green at 901 tests. ",
+      "action": "ENCODE"
     },
     {
       "id": "V22",
@@ -264,8 +264,8 @@
       "baseline": "At 4e33cc6 d24 patches cli._source, invokes resolve/submit/handle, gets statuses (6,0,0), constructor_count=3 and source_builder_count=1 from handle.",
       "expected": "Legacy d24 raises AttributeError before a verdict. Rewritten d24 gets statuses=(6,0), constructor_count=2, resolve_count=1, submit_count=1, propose_count=0, exploding_source_calls=0, and nonzero table delta {'events':1,'proposals':1,'requests':1}.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED, and this is the sharper half of D19. A `mock.patch.object` spy on a deleted symbol RAISES; it does not fail. `d24`'s spies became `hasattr(cement_cli, '_source')` absence assertions, which are strictly stronger than a zero call count \u2014 zero calls is satisfiable by a live-but-unreached symbol, absence is not. Landed this session as part of the frame re-base; the suite is green at 901 tests. ",
+      "action": "ENCODE"
     },
     {
       "id": "V23",
@@ -276,8 +276,8 @@
       "baseline": "At 4e33cc6 B02 freezes exactly 2 files but narrates M3.5a's '28 to 30 leaves and 35 to 37 nodes' addition.",
       "expected": "The paths tuple remains 2 members; its docstring contains '30 to 28' and '37 to 35', names removed handle/request, and contains neither '28 to 30' nor '35 to 37'. Both f9b9755 byte comparisons are True.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED, landed at 1880241 and corrected again at 75f92b2. B02 now records the 30 to 28 and 37 to 35 reversal, D24's zero-call clause becoming an absence assertion, and D28's standing refusal to re-pin `cli.py` citing M3.6a and M3.7 as the scheduled edits.",
+      "action": "ENCODE"
     },
     {
       "id": "V24",
@@ -288,8 +288,8 @@
       "baseline": "At 4e33cc6 both independent oracles return (163,'8b58b465c08aa693'); changing events --limit default moves the battery result.",
       "expected": "Both independent oracles return exactly (151,'ebd2ac811bd9776d'); the unmutated comparison is equal and the default=7 control is not equal.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. The duplication stays: importing the graded function would make the check circular. Re-derived to 151 actions and `ebd2ac811bd9776d`.",
+      "action": "ENCODE"
     },
     {
       "id": "V25",
@@ -300,8 +300,8 @@
       "baseline": "At 4e33cc6 the quick start invokes handle once with --request-id and --source-command, then consumes its printed proposal ID in show/review examples.",
       "expected": "The slice contains exactly 1 proposal-submit invocation with envelope keys {'input','output','provenance'}, 0 handle commands, 0 request commands, 0 --request-id/--retry-failed/--source-* options, and every extracted invocation parses.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED, landed at d54ddde. The quick start reaches a proposal through `proposal submit --submission` and names no removed command. Gate 5 measures the whole shipped set: 5 surfaces, 18 invocations, 0 parse failures.",
+      "action": "ENCODE"
     },
     {
       "id": "V26",
@@ -312,8 +312,8 @@
       "baseline": "At 4e33cc6 all 4 anchored spans describe the library handle lifecycle, including README's request_id= argument and two hospital_ocr System.handle mentions.",
       "expected": "Exactly 4/4 protected spans compare byte-identical with 'changed_spans=[]'; System.handle and its request_id keyword remain documented while CLI-only prose moves separately.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED, and BOTH directions are defects. `System.handle` prose survives byte-identical: the API example with its `request_id=` argument, `docs/architecture.md` steps 1-3, `docs/threat-model.md:78` and `examples/hospital_ocr/README.md`. Deleting it pre-empts M3.6a's own doc pass and breaks the track order.",
+      "action": "ENCODE"
     },
     {
       "id": "V27",
@@ -324,8 +324,8 @@
       "baseline": "At 4e33cc6 README contains 18 runnable fenced cement commands; threat-model inline text includes partial `cement proposal submit --submission -` and `cement resolve --input` references without OPERATION.",
       "expected": "Reading A requires 18/18 post-rewrite fenced commands to parse and 0 failures. Reading B has at least 2 invalid inline occurrences because each lacks the required operation positional.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED, scoped by X37's ruling. 'Every invocation' means every invocation inside a fenced shell block; inline prose references legitimately omit required positionals and cannot parse. Gate 5 ships as `.agent/decisions/m3u5b-doc-parse.py` and measures 18 invocations across 5 surfaces with 0 failures, behind three control classes.",
+      "action": "ENCODE-SCOPED"
     },
     {
       "id": "V28",
@@ -336,8 +336,8 @@
       "baseline": "At 4e33cc6 the existing fence-aware M3.5a oracle reports orphan_placeholders={} and treats proposal list before prop_REPLACE_ME as its producer.",
       "expected": "Post-rewrite orphan_placeholders={} across all shell blocks; proposal-submit command count is at least 3, resolve count at least 2, and every consumed placeholder has an earlier producer in the same block.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. X30 already implements this and already treats `proposal submit` as a producer of `prop_REPLACE_ME`. The rewritten quick start keeps `proposal list` ahead of `proposal show prop_REPLACE_ME` inside the same block, so the orphan set stays empty.",
+      "action": "ENCODE"
     },
     {
       "id": "V29",
@@ -348,8 +348,8 @@
       "baseline": "At 4e33cc6 root help names handle, request, retry and source; its description says supervised LLM fallback and deterministic artifacts.",
       "expected": "Seven-edit help yields resolve=True, proposal=True, request/lifecycle/retry/source=False, but resolution/submit/capture=False. Reading A passes that vector; reading B requires at least 1 of {'submit','capture'} and therefore fails.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED, landed at d54ddde. Root help named no request lifecycle but its DESCRIPTION still sold one. `Supervised LLM fallback ...` became `Supervised proposal capture that compiles confirmed behavior into exact deterministic artifacts, then answers inputs from the promoted function set`, and `proposal` gained `submit/` in its group help. Map rows S4-C01, S4-C07 and S3-054 called both. Neither edit moves gate 4, because the digest omits help text entirely.",
+      "action": "ENCODE"
     },
     {
       "id": "V30",
@@ -360,8 +360,8 @@
       "baseline": "At 4e33cc6 both methods are callable and both handle/request parser leaves exist; handle signature includes keyword-only request_id=None and retry_failed=False.",
       "expected": "Callable methods=2, parser leaves {'handle','request'} intersection={}, scheduling_sentences=0; signatures remain exactly `(self, partition, operation, input_value, *, request_id=None, retry_failed=False) -> Outcome` and `(self, partition, request_id) -> Outcome` modulo annotations.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. D01's headline: the LIBRARY surface is untouched. `System.handle` and `System.request_status` stay public, and no shipped prose offers an operator route to either. Encode both halves \u2014 public in the module, absent from the parser.",
+      "action": "ENCODE"
     },
     {
       "id": "X01",
@@ -372,8 +372,8 @@
       "baseline": "The committed 36f7890 measurement records stage1 broken=113/901 frames=11 and stage2 broken=119/901 frames=17.",
       "expected": "A clean rerun prints stage 1: broken=113 frames=11 ran=901 rc=1 and stage 2: broken=119 frames=17 ran=901 rc=1.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. A raw failing-test count is not reproducible across a gate-4 re-base; a frame work list is. Measured: the post-removal gate showed 118 failures against the burden's predicted 119, and `test_d27_...` passes where the burden showed it failing \u2014 plausibly because the burden run did not re-base gate 4 and this session did. Unconfirmed, and exactly why the count is the wrong unit.",
+      "action": "ENCODE"
     },
     {
       "id": "X02",
@@ -384,8 +384,8 @@
       "baseline": "Measurement has 17 stage-2 frames, 16 after excluding payload; D18 says 11 remaining, displays 18 rows, and the roadmap says 16 named instrument frames.",
       "expected": "The coherent observable is total_frames=17 and remaining_after_payload=16; D18 literal=11 is short by 5, while table_rows=18 is not a distinct-frame count.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED, and it is MAIN's own defect. D03/D18 carry THREE different numbers for one work list: D18's prose says eleven, its table has 18 rows, and the measurement is 17. The surplus table row is `test_cli_channels_battery.py:139 _leaf_parser`, which is not a distinct frame. The teammate's total_frames=17 is right for CODE-coupled frames. MAIN then found an EIGHTEENTH, PROSE-coupled frame the census could not see: `test_cli_channels_battery.py` `test_d23_...` broke on the D22 prose edit alone. So the true touched total is 18 by coincidence of arithmetic and different in membership.",
+      "action": "ENCODE-SCOPED"
     },
     {
       "id": "X03",
@@ -396,8 +396,8 @@
       "baseline": "At 4e33cc6 all 7 anchors resolve exactly once; apply_stage returns 7 descriptions and produces the measured 151-action parser.",
       "expected": "Clean replay reports applied=7 and byte_match=True; a one-byte anchor perturbation exits nonzero with quoted 'ANCHOR-MISS' and expected=1 found=0.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. Every deletion went through `apply_stage(pathlib.Path('.'), 2)` over the committed anchored EDITS table; no hand edit was made. `cli.py` moved -44/+1. A moved anchor aborts rather than applying, which is the property that makes the removal replayable.",
+      "action": "ENCODE"
     },
     {
       "id": "X04",
@@ -408,8 +408,8 @@
       "baseline": "At 4e33cc6 the named runtime/library/docs/demo surfaces match 36f7890; SCHEMA_VERSION=2 and System.__init__ still has candidate_source.",
       "expected": "The result is 'changed_paths=[]', SCHEMA_VERSION=2, candidate_source_parameters=1, public lifecycle methods=2, examples_added_or_deleted=0, and adapter_protocol_diff_bytes=0.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. Constructor, models, schema, source runtime, adapter protocol and demo are all outside the write set. Assert the boundary positively against git objects rather than inferring it from an unchanged diff.",
+      "action": "ENCODE"
     },
     {
       "id": "X05",
@@ -420,8 +420,8 @@
       "baseline": "At 4e33cc6 live tests still encode _source non-reach, 28-to-30 census, and B02's addition narrative; M3.5a contract is complete history.",
       "expected": "historical_contract_changed_bytes=0 and rebased_obligations=3: D24 asserts _source absent, D25 asserts 30-to-28 set removal, and D27 narrates that removal.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. M3.5a is DONE and its contract is history. The supersession is recorded in M3.5b's D27 and the affected tests are re-based IN PLACE, so no M3.5a record is rewritten. Where a re-based docstring carried an M3.5a amendment verbatim, the amendment stayed and an M3.5b note was appended beneath it.",
+      "action": "ENCODE"
     },
     {
       "id": "X06",
@@ -432,8 +432,8 @@
       "baseline": "At 4e33cc6 nodes=37 with allow_abbrev {True:35,False:2}; --part, --bun and --in bind successfully.",
       "expected": "Reading A yields 35/35 nodes False and exits [2,2,2]. Reading B's seven-edit tree yields {True:33,False:2} and all 3 legacy probes remain accepted.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ACCEPTED, and the ownership claim is CORRECTED. M3.5a's deferral named M3.5b as owner because the weakness bites on removal predicates. M3.5b DECLINED the global grammar change \u2014 disabling abbreviation repo-wide breaks `--part`, `--bun` and `--in` for existing callers and needs its own mandate \u2014 and closed the removal half locally instead: D06 refuses every proper prefix of a removed flag over all 112 removed-flag/leaf combinations, D10 exempts prefixes a surviving flag legitimately claims. The polish row now carries the public-grammar residue alone, owned by no unit.",
+      "action": "DEFER"
     },
     {
       "id": "X07",
@@ -444,8 +444,8 @@
       "baseline": "At 4e33cc6 handle accepts --request/--retry/--source-c while shared --r and --s are ambiguous.",
       "expected": "Post-removal collisions include --r/--re on 6 reviewer/reason/receipt leaves and --s on proposal-list status plus promote scope-hash; universal refusal and exemption readings disagree on at least 18 live cells.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CORRECTED. D06 and D10 do not conflict; D10 is D06's exemption clause and takes precedence where the live parser resolves a token to a surviving option. V10 reading A fixes how that precedence is decided. Encode the conjunction, not either half.",
+      "action": "ENCODE-SCOPED"
     },
     {
       "id": "X08",
@@ -456,8 +456,8 @@
       "baseline": "At 4e33cc6 cli.py has 1 bare 65_536 literal inside _source, 0 named source-bound constants, and 1 source_command destination.",
       "expected": "Reading B yields 'literal_sites=0', named_source_bound_constants=0, source_command_destinations=0, helper_count=0; reading A requires 1 named constant with 0 consumers.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ACCEPTED and DISCHARGED. M3.5a deferred naming a constant for `cli.py:370`'s bare `65_536` bounding `--source-command`. That literal lived inside `_source` and left with it. Measured: `cli.py` now holds ZERO bare `65_536`. The deferral's first clause is moot and its second is satisfied, so the polish row is pruned. Obligations `x11` and `d16` strengthen from 'exactly one, and it is the source-command bound' to 'no bare copy survives'.",
+      "action": "ENCODE"
     },
     {
       "id": "X09",
@@ -468,8 +468,8 @@
       "baseline": "The seven-edit root help has resolve=True and proposal=True but submit=False, capture=False, with all lifecycle terms absent.",
       "expected": "Reading A accepts source_edits=7. Reading B requires source_edits=8 and at least one of {'submit','capture'}=True; the current seven-edit result has explicit_capture_terms=0.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. The seven-edit EDITS table deletes code and cannot teach anything. D26 needed two help-string edits OUTSIDE that table, applied by hand and verified not to move the digest: the root description and the `proposal` group help. A contract that lists its source plan as exhaustive and also carries a help obligation is internally inconsistent until one of them names the other.",
+      "action": "ENCODE"
     },
     {
       "id": "X10",
@@ -480,8 +480,8 @@
       "baseline": "At 4e33cc6 normalized hits occur at root, handle, and request; handle contributes request id, retry failed, and all 3 source option names.",
       "expected": "The post-removal scan visits exactly 35 nodes and returns hit_count=0 with hit_paths={} for every normalized forbidden spelling.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. Normalize flag and identifier spellings before scanning. A prose-phrase scan passes on help text containing `--request-id` or `request_id` while failing on 'request id', which inverts the obligation's sensitivity.",
+      "action": "ENCODE-SCOPED"
     },
     {
       "id": "X11",
@@ -492,8 +492,8 @@
       "baseline": "At 4e33cc6 verify-without-id exits 2 invalid and oversized text stdin through handle exits 2 with a 'stdin exceeds' JSON message.",
       "expected": "Both probes return status=2, stdout_bytes=0, stderr error='invalid'; the surviving-input probe message contains quoted 'stdin exceeds' and no traceback.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. `test_usage_errors_and_oversized_stdin_are_machine_readable` moved to `resolve --input -`, and it needs `self.register('echo')` first because M3.5a D13's existence check precedes `--input` parsing \u2014 without the registration, exit 5 pre-empts the cap and the test measures the wrong refusal. Landed this session as part of the frame re-base; the suite is green at 901 tests. ",
+      "action": "ENCODE"
     },
     {
       "id": "X12",
@@ -504,8 +504,8 @@
       "baseline": "At 4e33cc6 function eval actions are {'bundle','input','expected_function_hash'} and its input help equals handle input help.",
       "expected": "The action set remains 3 names; required flags=[bundle,input], expected hash optional, and eval_input.help == resolve_input.help == \"JSON text; '-' reads stdin\".",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. `test_function_eval_help_reuses_the_shipped_flag_register` retargets its `--input` register reference from `handle` to `resolve`, keeping the shared-input wording pin. Landed this session as part of the frame re-base; the suite is green at 901 tests. ",
+      "action": "ENCODE"
     },
     {
       "id": "X13",
@@ -516,8 +516,8 @@
       "baseline": "At 4e33cc6 c8b82cd is 28/35 and current is 30/37 with current-only {'proposal submit','resolve'}.",
       "expected": "Both parsers are 28 leaves/35 nodes; baseline-current={'handle','request'} and current-baseline={'proposal submit','resolve'}.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. `v27` becomes the inverse-set removal census, not two changed cardinalities. Set difference in both directions with the counts riding along. Landed this session as part of the frame re-base; the suite is green at 901 tests. ",
+      "action": "ENCODE"
     },
     {
       "id": "X14",
@@ -528,8 +528,8 @@
       "baseline": "At 4e33cc6 leaves=30, submission owners={proposal submit}, expected-hash owners=4, and both cross probes exit 2.",
       "expected": "leaves=28, submission_owners={'proposal submit'}, expected_hash_owner_count=4, both cross probes exit 2 with exact 'unrecognized arguments' messages.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. `v28` keeps its two-direction property over the reduced 28-leaf set. Landed this session as part of the frame re-base; the suite is green at 901 tests. ",
+      "action": "ENCODE"
     },
     {
       "id": "X15",
@@ -540,8 +540,8 @@
       "baseline": "At 4e33cc6 x04 reports {System.resolve:1,System.propose:0,System.verify_function:0,_source:0} and status 6.",
       "expected": "status=6 and counters exactly {System.resolve:1,System.propose:0,System.verify_function:0}; call is resolve(PARTITION,OPERATION,0,expected_function_hash=None).",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. `x04` drops its deleted `_source` spy without weakening the composed entry-point assertion. Landed this session as part of the frame re-base; the suite is green at 901 tests. ",
+      "action": "ENCODE"
     },
     {
       "id": "X16",
@@ -552,8 +552,8 @@
       "baseline": "At 4e33cc6 SUBMISSION_MAX_BYTES=2162722, framing=34, system provenance uses=3, and cli has 1 bare 65536 literal inside _source.",
       "expected": "cap=2162722, framing=34, system_provenance_loads=3, cli_65536_literals=0, source_helper_count=0, and cap assignment names all 3 derivation constants.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. `x11`'s aggregate-cap derivation survives; its assertion about the deleted source helper inverts, and strengthens to zero bare `65_536` per X08. Landed this session as part of the frame re-base; the suite is green at 901 tests. ",
+      "action": "ENCODE"
     },
     {
       "id": "X17",
@@ -564,8 +564,8 @@
       "baseline": "At 4e33cc6 resolve/submit own no source options and make 0 source calls, while handle owns 3 source destinations.",
       "expected": "Across 28 leaves source_option_owners={}, resolved status in {0,6}, submitted status=0, System.propose_count=0, and configured_source_accesses=0.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. `x21` expands from the two M3.5a leaves to the complete surviving CLI, which the source-grammar deletion makes both possible and necessary. Landed this session as part of the frame re-base; the suite is green at 901 tests. ",
+      "action": "ENCODE"
     },
     {
       "id": "X18",
@@ -576,8 +576,8 @@
       "baseline": "At 4e33cc6 baseline-current loss is empty and current adds resolve plus proposal submit, reaching 30 leaves.",
       "expected": "intersection_count=26, baseline_only={'handle','request'}, current_only={'proposal submit','resolve'}, and both set cardinalities=28.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. `x22` inverts exactly two historical members and retains the other 26. Encode as a set operation so a third change cannot ride along. Landed this session as part of the frame re-base; the suite is green at 901 tests. ",
+      "action": "ENCODE"
     },
     {
       "id": "X19",
@@ -588,8 +588,8 @@
       "baseline": "At 4e33cc6 v05 counters are {_source:0,System.propose:0,CandidateSource.propose:0}, with resolve=1 and submit=1.",
       "expected": "resolved status in {0,6}, submitted status=0, counters exactly {System.propose:0,CandidateSource.propose:0,System.resolve:1,System.submit_proposal:1}.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. `v05` keeps every meaningful counter after the deleted builder counter leaves; a counter set that shrinks silently is how an isolation pin becomes a tautology. Landed this session as part of the frame re-base; the suite is green at 901 tests. ",
+      "action": "ENCODE"
     },
     {
       "id": "X20",
@@ -600,8 +600,8 @@
       "baseline": "At 4e33cc6 D26 calls _leaf_parser for resolve, proposal submit, and handle; all 3 paths exist.",
       "expected": "D26 literal leaf paths equal {('resolve',),('proposal','submit')}; call_count=2, missing_paths=[], and ('handle',) occurs 0 times.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. The battery's `_leaf_parser` caller set stops demanding a deleted `handle` node while retaining both M3.5a leaf assertions. Landed this session as part of the frame re-base; the suite is green at 901 tests. ",
+      "action": "ENCODE"
     },
     {
       "id": "X21",
@@ -612,8 +612,8 @@
       "baseline": "At 4e33cc6 D03 reports status=0, constructor=1, resolve=1, verify_function=0, propose=0, source_builder=0.",
       "expected": "status=0, constructor.call_args=((path,),{}), resolve_count=1, verify_function_count=0, propose_count=0, configured_source_access_count=0, and output={'answer':12}.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. Battery D03 removes the deleted source-builder patch and preserves exact resolve dispatch plus configured-source non-reach. Landed this session as part of the frame re-base; the suite is green at 901 tests. ",
+      "action": "ENCODE"
     },
     {
       "id": "X22",
@@ -624,8 +624,8 @@
       "baseline": "At 4e33cc6 cli literal count=1, system literal count=1, system PROVENANCE_MAX_BYTES Name count=4, cap=2162722.",
       "expected": "cli literal count=0, system literal count=1, system named count=4, cap_names={'DEFAULT_MAX_BYTES','PROVENANCE_MAX_BYTES','_SUBMISSION_FRAMING'}, framing=34, cap=2162722.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. Battery D16 keeps its aggregate-cap derivation and re-bases the coincidental literal count from one to zero. Same measurement as X08. Landed this session as part of the frame re-base; the suite is green at 901 tests. ",
+      "action": "ENCODE"
     },
     {
       "id": "X23",
@@ -636,8 +636,8 @@
       "baseline": "At 4e33cc6 D24 statuses=(6,0,0), constructor_count=3, source_builder_count=1, and handle adds one request plus one event.",
       "expected": "statuses=(6,0), constructor_count=2, resolve_count=1, submit_count=1, propose_count=0, source_accesses=0, and total delta={'events':1,'proposals':1,'requests':1}.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED, with the control RELOCATED rather than deleted. `handle` was the CLI witness that a configured source IS reachable \u2014 the fact that stops `d24`'s two zeros from being vacuous. The CLI route is gone and the LIBRARY method survives, so the control moved onto `System.handle` itself: `status == 'fallback_failed'`, `code == 'candidate_source_error'`. A control deleted rather than relocated turns an isolation pin into a tautology.",
+      "action": "ENCODE"
     },
     {
       "id": "X24",
@@ -648,8 +648,8 @@
       "baseline": "At 4e33cc6 current allow map has 35 True and 2 False; all 3 legacy abbreviation probes parse.",
       "expected": "Both readings require 28/35 and inverse two-leaf differences. Reading A gives False=35 and exits [2,2,2]; reading B gives {True:33,False:2} and accepts all 3.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED, resolved by X06. Battery D25's abbreviation-preservation clause inherits the DECLINE: legacy abbreviation is preserved deliberately, and `d25`'s `abbreviation_map` comparison is scoped to shared paths so a removal reports as a removal rather than as a `KeyError` instrument error. Landed this session as part of the frame re-base; the suite is green at 901 tests. ",
+      "action": "ENCODE-SCOPED"
     },
     {
       "id": "X25",
@@ -660,8 +660,8 @@
       "baseline": "At 4e33cc6 store matches 4783eed, schema=2, submit delta has 3 nonzero tables, source import/helper/handle exist, and cross-option probes exit 2.",
       "expected": "store_equal=True, SCHEMA_VERSION=2, delta={'events':1,'proposals':1,'requests':1}, import/helper/handle counts=(0,0,0), and both cross-option statuses=2.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. Battery D26 retains store, schema, submission footprint and option isolation while its source-import and `handle` clauses invert. `d26` now pins the removed leaf's refusal as `cement_cli._UsageError` whose message ENUMERATES the survivors, which is D05's free complement. Landed this session as part of the frame re-base; the suite is green at 901 tests. ",
+      "action": "ENCODE"
     },
     {
       "id": "X26",
@@ -672,8 +672,8 @@
       "baseline": "At 4e33cc6 B02 says parser_shape carries changed default, help string, payload or dispatch; a help mutation leaves 163/'8b58b465c08aa693' unchanged.",
       "expected": "Reading A can contain '30 to 28' while stale_claims=1. Reading B requires stale_claims=0 or a widened digest; choices/type/help mutants currently all survive.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ACCEPTED, and it caught a defect in MAIN's own D20 edit. The corrected B02 docstring still said the parser_shape digest carries 'changed default, help string, payload or dispatch'; only the default is true. `probe_parser_shape` digests dest, option strings, default, required, nargs, class and `allow_abbrev` \u2014 no help, no choices, no type. Proved by measurement: M3.5b rewrote the root description and the `proposal` group help under D26 and the digest held at 151/`ebd2ac811bd9776d`. Fixed at 75f92b2, and the uninstrumented facets are now a polish row with its acceptance check. Reading B.",
+      "action": "ENCODE"
     },
     {
       "id": "X27",
@@ -684,8 +684,8 @@
       "baseline": "At 4e33cc6 the table lists 6 statuses: resolved,review_required,in_progress,fallback_failed,rejected,reconciliation_required; CLI-only advice appears in 4 action cells.",
       "expected": "Reading A leaves 'table_rows=0'. Reading B retains library_status_rows=6 and removes CLI_command_advice=4, naming System.handle/System.request_status explicitly.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ACCEPTED. D22's locus table dispositions README's `handle`/`request` return-state table `remove; no command reaches these states`. OVERRULED, reading B. No COMMAND reaches those states, but `System.handle` and `System.request_status` both survive and both return them, so the table is live library-API documentation and removing it does exactly what D22's own header forbids. The table is KEPT with library_status_rows=6 intact and its CLI-shaped caller actions re-scoped: `Poll `request REQUEST_ID`` became `Poll `System.request_status``, and `retry `handle` with `--retry-failed`` became `call `System.handle` again with `retry_failed=True``. Third contract-claim defect this unit, and the teammate reached it diff-blind.",
+      "action": "ENCODE-SCOPED"
     },
     {
       "id": "X28",
@@ -696,8 +696,8 @@
       "baseline": "The diagram has 1 handle(request) root, 1 LLM proposal branch, and 0 literal cement command invocations.",
       "expected": "Reading A rewrites/removes 1 root line; reading B reports 'protected_fence_equal=True'. D22 currently assigns this locus 0 dispositions.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ACCEPTED, reading B. D22's table assigns the opening `handle(request)` lifecycle fence zero dispositions, which is a gap rather than a KEEP. Ruling: the fence depicts the surviving `System.handle` pipeline, it contains zero literal `cement` invocations, and it is therefore protected on exactly the same grounds as every other `System.handle` locus. protected_fence_equal=True. Gate 5 does not reach it because it is a ```text fence, so the battery must assert the byte equality directly.",
+      "action": "ENCODE"
     },
     {
       "id": "X29",
@@ -708,8 +708,8 @@
       "baseline": "At 4e33cc6 the paragraph says exactly 1 generic handle/request route carries a request identifier and names 0 System methods.",
       "expected": "The rewritten paragraph names both 'System.handle' and 'System.request_status', contains 0 generic CLI-route claims, and retains the request-identifier fact once.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED, landed at d54ddde. 'Only the `handle` and `request` route still carries a request identifier' became 'Only the `System.handle` and `System.request_status` library route ...'. The same re-scope was applied to the deployment-boundary sentence, which named a bare `handle` inside a CLI-command enumeration.",
+      "action": "ENCODE"
     },
     {
       "id": "X30",
@@ -720,8 +720,8 @@
       "baseline": "At 4e33cc6 all 4 protected loci exist; hospital_ocr has 2 System.handle mentions and adapter protocol has 0 core CLI invocation blocks.",
       "expected": "The result is 'changed_protected_spans=[]', adapter_protocol_diff_bytes=0, hospital_tree_changed_paths=0, architecture_pipeline_changes=0, and threat_idempotency_changes=0.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. Route classification is what protects them, not their file paths. `docs/architecture.md` steps 1-3, `docs/threat-model.md:78` and `examples/hospital_ocr/README.md` are library-route; `docs/adapter-protocol.md` is M3.7's and stays untouched. MAIN's sweep found zero remaining `cement <removed>` invocations across all of them.",
+      "action": "ENCODE"
     },
     {
       "id": "X31",
@@ -732,8 +732,8 @@
       "baseline": "At 4e33cc6 named D25 grading_tools=0 and changed_span_manifest=0; only project CLAUDE.md states the register rules.",
       "expected": "Reading B requires 'committed_grader_count=1' and reports instruction_over_20=0, description_over_25=0, nonimperative_steps=0, and forbidden_fillers=0; reading A has no machine observable.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ACCEPTED. D25's register claim has no committed grader, so MAIN's conformance pass is by hand and cannot rerun from a clean checkout. This is the SAME row the polish register already carries twice \u2014 'port the human-facing register audit to committed state' and its M3.1 duplicate \u2014 now with a third consumer. Do not open a fourth row; the acceptance check already written covers M3.5b's surfaces.",
+      "action": "DEFER"
     },
     {
       "id": "X32",
@@ -744,8 +744,8 @@
       "baseline": "At 4e33cc6 paths are exactly _command_supervisor.py and example_adapter.py, both equal f9b9755, with cli.py absent.",
       "expected": "path_count=2, cli_membership=False, comparisons=[True,True], and paths exactly {'src/cement_runtime/_command_supervisor.py','src/cement_runtime/example_adapter.py'}.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. B02 keeps `cli.py` OUT and retains exactly `_command_supervisor.py` and `example_adapter.py`. D28's grounds are unchanged and now cite M3.6a and M3.7 as the scheduled edits rather than M3.5b.",
+      "action": "ENCODE"
     },
     {
       "id": "X33",
@@ -756,8 +756,8 @@
       "baseline": "At 4e33cc6 the M3.5b battery is absent, so witnessed_single_undo_controls=0 of 28.",
       "expected": "single_undo_controls=28, red_controls=28, unexpected_green=0; each control names exactly 1 undone obligation and exits nonzero.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. Gate 2 must demonstrate ONE INDEPENDENT RED CONTROL per obligation D01-D28. Inferring sensitivity from coverage is how a diff-blind battery ships assertions that cannot fail. This binds S3's construction, not a test body.",
+      "action": "GATE-SPEC"
     },
     {
       "id": "X34",
@@ -768,8 +768,8 @@
       "baseline": "At 4e33cc6 battery_file_count=0 and no red credential exists yet.",
       "expected": "baseline_rc=1, post_rc=0, obligation_tests=28, and UNFILLED-TESTS=OBLIGATIONS-UNCOVERED=ORPHAN-TESTS=ASSERTIONLESS=SKIPPED=AMENDMENT-UNCITED=0.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. Gate 2's validator result and its red/green credential are SEPARATE artifacts from the battery's ordinary pass. A green suite proves the assertions run; only the red control proves they bind.",
+      "action": "GATE-SPEC"
     },
     {
       "id": "X35",
@@ -780,8 +780,8 @@
       "baseline": "At 4e33cc6 mutation_driver_count=0, verdict_modules=[], and unmutated_control is absent.",
       "expected": "The control line contains quoted 'UNMUTATED=GREEN', 'VERDICT-MODULES=', and 'SURVIVORS='; unlisted_survivors=0 and module_set_mismatch=0.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. Gate 3's control line must bind the mutation verdict modules, the NAMED SURVIVOR SET and a green unmutated run together. A survivor count without names is not checkable at the next unit.",
+      "action": "GATE-SPEC"
     },
     {
       "id": "X36",
@@ -792,8 +792,8 @@
       "baseline": "At 4e33cc6 the full gate runs 901 tests with failures=0, errors=0, skips=0.",
       "expected": "returncode=0, failures=0, errors=0, skipped=0, and the output contains one concrete 'Ran N tests' count from committed state.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. Gate 1 is the complete committed suite with zero failures, zero errors and zero skips \u2014 not a targeted green subset. MAIN's runs this session report 901 tests OK rc 0.",
+      "action": "GATE-SPEC"
     },
     {
       "id": "X37",
@@ -804,8 +804,8 @@
       "baseline": "At 4e33cc6 the runnable-fence corpus has 18 Cement commands; lexical inline scanning adds at least 2 intentionally incomplete references.",
       "expected": "fenced_invocations=18, parse_failures=0, inline_partial_invocations_excluded>=2, unterminated_fences=0, and extraction_errors=0.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED, and it resolves V27. D23's 'every `cement <command>` invocation' is undefined against inline prose references, which legitimately omit required positionals and can never parse. The corpus is every invocation inside a fenced SHELL block. Gate 5 implements exactly that and rebuilds logical commands across backslash continuations AND across newlines held open by an unterminated quote, because the repo ships multi-line single-quoted JSON arguments.",
+      "action": "ENCODE-SCOPED"
     },
     {
       "id": "X38",
@@ -816,8 +816,8 @@
       "baseline": "At 4e33cc6 the M3.5a oracle reports orphans={} and recognizes prop_REPLACE_ME, HASH_FROM_INSPECT, and HASH_FROM_VERIFY producer families.",
       "expected": "orphan_set={}, consumers_before_producer=0, cross_fence_satisfactions=0, and producer_family_count=3.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. Placeholder production is decided by command semantics and line order inside each fence, which is what X30 already does. A naive fence regex spans fence boundaries and reports prose words such as `LLM`, `OCR` and `README` as placeholders.",
+      "action": "ENCODE"
     },
     {
       "id": "X39",
@@ -828,8 +828,8 @@
       "baseline": "At 4e33cc6 M3.5b clause-to-assertion mappings=0 because the battery does not exist.",
       "expected": "compound_clause_orphans=0, D15 protected_path_groups>=7, D18 named_frame_groups>=16, D22 disposition_groups>=10, and assertionless_groups=0.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "CONFIRMED. D15, D18 and D22 are compound and cannot be certified by one asserted clause plus an obligation citation. Each clause needs its own assertion and its own red control. D22 in particular has two directions \u2014 CLI-route prose that MUST change and library-route prose that MUST NOT \u2014 and a single-clause test can satisfy one while violating the other.",
+      "action": "GATE-SPEC"
     },
     {
       "id": "X40",
@@ -840,8 +840,8 @@
       "baseline": "The contract states material_forks=0 and therefore opened no spike wave.",
       "expected": "The diff-blind table reports 'material_forks>=5': global abbreviation, explicit capture help, status-table scope, invocation extraction, and digest sufficiency.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ACCEPTED. Section 9's zero-fork claim is FALSE. Five material forks existed and MAIN ruled every one this session: global abbreviation (DECLINED, X06), explicit capture help (TAKEN, V29), status-table scope (KEPT and re-scoped, X27), invocation extraction (fenced shell blocks, X37), and digest sufficiency (gap named, X26). A contract that claims no fork and carries five is a sizing defect as much as a claim defect: each fork cost a ruling the plan did not budget.",
+      "action": "ENCODE"
     }
   ]
 }
