@@ -549,7 +549,7 @@ Measured gaps driving the arc:
     Polish gains one row: all five M3.4 evidence tags are local-only and `origin` carries no tags, so
     every clone resolves none of them. No claim depends on them - each ruling's grounds are restated
     as measured facts - but publishing is the owner's call.
-  - M3.5a IN-PROGRESS tier=kernel tags=- depends=M3.2b,M3.4 - add `resolve` and `proposal submit` CLI
+  - M3.5a DONE tier=kernel tags=- depends=M3.2b,M3.4 - add `resolve` and `proposal submit` CLI
     channels with exact exit and payload contracts. Sessions: S1 wave 1, S2 fork ruling + contract,
     S3 implementation, S4 battery + closure.
     S1 DONE, wave-1 session, `main=` 85% 204K/240K; `mate=` 67% 161K/240K (`map-m3u5a`;
@@ -837,9 +837,41 @@ Measured gaps driving the arc:
     and deletes `tests/test_cli_channels.py` outright. Take
     `tests/test_cli_channels_battery.py` from `wt/test-m3u5a-3` and
     `.agent/decisions/m3u5a-mutants.json` from `wt/gate-m3u5a-1`, nothing else.
-    S4 REMAINING: harvest both teammates; reamend the harvested battery; run it against the
-    implementation and rule each red; run the DECISIVE sweep with both verdict modules
-    (`tests.test_cli_channels` + `tests.test_cli_channels_battery`); close.
+    S4 DONE, closure session, ran past one compaction boundary. `main=` 100% 240K/240K at the
+    boundary and 44% 106K/240K in the post-compaction close window; `mate=` 89% 213K/240K
+    (`test-m3u5a-3`; `gate-m3u5a-1` 63% 151K/240K). S4 range `22182e9..8b84ae5`, 10 commits;
+    both worktrees removed and both `wt/` branches deleted at their harvested tips (`4005507`,
+    `f36104b`).
+    ALL FOUR GATES GREEN at `8b84ae5`: 901 tests / 0 failures / OK / 184.548 s; validator PASS with
+    all six controls zero; 128 mutants / 127 killed / `SURVIVORS: 1 ['M41']` = the named survivor
+    set, CONTROL GREEN, verdict modules `tests.test_cli_channels` +
+    `tests.test_cli_channels_battery`; gate 4 rc 0 over 19 CHECK lines.
+    THE BATTERY'S CREDENTIAL IS RED-AT-BASELINE / GREEN-AT-HEAD: 30/30 distinct tests red at
+    `c8b82cd` in a detached worktree (`PYTHONPATH=<baseline>/src`, import path verified as the
+    baseline's `__init__.py`, `resolve` leaf absent) and 30/30 green at HEAD. Five reds split three
+    ways. TWO WERE THE REPO'S: `tests/test_submission_battery.py:181` still carried the `strictly
+    stronger` claim A8 withdrew as false, and `docs/architecture.md` carried a 26-word and a 37-word
+    sentence against the project's own <=25-word rule. Three were the suite's — D15's missing `-h`,
+    D23's absence-grep matching `can repeat` because blank-line splitting makes a 33-line bullet
+    list one paragraph, and D24's `assertRaisesRegex` around `handle`, structurally blind because
+    `System` converts the raising source into a `candidate_source_error` envelope at status 0
+    (measured `System.propose` call count 0). D27 also needed A23's `<node>` line mirrored into the
+    battery's independent `parser_shape` oracle: 126 -> 163 rows, `89dfa3d982d8c54b` ->
+    `8b58b465c08aa693`.
+    GATE 3 FAILED ON ITS FIRST DECISIVE RUN, which is this session's most valuable result: 121
+    killed / 7 survivors against a named set of 1. All six unexpected survivors were
+    behaviour-changing, none equivalent, and all six were ONE blindness in three shapes — an
+    assertion is bounded by the surface it RENDERS and by the discriminator it USES. D30 scanned
+    the leaf parser, where an `add_parser(help=...)` string can never appear; D09 pinned null-ness,
+    which cannot separate two non-null fields; D15 covered the binary branch of a two-branch reader
+    and fixtured it entirely in ASCII. Fixes and per-mutant credit in `8b84ae5`, generalisation in
+    `.agent/memory.md`.
+    DIFF-BLINDNESS AUDIT of `test-m3u5a-3`: zero references to the primary tree's `src/`, `tests/`,
+    `docs/`, `README` and zero `git show main:` / `git diff main`, under a positive control that
+    lists its own worktree paths. It read that worktree's `c8b82cd` baseline 13 times, which the
+    contract's git-object pins REQUIRE, so the role is diff-blind on two counts that must be audited
+    separately; `/session-roadmap`'s `test` role now states the boundary and MAIN's baseline-run
+    credential explicitly.
     M41 IS ALREADY A RULED SURVIVOR AND ITS RULING PRE-DATES THE SWEEP, which is `Y12`'s own demand:
     `FunctionMatch.matched` is `bool` and the CLI binds `None if match is None else match.matched`,
     so identity and truthiness agree over the whole `{True, False, None}` domain. `6` -> `7` on the
