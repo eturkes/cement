@@ -441,9 +441,11 @@ class CliChannelTests(unittest.TestCase):
         system = System(self.database, candidate_source=source)
         system.register_operation(PARTITION, OPERATION, policy=CompilePolicy(2, 1, 0))
         envelope = json.dumps({"input": 0, "output": 1, "provenance": {}})
+        # M3.5b D19: `_source` is deleted, so a spy on it raises rather than
+        # returning a verdict. Absence is the stronger successor - a zero call
+        # count says the builder was not reached, absence says it cannot be.
+        self.assertFalse(hasattr(cement_cli, "_source"))
         with mock.patch.object(cement_cli, "System", return_value=system), mock.patch.object(
-            cement_cli, "_source", wraps=cement_cli._source
-        ) as source_builder, mock.patch.object(
             system, "resolve", wraps=system.resolve
         ) as resolve, mock.patch.object(
             system, "submit_proposal", wraps=system.submit_proposal
@@ -458,11 +460,11 @@ class CliChannelTests(unittest.TestCase):
         self.assertEqual(submitted.status, 0)
         self.assertEqual(
             {
-                "_source": source_builder.call_count,
+                "_source": hasattr(cement_cli, "_source"),
                 "System.propose": propose.call_count,
                 "CandidateSource.propose": len(source.calls),
             },
-            {"_source": 0, "System.propose": 0, "CandidateSource.propose": 0},
+            {"_source": False, "System.propose": 0, "CandidateSource.propose": 0},
         )
         self.assertEqual((resolve.call_count, submit.call_count), (1, 1))
 
@@ -1391,13 +1393,16 @@ class CliChannelTests(unittest.TestCase):
         current_leaves, current_nodes = _parser_nodes(cement_cli._parser())
         baseline_paths = {" ".join(path) for path in baseline_leaves}
         current_paths = {" ".join(path) for path in current_leaves}
+        # M3.5b D02/D17: the census returns to 28/35 over the INVERSE set, so a
+        # count pin cannot separate this state from the baseline's own 28/35.
+        # Both set differences are asserted, and the count travels with them.
         self.assertEqual((len(baseline_paths), baseline_nodes), (28, 35))
-        self.assertEqual((len(current_paths), current_nodes), (30, 37))
+        self.assertEqual((len(current_paths), current_nodes), (28, 35))
         self.assertEqual(
             current_paths - baseline_paths,
             {"resolve", "proposal submit"},
         )
-        self.assertEqual(baseline_paths - current_paths, set())
+        self.assertEqual(baseline_paths - current_paths, {"handle", "request"})
 
     def test_v28_cross_leaf_option_isolation_holds_in_both_directions_for_b(self) -> None:
         """V28 [D26] cross-leaf option isolation holds in both directions for both new options
@@ -1455,7 +1460,7 @@ class CliChannelTests(unittest.TestCase):
             self.assertEqual(run.status, 2)
             self.assertEqual(run.stdout, "")
             self.assertEqual(self.error(run)["message"], message)
-        self.assertEqual(len(leaves), 30)
+        self.assertEqual(len(leaves), 28)  # M3.5b D17: 30 -> 28
         self.assertEqual(submission_owners, {("proposal", "submit")})
         self.assertEqual(len(hash_owners), 4)
         self.assertIn(("resolve",), hash_owners)
@@ -1641,11 +1646,10 @@ class CliChannelTests(unittest.TestCase):
         """
         system = mock.Mock(spec=System)
         system.resolve.return_value = _resolution("miss")
-        with mock.patch.object(
-            cement_cli, "System", return_value=system
-        ), mock.patch.object(
-            cement_cli, "_source", wraps=cement_cli._source
-        ) as source:
+        # M3.5b D19: the `_source` spy targets a deleted symbol, so absence
+        # replaces its zero call count.
+        self.assertFalse(hasattr(cement_cli, "_source"))
+        with mock.patch.object(cement_cli, "System", return_value=system):
             run = self.run_cli("resolve", OPERATION, "--input", "0")
         self.assertEqual(run.status, 6)
         self.assertEqual(
@@ -1653,13 +1657,13 @@ class CliChannelTests(unittest.TestCase):
                 "System.resolve": system.resolve.call_count,
                 "System.propose": system.propose.call_count,
                 "System.verify_function": system.verify_function.call_count,
-                "_source": source.call_count,
+                "_source": hasattr(cement_cli, "_source"),
             },
             {
                 "System.resolve": 1,
                 "System.propose": 0,
                 "System.verify_function": 0,
-                "_source": 0,
+                "_source": False,
             },
         )
         self.assertEqual(
@@ -1986,18 +1990,11 @@ class CliChannelTests(unittest.TestCase):
             and type(node.value) is int
             and node.value == 65_536
         ]
-        source_helper = next(
-            node
-            for node in ast.walk(cli_tree)
-            if isinstance(node, ast.FunctionDef) and node.name == "_source"
-        )
-        helper_literals = {
-            node.lineno
-            for node in ast.walk(source_helper)
-            if isinstance(node, ast.Constant) and node.value == 65_536
-        }
-        self.assertEqual(len(cli_literals), 1)
-        self.assertEqual({node.lineno for node in cli_literals}, helper_literals)
+        # M3.5b: the single surviving bare literal lived in `_source`, which this
+        # unit deletes, so the obligation strengthens from "one literal, and it
+        # is the source-command bound" to "no bare copy of the number remains".
+        # `--source-command`'s coincidental 65_536 is gone with its helper.
+        self.assertEqual(len(cli_literals), 0)
 
         cap_assignment = next(
             node
@@ -2599,11 +2596,11 @@ class CliChannelTests(unittest.TestCase):
         system = System(self.database, candidate_source=source)
         system.register_operation(PARTITION, OPERATION, policy=CompilePolicy(2, 1, 0))
         envelope = json.dumps({"input": 1, "output": 2, "provenance": {}})
+        # M3.5b D19: `_source` is deleted; absence replaces its zero call count.
+        self.assertFalse(hasattr(cement_cli, "_source"))
         with mock.patch.object(
             cement_cli, "System", return_value=system
         ), mock.patch.object(
-            cement_cli, "_source", wraps=cement_cli._source
-        ) as source_builder, mock.patch.object(
             system, "propose", wraps=system.propose
         ) as propose:
             resolved = self.run_cli("resolve", OPERATION, "--input", "0")
@@ -2614,11 +2611,11 @@ class CliChannelTests(unittest.TestCase):
         self.assertEqual(submitted.status, 0)
         self.assertEqual(
             {
-                "_source": source_builder.call_count,
+                "_source": hasattr(cement_cli, "_source"),
                 "System.propose": propose.call_count,
                 "source.propose": len(source.calls),
             },
-            {"_source": 0, "System.propose": 0, "source.propose": 0},
+            {"_source": False, "System.propose": 0, "source.propose": 0},
         )
 
     def test_x22_all_twenty_eight_baseline_leaf_paths_survive_by_identity_r(self) -> None:
@@ -2639,9 +2636,11 @@ class CliChannelTests(unittest.TestCase):
         current, _ = _parser_nodes(cement_cli._parser())
         baseline_paths = {" ".join(path) for path in baseline}
         current_paths = {" ".join(path) for path in current}
+        # M3.5b D02/D12: both cardinalities are 28 over DIFFERENT sets, so the
+        # two set differences are the whole assertion and the counts ride along.
         self.assertEqual(len(baseline_paths), 28)
-        self.assertEqual(len(current_paths), 30)
-        self.assertEqual(baseline_paths - current_paths, set())
+        self.assertEqual(len(current_paths), 28)
+        self.assertEqual(baseline_paths - current_paths, {"handle", "request"})
         self.assertEqual(
             current_paths - baseline_paths,
             {"resolve", "proposal submit"},
@@ -2774,18 +2773,24 @@ class CliChannelTests(unittest.TestCase):
         self.assertEqual(delta, expected)
 
     def test_x26_commandcandidatesource_remains_imported_and_the_existing_h(self) -> None:
-        """X26 [D26] CommandCandidateSource remains imported and the existing handle source seam remains intact
+        """X26 [D08, D19] CommandCandidateSource is no longer imported and the handle source seam is gone
 
         ACTION: ENCODE
 
+        INVERTED by M3.5b D19. The pre-removal reading asserted the import SURVIVES, which
+        after the removal is a pin on a property the unit is chartered to destroy: a pin left
+        asserting the pre-removal property tests nothing.
+
         EXPECTED:
-        The import count is 1, `_source` still references `CommandCandidateSource` 1 or more
-        times, and handle's source destination set remains exactly 3 names.
+        Zero `from .source import ...` aliases, zero `CommandCandidateSource` names anywhere in
+        `cli.py`, no `_source` definition and no `_source` module attribute, and `handle` is not
+        a parser node at all, so it offers no `source_*` destination.
 
         RULING:
-        CONFIRMED. `cli.py` holds three `CommandCandidateSource` references: the import and its
-        uses inside `_source`. The seam must survive intact - D24 forbids the new leaves from
-        REACHING a source, never the CLI from offering one to the routes that always had it.
+        CONFIRMED post-removal. D08 makes the import and the helper an AST claim rather than a
+        text claim, so a renamed helper cannot satisfy it. `handle` losing its whole node is the
+        stronger statement: the three `source_*` destinations cannot be reached because their
+        owning leaf does not exist.
         """
         source = Path(inspect.getsourcefile(cement_cli) or "").read_text()
         tree = ast.parse(source)
@@ -2796,33 +2801,23 @@ class CliChannelTests(unittest.TestCase):
             and node.module == "source"
             and node.level == 1
             for alias in node.names
-            if alias.name == "CommandCandidateSource"
         ]
-        helper = next(
+        helpers = [
             node
             for node in ast.walk(tree)
             if isinstance(node, ast.FunctionDef) and node.name == "_source"
-        )
+        ]
         references = sum(
             isinstance(node, ast.Name) and node.id == "CommandCandidateSource"
-            for node in ast.walk(helper)
+            for node in ast.walk(tree)
         )
-        handle = self.parser_node("handle")
-        self.assertIsNotNone(handle)
-        assert handle is not None
-        source_destinations = {
-            action.dest for action in handle._actions if action.dest.startswith("source_")
-        }
-        configured = cement_cli._source(
-            '["adapter"]', source_id="source-probe", timeout=1.0
-        )
-        self.assertEqual(len(imports), 1)
-        self.assertGreaterEqual(references, 1)
-        self.assertEqual(
-            source_destinations,
-            {"source_command", "source_id", "source_timeout"},
-        )
-        self.assertIsInstance(configured, cement_cli.CommandCandidateSource)
+        self.assertEqual(imports, [])
+        self.assertEqual(helpers, [])
+        self.assertEqual(references, 0)
+        self.assertFalse(hasattr(cement_cli, "_source"))
+        self.assertFalse(hasattr(cement_cli, "CommandCandidateSource"))
+        self.assertIsNone(self.parser_node("handle"))
+        self.assertIsNone(self.parser_node("request"))
 
     def test_x27_b02_retires_only_the_cli_py_byte_pin_and_keeps_both_surviv(self) -> None:
         """X27 [D27] B02 retires only the cli.py byte pin and keeps both surviving runtime files frozen

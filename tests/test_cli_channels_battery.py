@@ -566,14 +566,11 @@ class ObligationBatteryTests(unittest.TestCase):
         fake = mock.create_autospec(System, instance=True)
         fake.candidate_source = source
         fake.resolve.return_value = _resolution("hit")
-        with (
-            mock.patch.object(cement_cli, "System", return_value=fake) as constructor,
-            mock.patch.object(
-                cement_cli,
-                "_source",
-                side_effect=AssertionError("source builder reached"),
-            ) as source_builder,
-        ):
+        # M3.5b D19: the exploding `_source` double targets a deleted symbol, so
+        # `mock.patch.object` raises rather than returning a verdict. Absence is
+        # the successor and it is stronger: the builder cannot be reached.
+        self.assertFalse(hasattr(cement_cli, "_source"))
+        with mock.patch.object(cement_cli, "System", return_value=fake) as constructor:
             status, stdout, stderr = _invoke(
                 [
                     "--db",
@@ -599,7 +596,6 @@ class ObligationBatteryTests(unittest.TestCase):
         )
         fake.verify_function.assert_not_called()
         fake.propose.assert_not_called()
-        source_builder.assert_not_called()
         self.assertIs(fake.candidate_source, source)
         with self.assertRaisesRegex(AssertionError, "candidate source reached"):
             _ = source.propose
@@ -1796,12 +1792,15 @@ class ObligationBatteryTests(unittest.TestCase):
         system_tree = ast.parse(
             (ROOT / "src/cement_runtime/system.py").read_text(encoding="utf-8")
         )
+        # M3.5b: the last bare copy lived in `_source`, deleted with the helper,
+        # so "exactly one, and it is the source-command bound" strengthens to
+        # "no bare copy of the number survives in cli.py".
         self.assertEqual(
             sum(
                 isinstance(node, ast.Constant) and node.value == 65_536
                 for node in ast.walk(cli_tree)
             ),
-            1,
+            0,
         )
         self.assertEqual(
             sum(
@@ -2602,11 +2601,11 @@ class ObligationBatteryTests(unittest.TestCase):
         source = _ExplodingSource()
         system, path = _new_system(self, source=source)
         before = _table_counts(path)
+        # M3.5b D19: `_source` is deleted, so the spy raises rather than
+        # verdicting. Absence replaces its zero count.
+        self.assertFalse(hasattr(cement_cli, "_source"))
         with (
             mock.patch.object(cement_cli, "System", return_value=system) as constructor,
-            mock.patch.object(
-                cement_cli, "_source", wraps=cement_cli._source
-            ) as source_builder,
             mock.patch.object(
                 system,
                 "propose",
@@ -2648,28 +2647,19 @@ class ObligationBatteryTests(unittest.TestCase):
             self.assertEqual(resolve.call_count, 1)
             self.assertEqual(submit.call_count, 1)
             propose.assert_not_called()
-            source_builder.assert_not_called()
             self.assertIs(system.candidate_source, source)
             leaves = _table_counts(path)
 
-            handle_result = _invoke(
-                [
-                    "--db",
-                    str(path),
-                    "--partition",
-                    PARTITION,
-                    "handle",
-                    OPERATION,
-                    "--input",
-                    "12",
-                ]
-            )
-            self.assertEqual(handle_result[0], 0)
-            self.assertEqual(
-                _payload(handle_result[1])["code"], "candidate_source_error"
-            )
-            self.assertEqual(source_builder.call_count, 1)
-        self.assertEqual(constructor.call_count, 3)
+            # POSITIVE CONTROL. `handle` was the CLI witness that a configured
+            # source IS reachable, which is what stops the two zeros above from
+            # being vacuous. M3.5b removes that CLI route and keeps the LIBRARY
+            # method, so the control moves onto `System.handle` itself. A control
+            # deleted rather than relocated turns an isolation pin into a
+            # tautology.
+            handled = system.handle(PARTITION, OPERATION, 12)
+        self.assertEqual(handled.status, "fallback_failed")
+        self.assertEqual(handled.code, "candidate_source_error")
+        self.assertEqual(constructor.call_count, 2)
 
         after = _table_counts(path)
         leaf_delta = {table: leaves[table] - before[table] for table in before}
@@ -2730,10 +2720,13 @@ class ObligationBatteryTests(unittest.TestCase):
 
         base_leaves, base_nodes = _parser_census(base_parser)
         current_leaves, current_nodes = _parser_census(current_parser)
-        self.assertEqual(base_leaves - current_leaves, set())
+        # M3.5b D02/D12: the counts return to the base's own 28/35 over the
+        # INVERSE set, so both set differences carry the claim and the equal
+        # cardinality is asserted as a CONSEQUENCE of the two named swaps.
+        self.assertEqual(base_leaves - current_leaves, {"handle", "request"})
         self.assertEqual(current_leaves - base_leaves, {"proposal submit", "resolve"})
-        self.assertEqual(len(current_leaves), len(base_leaves) + 2)
-        self.assertEqual(current_nodes, base_nodes + 2)
+        self.assertEqual(len(current_leaves), len(base_leaves))
+        self.assertEqual(current_nodes, base_nodes)
 
         def abbreviation_map(parser: argparse.ArgumentParser) -> dict[str, bool]:
             values: dict[str, bool] = {}
@@ -2750,9 +2743,18 @@ class ObligationBatteryTests(unittest.TestCase):
 
         base_abbreviation = abbreviation_map(base_parser)
         current_abbreviation = abbreviation_map(current_parser)
+        # M3.5b: `handle` and `request` leave the base map, so the preservation
+        # claim runs over the SHARED paths and the two removals are asserted
+        # separately. Comparing over the base's own key set would raise a
+        # KeyError and report a removal as an instrument error.
+        shared = set(base_abbreviation) & set(current_abbreviation)
         self.assertEqual(
-            {path: current_abbreviation[path] for path in base_abbreviation},
-            base_abbreviation,
+            {path: current_abbreviation[path] for path in shared},
+            {path: base_abbreviation[path] for path in shared},
+        )
+        self.assertEqual(set(base_abbreviation) - shared, {"handle", "request"})
+        self.assertEqual(
+            set(current_abbreviation) - shared, {"resolve", "proposal submit"}
         )
         self.assertFalse(current_abbreviation["resolve"])
         self.assertFalse(current_abbreviation["proposal submit"])
@@ -2851,33 +2853,45 @@ class ObligationBatteryTests(unittest.TestCase):
 
         cli_source = (ROOT / "src/cement_runtime/cli.py").read_text(encoding="utf-8")
         cli_tree = ast.parse(cli_source)
+        # M3.5b D08/D19 INVERT this block. The pre-removal reading pinned the
+        # import, the helper and `handle`'s three source destinations as
+        # SURVIVORS; the unit is chartered to delete all five, so the assertion
+        # is restated over the post-removal property. `source.py` itself is
+        # untouched here and belongs to M3.7.
         imports = [
             alias.name
             for node in cli_tree.body
             if isinstance(node, ast.ImportFrom) and node.module == "source"
             for alias in node.names
-            if alias.name == "CommandCandidateSource"
         ]
-        self.assertEqual(imports, ["CommandCandidateSource"])
-        source_function = next(
-            node
-            for node in cli_tree.body
-            if isinstance(node, ast.FunctionDef) and node.name == "_source"
+        self.assertEqual(imports, [])
+        self.assertEqual(
+            [
+                node
+                for node in cli_tree.body
+                if isinstance(node, ast.FunctionDef) and node.name == "_source"
+            ],
+            [],
         )
-        self.assertGreaterEqual(
+        self.assertEqual(
             sum(
                 isinstance(node, ast.Name) and node.id == "CommandCandidateSource"
-                for node in ast.walk(source_function)
+                for node in ast.walk(cli_tree)
             ),
-            1,
+            0,
         )
-        self.assertIs(cement_cli.CommandCandidateSource, CommandCandidateSource)
-        handle = _leaf_parser(self, parser, ("handle",))
-        self.assertEqual(
-            {action.dest for action in handle._actions}
-            & {"source_command", "source_id", "source_timeout"},
-            {"source_command", "source_id", "source_timeout"},
-        )
+        self.assertFalse(hasattr(cement_cli, "CommandCandidateSource"))
+        self.assertIsNotNone(CommandCandidateSource)
+        # D05: subcommand names are exact-match, so the removed leaf raises an
+        # invalid-choice error whose message ENUMERATES the survivors. That makes
+        # the refusal a complement assertion for free.
+        for removed in ("handle", "request"):
+            with self.assertRaises(cement_cli._UsageError) as raised:
+                parser.parse_args([removed, OPERATION])
+            message = str(raised.exception)
+            self.assertIn(f"invalid choice: '{removed}'", message)
+            for survivor in ("operation", "resolve", "proposal", "function", "events"):
+                self.assertIn(f"'{survivor}'", message)
 
         base_source = subprocess.run(
             ["git", "show", "c8b82cd:src/cement_runtime/cli.py"],
