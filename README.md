@@ -229,7 +229,8 @@ uv run cement --db demo.db --partition acme proposal submit support.reply --subm
 
 One frame carries every field at its maximum size. Separate flags cannot, because the operating system
 refuses an argument list above 131,071 bytes, and only one flag can read standard input. Inline text is
-also visible to any process that reads the process list. Prefer `-` for a candidate you must protect.
+also visible to observers on the same host, because it enters the argument list of the process.
+Prefer `-` for a candidate you must protect.
 
 The object takes three keys. `input` and `output` are required. `provenance` is optional and defaults to
 an empty object. Any other key is an error, and the message names every offending key. A repeated key is

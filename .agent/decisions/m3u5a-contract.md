@@ -314,8 +314,8 @@ green when a behaviour and its pin vanish together).
    "zero survivors", so a survivor outside that set fails while ruled ones do not. The UNMUTATED
    control run must be reported GREEN on the same control line: without it a sweep whose harness is
    broken reports every mutant killed and passes, which is the same vacuity gate 4 was carrying.
-4. `uv run python .agent/decisions/m3u5a-s2-probe.py` — section 2's six ground probes, graded
-   against **16 pinned facts**, exit 1 on any mismatch. Re-anchored at S3: the probe previously
+4. `uv run python .agent/decisions/m3u5a-s2-probe.py` — section 2's **seven** ground probes, graded
+   against **19 pinned facts**, exit 1 on any mismatch. Re-anchored at S3: the probe previously
    printed its findings and returned 0 unconditionally, so it could not fail, and its pins as
    written contradicted this unit's own obligations. Two pins now carry POST-implementation
    values — `parser_census` at 30 leaves / 37 nodes and `provenance_literal` at one declaration
@@ -326,8 +326,13 @@ green when a behaviour and its pin vanish together).
    fresh-ledger BYTE SIZE is reported but not graded: it is a function of the host SQLite build's
    page size and layout, and D13 needs creation versus non-creation. What the gate grades instead
    is `bytes_positive` and `bytes_deterministic` — two independently constructed fresh ledgers must
-   have the same non-zero size — which is falsifiable without being host-fragile. Verified at seed
-   with 11 negative controls, all firing.
+   have the same non-zero size — which is falsifiable without being host-fragile. A seventh probe,
+   `parser_shape`, digests every leaf's option strings, destinations, defaults, required flags and
+   nargs (126 actions, sha256-16 `89dfa3d982d8c54b`); it is what makes D27's migration claim true,
+   because mutating `events --limit` from 1000 to 7 leaves D24, D25, D26 and the census all green
+   while the digest moves. `provenance_literal` counts literals over the AST and reads the exported
+   symbol from the imported module, since a substring census also counts comments and prose.
+   Verified at seed with **15 negative controls**, all firing.
 5. Re-derivation of both spike tables from their tracked patches and drivers is NOT a gate; it is
    the fork ruling's evidence and was run at S1.
 
@@ -381,6 +386,9 @@ Five expectations were corrected against MAIN's live measurement before ruling �
 
 ### Amendments — binding, superseding the cited section text
 
+A1-A6 come from the verdict table below; **A7 (D13)** and **A8 (D27)** come from the attack table
+and are written in section 14. All eight are one set.
+
 - **A1 (D01, D14)** The guarantee is that no option prefix ever BINDS: every prefix invocation
   exits 2 with empty stdout. The message is `unrecognized arguments: <prefix> <value>` only when
   the required option is separately supplied. A prefix standing IN PLACE of the required option
@@ -427,4 +435,74 @@ Five expectations were corrected against MAIN's live measurement before ruling �
 
 ## 14. Review dispositions, differential and attack results
 
-PENDING. Filled at S3/S4.
+Attack table = `.agent/decisions/m3u5a-attack.json`, **50 rows** (20 seeded, 30 extension) from
+`wt/rev-m3u5a-1` @ `c462286`, graded `PASS` with `UNKNOWN-CELLS 0` by
+`m3u5a-wave2-validate.py`, re-run by MAIN. Severity split as the reviewer filed it:
+**11 blocking, 33 material, 4 cleared, 2 minor**.
+
+### Blocking — all 11 ruled, none open
+
+| id | ruling | landed |
+| --- | --- | --- |
+| `A01` | ACCEPTED. Same finding as verdict `X02`; D09's domain narrowed. | amendment A4 |
+| `A03` | ACCEPTED. D13's `never worsens` was unconditional and false. | amendment A7 |
+| `A12` | ACCEPTED. D27's `strictly stronger` was false; a parser-shape digest now carries what B02 lost. | amendment A8 + gate 4 |
+| `Y01` | ACCEPTED. The fresh-ledger byte size is a host SQLite property, not a Cement invariant. | gate 4 re-grade |
+| `Y02` | ACCEPTED. Gate 4 was unsatisfiable — it required the two facts D25 and D16 move. | gate 4 re-anchor |
+| `Y03` | ACCEPTED. `m3u5a-s2-probe.py` returned 0 unconditionally and could not fail. | gate 4 grading |
+| `Y04` | ACCEPTED. Same finding as verdict `X01`. | amendment A2 |
+| `Y05` | ACCEPTED. Same finding as verdict `X06`. | amendment A3 |
+| `Y06` | ACCEPTED. Same finding as verdict rows `V02`/`V18`. | amendment A1 |
+| `Y18` | ACCEPTED. The argv disclosure claim was platform- and policy-unconditional. | `docs/threat-model.md`, `README.md` |
+| `Y21` | ACCEPTED. The stdin-capacity claim rested on `@PATH` probes the fork ruling removed. | re-cited below |
+
+`A01`, `Y04`, `Y05` and `Y06` were each raised INDEPENDENTLY by the diff-blind `test` teammate and
+by this reviewer, on different lenses and from different evidence. Four two-lens confirmations
+satisfy the council rule without MAIN adjudicating.
+
+### Two further amendments
+
+- **A7 (D13)** The pre-construction check strictly improves for a path that is STABLY ABSENT. The
+  claim `never worsens` is withdrawn as unconditional: in the inverse race a valid ledger appearing
+  between the check and construction turns a would-be success into exit 5. The mechanism is
+  decomposed rather than raced: `System` builds a valid ledger at a staging path, the target tests
+  absent, `os.replace` moves it in, and ordinary construction on the now-present target succeeds —
+  so the precheck's exit 5 would have been computed from a state construction no longer sees. The
+  window is the same microseconds D13 already discloses in the forward direction, and no code
+  change is warranted; the unconditional sentence is the defect.
+- **A8 (D27)** D27's claim that D24, D25 and D26 are `strictly stronger` than B02's retired `cli.py`
+  byte pin is FALSE and withdrawn. The three cover source reach, leaf names and option isolation;
+  none notices an old leaf's changed default, help string, payload or dispatch. Demonstrated by
+  mutating `events --limit` from 1000 to 7: census stays 30/37 and every D24/D25/D26 assertion stays
+  green. The replacement is gate 4's `parser_shape` digest, which moves on that exact mutation. D27
+  now claims what is true — the migration preserves B02's CLI-preservation property through a
+  behavioural digest rather than a byte pin over a file this unit is chartered to extend.
+
+### Y21 — the stdin-capacity citation
+
+The fork ruling's sentence credited a measured 2,162,722-byte stdin acceptance to spike probes
+`Z11`/`Z12`, which carry the cap pair through the `@PATH` route section 3.2 REMOVED; `Z09` measures
+41 stdin bytes. The claim is now carried by `m3u5a-smoke.py` instead, which drives the shipped
+`main`: a frame at exactly the cap is accepted on the byte stream, and `cap + 1` is rejected on the
+byte stream, on a text stream, and inline. The at-cap frame spends its bytes across `input`,
+`output` and `provenance` at their several maxima simultaneously, which is the submission per-field
+flags can never carry, so the probe exhibits the fork ruling's own ground.
+
+### Material, cleared and minor — 39 rows
+
+The 33 `material` rows are almost entirely BATTERY-DESIGN constraints: how a pin must be written so
+it cannot pass vacuously. They are S4 input, not S3 defects, and none indicts shipped behaviour.
+Four are already discharged inside gate 4 — `Y22` (AST literal census and imported-symbol check
+replace substring counting), `Y23` (the probe count in the docstring), `Y26` and `Y27` (gate 2's
+`ASSERTIONLESS`/`SKIPPED` and gate 3's green control run). `Y28` is ruled NOT a defect: repeated
+options are argparse last-win uniformly across all 30 leaves — measured, `--input 1 --input 2`
+resolves against `2` — and D01/D14 fix the option SET rather than repetition arity, so making two
+leaves differ would be the asymmetry.
+
+The 4 `cleared` rows (`A05`, `A06`, `A14`, `A15`) record probes with no defensible alternative and
+are kept as written. The 2 `minor` rows are absorbed: `Y23` above, and `Y30`'s rationale correction
+to D27, which A8 supersedes.
+
+The per-row `disposition` and `main_note` columns are filled at S4 by an idempotent `--check`
+patcher asserting the id set, following `m3u5a-rule-verdicts.py`. Every blocking row's ruling is
+already binding here; the patcher records it per row rather than deciding it.

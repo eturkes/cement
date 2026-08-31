@@ -82,8 +82,11 @@
   and match your input before you act. The `cement proposal submit` command inherits every sentence
   above, because it calls `submit_proposal` directly.
 - Pass `cement proposal submit --submission -` for a candidate that must stay private. An inline
-  value is readable by any process that reads the process list, and it also enters shell history. The
-  same applies to `cement resolve --input`.
+  value enters the argument list of the process. Cement cannot control who reads that list. On Linux
+  the value appears in `/proc/<pid>/cmdline`, and other hosts expose equivalent process listings.
+  Access depends on the host identity model and the local policy, so treat the value as visible to
+  any observer on the same host. An interactive shell can also record the value in its history file.
+  Cement controls neither mechanism. The same applies to `cement resolve --input`.
 - Keep provider wrappers pure. Model calls can repeat after timeout or lease recovery.
 - Monitor promoted scopes. When policy or expected behavior changes, challenge them. Revise the
   operation instead of overwriting contradictory history.

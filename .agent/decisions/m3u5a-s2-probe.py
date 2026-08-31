@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-"""S2 ground probes: MAIN's own re-derivation of the five wave-1 map findings the
-M3.5a acceptance contract asserts as facts.
+"""S2 ground probes: MAIN's own re-derivation of the wave-1 map findings the M3.5a
+acceptance contract asserts as facts. Seven probes, 19 graded pins.
 
 A grade proves each map anchor resolves and each cell is filled; it never proves a
 finding true. Run from the repository root:
@@ -29,6 +29,8 @@ sweep is deferred to M3.5b, so this pin failing green would hide that deferral c
 from __future__ import annotations
 
 import argparse
+import ast
+import hashlib
 import io
 import json
 import pathlib
@@ -118,6 +120,51 @@ def probe_parser_census() -> dict[str, object]:
     return {"leaves": leaves, "nodes": nodes, "leaf_names": names}
 
 
+def probe_parser_shape() -> dict[str, object]:
+    """A12: a canonical digest of the WHOLE parser, replacing B02's retired `cli.py` pin.
+
+    D24, D25 and D26 between them cover source reach, leaf names and option isolation.
+    None of the three notices an old leaf's changed default, so mutating `events --limit`
+    from 1000 to 7 left all of them green while operator-visible behaviour changed. This
+    digest is what makes D27's migration claim true: every leaf's option strings,
+    destinations, defaults, required flags and nargs, canonically ordered.
+    """
+    shape: list[str] = []
+
+    def visit(node: argparse.ArgumentParser, path: tuple[str, ...]) -> None:
+        children = [
+            action
+            for action in node._actions
+            if isinstance(action, argparse._SubParsersAction)
+        ]
+        for action in sorted(node._actions, key=lambda item: item.dest):
+            if isinstance(action, argparse._SubParsersAction):
+                continue
+            shape.append(
+                "|".join(
+                    (
+                        " ".join(path),
+                        action.dest,
+                        ",".join(sorted(action.option_strings)),
+                        repr(action.default),
+                        repr(bool(action.required)),
+                        repr(action.nargs),
+                        type(action).__name__,
+                    )
+                )
+            )
+        for action in children:
+            for name, child in sorted(action.choices.items()):
+                visit(child, path + (name,))
+
+    visit(cement_cli._parser(), ())
+    payload = "\n".join(shape).encode("utf-8")
+    return {
+        "actions": len(shape),
+        "digest": hashlib.sha256(payload).hexdigest()[:16],
+    }
+
+
 def probe_abbreviation() -> dict[str, object]:
     """M16: is option abbreviation reachable on the root and on a nested leaf?"""
     parser = cement_cli._parser()
@@ -148,16 +195,33 @@ def probe_bare_string_emit() -> dict[str, object]:
 
 
 def probe_provenance_literal() -> dict[str, object]:
-    """Y10: how many unexported copies of the provenance cap the library holds."""
-    source = (
+    """Y10: how many unexported copies of the provenance cap the library holds.
+
+    Counted over the AST, not the text: a substring census also counts the number inside
+    comments and docstrings, and substring membership is not an exported-symbol check, so
+    a module that only MENTIONS `PROVENANCE_MAX_BYTES` in prose would read as exporting it.
+    """
+    path = (
         pathlib.Path(__file__).resolve().parents[2]
         / "src"
         / "cement_runtime"
         / "system.py"
-    ).read_text(encoding="utf-8")
+    )
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    literals = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and node.value == 65_536
+    ]
+    import cement_runtime.system as system_module
+
     return {
-        "literal_sites": source.count("65_536"),
-        "exported_constant": "PROVENANCE_MAX_BYTES" in source,
+        "literal_sites": len(literals),
+        "exported_constant": getattr(system_module, "PROVENANCE_MAX_BYTES", None) == 65_536,
+        "reference_sites": sum(
+            isinstance(node, ast.Name) and node.id == "PROVENANCE_MAX_BYTES"
+            for node in ast.walk(tree)
+        ),
     }
 
 
@@ -211,8 +275,14 @@ EXPECTED: dict[str, dict[str, object]] = {
         "path_absent_after": True,
     },
     "parser_census": {"leaves": 30, "nodes": 37},
+    "parser_shape": {"actions": 126, "digest": "89dfa3d982d8c54b"},
     "bare_string_emit": {"bytes": '"prop_probe"\n'},
-    "provenance_literal": {"exported_constant": True, "literal_sites": 1},
+    "provenance_literal": {
+        "exported_constant": True,
+        "literal_sites": 1,
+        # 1 declaration target + the 3 former literal sites D16 rewired.
+        "reference_sites": 4,
+    },
 }
 
 
@@ -268,6 +338,7 @@ def main(argv: list[str]) -> int:
         "absent_path_construction": probe_absent_path_construction(),
         "deleted_ledger_resolve": probe_deleted_ledger_resolve(),
         "parser_census": probe_parser_census(),
+        "parser_shape": probe_parser_shape(),
         "abbreviation": probe_abbreviation(),
         "bare_string_emit": probe_bare_string_emit(),
         "provenance_literal": probe_provenance_literal(),
