@@ -701,6 +701,14 @@ Measured gaps driving the arc:
     `rev-m3u5a-1` STOPPED at 88% after the 50-row attack table; report file likewise absent, its
     findings harvested from the committed table. Both worktrees clean; `wt/rev-m3u5a-1` is
     HARVESTED and removable, `wt/test-m3u5a-1` is IN USE by `test-m3u5a-2`.
+    STANDING RULE, cost two harvests this session: the subagent harness FORBIDS report files -
+    "Do NOT Write report/summary/findings/analysis .md files. Return findings directly as your
+    final assistant message." A brief that names `.scratch/agents/<name>.md` as the report
+    destination makes its agent choose between the policy and the brief, and both teammates
+    withheld their DONE marker over the conflict. Always brief the report as INLINE final-message
+    content with the marker as its last line, and always name the committed artifact - table,
+    suite, script - as the real deliverable. Teammate-written `.md` files under `tests/` or
+    `src/` are unaffected; the ban is on report/summary/findings prose.
 
     S3 REMAINING, resume here: `test-m3u5a-2` is filling `tests/test_cli_channels.py` in
     `.scratch/worktrees/test-m3u5a-1` (branch `wt/test-m3u5a-1`, seeded at `e9f73dd`), graded by
