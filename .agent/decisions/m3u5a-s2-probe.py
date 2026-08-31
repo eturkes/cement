@@ -7,8 +7,23 @@ finding true. Run from the repository root:
 
     uv run python .agent/decisions/m3u5a-s2-probe.py
 
-Emits one JSON object on stdout. Exit 0 = every probe answered; the contract cites
-these values, so a changed answer is a contract defect rather than a test failure.
+Emits one JSON object on stdout and one `CHECK` line per pinned fact on stderr.
+**Exit 0 = every pinned fact still holds**; any mismatch exits 1 and names the fact.
+
+`--emit-pins` prints the live values in `EXPECTED` form, so a deliberate re-anchor is a
+copy rather than a retype.
+
+Two pins carry POST-implementation values because M3.5a's own obligations move them, and
+pinning the S1 measurement would make the unit's gate contradict the unit's contract:
+
+  parser_census      D25 moves 28 leaves / 35 nodes -> 30 / 37, adding exactly
+                     `resolve` and `proposal submit` while all 28 baseline names survive.
+  provenance_literal D16 exports `PROVENANCE_MAX_BYTES`, so system.py's three unexported
+                     `65_536` copies collapse to the single declaration site.
+
+Every other pin is the S1 measurement unchanged. Legacy option abbreviation stays ACCEPTED
+here on purpose: M3.5a scopes `allow_abbrev=False` to its two new leaves, and a global
+sweep is deferred to M3.5b, so this pin failing green would hide that deferral closing.
 """
 
 from __future__ import annotations
@@ -131,7 +146,108 @@ def probe_provenance_literal() -> dict[str, object]:
     }
 
 
-def main() -> int:
+# The 28 leaf paths that predate M3.5a, walked out of `_parser()` at c8b82cd, whose
+# `cli.py` is 83198e1's. D25 requires every one to survive by NAME, which is the
+# assertion the leaf COUNT cannot make. Derived, never recalled: a hand-written set got
+# three names wrong and this gate caught it.
+BASELINE_LEAVES = frozenset(
+    {
+        "artifact list",
+        "artifact show",
+        "artifact suspend",
+        "challenge",
+        "compile",
+        "events",
+        "example list",
+        "example revoke",
+        "function eval",
+        "function export",
+        "function inspect",
+        "function promote",
+        "function receipts",
+        "function show",
+        "function verify",
+        "function verify-drafts",
+        "handle",
+        "operation list",
+        "operation register",
+        "operation revise",
+        "promote",
+        "proposal list",
+        "proposal review",
+        "proposal show",
+        "report list",
+        "report show",
+        "request",
+        "verify",
+    }
+)
+
+EXPECTED: dict[str, dict[str, object]] = {
+    "absent_path_construction": {
+        "exists_before": False,
+        "exists_after": True,
+        "bytes_after": 208_896,
+    },
+    "deleted_ledger_resolve": {
+        "raised": "IntegrityError",
+        "message": "ledger file is missing or unreadable",
+        "path_absent_after": True,
+    },
+    "parser_census": {"leaves": 30, "nodes": 37},
+    "bare_string_emit": {"bytes": '"prop_probe"\n'},
+    "provenance_literal": {"exported_constant": True, "literal_sites": 1},
+}
+
+
+def _grade(report: dict[str, object]) -> list[str]:
+    """Return one failure sentence per broken pin; empty means the gate passes."""
+    failures: list[str] = []
+    for probe, pins in EXPECTED.items():
+        answered = report[probe]
+        assert isinstance(answered, dict)
+        for fact, want in pins.items():
+            got = answered.get(fact)
+            verdict = "ok" if got == want else "FAIL"
+            print(f"CHECK   {probe}.{fact} {verdict} want={want!r} got={got!r}", file=sys.stderr)
+            if got != want:
+                failures.append(f"{probe}.{fact}: want {want!r}, got {got!r}")
+
+    # D25 is a NAME claim, so the census pin above is graded a second way.
+    names = set(report["parser_census"]["leaf_names"])  # type: ignore[index,call-overload]
+    lost = sorted(BASELINE_LEAVES - names)
+    added = sorted(names - BASELINE_LEAVES)
+    for label, got, want in (
+        ("parser_census.lost_baseline_leaves", lost, []),
+        ("parser_census.added_leaves", added, ["proposal submit", "resolve"]),
+    ):
+        verdict = "ok" if got == want else "FAIL"
+        print(f"CHECK   {label} {verdict} want={want!r} got={got!r}", file=sys.stderr)
+        if got != want:
+            failures.append(f"{label}: want {want!r}, got {got!r}")
+
+    # Legacy abbreviation is DEFERRED, never fixed here; a green would mean M3.5b landed
+    # early and this probe stopped describing the tree.
+    abbreviation = report["abbreviation"]
+    assert isinstance(abbreviation, dict)
+    for label, field, want in (
+        ("root_--part", "partition", "tenant_a"),
+        ("nested_function_eval_--bun", "bundle", "b"),
+    ):
+        cell = abbreviation[label]
+        assert isinstance(cell, dict)
+        got = (cell.get("accepted"), cell.get(field))
+        verdict = "ok" if got == (True, want) else "FAIL"
+        print(
+            f"CHECK   abbreviation.{label} {verdict} want={(True, want)!r} got={got!r}",
+            file=sys.stderr,
+        )
+        if got != (True, want):
+            failures.append(f"abbreviation.{label}: want {(True, want)!r}, got {got!r}")
+    return failures
+
+
+def main(argv: list[str]) -> int:
     report = {
         "absent_path_construction": probe_absent_path_construction(),
         "deleted_ledger_resolve": probe_deleted_ledger_resolve(),
@@ -142,8 +258,21 @@ def main() -> int:
     }
     json.dump(report, sys.stdout, indent=2, sort_keys=True)
     sys.stdout.write("\n")
+    if argv[1:] == ["--emit-pins"]:
+        json.dump(report, sys.stderr, indent=2, sort_keys=True)
+        sys.stderr.write("\n")
+        return 0
+
+    failures = _grade(report)
+    total = sum(len(pins) for pins in EXPECTED.values()) + 4
+    if failures:
+        print(f"FAIL    {len(failures)} of {total} pinned facts moved", file=sys.stderr)
+        for line in failures:
+            print(f"        {line}", file=sys.stderr)
+        return 1
+    print(f"PASS    {total} pinned facts hold", file=sys.stderr)
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(sys.argv))
