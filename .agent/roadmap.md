@@ -930,13 +930,51 @@ Measured gaps driving the arc:
     M3.6a, and must NOT change here. `examples/hospital_ocr/run_demo.py` and its README drive the LIBRARY
     method, so the demo is untouched by this unit. Deleting library prose would pre-empt M3.6a's own doc
     pass and break the track order.
-    S2 ENTRY STATE: contract sections 1-9 are binding; open with the anchored `EDITS` table in
-    `m3u5b-burden.py` (7 occurrence-asserted edits, re-runnable) rather than hand edits, then the three
-    fixture helpers, then the 16 named instrument frames, then gate 4, then the D22 prose table. Dispatch
-    wave 2 (`test-m3u5b-1` diff-blind verdict table, `rev-m3u5b-1` contract attack) against the
-    pre-implementation commit, both seeded by a MAIN-committed both-ways-graded validator plus an
-    all-`unknown` skeleton naming each row's SUBJECT, both reporting INLINE with the marker as the final
-    line.
+    S2 DONE, implementation + wave 2, `main=` 96% 231K/240K, `mate=` 86% 206K/240K (`test-m3u5b-1`).
+    Commits `4e33cc6`..`4a01693`. Gates rerun from the committed tip `4a01693`, tree otherwise clean:
+    suite 901 OK, gate 4 rc 0 (19 checks), gate 5 rc 0, `uv build` rc 0, both ruling patchers
+    `--check` rc 0.
+    THE REMOVAL WENT THROUGH THE ANCHORED TABLE, never by hand: `apply_stage(pathlib.Path('.'), 2)` over
+    `m3u5b-burden.py`'s 7 occurrence-asserted `EDITS`, `cli.py` -44/+1. Census and digest hit S1's
+    predictions exactly - 28 leaves / 35 nodes / 151 actions / `ebd2ac811bd9776d`, with 151 derived as
+    116 action lines + 35 node lines rather than added. Gate 4's five predicted checks failed with the
+    predicted values and no others.
+    WAVE 2 CONFIRMED THE CENSUS COLLISION INDEPENDENTLY AND DIFF-BLIND: `c8b82cd` re-derives to 28/35
+    with INVERSE two-leaf sets and `154`/`af19339c3995c97d`. S1's sharpest find survives an adversary.
+    EIGHT CLAIM DEFECTS IN MAIN'S OWN CONTRACT, ninth consecutive unit on this pattern, all corrected in
+    contract section 10: D17's 16-vs-19 checks; D03/D18's three cardinalities (prose 11, table 18 rows,
+    measured 17) for one work list; D18's 103-vs-102 shielded assertions - re-basing the three helpers
+    leaves ONE of the 103 still failing at `payload`, so 105 = 102 + 3; D22's `remove` on a table
+    documenting live library methods; D14's false claim that the digest carries choices, types and help;
+    D14's wrong cross-reference to D16; D28's false claim that M3.6a and M3.7 are scheduled to edit
+    `cli.py`, which MAIN verified against THIS FILE; and S9's zero-fork claim against five real forks.
+    THE FRAME CENSUS HAD A CATEGORY IT NEVER SCANNED. 17 code-coupled frames is right; an EIGHTEENTH,
+    PROSE-coupled frame broke on the D22 edit alone (`test_cli_channels_battery.py` `test_d23_...`, whose
+    final `assertIn` is A11's positive control). A burden staged over SOURCE deletions cannot see a frame
+    that pins shipped prose. Binding on every later removal unit: stage the prose edit too, or scan for
+    doc-string pins separately.
+    POSITIVE CONTROLS RELOCATE, NEVER DELETE. Twice this session: `d24`'s CLI witness that a configured
+    source IS reachable moved onto `System.handle`, and A11's README retry advice moved onto the library
+    spelling. A control deleted rather than relocated turns an isolation pin into a tautology.
+    GATE 3 AS SPECIFIED WAS VACUOUS - it mutates touched predicates read from the final tree, and the
+    seven EDITS delete five predicates and add none, so the set is EMPTY. Contract section 11 redefines
+    it as REINSERTION mutants. Binding on every later removal unit: a removal is bound by restoring what
+    was removed, never by mutating what remains.
+    GATE 5 IS NEW AND CREDITED BY MUTATION: `m3u5b-doc-parse.py` parses every `cement` invocation in
+    fenced shell blocks of README, `docs/*.md` and `examples/*/README.md` under `_parser()` - 5 surfaces,
+    18 invocations, 0 failures - behind an invocation floor, two must-fail removed-leaf controls and one
+    must-parse surviving control. Injecting a stale `handle` line turns it red at the exact locus.
+    ONE POLISH ROW DISCHARGED (`cli.py`'s bare `65_536` left with `_source`; measured 0 remaining), one
+    ownership CORRECTED (global `allow_abbrev` DECLINED - a repo-wide grammar break needs its own
+    mandate; D06/D10 close the removal half locally), two OPENED (the digest instruments no help,
+    `choices` or `type`; no shipped prose names `example_adapter`).
+    S3 ENTRY STATE: contract sections 1-9 bind EXCEPT where section 10 corrects them; section 11 is the
+    gate specification and REPLACES section 8's. Build gate 2 (one test per D01-D28 plus one independent
+    RED control per obligation, per-direction controls on compound D15/D18/D22, a runtime
+    candidate-source assertion, a self-grading D20 narrative) and gate 3 (reinsertion mutants, NAMED
+    survivor set). Every gate reruns from the committed tip with its SHA recorded. The verdict table's
+    `action` column carries the encode instruction per row; `GATE-SPEC` rows bind construction, not
+    assertions.
   - M3.6a tier=kernel tags=- depends=M3.5b - delete public lifecycle methods, leases, result models and
     exports; retain only the private v2 binding plumbing.
   - M3.6b tier=kernel tags=prod depends=M3.6a - the sole schema cut v2->v3: direct proposal columns,
