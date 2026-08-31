@@ -1,0 +1,237 @@
+{
+  "kind": "attack",
+  "unit": "M3.5b",
+  "note": "Seeded rows are a FLOOR, never a cap. Add extension rows with ids Y01, Y02, ... for any locus the seed missed; extensions have outnumbered seeds in every M3 wave. A cleared claim is a filled cell: write 'no defensible alternative: <reason>' rather than leaving unknown.",
+  "rows": [
+    {
+      "id": "A01",
+      "section": "D02",
+      "lens": "the census collision: can a conforming pin satisfy D02's letter while still counting rather than asserting the set",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A02",
+      "section": "D05",
+      "lens": "invalid-choice enumeration called a complement for free: what makes it a property rather than argparse's wording",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A03",
+      "section": "D10",
+      "lens": "every proper prefix that is not a prefix of a surviving flag: is that set well defined and non-empty per leaf",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A04",
+      "section": "D08",
+      "lens": "AST over text grep: how would a conforming AST pin pass while the property fails",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A05",
+      "section": "D06",
+      "lens": "abbreviation reaches across leaves in both directions: can a removed spelling stay reachable somewhere",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A06",
+      "section": "D11",
+      "lens": "walk EVERY node: name the surface each node renders and where a ban scans a string that cannot hold the text",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A07",
+      "section": "D14",
+      "lens": "carried by the digest: does parser_shape observe defaults, choices, types, help and container-level attributes",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A08",
+      "section": "D15",
+      "lens": "byte equality against git objects: which object, and does a scope breach fail rather than pass silently",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A09",
+      "section": "D17",
+      "lens": "BASELINE_LEAVES retained while the expectation moves: what does the frozenset now prove",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A10",
+      "section": "D18",
+      "lens": "the fixture re-base: does proposal submit produce the state the 103 shielded assertions require",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A11",
+      "section": "D19",
+      "lens": "an inverted pin: what stops the inversion from asserting a tautology after the symbol is gone",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A12",
+      "section": "D20",
+      "lens": "a docstring corrected but ungraded: what fails the next time it goes stale",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A13",
+      "section": "D22",
+      "lens": "the prose split by route: is any locus mis-assigned, and is the mixed row's re-scoping complete",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A14",
+      "section": "D23",
+      "lens": "mechanical extraction of cement invocations from prose: which invocation shapes does the extractor miss",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A15",
+      "section": "D26",
+      "lens": "root help positive claim: what makes the test pass while a reader still cannot learn what exists",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A16",
+      "section": "D27",
+      "lens": "do the replacements really carry every property the three superseded M3.5a obligations held",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A17",
+      "section": "D29",
+      "lens": "must fail when one obligation remains undone: name an obligation whose undoing the battery cannot see",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A18",
+      "section": "D03",
+      "lens": "the work list is stated as eleven frames, tabled as eighteen rows and measured as seventeen",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A19",
+      "section": "S1",
+      "lens": "the not-owned table: name an edit this unit must make that touches a not-owned surface",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A20",
+      "section": "D04",
+      "lens": "the anchored EDITS table re-run at implementation time: what happens when an anchor has moved",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A21",
+      "section": "D25",
+      "lens": "register conformance on rewritten prose: which tool grades it and is the claim re-derivable from a clone",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A22",
+      "section": "S8",
+      "lens": "gate 3 over every touched predicate: what IS the predicate set when the change is a deletion",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A23",
+      "section": "S9",
+      "lens": "project CLAUDE.md conformance on every durable file this unit touches, code and prose alike",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    }
+  ]
+}
