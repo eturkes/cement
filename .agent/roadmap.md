@@ -681,12 +681,47 @@ Measured gaps driving the arc:
     across three polls with live transcripts, took ONE directive re-ordering fill-before-execute, and
     moved within one poll (140 -> 125 and 60 -> 45 unknown cells, one commit). The directive is
     cheap and the gauge-plus-mtime rule still says read them together before ruling a stall.
-    S4 ENTRY STATE: harvest both wave-2 tables, rule sections 13-14 through idempotent `--check`
-    patchers, run the diff-blind battery (`tests/test_cli_channels_battery.py` graded by
-    `m3u5a-battery-validate.py`, one test per D01-D30), the mutation sweep with its verdict module
-    list printed and its acceptance predicate written as a NAMED SURVIVOR SET, and re-run
-    `m3u5a-s2-probe.py` - section 2's parser census now reads 30 leaves / 37 nodes, so that probe's
-    own expectation moved and must be re-derived rather than read as a regression.
+    S3 CHECKPOINT 2, both wave-2 tables harvested and ruled. `main=` 95% 227K/240K at checkpoint;
+    ran past one compaction boundary. Landed `9372664` verdict rulings, `8b96ab6` + `a0cbc94` +
+    `7ad8c53` gate 4, `cc4bc9b` suite validator, `e9f73dd` phase-2 seed (on `wt/test-m3u5a-1`).
+    Contract sections 13 and 14 are WRITTEN, no longer PENDING. Verdict table 60 rows ruled
+    58 CONFIRMED + 2 SCOPED, 53 ENCODE + 7 ENCODE-SCOPED, by `m3u5a-rule-verdicts.py --check`.
+    Attack table 50 rows, 11 blocking ALL RULED, section 14 written. EIGHT binding amendments
+    A1-A8 supersede cited section text; A1-A6 in section 13, A7-A8 in section 14.
+    Four two-lens confirmations (A01/X02, Y04/X01, Y05/X06, Y06/V02+V18) satisfied the council rule
+    without MAIN adjudicating - the diff-blind author and the reviewer found them independently.
+    Gate 4 was the session's biggest find and is REBUILT: `m3u5a-s2-probe.py` printed six probe
+    results and returned 0 unconditionally, so it could never fail, and its implied pins were the S1
+    pre-implementation values that D25 and D16 deliberately move. Now 7 probes, 19 pinned facts,
+    15 negative controls, exit 1 on mismatch. Its new `parser_shape` digest (126 actions,
+    `89dfa3d982d8c54b`) is what makes D27's migration claim true - it moves on the `events --limit`
+    1000->7 mutation that leaves D24, D25, D26 and the census all green.
+    Teammates: `test-m3u5a-1` STOPPED at 76% after delivering the 60-row table (report persisted by
+    MAIN at `.scratch/agents/test-m3u5a-1.md` - the agent judged report files policy-forbidden).
+    `rev-m3u5a-1` STOPPED at 88% after the 50-row attack table; report file likewise absent, its
+    findings harvested from the committed table. Both worktrees clean; `wt/rev-m3u5a-1` is
+    HARVESTED and removable, `wt/test-m3u5a-1` is IN USE by `test-m3u5a-2`.
+
+    S3 REMAINING, resume here: `test-m3u5a-2` is filling `tests/test_cli_channels.py` in
+    `.scratch/worktrees/test-m3u5a-1` (branch `wt/test-m3u5a-1`, seeded at `e9f73dd`), graded by
+    `m3u5a-suite-validate.py` (`UNFILLED-TESTS`/`ROWS-UNCOVERED`/`ORPHAN-TESTS`/`ASSERTIONLESS` all
+    zero for PASS). It was at 8/60 filled and 70% context, so expect two or three successors
+    (`test-m3u5a-3`, ...), each inheriting that worktree and its filled tests. The suite is
+    diff-blind: its `src/` sits at `c8b82cd`, so it can only be proven RED there and MAIN owns the
+    run against the implementation. Then: `git merge --squash wt/test-m3u5a-1`, run the suite green,
+    correct verdict table -> red suite -> code in that order for any legitimate red, and apply the
+    close order (stop all, prove quiescence, per-worktree status in its own call, remove worktrees +
+    `wt/` branches, decisive rerun, commit).
+
+    S4 ENTRY STATE: fill the attack table's per-row `disposition`/`main_note` columns through an
+    idempotent `--check` patcher asserting the id set (pattern `m3u5a-rule-verdicts.py`; every
+    blocking ruling is already binding in section 14, the patcher records rather than decides).
+    Run the diff-blind obligation battery (`tests/test_cli_channels_battery.py` graded by
+    `m3u5a-battery-validate.py`, one test per D01-D30) requiring `UNFILLED-TESTS 0`,
+    `OBLIGATIONS-UNCOVERED 0`, `ASSERTIONLESS 0` and `SKIPPED 0`, and the mutation sweep with its
+    verdict module list printed, its acceptance predicate written as a NAMED SURVIVOR SET, and its
+    UNMUTATED control run reported GREEN on the same control line. The 33 `material` attack rows are
+    battery-design constraints and are the battery's specification, not S3 defects.
   - M3.5b tier=kernel tags=- depends=M3.5a - remove `handle`/`request`/source grammar, imports, fixtures,
     help and operator prose.
   - M3.6a tier=kernel tags=- depends=M3.5b - delete public lifecycle methods, leases, result models and
