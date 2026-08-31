@@ -757,8 +757,9 @@ Measured gaps driving the arc:
     `m3u5a-battery-validate.py`, one test per D01-D30) requiring `UNFILLED-TESTS 0`,
     `OBLIGATIONS-UNCOVERED 0`, `ASSERTIONLESS 0` and `SKIPPED 0`, and the mutation sweep with its
     verdict module list printed, its acceptance predicate written as a NAMED SURVIVOR SET, and its
-    UNMUTATED control run reported GREEN on the same control line. The 33 `material` attack rows are
-    battery-design constraints and are the battery's specification, not S3 defects.
+    UNMUTATED control run reported GREEN on the same control line. This entry state also ruled the
+    33 `material` attack rows "battery-design constraints, not S3 defects" IN ADVANCE OF READING
+    THEM; checkpoint 1 falsified that whole-class ruling twice (`Y08`, `A10`).
     `m3u5a-battery-validate.py` is BUILT and graded both ways, so S4 opens on dispatch, not on
     tooling. It parses the contract itself - 30 `- **DNN**` bullets from sections 5-10, 8
     `- **A<k> (D..)**` amendments from sections 13-14 - so the seed cannot drift from the spec.
@@ -809,13 +810,36 @@ Measured gaps driving the arc:
     `proposal review`) moves the digest while the 30/37 census stays put. Generalize: when a pin
     digests a collection, check which attributes live on the CONTAINER and are therefore invisible
     to it.
-    S4 REMAINING: rule all 50 attack rows through an idempotent `--check` patcher; land the new
-    amendments (A9+) in a contract section 15 — MAIN's re-derivation upheld `A04 A07 A08 A10 A11
-    A17 Y07 Y08 Y10 Y15 Y16 Y17 Y19 Y20 Y24 Y25` as contract-text defects, so the battery arrives
-    written against A1-A8 and MAIN applies the amendment deltas at harvest, which is the designed
-    flow and not a re-dispatch; fix `m3u5a-battery-validate.py`'s `A\d` amendment regex, which
-    silently drops `A10` and every later id; harvest both teammates; run the DECISIVE sweep with
-    both verdict modules; close.
+    S4 CHECKPOINT 2, `main=` 100% 240K/240K at the compaction boundary. Shipped `2b2753a` (contract
+    section 15 = A9-A23, plus the validator's amendment-regex fix), `8006764` (`m3u5a-rule-attack.py`
+    + all 50 dispositions), `29754f7` (`m3u5a-battery-reamend.py`).
+    ALL 50 ATTACK ROWS RULED, census derived from the committed JSON: ACCEPTED-AMENDED 20
+    (A01 A03 A04 A07 A08 A11 A12 A17 A20 Y04 Y05 Y06 Y10 Y15 Y16 Y17 Y19 Y20 Y24 Y25),
+    ACCEPTED-FIXED 7 (A10 Y01 Y02 Y03 Y08 Y18 Y21), BATTERY-CONSTRAINT 8, DISCHARGED 6, SCOPED 4,
+    CLEARED 4, REJECTED 1. `Y08` is the ONLY code defect the table found; the other six fixes
+    repaired instruments (gate 4 pins, the `m3u5a-s2-probe.py` unconditional `return 0`) or docs.
+    Contract amendments 8 -> 23, amended obligations 9 -> 18 (D01 D05 D06 D09 D12 D13 D14 D15 D16
+    D18 D20 D21 D23 D25 D26 D27 D28 D30). `A21`/`A22` bind section 12 and section 3.1/G1 rather than
+    a `DNN`, so `AMENDMENT-UNCITED` ignores them by construction.
+    THE VALIDATOR'S AMENDMENT REGEX WAS `A\d`, dropping `A10` and every later id in silence — the
+    fail-open shape of a forbidden-list grep. `A\d+` now parses all 23. Any gate matching an id
+    class must be graded against an id that crosses the digit boundary.
+    A DIFF-BLIND AUTHOR OUTLIVES ITS OWN CONTRACT: the battery is written against A1-A8 while the
+    contract now carries A1-A23, so nine obligations arrive encoded in superseded form. That
+    reconciliation is the designed WORK-UNIT flow, not a re-dispatch, and its MECHANICAL half is
+    `m3u5a-battery-reamend.py` — it rebuilds each docstring from the validator's own emitter, edits
+    BOTTOM-UP so earlier line numbers stay valid, and leaves every body byte-identical under AST
+    comparison. A body that now contradicts its superseding amendment still goes red; that red is
+    MAIN's specification question and the script must never be read as answering it.
+    HARVEST IS A TARGETED CHECKOUT, NEVER `git merge --squash`. Both branches carry dispatch-time
+    snapshots of files MAIN has since advanced: squashing `wt/test-m3u5a-3` (based at `c8b82cd`,
+    which predates `e6ba873`) reverts `cli.py`, `system.py`, README, both docs, four `.agent/` files
+    and deletes `tests/test_cli_channels.py` outright. Take
+    `tests/test_cli_channels_battery.py` from `wt/test-m3u5a-3` and
+    `.agent/decisions/m3u5a-mutants.json` from `wt/gate-m3u5a-1`, nothing else.
+    S4 REMAINING: harvest both teammates; reamend the harvested battery; run it against the
+    implementation and rule each red; run the DECISIVE sweep with both verdict modules
+    (`tests.test_cli_channels` + `tests.test_cli_channels_battery`); close.
     M41 IS ALREADY A RULED SURVIVOR AND ITS RULING PRE-DATES THE SWEEP, which is `Y12`'s own demand:
     `FunctionMatch.matched` is `bool` and the CLI binds `None if match is None else match.matched`,
     so identity and truthiness agree over the whole `{True, False, None}` domain. `6` -> `7` on the
