@@ -7,231 +7,411 @@
       "id": "A01",
       "section": "D02",
       "lens": "the census collision: can a conforming pin satisfy D02's letter while still counting rather than asserting the set",
-      "attack": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": null,
-      "main_note": null
+      "attack": "no defensible alternative: D02 explicitly couples every count to exact leaf-set equality, and the measured collision proves why.",
+      "evidence": "uv run python first-lens probe: head=30; post_model=28; pre_model=28; equal_counts=True; equal_sets=False; post_only=['proposal submit', 'resolve']; pre_only=['handle', 'request']; applied stage 2 produced leaves=28, nodes=35, model_match=True.",
+      "severity": "cleared",
+      "disposition": "CLEARED",
+      "main_note": "CLEARED. The reviewer found no defensible alternative reading and MAIN concurs: the obligation admits one reading against the shipped parser, and the probe that would separate a second reading returns the same result either way."
     },
     {
       "id": "A02",
       "section": "D05",
       "lens": "invalid-choice enumeration called a complement for free: what makes it a property rather than argparse's wording",
-      "attack": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": null,
-      "main_note": null
+      "attack": "no defensible alternative: both removed leaves emit survivor lists exactly equal to the twelve-member root complement.",
+      "evidence": "uv run python first-lens probe parsed each post-removal error: handle and request both raised _UsageError; each message enumerated 12 names; roots=12; exact_complement=True.",
+      "severity": "cleared",
+      "disposition": "CLEARED",
+      "main_note": "CLEARED. The reviewer found no defensible alternative reading and MAIN concurs: the obligation admits one reading against the shipped parser, and the probe that would separate a second reading returns the same result either way."
     },
     {
       "id": "A03",
       "section": "D10",
       "lens": "every proper prefix that is not a prefix of a surviving flag: is that set well defined and non-empty per leaf",
-      "attack": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": null,
-      "main_note": null
+      "attack": "no defensible alternative: the natural per-leaf derivation yields 36 to 38 prefixes and no empty set across all 28 leaves.",
+      "evidence": "uv run python first-lens probe derived prefixes from all five removed flags across 28 post-removal leaves: min_prefixes=36, max_prefixes=38, empty=0; six named leaves held the minimum.",
+      "severity": "cleared",
+      "disposition": "CLEARED",
+      "main_note": "CLEARED. The reviewer found no defensible alternative reading and MAIN concurs: the obligation admits one reading against the shipped parser, and the probe that would separate a second reading returns the same result either way."
     },
     {
       "id": "A04",
       "section": "D08",
       "lens": "AST over text grep: how would a conforming AST pin pass while the property fails",
-      "attack": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": null,
-      "main_note": null
+      "attack": "The literal D08 conditions accept an inline source implementation plus a renamed helper while the candidate-source route remains intact.",
+      "evidence": "Python AST mutant replaced the .source import with InlineCandidateSource and renamed _source to _source_factory: no_source_import=True, no__source=True, no_CommandCandidateSource=True, inline_helper=True, route_remains=True.",
+      "severity": "blocking",
+      "disposition": "ACCEPTED",
+      "main_note": "Lands. D08's two literal conditions \u2014 no `_source` symbol, no name imported from `.source` \u2014 are satisfiable by an inline source class under a different name. They are necessary, not sufficient. D07 and D09 close the hole between them: no dispatch branch survives, and every reachable path constructs `System(args.db)` with no candidate-source argument. Gate 2 must encode the CONJUNCTION and add one runtime assertion that the constructed system's source is None, because an AST pin cannot see a source configured through a value."
     },
     {
       "id": "A05",
       "section": "D06",
       "lens": "abbreviation reaches across leaves in both directions: can a removed spelling stay reachable somewhere",
-      "attack": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": null,
-      "main_note": null
+      "attack": "no defensible alternative: all 1,189 exact-or-derived option probes were unreachable across every surviving leaf.",
+      "evidence": "uv run python post-removal _parse_optional probe covered 28 leaves and 1,189 exact-or-derived flag tokens: reachable=0.",
+      "severity": "cleared",
+      "disposition": "CLEARED",
+      "main_note": "CLEARED. The reviewer found no defensible alternative reading and MAIN concurs: the obligation admits one reading against the shipped parser, and the probe that would separate a second reading returns the same result either way."
     },
     {
       "id": "A06",
       "section": "D11",
       "lens": "walk EVERY node: name the surface each node renders and where a ban scans a string that cannot hold the text",
-      "attack": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": null,
-      "main_note": null
+      "attack": "no defensible alternative: walking all 35 rendered node surfaces covers parent-only add_parser help and produced zero banned hits.",
+      "evidence": "uv run python post-removal probe walked 35 nodes with banned_hits=[]; normalized root help contained the resolve add_parser help, while resolve.format_help did not.",
+      "severity": "cleared",
+      "disposition": "CLEARED",
+      "main_note": "CLEARED. The reviewer found no defensible alternative reading and MAIN concurs: the obligation admits one reading against the shipped parser, and the probe that would separate a second reading returns the same result either way."
     },
     {
       "id": "A07",
       "section": "D14",
       "lens": "carried by the digest: does parser_shape observe defaults, choices, types, help and container-level attributes",
-      "attack": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": null,
-      "main_note": null
+      "attack": "parser_shape omits action.help, action.choices, and action.type, so its unchanged digest does not carry D14 byte equality.",
+      "evidence": "uv run python mutation probe on proposal list --status: help, choices, and type mutations each retained {'actions': 151, 'digest': 'ebd2ac811bd9776d'}; digest_changed=False three times.",
+      "severity": "blocking",
+      "disposition": "ACCEPTED",
+      "main_note": "Lands, and it is the unit's most-confirmed finding: this row, Y07, verdict rows V15 and X26, and MAIN's own D26 measurement all reach it independently. `probe_parser_shape` digests dest, option strings, default, required, nargs, class and `allow_abbrev`. It digests no help, no `choices`, no `type`. D14's byte-equality claim therefore does not rest on the digest. V15 reading A replaces it with direct full-facet comparison (shared=28, equal=28, different=[]), and the uninstrumented facets are a polish row with its acceptance check written."
     },
     {
       "id": "A08",
       "section": "D15",
       "lens": "byte equality against git objects: which object, and does a scope breach fail rather than pass silently",
-      "attack": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": null,
-      "main_note": null
+      "attack": "Section 9.1 permits a six-module blob pin that omits the examples tree, so an example scope breach can pass that pin silently.",
+      "evidence": "After appending a worktree-only mutant to examples/hospital_ocr/README.md, git diff --quiet 36f7890 over the six modules returned 0 while the examples path returned 1; baseline and HEAD examples tree object was 9c734c5aec547259711d58f2a511304ab87a3dcf.",
+      "severity": "blocking",
+      "disposition": "ACCEPTED",
+      "main_note": "Lands against the PIN, not against the practice. Section 9.1's six-module blob omits the examples tree, so an example-scope breach passes it silently. The teammate's own run already exceeded the pin \u2014 18 protected paths verified, 6 runtime modules and 12 example files \u2014 which is exactly the gap: the practice is right and the written scope is short. Section 10 widens D15's scope pin to the examples tree, and gate 2 asserts against the named git object rather than against a second copy of the bytes. Y08 is the same defect reached from `errors.py`."
     },
     {
       "id": "A09",
       "section": "D17",
       "lens": "BASELINE_LEAVES retained while the expectation moves: what does the frozenset now prove",
-      "attack": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": null,
-      "main_note": null
+      "attack": "D17 requires an all-check closure credential of 16 although the executable probe grades 19 checks.",
+      "evidence": "uv run python post-removal probe: BASELINE_LEAVES=28, live=28, lost=['handle', 'request'], added=['proposal submit', 'resolve'], relation_exact=True; EXPECTED pins plus derived-set and abbreviation checks total 19, while D17 states 16.",
+      "severity": "blocking",
+      "disposition": "ACCEPTED",
+      "main_note": "Lands. D17 demands an all-check closure credential of 16; the executable probe grades 19, and the roadmap already recorded 19. MAIN's rerun: rc 0 over 19 CHECK lines, with exactly five re-based and no others. Verdict row V19 rules the same defect. The contract's number is simply wrong."
     },
     {
       "id": "A10",
       "section": "D18",
       "lens": "the fixture re-base: does proposal submit produce the state the 103 shielded assertions require",
-      "attack": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": null,
-      "main_note": null
+      "attack": "Rebasing only the three named helpers leaves one failure at payload, so the claimed 103 helper-shielded assertions are misclassified.",
+      "evidence": "Applied all seven source deletions, replaced confirm, handle_once, and confirm_text with proposal submit plus review, then ran the full gate: tests_ran=901, broken=17, distinct_frames=17, payload_frame_failures=1, process rc=1.",
+      "severity": "blocking",
+      "disposition": "ACCEPTED",
+      "main_note": "Lands, and MAIN's measurement corrects the number. `test_cli` showed 105 failures. Re-basing the three helpers cleared 102 of them together; 3 needed re-basing IN PLACE, each keeping its property on a surviving leaf. D18's '103 shielded assertions' is off by one and hides the 3-test residue. The correct triple is 105 / 102 / 3."
     },
     {
       "id": "A11",
       "section": "D19",
       "lens": "an inverted pin: what stops the inversion from asserting a tautology after the symbol is gone",
-      "attack": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": null,
-      "main_note": null
+      "attack": "Negative symbol inversions accept an inline replacement class and renamed helper while the original candidate-source route remains live.",
+      "evidence": "The inline AST mutant satisfied all inverted symbol predicates: no_source_import=True, no__source=True, no_CommandCandidateSource=True; inline_helper=True and route_remains=True.",
+      "severity": "blocking",
+      "disposition": "ACCEPTED",
+      "main_note": "Lands, same class as A04 on the test side. A negative symbol inversion accepts an inline replacement class and a renamed helper. The `hasattr(cement_cli, '_source')` absence assertions MAIN landed are strictly stronger than the zero call counts they replace, but absence of one name is still not absence of the route. Gate 2 pairs them with the runtime assertion named in A04."
     },
     {
       "id": "A12",
       "section": "D20",
       "lens": "a docstring corrected but ungraded: what fails the next time it goes stale",
-      "attack": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": null,
-      "main_note": null
+      "attack": "B02 never grades its migration narrative, so changing that docstring to false census values leaves its test green.",
+      "evidence": "Replaced only B02 docstring text 28 to 30 leaves / 35 to 37 nodes with 999 to 1000 / 1001 to 1002, then ran uv run python -m unittest -q -k b02 tests.test_submission_battery: Ran 1 test, OK, rc=0.",
+      "severity": "blocking",
+      "disposition": "ACCEPTED",
+      "main_note": "Lands, and it is the recursive form of this unit's own thesis. B02 never GRADES its migration narrative: the docstring can carry any census numbers and the test stays green, which is precisely why D20 exists \u2014 and D20's own fix inherits the defect. Gate 2 must derive B02's census numbers from `_parser()` and assert the docstring contains them, so the narrative becomes self-grading instead of merely correct today."
     },
     {
       "id": "A13",
       "section": "D22",
       "lens": "the prose split by route: is any locus mis-assigned, and is the mixed row's re-scoping complete",
-      "attack": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": null,
-      "main_note": null
+      "attack": "D22 omits two CLI-route sentences in the proposal-submit section, allowing shipped prose to keep naming the removed handle route.",
+      "evidence": "README.md contains both 'Use it instead of `handle` when you generate the candidate yourself' and 'same `proposal review` command that the `handle` route uses'; a Python corpus probe found each phrase present in README and absent from D22's table.",
+      "severity": "blocking",
+      "disposition": "ACCEPTED",
+      "main_note": "Lands, and MAIN found and fixed exactly the two sentences at d54ddde: 'Use it instead of `handle` when you generate the candidate yourself' and 'Review a submitted proposal with the same `proposal review` command that the `handle` route uses'. Both sit in the proposal-submit section and both are absent from D22's locus table. The table is a FLOOR, and section 10 says so."
     },
     {
       "id": "A14",
       "section": "D23",
       "lens": "mechanical extraction of cement invocations from prose: which invocation shapes does the extractor miss",
-      "attack": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": null,
-      "main_note": null
+      "attack": "An underspecified line or token extractor can omit valid command shapes, so its green result need not cover every shipped invocation.",
+      "evidence": "Python fenced-shell inventory found 18 logical cement commands: 10 multiline, 5 with quotes spanning lines, 1 with shell redirection, 17 with a global option immediately after cement, and only 1 with an immediate root command.",
+      "severity": "blocking",
+      "disposition": "SCOPED",
+      "main_note": "Lands against an underspecified extractor and is answered by gate 5's construction rather than by its green result. Two controls exist for exactly this: an invocation floor of 18, which trips on a silent extractor regression, and a mutation test \u2014 injecting `cement ... handle support.reply --request-id t` into a README block turns the gate red at `README.md:102` with the argparse invalid-choice message and lifts the count to 19, and restoring turns it green. A green run alone would indeed prove nothing; the mutation is the credential."
     },
     {
       "id": "A15",
       "section": "D26",
       "lens": "root help positive claim: what makes the test pass while a reader still cannot learn what exists",
-      "attack": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": null,
-      "main_note": null
+      "attack": "Keyword presence can satisfy D26 while root help still omits every verb that tells a reader how to capture a proposal.",
+      "evidence": "After stage-2 deletion, normalized root help had deterministic=True, proposal=True, supervised=True, request=False, handle=False, making naive_positive=True; submit=False and capture=False made explicit_capture=False.",
+      "severity": "blocking",
+      "disposition": "ACCEPTED",
+      "main_note": "Lands. Keyword presence satisfies a naive D26 while root help omits every verb that tells a reader how to capture a proposal \u2014 which is exactly the state MAIN found: the `proposal` group help read 'inspect/review supervised proposals', naming no capture. Fixed at d54ddde with `submit/` added and the root description rewritten from 'Supervised LLM fallback' to 'Supervised proposal capture'. Gate 2 asserts a capture VERB, not the noun."
     },
     {
       "id": "A16",
       "section": "D27",
       "lens": "do the replacements really carry every property the three superseded M3.5a obligations held",
-      "attack": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": null,
-      "main_note": null
+      "attack": "The three-row supersession omits M3.5a D26 even though that obligation requires the import which M3.5b explicitly removes and inverts.",
+      "evidence": "Python contract probe returned supersession_rows=['D24', 'D25', 'D27'], count=3; old_D26_requires_import=True; new_D19_inverts_x26=True.",
+      "severity": "blocking",
+      "disposition": "ACCEPTED",
+      "main_note": "Lands. D27's supersession table has three rows \u2014 M3.5a D24, D25 and D27 \u2014 and omits M3.5a D26, whose source-import clause M3.5b inverts. MAIN's frame re-base already inverted it in the battery (`d26`'s source-import and `handle` clauses), so the code is right and the record is short by one row. Section 10 adds the fourth row."
     },
     {
       "id": "A17",
       "section": "D29",
       "lens": "must fail when one obligation remains undone: name an obligation whose undoing the battery cannot see",
-      "attack": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": null,
-      "main_note": null
+      "attack": "D04 can remain procedurally undone through a direct edit that yields identical bytes, which no diff-blind final-state battery can distinguish.",
+      "evidence": "Python two-tree probe produced identical automated and direct-edit cli.py SHA-256 ff39e4b07731a25ba69deb76ed2c0fbaf266cea404a6b3cf088aa3af0159a35f; byte_equal=True.",
+      "severity": "blocking",
+      "disposition": "ACCEPTED",
+      "main_note": "Lands as a STATED LIMIT rather than a repairable defect. A direct edit producing identical bytes is indistinguishable from the staged apply in any final-state battery; no diff-blind test can separate them, and inventing one would only move the unverifiable step. The procedural credential lives outside the battery: the commit record plus a rerun of `apply_stage(pathlib.Path('.'), 2)` over the committed EDITS, which aborts on a moved anchor. Section 11 records the limit instead of claiming coverage the battery does not have."
     },
     {
       "id": "A18",
       "section": "D03",
       "lens": "the work list is stated as eleven frames, tabled as eighteen rows and measured as seventeen",
-      "attack": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": null,
-      "main_note": null
+      "attack": "The contract gives three incompatible code-frame cardinalities and also omits a prose-coupled rebase, so neither scope nor completion count is determinate.",
+      "evidence": "Python contract/report probe measured D18 prose_frames=11, D18 table_rows=18, committed stage-2 distinct_frames=17, and stage-2 broken=119. MAIN then found test_cli_channels_battery.py test_d23_ as a distinct prose-coupled rebase outside that code-coupled census.",
+      "severity": "blocking",
+      "disposition": "ACCEPTED",
+      "main_note": "Lands twice over, and both halves are MAIN's own defects. D03/D18 carry three incompatible cardinalities for one work list: prose 11, table 18 rows, measurement 17. The surplus table row `test_cli_channels_battery.py:139 _leaf_parser` is not a distinct frame. MAIN then found an eighteenth, PROSE-coupled frame the code census could not see \u2014 `test_cli_channels_battery.py` `test_d23_...`, which broke on the D22 prose edit alone. So the census undercounts in two independent ways: a wrong literal and a category it never scanned."
     },
     {
       "id": "A19",
       "section": "S1",
       "lens": "the not-owned table: name an edit this unit must make that touches a not-owned surface",
-      "attack": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": null,
-      "main_note": null
+      "attack": "no defensible alternative: every required implementation path is owned, while the entire explicit not-owned intersection is empty.",
+      "evidence": "Python path derivation found required_paths=['.agent/decisions/m3u5a-s2-probe.py', 'README.md', 'docs/architecture.md', 'docs/threat-model.md', 'src/cement_runtime/cli.py', 'tests/']; required_not_owned=[]; all seven EDITS target cli.py.",
+      "severity": "cleared",
+      "disposition": "CLEARED",
+      "main_note": "CLEARED. The reviewer found no defensible alternative reading and MAIN concurs: the obligation admits one reading against the shipped parser, and the probe that would separate a second reading returns the same result either way."
     },
     {
       "id": "A20",
       "section": "D04",
       "lens": "the anchored EDITS table re-run at implementation time: what happens when an anchor has moved",
-      "attack": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": null,
-      "main_note": null
+      "attack": "no defensible alternative: a moved first anchor aborts with ANCHOR-MISS before changing the temporary file.",
+      "evidence": "Python temporary-tree probe moved the first anchor: result='ANCHOR-MISS stage 1 src/cement_runtime/cli.py: expected 1 occurrence(s), found 0'; file_unchanged=True.",
+      "severity": "cleared",
+      "disposition": "CLEARED",
+      "main_note": "CLEARED. The reviewer found no defensible alternative reading and MAIN concurs: the obligation admits one reading against the shipped parser, and the probe that would separate a second reading returns the same result either way."
     },
     {
       "id": "A21",
       "section": "D25",
       "lens": "register conformance on rewritten prose: which tool grades it and is the claim re-derivable from a clone",
-      "attack": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": null,
-      "main_note": null
+      "attack": "D25 states prose-register properties but no acceptance gate names a sentence parser, register checker, or reproducible grading command.",
+      "evidence": "Python gate-section probe returned gate_mentions_D25=False, gate_mentions_register=False, gate_mentions_sentence=False, gate_mentions_ASD=False; the only named uv command was Gate 1's unittest discovery.",
+      "severity": "blocking",
+      "disposition": "DEFERRED",
+      "main_note": "Lands. D25 states register properties with no acceptance gate naming a sentence parser, a register checker or a reproducible grading command, so MAIN's conformance pass is by hand and cannot rerun from a clean checkout. Owner is the polish register's existing 'port the human-facing register audit to committed state' row, which already carries the acceptance check and now has a third consumer. Verdict row X31 is the same finding; no fourth duplicate row is opened."
     },
     {
       "id": "A22",
       "section": "S8",
       "lens": "gate 3 over every touched predicate: what IS the predicate set when the change is a deletion",
-      "attack": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": null,
-      "main_note": null
+      "attack": "Reading touched predicates from the final source yields an empty survivor set, so Gate 3 can pass vacuously without reinsertion mutants.",
+      "evidence": "AST comparison before and after all seven deletions counted predicates_before=79, predicates_after=74, deleted=5, added=0, final_touched_survivors=0; deleted tests include two handle branches and one request branch.",
+      "severity": "blocking",
+      "disposition": "ACCEPTED",
+      "main_note": "Lands, and it is the most consequential finding for S3. Gate 3 as written mutates TOUCHED PREDICATES read from the final tree. The seven EDITS delete five predicates and add none, so that set is EMPTY and gate 3 passes vacuously. Section 11 redefines gate 3's catalogue as REINSERTION mutants: re-add the removed leaf, each removed flag, the `.source` import, each dispatch branch and the `candidate_source=` construction, and require a NAMED red per mutant. That is the only mutation that can bind a removal."
     },
     {
       "id": "A23",
       "section": "S9",
       "lens": "project CLAUDE.md conformance on every durable file this unit touches, code and prose alike",
-      "attack": "unknown",
-      "evidence": "unknown",
-      "severity": "unknown",
-      "disposition": null,
-      "main_note": null
+      "attack": "The contract grades project register only for rewritten human prose while mandating provenance narration in a durable test docstring.",
+      "evidence": "Python rules/contract probe returned D25_human_only=True, D20_requires_history=True, contract_provenance_phrase=True for 'seven consecutive units', and rules_omit_provenance=True.",
+      "severity": "blocking",
+      "disposition": "SCOPED",
+      "main_note": "Lands only across a register boundary the contract failed to name. The project rule splits surfaces: human-facing prose a person reads at consumption time takes the ASD-STE100 register; machine-consumed and agent-consumed surfaces take the dense, symbol-forward project register. A test docstring is the second kind, so mandating narration there does not conflict with D25's caps on README and docs prose. Section 11 names both registers and their surfaces so the apparent contradiction cannot recur."
+    },
+    {
+      "id": "Y01",
+      "section": "D14",
+      "lens": "the digest obligation points at the clause that does not define or re-base that digest",
+      "attack": "D14 cites D16 as the parser-shape carrier even though D16 specifies exit classes and payload keys, leaving the actual gate reference wrong.",
+      "evidence": "Python cross-reference probe returned D14_cites_D16=True, D16_defines_parser_shape=False, D17_defines_parser_shape=True.",
+      "severity": "material",
+      "disposition": "ACCEPTED",
+      "main_note": "Lands. D14 cites D16 as the parser-shape carrier, but D16 specifies exit classes and payload key sets; D17 is what defines the digest re-base. A wrong cross-reference in a binding section sends the battery to the wrong obligation. Section 10 corrects it."
+    },
+    {
+      "id": "Y02",
+      "section": "D09",
+      "lens": "AST keyword and equality pins do not force semantic absence of source construction or dispatch",
+      "attack": "A kwargs dictionary can configure candidate_source while leaving no named keyword node and no removed-command equality for a literal AST pin to find.",
+      "evidence": "After stage-2 deletion, a Python AST mutant replaced System(args.db) with kwargs={\"candidate_source\": object()}; System(args.db, **kwargs): no_removed_eq=True, no_named_candidate_keyword=True, semantic_candidate_source=True, ast_parse=ok.",
+      "severity": "blocking",
+      "disposition": "ACCEPTED",
+      "main_note": "Lands. A kwargs dictionary configures `candidate_source` while leaving no named keyword node for a literal AST pin to find. This is A04's hole reached from the construction side, and it has the same answer: gate 2 asserts at RUNTIME that the constructed system's candidate source is None on every reachable CLI path, which no static shape can be made to guarantee."
+    },
+    {
+      "id": "Y03",
+      "section": "D16",
+      "lens": "the referenced predecessor contract must actually define every preserved exit class and payload key set",
+      "attack": "D16 claims five leaves preserve contracts from M3.5a, but that contract supplies no named baseline at all for proposal show or proposal list.",
+      "evidence": "Python source-corpus probe counted M3.5a contract mentions: 'proposal submit'=10, 'resolve'=39, 'proposal review'=1, 'proposal show'=0, 'proposal list'=0; key-set and exit-class phrases cannot anchor the two absent leaves.",
+      "severity": "blocking",
+      "disposition": "ACCEPTED",
+      "main_note": "Lands, and verdict row V18 rules it. M3.5a's contract supplies no named baseline for `proposal show` or `proposal list`, so D16's literal reading leaves three of its five leaves with no oracle at all. Reading B makes the M3.5a SHIPPED git object the preservation oracle, which resolves all five to mismatches=0."
+    },
+    {
+      "id": "Y04",
+      "section": "D24",
+      "lens": "caller-supplied placeholders need an explicit exemption from the same-block producer invariant",
+      "attack": "The literal D24 universal already fails on candidate.json, which a one-command shipped block consumes without any earlier producing command.",
+      "evidence": "Python fence probe found candidate_block_commands=1, producer_before=False; the sole command is 'uv run cement --db demo.db --partition acme proposal submit support.reply --submission - < candidate.json'.",
+      "severity": "blocking",
+      "disposition": "SCOPED",
+      "main_note": "Does not land against D24's real domain. `candidate.json` is a CALLER-SUPPLIED input file, not a value an earlier cement command produces. D24's placeholder grammar is `*_FROM_*` and `*_REPLACE_ME` \u2014 tokens whose producer is a preceding command \u2014 and X30's extractor already encodes exactly that. Section 10 states the domain so a future battery does not red on every shipped `< file` redirection."
+    },
+    {
+      "id": "Y05",
+      "section": "S9",
+      "lens": "the 56 vocabulary-hit sizing claim needs its exact corpus and matcher to be re-derivable",
+      "attack": "The contract names no vocabulary matcher, and reasonable route vocabularies over the stated corpus produce incompatible counts rather than 56.",
+      "evidence": "Python corpus probe confirmed 5 files and 1,080 lines; leaves-and-flags matched 53 lines, route-terms matched 60, and broad-source matched 68.",
+      "severity": "material",
+      "disposition": "ACCEPTED",
+      "main_note": "Lands. Section 9's 56-hit figure names no vocabulary matcher, and three reasonable route vocabularies over the stated corpus give 53, 60 and 68. An unreproducible count in a binding section is worse than no count, because it reads as measured. Section 11 drops the figure and states the matcher-dependence instead of inventing a matcher after the fact."
+    },
+    {
+      "id": "Y06",
+      "section": "D28",
+      "lens": "the rejected cli.py pin relies on future units that must actually schedule another edit to that file",
+      "attack": "D28 says M3.6a and M3.7 are scheduled to edit cli.py, but neither roadmap unit names that file and post-removal cli.py has no lifecycle/source residue for them.",
+      "evidence": "Python roadmap/post-removal probe returned m36_names_cli=False, m37_names_cli=False; candidate_source, request_status, CommandCandidateSource, _source, handle dispatch, and request dispatch each had 0 post-removal hits.",
+      "severity": "material",
+      "disposition": "ACCEPTED",
+      "main_note": "Lands, and MAIN verified it independently against the roadmap. M3.6a deletes public lifecycle methods, leases, result models and exports; M3.7 relocates the command runtime to an optional example surface. NEITHER names `cli.py`, and post-removal `cli.py` holds no lifecycle or source residue for either to reach. D28's stated ground was false. The CONCLUSION survives on a different ground \u2014 `cli.py` took two commits each from M3.5a and M3.5b, and M3.6b's refusal fixtures and M3.9a's documentation rewrite both plausibly land there \u2014 and B02's docstring now says that instead."
+    },
+    {
+      "id": "Y07",
+      "section": "D14",
+      "lens": "surviving root-help ordering is operator-visible parser shape that the sorted digest discards",
+      "attack": "Reordering the surviving root command listing changes operator help while parser_shape remains identical and D13 set equality remains true.",
+      "evidence": "Python post-removal mutation reversed root _choices_actions: parser_shape stayed {'actions': 151, 'digest': 'ebd2ac811bd9776d'}, digest_changed=False; help_changed=True, help SHA moved 119addfd7e300cf5 to 9f37b4636965a598.",
+      "severity": "material",
+      "disposition": "ACCEPTED",
+      "main_note": "Lands, and it sharpens A07. Reordering the surviving root command listing changes operator help while `parser_shape` stays identical and D13's set equality stays true. The help SHA moved and the digest did not. Same polish row."
+    },
+    {
+      "id": "Y08",
+      "section": "D15",
+      "lens": "the owned declaration makes every other runtime file out of scope even when D15 omits it from the frozen set",
+      "attack": "A change to errors.py is outside the sole owned runtime file but passes D15 because six other runtime modules are absent from its scope pin.",
+      "evidence": "Python/git probe found 13 top-level runtime files, 6 D15-frozen and 1 owned; unpinned=['__init__.py', '__main__.py', 'artifacts.py', 'errors.py', 'function.py', 'json_value.py']. After an errors.py mutant, d15_scope_rc=0 and errors_scope_rc=1.",
+      "severity": "blocking",
+      "disposition": "ACCEPTED",
+      "main_note": "Lands, and it is A08 reached from a second direction. A change to `errors.py` sits outside the sole owned runtime file yet passes D15, because six other runtime modules are absent from its scope pin. Section 10 widens the pin."
+    },
+    {
+      "id": "Y09",
+      "section": "S8",
+      "lens": "every durable gate credential must bind to the committed checkpoint rather than a dirty worktree",
+      "attack": "Only D29 binds Gate 2 to a committed checkpoint; Gates 1, 3, and 4 can support closure from uncommitted or mismatched bytes.",
+      "evidence": "Regex extraction of each Gate 1-4 bullet returned committed_named=False and checkpoint_named=False four times; the separate D29 sentence names only Gate 2's battery.",
+      "severity": "blocking",
+      "disposition": "ACCEPTED",
+      "main_note": "Lands, and MAIN is the proof: gate 1 was run from the working tree repeatedly this session before the frame re-bases were committed. Only D29 binds gate 2 to a committed checkpoint, so gates 1, 3 and 4 can support closure from uncommitted or mismatched bytes. The project rule already requires a gate backing a durable claim to rerun from committed state; the contract failed to bind it. Section 11 makes the closure credential require every gate rerun from the committed tip, with the tip SHA recorded beside each result."
+    },
+    {
+      "id": "Y10",
+      "section": "D01",
+      "lens": "positive library retention must survive the CLI deletion with signatures and implementation bytes intact",
+      "attack": "no defensible alternative: the frozen system.py bytes retain both public methods and their complete signatures after CLI deletion.",
+      "evidence": "Post-removal probe found system.py byte-equal to git object 36f7890 (SHA-256 prefix 04a9256605a23710); System.handle and System.request_status remained callable with their full pre-removal signatures.",
+      "severity": "cleared",
+      "disposition": "CLEARED",
+      "main_note": "CLEARED. The reviewer found no defensible alternative reading and MAIN concurs: the obligation admits one reading against the shipped parser, and the probe that would separate a second reading returns the same result either way."
+    },
+    {
+      "id": "Y11",
+      "section": "D07",
+      "lens": "both removed leaves must traverse the real main error channel rather than only disappear from parser introspection",
+      "attack": "no defensible alternative: both removed leaf invocations traverse real main, return status 2, and emit only invalid-choice stderr.",
+      "evidence": "After all seven deletions, direct cli.main probes for handle and request each returned status 2, emitted empty stdout, and produced stderr messages containing invalid choice.",
+      "severity": "cleared",
+      "disposition": "CLEARED",
+      "main_note": "CLEARED. The reviewer found no defensible alternative reading and MAIN concurs: the obligation admits one reading against the shipped parser, and the probe that would separate a second reading returns the same result either way."
+    },
+    {
+      "id": "Y12",
+      "section": "D12",
+      "lens": "the complete surviving nested-leaf set needs an independent historical anchor and exact two-way equality",
+      "attack": "no defensible alternative: the independently anchored 28-member post-removal leaf set has no missing or extra member.",
+      "evidence": "Post-removal parser walk measured 28 leaves and 35 nodes; equality against BASELINE_LEAVES minus handle/request plus proposal submit/resolve was exact, with missing=[] and extra=[].",
+      "severity": "cleared",
+      "disposition": "CLEARED",
+      "main_note": "CLEARED. The reviewer found no defensible alternative reading and MAIN concurs: the obligation admits one reading against the shipped parser, and the probe that would separate a second reading returns the same result either way."
+    },
+    {
+      "id": "Y13",
+      "section": "D13",
+      "lens": "root command preservation requires exact set equality rather than count or removed-name absence",
+      "attack": "no defensible alternative: the post-removal root set equals all twelve named D13 commands with no exchange.",
+      "evidence": "Post-removal root-subparser probe measured root_count=12 and exact_root_set=True against the twelve D13 names, with missing=[] and extra=[].",
+      "severity": "cleared",
+      "disposition": "CLEARED",
+      "main_note": "CLEARED. The reviewer found no defensible alternative reading and MAIN concurs: the obligation admits one reading against the shipped parser, and the probe that would separate a second reading returns the same result either way."
+    },
+    {
+      "id": "Y14",
+      "section": "D21",
+      "lens": "the battery oracle must recompute parser shape locally rather than call the graded probe implementation",
+      "attack": "no defensible alternative: the battery computes parser shape in a local nested oracle and only reads the separate expected literal.",
+      "evidence": "AST extraction found a battery-local nested parser_shape function and no call to probe_parser_shape; it independently returned (151, 'ebd2ac811bd9776d'), equal to Gate 4. The battery reads only the EXPECTED literal from the probe file.",
+      "severity": "cleared",
+      "disposition": "CLEARED",
+      "main_note": "CLEARED. The reviewer found no defensible alternative reading and MAIN concurs: the obligation admits one reading against the shipped parser, and the probe that would separate a second reading returns the same result either way."
+    },
+    {
+      "id": "Y15",
+      "section": "S2",
+      "lens": "every parser census and digest must be re-derived under the same parser_shape algorithm",
+      "attack": "no defensible alternative: all three action counts and digests reproduce under one algorithm and match their recorded values.",
+      "evidence": "Fresh probes returned HEAD census 30/37 and shape 163/8b58b465c08aa693; post-removal 28/35 and 151/ebd2ac811bd9776d; archived c8b82cd under the current algorithm 154/af19339c3995c97d.",
+      "severity": "cleared",
+      "disposition": "CLEARED",
+      "main_note": "CLEARED. The reviewer found no defensible alternative reading and MAIN concurs: the obligation admits one reading against the shipped parser, and the probe that would separate a second reading returns the same result either way."
+    },
+    {
+      "id": "Y16",
+      "section": "S1, S11",
+      "lens": "the claimed obligation and section cardinalities must match the binding document structure exactly",
+      "attack": "no defensible alternative: the binding document defines exactly 29 gapless obligations and eleven sequential sections.",
+      "evidence": "Regex structure probe found obligation_count=29 with definitions exactly D01 through D29 in order and gapless=True; it found 11 numbered section headings, exactly 1 through 11.",
+      "severity": "cleared",
+      "disposition": "CLEARED",
+      "main_note": "CLEARED. The reviewer found no defensible alternative reading and MAIN concurs: the obligation admits one reading against the shipped parser, and the probe that would separate a second reading returns the same result either way."
+    },
+    {
+      "id": "Y17",
+      "section": "S8",
+      "lens": "the untouched pre-implementation worktree must still establish the recorded clean Gate 1 baseline",
+      "attack": "no defensible alternative: the clean attack branch reran all 901 baseline tests at exit 0 with no leaked source mutation.",
+      "evidence": "Ran uv run python -m unittest discover -s tests -t . from the clean attack branch: Ran 901 tests in 179.018s; OK; process exit 0.",
+      "severity": "cleared",
+      "disposition": "CLEARED",
+      "main_note": "CLEARED. The reviewer found no defensible alternative reading and MAIN concurs: the obligation admits one reading against the shipped parser, and the probe that would separate a second reading returns the same result either way."
+    },
+    {
+      "id": "Y18",
+      "section": "D22",
+      "lens": "the return-state table route classification must preserve live library API documentation while rewriting CLI-shaped caller actions",
+      "attack": "D22 dispositions the handle/request return-state table as remove even though the table documents live System.handle and System.request_status behavior.",
+      "evidence": "MAIN overruled removal and retained the table, re-scoping Poll request REQUEST_ID to System.request_status and retry handle with --retry-failed to System.handle(..., retry_failed=True).",
+      "severity": "blocking",
+      "disposition": "ACCEPTED",
+      "main_note": "Lands, and MAIN had already OVERRULED the disposition on the same grounds before reading this row; verdict row X27 is the third independent arrival. D22 dispositions README's `handle`/`request` return-state table `remove; no command reaches these states`. No COMMAND reaches them, but `System.handle` and `System.request_status` both survive and both return every listed status, so the table is live library-API documentation and removing it does what D22's own header forbids. Kept with six status rows intact and the CLI-shaped caller actions re-scoped at d54ddde."
     }
   ]
 }

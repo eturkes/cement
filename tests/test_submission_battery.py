@@ -197,9 +197,11 @@ class SubmissionBatteryTests(unittest.TestCase):
         gap is the point: the earlier wording claimed the digest closed it.
 
         Re-pinning `cli.py` to a fresh baseline stays rejected (M3.5b D28). The
-        roadmap schedules M3.6a and M3.7 to edit the same file again, so a
-        per-unit re-pin passes at the moment it is written and reports its next
-        scheduled break as a defect.
+        grounds are the file's rate of change, not a named future edit: no
+        remaining M3 unit schedules `cli.py` by name, yet M3.5a and M3.5b took
+        two commits each against it, and M3.6b's refusal fixtures and M3.9a's
+        documentation rewrite both plausibly land here. A per-unit re-pin passes
+        at the moment it is written and reports its next break as a defect.
         """
         paths = (
             "src/cement_runtime/_command_supervisor.py",
