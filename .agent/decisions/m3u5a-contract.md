@@ -303,11 +303,16 @@ green when a behaviour and its pin vanish together).
    D27 lands, so S3 opens by dispositioning it rather than by reading 810/1 as a regression.
 2. A diff-blind obligation battery, one test per obligation D01-D30, in
    `tests/test_cli_channels_battery.py`, graded by `m3u5a-battery-validate.py`
-   (`--emit-stub` = the seed's single source of truth). `UNFILLED-TESTS 0` and
-   `OBLIGATIONS-UNCOVERED 0` are both required, and so are `ASSERTIONLESS 0` and `SKIPPED 0`:
-   a covered-but-empty body and a `skipTest` body both satisfy a coverage count while asserting
-   nothing, which is the cheapest way to turn this gate vacuous. The phase-2 suite validator
-   `m3u5a-suite-validate.py` already carries the `ASSERTIONLESS` half and is the pattern to copy.
+   (`--emit-stub` = the seed's single source of truth, parsing this contract's own obligation and
+   amendment bullets). SIX control lines must all read zero: `UNFILLED-TESTS`,
+   `OBLIGATIONS-UNCOVERED`, `ORPHAN-TESTS`, `ASSERTIONLESS`, `SKIPPED`, `AMENDMENT-UNCITED`.
+   A covered-but-empty body and a `skipTest` body both satisfy a coverage count while asserting
+   nothing, which is the cheapest way to turn this gate vacuous; `@unittest.skip` is the same move
+   one level up, and the validator unparses `decorator_list` to see it, because
+   `ast.get_source_segment` starts at `def`. `AMENDMENT-UNCITED` fails any docstring that dropped
+   its `AMENDED-BY A<k>` block: nine obligations — `D01 D05 D06 D09 D13 D14 D18 D27 D28` — are
+   superseded by A1-A8, so encoding their literal bullet text goes red against correct code.
+   Verified at seed by grading both ways plus six controls, all firing.
 3. A mutation sweep over every predicate the two leaves add — the payload projections, the status
    selectors, the envelope validators, the ledger precheck — reporting **its verdict module list on
    the control line**, with the acceptance predicate written as the NAMED SURVIVOR SET rather than

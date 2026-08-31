@@ -759,11 +759,31 @@ Measured gaps driving the arc:
     verdict module list printed, its acceptance predicate written as a NAMED SURVIVOR SET, and its
     UNMUTATED control run reported GREEN on the same control line. The 33 `material` attack rows are
     battery-design constraints and are the battery's specification, not S3 defects.
-    The battery is diff-blind, so its worktree branches from `c8b82cd` - the last commit before
-    `e6ba873` - and MAIN alone runs it against the implementation. Seed `m3u5a-battery-validate.py`
-    and the stub it grades BEFORE dispatch, grade the seed both ways, and brief the report as
-    inline final-message content. `tests/test_cli_channels.py` is already green in the primary tree
-    and is NOT the battery: it encodes the 60 verdict rows, while the battery encodes D01-D30.
+    `m3u5a-battery-validate.py` is BUILT and graded both ways, so S4 opens on dispatch, not on
+    tooling. It parses the contract itself - 30 `- **DNN**` bullets from sections 5-10, 8
+    `- **A<k> (D..)**` amendments from sections 13-14 - so the seed cannot drift from the spec.
+    Derived binding map: A1(D01,D14) A2(D05) A3(D06) A4(D09) A5(D18) A6(D28) A7(D13) A8(D27).
+    Control lines: `UNFILLED-TESTS`, `OBLIGATIONS-UNCOVERED`, `ORPHAN-TESTS`, `ASSERTIONLESS`,
+    `SKIPPED`, `AMENDMENT-UNCITED`; all zero for PASS. `AMENDMENT-UNCITED` fails a docstring that
+    dropped its `AMENDED-BY A<k>` block, which is what keeps an amended obligation from being
+    encoded in its superseded form. Graded both ways plus six controls, ALL FIRING: pass-bodies
+    -> ASSERTIONLESS 30, `self.skipTest` -> SKIPPED 1, `@unittest.skip` -> SKIPPED 1, extra test
+    -> ORPHAN 1, deleted test -> UNCOVERED 1, dropped `AMENDED-BY` -> UNCITED 1.
+    The decorator control caught a real hole at seed: `ast.get_source_segment` starts at `def`, so
+    `node.decorator_list` must be unparsed and prepended or a `@unittest.skip` reads as an
+    ordinary filled body. Write the decorator control into every future AST-based gate.
+    DISPATCH RECIPE, and the trap it avoids: the battery is diff-blind, so its worktree branches
+    from `c8b82cd`, the last commit before `e6ba873`. Running the validator in a PLAIN `c8b82cd`
+    tree ABORTS with `contract holds no amendments; A1-A8 are binding`, because sections 13 and 14
+    landed later at `9372664` and `7ad8c53` - that tree has all 30 obligation bullets and zero
+    amendment bullets. The abort is load-bearing: emitting there would seed nine obligations in
+    their SUPERSEDED form. So build the branch at `c8b82cd`, commit the CURRENT `.agent/decisions/`
+    onto it, emit the stub there, commit it, and only then dispatch. `src/`, README and docs stay at
+    `c8b82cd`; the contract the teammate is entitled to read stays current. MAIN alone runs the
+    battery against the implementation.
+    Brief the report as inline final-message content. `tests/test_cli_channels.py` is already green
+    in the primary tree and is NOT the battery: it encodes the 60 verdict rows, D01-D30 is a
+    different axis, and the battery must be authored without reading it.
   - M3.5b tier=kernel tags=- depends=M3.5a - remove `handle`/`request`/source grammar, imports, fixtures,
     help and operator prose.
   - M3.6a tier=kernel tags=- depends=M3.5b - delete public lifecycle methods, leases, result models and
