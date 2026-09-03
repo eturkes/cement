@@ -733,6 +733,21 @@ class RemovalObligationBatteryTests(unittest.TestCase):
                 apply_stage(tree, 2)
             self.assertIn("ANCHOR-MISS", str(raised.exception))
 
+            # "Aborts loudly" runs in BOTH directions. A moved anchor is the case above; a
+            # DUPLICATED one must abort just as loudly, because the script would otherwise
+            # patch whichever occurrence came first and pick its edit site by accident.
+            duplicated = tree / "duplicate"
+            duplicate_path = duplicated / "src/cement_runtime/cli.py"
+            duplicate_path.parent.mkdir(parents=True)
+            text = baseline.decode()
+            self.assertEqual(text.count(edits[0][2]), 1)
+            duplicate_path.write_text(text + text, encoding="utf-8")
+            with self.assertRaises(SystemExit) as duplicate_error:
+                apply_stage(duplicated, 2)
+            message = str(duplicate_error.exception)
+            self.assertIn("ANCHOR-MISS", message)
+            self.assertIn("found 2", message)
+
     def test_d05_subcommand_names_are_exact_match_at_both_levels_a_remo(self) -> None:
         """D05 obligation
 
@@ -3057,19 +3072,71 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         self.assertNotRegex(register.lower(), r"\b(?:simply|robust|seamlessly|leverage)\b")
         sentence_violations: list[tuple[int, str]] = []
         instruction_violations: list[tuple[int, str]] = []
+        # The 20-word instruction bound applies only where the opener is recognised as a verb,
+        # so an OPEN list silently relaxes every unlisted instruction to the 25-word
+        # description bound. Both lists below are a census of the openers the changed prose
+        # actually uses, and an unclassified opener is a FAILURE, not a default to the looser
+        # bound. Adding prose therefore forces the classification rather than skipping it.
         imperatives = {
             "call",
             "capture",
+            "generate",
             "inspect",
             "list",
             "pass",
             "poll",
+            "re-run",
+            "reconcile",
             "repeat",
             "review",
             "run",
             "submit",
             "use",
         }
+        descriptive = {
+            "a",
+            "caller",
+            "candidate",
+            "cement",
+            "compilation",
+            "confirmed",
+            "conflicts",
+            "counterexamples",
+            "current",
+            "every",
+            "fallbackfailed",
+            "for",
+            "if",
+            "inprogress",
+            "it",
+            "its",
+            "linux",
+            "llm",
+            "meaning",
+            "no",
+            "only",
+            "operation",
+            "promotion",
+            "reconciliationrequired",
+            "rejected",
+            "request",
+            "resolved",
+            "reviewrequired",
+            "schema",
+            # Always a noun phrase in this prose -- "Set promotion", "Set verification" --
+            # never the imperative verb.
+            "set",
+            "status",
+            "supervised",
+            "system",
+            "that",
+            "the",
+            "then",
+            "this",
+            "verification",
+            "while",
+        }
+        unclassified: list[str] = []
         units: list[str] = []
         # The register bounds a SENTENCE. A table cell routinely holds several, so cells are
         # split into cells FIRST and then into sentences; measuring a whole cell reports a
@@ -3088,8 +3155,15 @@ class RemovalObligationBatteryTests(unittest.TestCase):
             words = re.findall(r"\b[\w-]+\b", plain)
             if words and len(words) > 25:
                 sentence_violations.append((len(words), plain))
-            if words and words[0].lower() in imperatives and len(words) > 20:
-                instruction_violations.append((len(words), plain))
+            if not words:
+                continue
+            opener = words[0].lower()
+            if opener in imperatives:
+                if len(words) > 20:
+                    instruction_violations.append((len(words), plain))
+            elif opener not in descriptive:
+                unclassified.append(opener)
+        self.assertEqual(sorted(set(unclassified)), [])
         self.assertEqual(sentence_violations, [])
         self.assertEqual(instruction_violations, [])
 

@@ -63,11 +63,11 @@
       "obligation": "D06",
       "target_test": "test_d06_legacy_leaves_abbreviate_act_reaches_actor_so_flag_rem",
       "expect": "killed",
-      "kind": "reinsertion",
+      "kind": "sensitivity",
       "path": "src/cement_runtime/cli.py",
       "anchor": "    compile_command.add_argument(\"--actor\", default=\"local-system\")\n",
-      "replacement": "    compile_command.add_argument(\"--actor\", default=\"local-system\")\n    compile_command.add_argument(\"--request-id\")\n",
-      "note": "baseline=misdirected; restore --request-id on a surviving leaf \u2192 its exact spelling and unclaimed proper prefixes become accepted."
+      "replacement": "    compile_command.add_argument(\"--actor\", default=\"local-system\")\n    compile_command.add_argument(\"--action\", default=\"none\")\n",
+      "note": "aims at D06's ABBREVIATION property: a colliding `--action` makes `--act` ambiguous, so `parse_args([\"compile\", \"operation\", \"--act\", \"actor\"])` raises instead of resolving. Reinserting `--request-id` restored a removed SPELLING and exercised D10 instead."
     },
     {
       "id": "M07",
@@ -237,7 +237,7 @@
     {
       "id": "M22",
       "obligation": "D18d",
-      "target_test": "test_d18d_test_cli_channels_py_1395_v27_preserve_census_re_based",
+      "target_test": "test_v27_the_parser_census_moves_28_to_30_leaves_and_35_to_37_nodes",
       "expect": "killed",
       "kind": "reinsertion",
       "path": "src/cement_runtime/cli.py",
@@ -248,7 +248,7 @@
     {
       "id": "M23",
       "obligation": "D18e",
-      "target_test": "test_d18e_test_cli_channels_py_1458_v28_preserve_cross_leaf_opti",
+      "target_test": "test_v28_cross_leaf_option_isolation_holds_in_both_directions_for_b",
       "expect": "killed",
       "kind": "sensitivity",
       "path": "src/cement_runtime/cli.py",
@@ -259,7 +259,7 @@
     {
       "id": "M24",
       "obligation": "D18f",
-      "target_test": "test_d18f_test_cli_channels_py_1647_x04_preserve_resolve_dispatc",
+      "target_test": "test_x04_each_completed_resolve_dispatch_calls_system_resolve_once",
       "expect": "killed",
       "kind": "sensitivity",
       "path": "src/cement_runtime/cli.py",
@@ -270,7 +270,7 @@
     {
       "id": "M25",
       "obligation": "D18g",
-      "target_test": "test_d18g_test_cli_channels_py_1989_x11_preserve_aggregate_trans",
+      "target_test": "test_x11_the_aggregate_transport_cap_is_derived_from_one_exported_p",
       "expect": "killed",
       "kind": "sensitivity",
       "path": "src/cement_runtime/cli.py",
@@ -281,7 +281,7 @@
     {
       "id": "M26",
       "obligation": "D18h",
-      "target_test": "test_d18h_test_cli_channels_py_2605_x21_preserve_both_new_leaves",
+      "target_test": "test_x21_both_new_parser_nodes_omit_every_source_option_as_well_as",
       "expect": "killed",
       "kind": "reinsertion",
       "path": "src/cement_runtime/cli.py",
@@ -292,7 +292,7 @@
     {
       "id": "M27",
       "obligation": "D18i",
-      "target_test": "test_d18i_test_cli_channels_py_2643_x22_preserve_the_28_baseline",
+      "target_test": "test_x22_all_twenty_eight_baseline_leaf_paths_survive_by_identity_r",
       "expect": "killed",
       "kind": "reinsertion",
       "path": "src/cement_runtime/cli.py",
@@ -303,7 +303,7 @@
     {
       "id": "M28",
       "obligation": "D18j",
-      "target_test": "test_d18j_test_cli_channels_py_2801_2811_x26_preserve_inverted_c",
+      "target_test": "test_x26_commandcandidatesource_remains_imported_and_the_existing_h",
       "expect": "killed",
       "kind": "reinsertion",
       "path": "src/cement_runtime/cli.py",
@@ -314,7 +314,7 @@
     {
       "id": "M29",
       "obligation": "D18k",
-      "target_test": "test_d18k_test_cli_channels_py_445_v05_preserve_a_configured_can",
+      "target_test": "test_v05_a_configured_candidate_source_is_never_called_by_either_ne",
       "expect": "killed",
       "kind": "reinsertion",
       "path": "src/cement_runtime/cli.py",
@@ -336,18 +336,18 @@
     {
       "id": "M31",
       "obligation": "D18m",
-      "target_test": "test_d18m_test_cli_channels_battery_py_571_d03_preserve_dispatch",
+      "target_test": "test_d03_dispatch_calls_system_resolve_exactly_once_and_reaches_no",
       "expect": "killed",
       "kind": "reinsertion",
       "path": "src/cement_runtime/cli.py",
       "anchor": "    system = System(args.db)\n",
-      "replacement": "    source = None\n    if args.command == \"handle\":\n        source = _source(\n            args.source_command,\n            source_id=args.source_id,\n            timeout=args.source_timeout,\n        )\n    system = System(args.db, candidate_source=source)\n",
-      "note": "baseline=survived; probe=System kwargs {}\u2192{candidate_source:null}; restore candidate_source construction \u2192 battery D03 observes a constructor keyword on every reachable route."
+      "replacement": "    system = System(args.db, candidate_source=object())\n",
+      "note": "hands the constructor a real candidate source on EVERY route. The previous form guarded construction on `args.command == \"handle\"`, which no longer parses, so the branch was unreachable and D03's property still held."
     },
     {
       "id": "M32",
       "obligation": "D18n",
-      "target_test": "test_d18n_test_cli_channels_battery_py_1799_d16_preserve_aggrega",
+      "target_test": "test_d16_the_aggregate_cap_is_2_default_max_bytes_provenance_max_by",
       "expect": "killed",
       "kind": "sensitivity",
       "path": "src/cement_runtime/cli.py",
@@ -358,7 +358,7 @@
     {
       "id": "M33",
       "obligation": "D18o",
-      "target_test": "test_d18o_test_cli_channels_battery_py_2608_2667_d24_preserve_re",
+      "target_test": "test_d24_zero_source_calls_zero_system_propose_calls_and_zero_sourc",
       "expect": "killed",
       "kind": "reinsertion",
       "path": "src/cement_runtime/cli.py",
@@ -369,7 +369,7 @@
     {
       "id": "M34",
       "obligation": "D18p",
-      "target_test": "test_d18p_test_cli_channels_battery_py_2733_d25_preserve_census",
+      "target_test": "test_d25_the_parser_census_moves_28_30_leaves_and_35_37_nodes_deriv",
       "expect": "killed",
       "kind": "reinsertion",
       "path": "src/cement_runtime/cli.py",
@@ -380,7 +380,7 @@
     {
       "id": "M35",
       "obligation": "D18q",
-      "target_test": "test_d18q_test_cli_channels_battery_py_2861_d26_preserve_preserv",
+      "target_test": "test_d26_preserved_and_asserted_independently_store_py_byte_identic",
       "expect": "killed",
       "kind": "sensitivity",
       "path": "src/cement_runtime/cli.py",
@@ -391,7 +391,7 @@
     {
       "id": "M36",
       "obligation": "D18r",
-      "target_test": "test_d18r_test_cli_channels_battery_py_3059_d27_preserve_b02_fro",
+      "target_test": "test_d27_b02_drops_cli_py_from_its_frozen_tuple_and_keeps_command_s",
       "expect": "killed",
       "kind": "sensitivity",
       "path": "tests/test_submission_battery.py",

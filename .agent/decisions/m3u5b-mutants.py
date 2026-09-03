@@ -69,7 +69,7 @@ DEFAULT_VERDICT = (
 )
 # The parenthesised group is already the FULL dotted path, test name included; pairing it with
 # the leading bare name would render every witness twice.
-WITNESS = re.compile(r"^(?:FAIL|ERROR): \w+ \(([\w.]+)\)", re.M)
+WITNESS = re.compile(r"^(?:FAIL|ERROR): \w+ \(([\w.]+)\)", re.MULTILINE)
 
 
 def _purge_pycache(root: pathlib.Path) -> None:
@@ -213,8 +213,8 @@ def main(argv: list[str]) -> int:
     for result in results:
         marks = ",".join(str(w) for w in result["witnesses"][:2]) or "-"
         print(
-            f"{result['id']:<5} {str(result['verdict']):<12} {str(result['obligation']):<6} "
-            f"{str(result['kind']):<12} {marks}"
+            f"{result['id']:<5} {result['verdict']!s:<12} {result['obligation']!s:<6} "
+            f"{result['kind']!s:<12} {marks}"
         )
 
     killed = [r for r in results if r["verdict"] == "killed"]

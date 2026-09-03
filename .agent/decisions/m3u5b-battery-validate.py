@@ -76,6 +76,17 @@ OBLIGATION = re.compile(r"^\*\*(D\d{2})(\s+—[^*]*)?\*\*\s*(.*)$")
 STOP = re.compile(r"^(\*\*D\d{2}|#{2,3} |---\s*$|\*\*[A-Z])")
 TABLE_ROW = re.compile(r"^\|(?!-)(.+)\|\s*$")
 
+# A control may aim at any test the sweep's verdict modules run, never the battery alone. A
+# D18 clause obligation protects a FRAME in another module, so restricting targets to the
+# battery would report the contract's own D18 table as fourteen orphans.
+VERDICT_MODULES = (
+    "test_cli_removal_battery",
+    "test_cli_channels",
+    "test_cli_channels_battery",
+    "test_cli",
+    "test_submission_battery",
+)
+
 BATTERY_IDS = [f"D{index:02d}" for index in range(1, 29)]
 CLAUSE_TAGS = "abcdefghijklmnopqrstuvwxyz"
 
@@ -128,7 +139,7 @@ def _corrections() -> dict[str, list[tuple[str, str]]]:
                 (f"correction {number}", f"WRONG AS WRITTEN: {wrong} -- CORRECT: {correct}")
             )
 
-    for match in re.finditer(r"^- \*\*(D\d{2})'s ([^*]+)\*\*(.*)$", section, re.M):
+    for match in re.finditer(r"^- \*\*(D\d{2})'s ([^*]+)\*\*(.*)$", section, re.MULTILINE):
         target, headline, tail = match.groups()
         binding.setdefault(target, []).append(
             (f"scope correction ({target}'s {headline})", tail.strip())
@@ -143,7 +154,7 @@ def _strengthenings() -> dict[str, str]:
     text = CONTRACT.read_text(encoding="utf-8")
     section = text.split("**Gate 2 —")[-1].split("**Gate 3 —")[0]
     found: dict[str, str] = {}
-    for match in re.finditer(r"^- \*\*([^*]+)\*\*(.*)$", section, re.M):
+    for match in re.finditer(r"^- \*\*([^*]+)\*\*(.*)$", section, re.MULTILINE):
         headline, tail = match.groups()
         body = f"{headline.strip()}{tail}".strip()
         for target in re.findall(r"D\d{2}", headline):
@@ -171,21 +182,45 @@ def _d18_clauses() -> list[str]:
     return frames
 
 
+def _verdict_test_names() -> set[str]:
+    """Every test name a control may legitimately aim at, read from the verdict modules."""
+    names: set[str] = set()
+    for module in VERDICT_MODULES:
+        path = ROOT / "tests" / f"{module}.py"
+        if not path.is_file():
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        names.update(
+            node.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef) and node.name.startswith("test_")
+        )
+    return names
+
+
 def _clauses() -> dict[str, list[str]]:
     return {
         "D15": [
-            "the SIX runtime modules stay byte-identical to their `36f7890` git objects, "
-            "each asserted individually",
-            "the TWELVE `examples/` files stay byte-identical to their `36f7890` git objects, "
-            "each asserted individually",
+            (
+                "the SIX runtime modules stay byte-identical to their `36f7890` git objects, "
+                "each asserted individually"
+            ),
+            (
+                "the TWELVE `examples/` files stay byte-identical to their `36f7890` git "
+                "objects, each asserted individually"
+            ),
         ],
         "D18": _d18_clauses(),
         "D22": [
             "DIRECTION cli-route: every CLI-route locus was rewritten and names no removed command",
-            "DIRECTION library-route: every library-API locus is byte-identical, `System.handle` "
-            "prose included, so this unit pre-empts no M3.6a doc work",
-            "the opening ` ```text ` `handle(request)` fence is PROTECTED and byte-identical; "
-            "gate 5 cannot reach it, so the battery asserts it directly",
+            (
+                "DIRECTION library-route: every library-API locus is byte-identical, "
+                "`System.handle` prose included, so this unit pre-empts no M3.6a doc work"
+            ),
+            (
+                "the opening ` ```text ` `handle(request)` fence is PROTECTED and "
+                "byte-identical; gate 5 cannot reach it, so the battery asserts it directly"
+            ),
         ],
     }
 
@@ -368,12 +403,16 @@ def grade(battery: pathlib.Path, controls: pathlib.Path) -> int:
     control_unfilled: list[str] = []
     control_orphan: list[str] = []
     aimed: set[str] = set()
+    reachable = _verdict_test_names()
     if controls.is_file():
         document = json.loads(controls.read_text(encoding="utf-8"))
         for row in document.get("rows", []):
             target = row.get("target_test", "")
-            if target in by_name:
-                aimed.add(by_name[target])
+            # A row covers the clause it DECLARES, once its target names a test that really
+            # exists. Resolving coverage back through the target would confine every control
+            # to the battery and silently drop the cross-module D18 frames.
+            if target in reachable:
+                aimed.add(str(row.get("obligation", "")))
             else:
                 control_orphan.append(f"{row.get('id', '?')}->{target}")
             if any(value == UNKNOWN for value in row.values()):
