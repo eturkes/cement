@@ -78,7 +78,7 @@ Measured gaps driving the arc:
   it; under this milestone's own fail-closed no-migration contract nobody does, so it would uniquely pay
   two disposable transient test families plus two mid-milestone rewrites for zero operator value.
 
-  Units - 13, 5 DONE + 8 remaining, executing as 7 waves. `depends` shows the DAG; same-wave units name the same
+  Units - 15 after M3.6a's pre-open split, 7 DONE + 8 remaining. `depends` shows the DAG; same-wave units name the same
   predecessor. Tier default `kernel`; `oracle` is kept only where an independent implementation can
   actually diverge, so deletion, forwarding and byte-preserving relocation carry none.
 
@@ -1083,11 +1083,70 @@ Measured gaps driving the arc:
     PRESERVATION obligations that legitimately hold at `4e33cc6`. That is exactly why section 11 requires
     an independent red control per obligation: the catalogue generalises the baseline-red credential to
     obligations no baseline can redden. Report the split; never force it.
-  - M3.6a tier=kernel tags=- depends=M3.5b - delete public lifecycle methods, leases, result models and
-    exports; retain only the private v2 binding plumbing.
+  - M3.6a SPLIT INTO M3.6a1 + M3.6a2 + M3.6a3 at its own pre-open measurement, which is the calibration
+    ruling's standing instruction for this unit. Burden measured, never counted: `m3u6a-burden.py` +
+    `m3u6a-burden.json` stage the source-only deletion in throwaway worktrees with per-edit occurrence
+    assertions and group every gate failure by its deepest `tests/` frame.
+    STAGE 1, the method deletion alone = 296 broken / 943 ran / 46 frame keys. The deletion closure is
+    exact: over `System`'s own call graph, `_request_revision_is_current` (11) is the ONLY private helper
+    dead with the seed, so the span is `handle` 271 + `_outcome` 116 + `_fail_generation` 32 +
+    `request_status` 14 + 11 = 444 lines. 251 of the 296 stand behind FOUR fixture helpers
+    (`test_system.py` `_confirm_scope` 189 and `confirm` 28, `test_resolve_battery.py` `_confirm` 23,
+    `test_proposal_binding_battery.py` `_promoted_conflict_fixture` 11) and 2 more behind
+    `test_hospital_ocr_example.py` `_promoted_example_ledger`. M3.4's 28x lesson reproduces at 60x.
+    STAGE 5 READS LOWER THAN STAGE 1 - 57 broken / 601 ran against 296 / 943 - and the drop is a
+    MEASUREMENT ARTIFACT, not relief: deleting the five result models breaks three modules at IMPORT
+    (`test_system`, `test_resolve_battery`, `test_hospital_ocr_example`), so 342 tests never run and their
+    failures are hidden. Stage 6 repairs the two test-module import lists alone, leaving the demo broken
+    because the demo is implementation work rather than an import repair, and measures 314 broken / 921
+    ran / 52 frame keys. STANDING RULE: a cumulative removal stage that reports FEWER breaks than its own
+    predecessor has hidden a module, so print `Ran N` beside every break count and diff the collection.
+    LAYER ATTRIBUTION, by frame key across the two stages: the method deletion owns 46 frames; the lease
+    knob, revision cancellation, result models and `CandidateRequest.request_id` own 10 between them.
+    Against M3.5b's measured 17 frames for a three-session unit, an unsplit M3.6a is 3.2x - and it also
+    carries a 7-site demo rewrite plus transcript regeneration and a five-document prose pass that M3.5b
+    did not have, because M3.5b D22 deliberately left every `System.handle` sentence to this unit.
+    THE SPLIT AXIS IS CONSUMER-MIGRATION-BEFORE-DELETION, and it works because both APIs exist TODAY.
+    All four `handle`-driven fixture helpers share one shape - `handle` -> `assert isinstance(...,
+    ReviewRequired)` -> `get_proposal` -> `review` - whose `propose` + `get_proposal` + `review`
+    replacement reaches the identical final row state, so the re-base lands GREEN with `handle` still
+    shipped and removes 253 of the deletion unit's breaks before it opens.
+    ROADMAP CORRECTION: M3.7's `depends` gains M3.6a3, which deletes `CandidateRequest.request_id`. The
+    prior line had M3.7 running alongside M3.6 on `depends=M3.3,M3.5b` while M3.7's own retained protocol
+    names that field, which the M3 track order already flagged and no dependency edge recorded.
+  - M3.6a1 tier=kernel tags=- depends=M3.5b - migrate every consumer off the lifecycle API while it still
+    ships. Re-base the four `handle`-driven fixture helpers plus `test_hospital_ocr_example.py`
+    `_promoted_example_ledger` onto `propose`/`get_proposal`/`review` through scripted, count-asserted,
+    idempotent surgery; drop the now-dead `request_id` argument from ~217 helper call sites in the same
+    script. Rewrite `examples/hospital_ocr/run_demo.py`'s seven `system.handle` sites onto `propose` and
+    `resolve`, and regenerate the README transcript, whose lines 208 and 216 name the vanishing
+    `request.resolved_by_artifact` event. Acceptance: gate green with `handle` and `request_status` still
+    shipped, plus a census proving the only surviving consumers are the lifecycle-pinning tests M3.6a2
+    deletes and the library itself.
+  - M3.6a2 tier=kernel tags=- depends=M3.6a1 - delete `handle`, `request_status`, `_outcome`,
+    `_fail_generation` and `_request_revision_is_current`; delete the `generation_lease_seconds`
+    constructor knob, `self._lease_us` and the clock bound named after it; delete request cancellation on
+    operation revision together with the `operation.revised` payload's `invalidated_generators` key. Two
+    event kinds vanish, `request.resolved_by_artifact` and `request.fallback_failed`. Rewrite the
+    library-API prose M3.5b D22 deferred: README 18 hit lines including the whole poll-state table,
+    `docs/architecture.md` 7, `docs/adapter-protocol.md` 8, `docs/threat-model.md` 4.
+    TRIPWIRES, named now so they become numbered obligations rather than regressions. THREE INVERT rather
+    than move: M3.3's P06 byte-span freeze on `System.handle` at `tests/test_submission.py:671` and
+    `tests/test_submission_battery.py:289` + `:330` RAISES once the method is gone, and M3.5b's D01 at
+    `tests/test_cli_removal_battery.py:617` asserts `System.handle` and `System.request_status` still ship
+    as library methods. M3.5b D15a freezes six runtime modules byte-identical. B02 is NOT a tripwire here:
+    its frozen tuple is `_command_supervisor.py` and `example_adapter.py` alone, `system.py` having never
+    been a member.
+  - M3.6a3 tier=kernel tags=- depends=M3.6a2 - delete `Resolved`, `InProgress`, `FallbackFailed`,
+    `Rejected`, `ReconciliationRequired`, the `Outcome` alias and every import and `__all__` entry naming
+    them; delete `CandidateRequest.request_id`, minting the private request-row id inside
+    `_persist_proposal` so the id survives as plumbing and leaves the public protocol. `ReviewRequired`
+    loses its last producer when M3.6a2 deletes `handle`, so its retention is this unit's first ruling
+    rather than the plan draft's assumption. Measured burden: 10 frames, `test_source.py` `request` (9
+    breaks) the only shared one.
   - M3.6b tier=kernel tags=prod depends=M3.6a - the sole schema cut v2->v3: direct proposal columns,
     adapter swap, `requests` plus index deletion, refusal fixtures, package 0.2.0.
-  - M3.7 tier=kernel tags=prod depends=M3.3,M3.5b - relocate the command runtime to an optional example
+  - M3.7 tier=kernel tags=prod depends=M3.3,M3.5b,M3.6a3 - relocate the command runtime to an optional example
     surface with byte equality, archive membership and blocked reverse imports. Owns its destination paths
     explicitly (implementation, sibling supervisor, stub, README), rules whether the source-only example
     may depend on private JSON helpers, states that `py.typed` covers core only, and mocks the
