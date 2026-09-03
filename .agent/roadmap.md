@@ -1011,6 +1011,35 @@ Measured gaps driving the arc:
     THE BATTERY STUB STAYS OFF `main`. 48 `self.fail` bodies in `tests/` would turn gate 1 red, so the
     seed lives on the teammate's branch alone; only the catalogue seed, which is evidence rather than a
     test, is committed here.
+    S3 CHECKPOINT 2, `main=` 92% 220K/240K at the compaction boundary. Battery HARVESTED by targeted
+    checkout at `wt/test-m3u5b-2` tip `644962b`; `git diff --name-status main..wt/test-m3u5b-2` renders
+    EIGHT of main's later files as modified (`cli.py`, README, four test files, roadmap, polish), so
+    squash-merge would have reverted the whole removal - the standing rule reproduced exactly. One added
+    file taken, nothing else.
+    Battery grades CLEAN on all six of its own counters at 48 tests / 28 obligations: UNFILLED 0,
+    UNCOVERED 0, ORPHAN 0, ASSERTIONLESS 0, SKIPPED 0, CORRECTION-UNCITED 0.
+    FIRST CONTACT AT HEAD: 38/48 green, 10 red, 3.190 s. Every red is UNRULED and is checkpoint 3's entry
+    work. FOUR (`D18f` x04, `D18h` x21, `D18k` v05, `D18m` d03) share one shape whose LIKELY reading is a
+    SUITE defect: each asserts the token `_source` is ABSENT from a re-based frame, while D19 re-shaped
+    those frames to assert the post-removal property DIRECTLY, which requires naming the deleted symbol
+    to deny it. A token-absence check cannot separate an assertion that USES a symbol from one that
+    FORBIDS it - the fail-open shape of a forbidden-list grep, arriving inside the instrument built to
+    catch it. VERIFY before ruling; a genuine `_source` residue in a re-based test is a real D08 finding.
+    The other six: `D18g` x11 expects a `node.name == '_source'` clause the frame does not use; `D18i`
+    x22 expects the integer 26 where the frame carries 28 twice; `D18p` d25 expects the (28, 35) census
+    pair at least twice; `D18q` d26 fails a compound predicate; `D22a` finds `provenance` in the
+    CLI-route locus set it did not expect; `D25` is the register pass section 11 already records as
+    having NO committed grader.
+    `test-m3u5b-2` reached 48/48 and committed at 100% of its window after ONE flush directive naming the
+    exact six remaining clauses and the exact report shape; it never emitted its marker, so its red/green
+    split must be RE-DERIVED by MAIN rather than read. `gate-m3u5b-1` is LIVE at 64% with all 48 controls
+    filled and its baseline sweep running; its last text reports M46 replaced after the survivor probe
+    exposed it as invalid - it removed `capture` but left `submit`, so D26 still held. A teammate
+    catching its own dead control is the catalogue working.
+    S3 CHECKPOINT 3 ENTRY STATE: rule all 10 reds (suite defect | repo defect | code defect) and correct
+    the suite or the code accordingly; harvest `m3u5b-mutants.json` from `wt/gate-m3u5b-1` by TARGETED
+    CHECKOUT; run the decisive sweep; close the unit with all five gates rerun from the committed tip and
+    their SHAs recorded.
     NOT EVERY OBLIGATION CAN BE RED AT BASELINE, and demanding it would corrupt the battery. M3.5a's
     30/30 red worked because every obligation described a NEW leaf; M3.5b's D12-D16, D21, D27 and D28 are
     PRESERVATION obligations that legitimately hold at `4e33cc6`. That is exactly why section 11 requires
