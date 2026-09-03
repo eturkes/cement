@@ -876,7 +876,7 @@ Measured gaps driving the arc:
     `FunctionMatch.matched` is `bool` and the CLI binds `None if match is None else match.matched`,
     so identity and truthiness agree over the whole `{True, False, None}` domain. `6` -> `7` on the
     same line is killed by six tests, which is the harness's positive control.
-  - M3.5b tier=kernel tags=- depends=M3.5a - remove `handle`/`request`/source grammar, imports, fixtures,
+  - M3.5b DONE tier=kernel tags=- depends=M3.5a - remove `handle`/`request`/source grammar, imports, fixtures,
     help and operator prose. THREE sessions, not four: S1 contract, S2 implementation, S3 battery +
     closure.
     S1 DONE, contract session, `main=` 80% 191K/240K at close. NO teammate dispatched. Shipped
@@ -1041,10 +1041,43 @@ Measured gaps driving the arc:
     filled and its baseline sweep running; its last text reports M46 replaced after the survivor probe
     exposed it as invalid - it removed `capture` but left `submit`, so D26 still held. A teammate
     catching its own dead control is the catalogue working.
-    S3 CHECKPOINT 3 ENTRY STATE: rule all 10 reds (suite defect | repo defect | code defect) and correct
-    the suite or the code accordingly; harvest `m3u5b-mutants.json` from `wt/gate-m3u5b-1` by TARGETED
-    CHECKOUT; run the decisive sweep; close the unit with all five gates rerun from the committed tip and
-    their SHAs recorded.
+    S3 DONE, battery + closure session, ran past two compaction boundaries. `main=` 86% 206K/240K at
+    close; `mate=` 100% 240K/240K (`test-m3u5b-2`, which reached its window filling 48/48).
+    ALL FIVE GATES GREEN FROM COMMITTED TIP `5857d88`. Gate 1: 949 tests / OK / 80.422 s, rc 0 (901 at
+    `69ce360` plus the battery's 48). Gate 2: validator rc 0 PASS, all NINE counters 0, self-test 11/11
+    negative controls firing. Gate 3 + gate 2's red control, one sweep: 48 KILLED, 0 MISDIRECTED, 0
+    SURVIVORS, 0 PATCH-NOOP, control GREEN, rc 0. Gate 4: rc 0 over 19 CHECK. Gate 5: rc 0 over 6 CHECK.
+    ALL TEN REDS WERE SUITE DEFECTS; ZERO code defects, zero repo defects. The four `_source` reds ruled
+    at checkpoint 2 plus six more, every one the same class: a diff-blind author pinning code it could
+    not read. Four of the ten live frames express their property MORE strongly than the pin demanded - a
+    set-difference census where the pin wanted a literal `(28, 35)` pair, one subTest loop where it
+    wanted two unrolled copies, an `_ExplodingSource` where it wanted empty-kwargs equality, the one
+    keyword the obligation names where it wanted `kwargs == {}`. D22a additionally demanded all three
+    submission keys in the quick start, where `provenance` is optional; D25 counted a README table CELL
+    as one sentence and reported a compliant 17+15-word pair as one 32-word violation.
+    THE CATALOGUE ARRIVED MEASURED, NOT REPAIRED. Its own `note` fields recorded `baseline=misdirected`
+    and `baseline=survived` on the three rows that were broken, and it still graded CLEAN on every
+    structural counter, because notes are free text. Preview sweep at `88703e8`: 31 killed, 15
+    misdirected, 2 survivors. 13 misdirected were one defect - a D18 clause test is a STATIC check on
+    another frame's source, so a `cli.py` mutation cannot redden it; the target is the FRAME, which the
+    contract's own D18 table names. Repairs land as `m3u5b-mutants-repair.py`, replayable: 19 changes,
+    then `--check` CLEAN. M06 aimed at D06 and exercised D10 (a reinserted spelling satisfies the
+    abbreviation property); M31 reinserted code guarded by `args.command == "handle"` after `handle`
+    stopped parsing, so the branch was dead and D03 genuinely still held.
+    BOTH SURVIVORS WERE REAL BATTERY GAPS, both closed. M04 weakened the burden script's `found !=
+    expected` to `<`; D04 only drove the missing-anchor direction, where both forms abort, so D04 now
+    also asserts a DUPLICATED anchor aborts with `found 2`. M45 seeded a 25-word four-clause instruction
+    that survived on one missing word: D25's hand-written `imperatives` list omitted `generate`, so every
+    unlisted verb fell through to the looser 25-word description bound. D25 is now FAIL-CLOSED on an
+    unclassified opener, which immediately caught `supervised` (the parser root description, invisible to
+    a paragraph scan) and forced the ruling that sentence-initial `Set` here is always the noun phrase.
+    The validator resolved control coverage back THROUGH the target, inheriting the same blind spot and
+    reporting the contract's own D18 frames as 14 orphans; a row now covers the clause it DECLARES once
+    its target names a test in any verdict module.
+    Teammates STOPPED, worktrees and `wt/` branches removed, both worktrees `status --porcelain` EMPTY at
+    removal. `cbfaf17` on `wt/test-m3u5b-2` was unharvested Ruff work that main never carried (the battery
+    came from `644962b`); replayed directly rather than merged, since that branch renders the battery
+    DELETED. Ruff rc 0 over the battery and all three instruments.
     NOT EVERY OBLIGATION CAN BE RED AT BASELINE, and demanding it would corrupt the battery. M3.5a's
     30/30 red worked because every obligation described a NEW leaf; M3.5b's D12-D16, D21, D27 and D28 are
     PRESERVATION obligations that legitimately hold at `4e33cc6`. That is exactly why section 11 requires
