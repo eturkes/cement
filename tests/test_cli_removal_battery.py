@@ -1673,12 +1673,16 @@ class RemovalObligationBatteryTests(unittest.TestCase):
             if isinstance(node, ast.Dict)
             and all(isinstance(key, ast.Constant) and isinstance(key.value, str) for key in node.keys)
         }
+        # D19 INVERTS this frame: it names `_source` in order to DENY it, so a
+        # token-absence check cannot separate an assertion that USES the symbol from
+        # one that FORBIDS it. Assert the RUNTIME absence the frame actually proves.
         expected_counters = frozenset(
-            {"System.resolve", "System.propose", "System.verify_function"}
+            {"System.resolve", "System.propose", "System.verify_function", "_source"}
         )
 
         self.assertIn(expected_counters, counter_key_sets)
-        self.assertNotIn("_source", strings)
+        self.assertIn("_source", strings)
+        self.assertIn("self.assertFalse(hasattr(cement_cli, '_source'))", code)
         self.assertIn("self.assertEqual(run.status, 6)", code)
         self.assertIn("system.resolve.call_count", code)
         self.assertIn("system.propose.call_count", code)
@@ -1805,7 +1809,9 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         self.assertTrue(
             {"source_command", "source_id", "source_timeout"}.issubset(strings)
         )
-        self.assertNotIn("_source", strings)
+        # D19 INVERTS this frame: `_source` is named only to be denied.
+        self.assertIn("_source", strings)
+        self.assertIn("self.assertFalse(hasattr(cement_cli, '_source'))", code)
         self.assertIn("_parser_nodes(cement_cli._parser())", code)
         self.assertIn("self.assertEqual(len(leaves), 28)", code)
         self.assertIn("self.assertEqual(source_option_owners, set())", code)
@@ -2001,17 +2007,20 @@ class RemovalObligationBatteryTests(unittest.TestCase):
             if isinstance(node, ast.Dict)
             and all(isinstance(key, ast.Constant) and isinstance(key.value, str) for key in node.keys)
         }
+        # D19 INVERTS this frame: `_source` stays a counter KEY bound to a denial.
         expected = frozenset(
             {
                 "System.propose",
                 "CandidateSource.propose",
                 "System.resolve",
                 "System.submit_proposal",
+                "_source",
             }
         )
 
         self.assertIn(expected, counter_key_sets)
-        self.assertNotIn("_source", strings)
+        self.assertIn("_source", strings)
+        self.assertIn("self.assertFalse(hasattr(cement_cli, '_source'))", code)
         self.assertIn("System(self.database, candidate_source=source)", code)
         self.assertIn("self.assertIn(resolved.status, (0, 6))", code)
         self.assertIn("self.assertEqual(submitted.status, 0)", code)
@@ -2120,7 +2129,9 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         strings = _code_strings(target)
         code = _code(target)
 
-        self.assertNotIn("_source", strings)
+        # D19 INVERTS this frame: `_source` is named only to be denied.
+        self.assertIn("_source", strings)
+        self.assertIn("self.assertFalse(hasattr(cement_cli, '_source'))", code)
         self.assertNotIn("source_builder", code)
         self.assertIn("constructor.call_args.args, (str(path),)", code)
         self.assertIn("constructor.call_args.kwargs, {}", code)
