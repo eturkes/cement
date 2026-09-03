@@ -1084,7 +1084,11 @@ Measured gaps driving the arc:
     an independent red control per obligation: the catalogue generalises the baseline-red credential to
     obligations no baseline can redden. Report the split; never force it.
   - M3.6a SPLIT INTO M3.6a1 + M3.6a2 + M3.6a3 at its own pre-open measurement, which is the calibration
-    ruling's standing instruction for this unit. Burden measured, never counted: `m3u6a-burden.py` +
+    ruling's standing instruction for this unit. `main=` 88% 212K/240K for the split session; NO teammate
+    dispatched, since a pre-open split is measurement plus arbitration and both are MAIN-retained. The
+    entry cost is the thing to cut: attached state plus the ground-state read spent ~150K before the
+    first gate stage ran, so a session that must also write a contract needs the split ruled first.
+    Burden measured, never counted: `m3u6a-burden.py` +
     `m3u6a-burden.json` stage the source-only deletion in throwaway worktrees with per-edit occurrence
     assertions and group every gate failure by its deepest `tests/` frame.
     STAGE 1, the method deletion alone = 296 broken / 943 ran / 46 frame keys. The deletion closure is
