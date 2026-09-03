@@ -1024,7 +1024,12 @@ Measured gaps driving the arc:
     those frames to assert the post-removal property DIRECTLY, which requires naming the deleted symbol
     to deny it. A token-absence check cannot separate an assertion that USES a symbol from one that
     FORBIDS it - the fail-open shape of a forbidden-list grep, arriving inside the instrument built to
-    catch it. VERIFY before ruling; a genuine `_source` residue in a re-based test is a real D08 finding.
+    catch it. RULED, verified against the shipped frames: all four are SUITE DEFECTS and the frames are
+    CORRECT. `test_cli_channels.py:447` and `:1651` carry `self.assertFalse(hasattr(cement_cli,
+    "_source"))`, and the counter dicts bind `"_source": hasattr(cement_cli, "_source")` against an
+    expected `False` - the token is present BECAUSE the frame denies the symbol, which is precisely D19's
+    inversion. The battery must assert the RUNTIME absence the frame proves, never the absence of the
+    token from its source text.
     The other six: `D18g` x11 expects a `node.name == '_source'` clause the frame does not use; `D18i`
     x22 expects the integer 26 where the frame carries 28 twice; `D18p` d25 expects the (28, 35) census
     pair at least twice; `D18q` d26 fails a compound predicate; `D22a` finds `provenance` in the
