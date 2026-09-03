@@ -1127,6 +1127,64 @@ Measured gaps driving the arc:
     `request.resolved_by_artifact` event. Acceptance: gate green with `handle` and `request_status` still
     shipped, plus a census proving the only surviving consumers are the lifecycle-pinning tests M3.6a2
     deletes and the library itself.
+    THREE sessions: S1 measurement + rulings, S2 contract + implementation, S3 battery + closure. NO
+    wave 1 - the M3.5a sizing correction budgets a unit with no fork to rule WITHOUT S1's spike wave, and
+    every open quantity here was directly measurable.
+    S1 DONE, measurement + rulings session, `main=` 90% 216K/240K at close. NO teammate dispatched;
+    measurement plus arbitration is MAIN-retained. Shipped `m3u6a1-premise.py`, `m3u6a1-census.py`,
+    `m3u6a1-census.json`, `m3u6a1-rule-census.py`. No shipped code touched, so the gate is unmoved at
+    `1146421`'s 949 tests and was not rerun.
+    BOTH PLAN-LINE PREMISES FALSIFIED AS WRITTEN, each by its own probe rather than by reading.
+    P1 - `propose` reaches the identical row state as `handle` across `requests`, `proposals`, `events`,
+    `examples`, `artifacts` and `operations` EXCEPT ONE CELL: the `proposal.created` event's
+    `payload_json`, where `handle` writes `{"request_id": "<caller id>"}` and `propose` writes `{}`. That
+    single cell is the migration's whole behavioural signature, and two tests pin it (`test_d03...`,
+    `test_b30...`), both consequently ruled RETAIN.
+    P2 - `resolve` CANNOT replace `handle`'s artifact-hit branch at the demo's Act-2 ledger state: it
+    fails check `persisted-function-receipt`, because the walkthrough promotes its function set only in
+    Act 5. It matches once the set is promoted. OWNER RULED: checkpoint the set right after each artifact
+    promotion so Acts 2 and 3 answer through `resolve`; Act 5 keeps export and identity but loses its
+    "becomes one exportable function" framing. The demo then teaches M3's actual post-trim lifecycle -
+    propose, review, compile, verify, promote artifact, promote set, resolve.
+    THE SAME-ROUTE CONTROL IS WHAT MADE P1 HONEST, AND ITS FIRST FORM FAILED OPEN. Run without a control,
+    P1 reported four differences, all of them fresh identifiers feeding persisted digests. Run with a
+    control that aggregated volatility PER COLUMN across all rows, it reported zero - one event row's
+    volatile subject id certified the whole `payload_json` column, masking the only real difference.
+    Attribution had to go per ROW and per column. A control is an instrument and inherits the fail-open
+    shapes of any other.
+    THE SCOPE GAP IS THE SIZING FINDING. The plan line names five fixture helpers; the acceptance
+    predicate quantifies over EVERY consumer, measured at 49 definitions / 79 sites. Ruled 27 MIGRATE +
+    1 MIGRATE-RESOLVE + 21 RETAIN with 3 overrides, so the work list is 28 definitions, not 5 - against
+    M3.5b's 17 frames for a three-session unit. Sizing holds at three sessions because 24 of the 28 are
+    single-site fixture routes the surgery script rewrites uniformly.
+    `request_id` CLASSIFIES NOTHING, which the first classifier learned the expensive way: every `handle`
+    call passes it, so a rule keying on that token returned 78 RETAIN of 79 sites. The decidable
+    discriminator is what the enclosing definition does with the call's RETURN VALUE - discarded, or read
+    only as `isinstance(x, ReviewRequired)` plus `x.proposal_id`, is migratable because `propose` returns
+    that identifier directly.
+    TWO FAIL-OPEN CLASSIFIER DEFECTS FOUND AND FIXED, both the same family. `assertIs(type(x), T)` states
+    the identical obligation as `assertIsInstance(x, T)` and was invisible to an `assertIsInstance`-only
+    rule - it hid `test_b04`, which asserts `Resolved`. `typing.cast(T, x).attr` reads the result exactly
+    as `x.attr` does and was invisible to a bare-Name attribute rule. Both ship in this repo.
+    THE MECHANICAL RULE READS CONSUMPTION, NEVER INTENT, so three rows carry MAIN's override with its
+    grounds in `m3u6a1-census.json`: the demo (RETAIN -> MIGRATE-RESOLVE, the second migration target the
+    rule cannot name), `test_handle_still_answers_on_a_system_that_submitted_directly` (MIGRATE -> RETAIN,
+    the method under test IS `handle`), and `test_b30...` (MIGRATE -> RETAIN, it pins the one payload P1
+    measured as changing). `m3u6a1-rule-census.py --check` is the in-sync gate and asserts the override
+    set exactly, so a later row addition fails loudly rather than going unruled.
+    THE CENSUS IS RED AT BASELINE BY CONSTRUCTION: `SURVIVING-MIGRATE: 28`, with UNRULED, STALE,
+    MEASURE-DRIFT, UNGROUNDED-OVERRIDE and BAD-VERDICT all 0. `--self-test` grades both ways from
+    committed state with four controls, ALL FIRING. Its first control compared a ruled table against a
+    bare measurement - two different shapes - and failed for a reason unrelated to the property; the
+    property that matters is that emit is IDEMPOTENT over its own output, so a recorded ruling survives
+    regeneration byte for byte.
+    S2 ENTRY STATE: write the acceptance contract from these rulings, then implement. The census is the
+    acceptance gate and must reach `SURVIVING-MIGRATE: 0`. Tripwires to number as obligations in S2
+    rather than meet as regressions - `test_d03...` and `test_b30...` pin the `{"request_id": ...}`
+    payload and must stay RETAIN and green; `_promote_scope`'s `prefix` parameter goes dead once
+    `_confirm_scope` drops `request_id`, so rule whether it is removed or kept; the README transcript
+    regenerates against a demo whose act structure moved, so both dynamic-value masks and their
+    occurrence counts move with it.
   - M3.6a2 tier=kernel tags=- depends=M3.6a1 - delete `handle`, `request_status`, `_outcome`,
     `_fail_generation` and `_request_revision_is_current`; delete the `generation_lease_seconds`
     constructor knob, `self._lease_us` and the clock bound named after it; delete request cancellation on

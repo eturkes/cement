@@ -1,0 +1,700 @@
+{
+  "definitions": [
+    {
+      "grounds": "Owner ruling: the walkthrough promotes its function set right after each artifact promotion, so Acts 2 and 3 answer through `resolve`. Five sites re-base onto `propose`; the two `Resolved(source=\"artifact\")` sites re-base onto `resolve`. Measured RETAIN because the mechanical rule reads `.source`/`.output` consumption and cannot name a second migration target. `m3u6a1-premise.py` P2 measures that `resolve` fails on check `persisted-function-receipt` at the Act-2 ledger state and matches once the set is promoted, which is why the checkpoint moves rather than the assertion.",
+      "lines": [
+        178,
+        194,
+        228,
+        248,
+        263,
+        292,
+        312
+      ],
+      "measured": "RETAIN",
+      "owner": "main",
+      "path": "examples/hospital_ocr/run_demo.py",
+      "reasons": [
+        "attr:output",
+        "attr:source"
+      ],
+      "site": "examples/hospital_ocr/run_demo.py::main",
+      "sites": 7,
+      "verdict": "MIGRATE-RESOLVE"
+    },
+    {
+      "lines": [
+        2289
+      ],
+      "measured": "MIGRATE",
+      "owner": "test_function_inspect_emits_the_tail_beyond_one_hundred_entries",
+      "path": "tests/test_cli.py",
+      "reasons": [],
+      "site": "tests/test_cli.py::test_function_inspect_emits_the_tail_beyond_one_hundred_entries",
+      "sites": 1,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        2667
+      ],
+      "measured": "RETAIN",
+      "owner": "test_d24_zero_source_calls_zero_system_propose_calls_and_zero_sourc",
+      "path": "tests/test_cli_channels_battery.py",
+      "reasons": [
+        "attr:code",
+        "attr:status"
+      ],
+      "site": "tests/test_cli_channels_battery.py::test_d24_zero_source_calls_zero_system_propose_calls_and_zero_sourc",
+      "sites": 1,
+      "verdict": "RETAIN"
+    },
+    {
+      "lines": [
+        624
+      ],
+      "measured": "MIGRATE",
+      "owner": "_promoted_example_ledger",
+      "path": "tests/test_hospital_ocr_example.py",
+      "reasons": [],
+      "site": "tests/test_hospital_ocr_example.py::_promoted_example_ledger",
+      "sites": 1,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        272
+      ],
+      "measured": "MIGRATE",
+      "owner": "_promoted_conflict_fixture",
+      "path": "tests/test_proposal_binding_battery.py",
+      "reasons": [],
+      "site": "tests/test_proposal_binding_battery.py::_promoted_conflict_fixture",
+      "sites": 1,
+      "verdict": "MIGRATE"
+    },
+    {
+      "grounds": "Pins the handle-route `proposal.created` payload as `{\"request_id\": ...}` unchanged. `m3u6a1-premise.py` P1 measures that payload as the migration's SOLE attributable row difference -- `propose` writes `{}` -- so migrating this test would silently retire the pin that records the difference. Measured MIGRATE because `typing.cast(ReviewRequired, outcome).proposal_id` reads as a safe consumption. M3.6a2 deletes it with the route.",
+      "lines": [
+        2471
+      ],
+      "measured": "MIGRATE",
+      "owner": "test_b30_the_six_owned_event_payloads_are_2",
+      "path": "tests/test_proposal_binding_battery.py",
+      "reasons": [],
+      "site": "tests/test_proposal_binding_battery.py::test_b30_the_six_owned_event_payloads_are_2",
+      "sites": 1,
+      "verdict": "RETAIN"
+    },
+    {
+      "lines": [
+        75
+      ],
+      "measured": "MIGRATE",
+      "owner": "_confirm",
+      "path": "tests/test_resolve_battery.py",
+      "reasons": [],
+      "site": "tests/test_resolve_battery.py::_confirm",
+      "sites": 1,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        249
+      ],
+      "measured": "RETAIN",
+      "owner": "test_b04",
+      "path": "tests/test_resolve_battery.py",
+      "reasons": [
+        "isinstance:Resolved"
+      ],
+      "site": "tests/test_resolve_battery.py::test_b04",
+      "sites": 1,
+      "verdict": "RETAIN"
+    },
+    {
+      "grounds": "The method under test IS `handle`: the test asserts that a system which submitted directly still answers the lifecycle route. Migrating it would delete its own subject. Measured MIGRATE because the result is consumed only as a `ReviewRequired` type check, which the rule reads as a fixture route. M3.6a2 deletes this test with the method.",
+      "lines": [
+        921
+      ],
+      "measured": "MIGRATE",
+      "owner": "test_handle_still_answers_on_a_system_that_submitted_directly",
+      "path": "tests/test_submission.py",
+      "reasons": [],
+      "site": "tests/test_submission.py::test_handle_still_answers_on_a_system_that_submitted_directly",
+      "sites": 1,
+      "verdict": "RETAIN"
+    },
+    {
+      "lines": [
+        451
+      ],
+      "measured": "RETAIN",
+      "owner": "test_d03_the_event_is_proposal_created_with",
+      "path": "tests/test_submission_battery.py",
+      "reasons": [
+        "attr:request_id"
+      ],
+      "site": "tests/test_submission_battery.py::test_d03_the_event_is_proposal_created_with",
+      "sites": 1,
+      "verdict": "RETAIN"
+    },
+    {
+      "lines": [
+        1480,
+        1486
+      ],
+      "measured": "RETAIN",
+      "owner": "test_d23_the_eight_named_seams_still_expose",
+      "path": "tests/test_submission_battery.py",
+      "reasons": [
+        "calls:request_status",
+        "result:inline"
+      ],
+      "site": "tests/test_submission_battery.py::test_d23_the_eight_named_seams_still_expose",
+      "sites": 2,
+      "verdict": "RETAIN"
+    },
+    {
+      "lines": [
+        1422
+      ],
+      "measured": "MIGRATE",
+      "owner": "_confirm_scope",
+      "path": "tests/test_system.py",
+      "reasons": [],
+      "site": "tests/test_system.py::_confirm_scope",
+      "sites": 1,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        235
+      ],
+      "measured": "MIGRATE",
+      "owner": "confirm",
+      "path": "tests/test_system.py",
+      "reasons": [],
+      "site": "tests/test_system.py::confirm",
+      "sites": 1,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        1044
+      ],
+      "measured": "MIGRATE",
+      "owner": "test_activation_requires_an_integrity_valid_promotion_receipt",
+      "path": "tests/test_system.py",
+      "reasons": [],
+      "site": "tests/test_system.py::test_activation_requires_an_integrity_valid_promotion_receipt",
+      "sites": 1,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        979
+      ],
+      "measured": "MIGRATE",
+      "owner": "test_artifact_evidence_edges_are_database_immutable",
+      "path": "tests/test_system.py",
+      "reasons": [],
+      "site": "tests/test_system.py::test_artifact_evidence_edges_are_database_immutable",
+      "sites": 1,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        465,
+        481,
+        485
+      ],
+      "measured": "RETAIN",
+      "owner": "test_artifact_request_cache_is_bound_to_current_execution",
+      "path": "tests/test_system.py",
+      "reasons": [
+        "calls:request_status",
+        "request-id-reuse",
+        "result:inline"
+      ],
+      "site": "tests/test_system.py::test_artifact_request_cache_is_bound_to_current_execution",
+      "sites": 3,
+      "verdict": "RETAIN"
+    },
+    {
+      "lines": [
+        311
+      ],
+      "measured": "MIGRATE",
+      "owner": "test_candidate_never_appears_in_consumer_outcome_and_rejection_is_not_evidence",
+      "path": "tests/test_system.py",
+      "reasons": [],
+      "site": "tests/test_system.py::test_candidate_never_appears_in_consumer_outcome_and_rejection_is_not_evidence",
+      "sites": 1,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        677,
+        682
+      ],
+      "measured": "RETAIN",
+      "owner": "test_concurrent_retry_observes_generation_lease",
+      "path": "tests/test_system.py",
+      "reasons": [
+        "isinstance:InProgress",
+        "request-id-reuse",
+        "result:inline"
+      ],
+      "site": "tests/test_system.py::test_concurrent_retry_observes_generation_lease",
+      "sites": 2,
+      "verdict": "RETAIN"
+    },
+    {
+      "lines": [
+        443,
+        446
+      ],
+      "measured": "RETAIN",
+      "owner": "test_confirmed_request_cache_is_bound_to_immutable_example",
+      "path": "tests/test_system.py",
+      "reasons": [
+        "calls:request_status",
+        "isinstance:ReconciliationRequired",
+        "result:inline"
+      ],
+      "site": "tests/test_system.py::test_confirmed_request_cache_is_bound_to_immutable_example",
+      "sites": 2,
+      "verdict": "RETAIN"
+    },
+    {
+      "lines": [
+        541,
+        556
+      ],
+      "measured": "MIGRATE",
+      "owner": "test_counterexample_and_revocation_quarantine",
+      "path": "tests/test_system.py",
+      "reasons": [],
+      "site": "tests/test_system.py::test_counterexample_and_revocation_quarantine",
+      "sites": 2,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        304
+      ],
+      "measured": "RETAIN",
+      "owner": "test_dispatch_uses_sealed_promotion_receipt_without_rehashing_tests",
+      "path": "tests/test_system.py",
+      "reasons": [
+        "attr:artifact_id"
+      ],
+      "site": "tests/test_system.py::test_dispatch_uses_sealed_promotion_receipt_without_rehashing_tests",
+      "sites": 1,
+      "verdict": "RETAIN"
+    },
+    {
+      "lines": [
+        702,
+        708,
+        713
+      ],
+      "measured": "RETAIN",
+      "owner": "test_expired_generation_poll_is_retryable_and_handle_reclaims",
+      "path": "tests/test_system.py",
+      "reasons": [
+        "attr:code",
+        "calls:request_status",
+        "isinstance:FallbackFailed",
+        "request-id-reuse",
+        "result:inline"
+      ],
+      "site": "tests/test_system.py::test_expired_generation_poll_is_retryable_and_handle_reclaims",
+      "sites": 3,
+      "verdict": "RETAIN"
+    },
+    {
+      "lines": [
+        15487
+      ],
+      "measured": "MIGRATE",
+      "owner": "test_function_report_is_one_read_only_snapshot_with_exact_limit_materialization",
+      "path": "tests/test_system.py",
+      "reasons": [],
+      "site": "tests/test_system.py::test_function_report_is_one_read_only_snapshot_with_exact_limit_materialization",
+      "sites": 1,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        15690
+      ],
+      "measured": "MIGRATE",
+      "owner": "test_function_report_pending_projection_validates_middle_and_last_but_not_tail",
+      "path": "tests/test_system.py",
+      "reasons": [],
+      "site": "tests/test_system.py::test_function_report_pending_projection_validates_middle_and_last_but_not_tail",
+      "sites": 1,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        14934,
+        14952,
+        14969
+      ],
+      "measured": "RETAIN",
+      "owner": "test_function_report_pending_proposals_bind_partition_operation_request_and_revision",
+      "path": "tests/test_system.py",
+      "reasons": [
+        "request-id-reuse"
+      ],
+      "site": "tests/test_system.py::test_function_report_pending_proposals_bind_partition_operation_request_and_revision",
+      "sites": 3,
+      "verdict": "RETAIN"
+    },
+    {
+      "lines": [
+        16820
+      ],
+      "measured": "MIGRATE",
+      "owner": "test_function_report_pending_request_join_is_like_and_case_exact",
+      "path": "tests/test_system.py",
+      "reasons": [],
+      "site": "tests/test_system.py::test_function_report_pending_request_join_is_like_and_case_exact",
+      "sites": 1,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        16700
+      ],
+      "measured": "MIGRATE",
+      "owner": "test_function_report_pending_rows_validate_middle_and_last_scalars_and_bindings",
+      "path": "tests/test_system.py",
+      "reasons": [],
+      "site": "tests/test_system.py::test_function_report_pending_rows_validate_middle_and_last_scalars_and_bindings",
+      "sites": 1,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        13645
+      ],
+      "measured": "MIGRATE",
+      "owner": "test_function_report_projects_both_anchors_with_exact_counts_and_ordering",
+      "path": "tests/test_system.py",
+      "reasons": [],
+      "site": "tests/test_system.py::test_function_report_projects_both_anchors_with_exact_counts_and_ordering",
+      "sites": 1,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        14461
+      ],
+      "measured": "MIGRATE",
+      "owner": "test_function_report_reaches_every_compiler_block_reason_through_public_apis",
+      "path": "tests/test_system.py",
+      "reasons": [],
+      "site": "tests/test_system.py::test_function_report_reaches_every_compiler_block_reason_through_public_apis",
+      "sites": 1,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        2698
+      ],
+      "measured": "MIGRATE",
+      "owner": "test_function_verification_duplicate_gate_and_runtime_defenses",
+      "path": "tests/test_system.py",
+      "reasons": [],
+      "site": "tests/test_system.py::test_function_verification_duplicate_gate_and_runtime_defenses",
+      "sites": 1,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        3090
+      ],
+      "measured": "RETAIN",
+      "owner": "test_function_verification_rehashes_sealed_reports_off_dispatch",
+      "path": "tests/test_system.py",
+      "reasons": [
+        "attr:artifact_id",
+        "isinstance:Resolved"
+      ],
+      "site": "tests/test_system.py::test_function_verification_rehashes_sealed_reports_off_dispatch",
+      "sites": 1,
+      "verdict": "RETAIN"
+    },
+    {
+      "lines": [
+        592,
+        608
+      ],
+      "measured": "MIGRATE",
+      "owner": "test_late_review_counterexample_quarantines_promoted_scope",
+      "path": "tests/test_system.py",
+      "reasons": [],
+      "site": "tests/test_system.py::test_late_review_counterexample_quarantines_promoted_scope",
+      "sites": 2,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        724,
+        726
+      ],
+      "measured": "RETAIN",
+      "owner": "test_missing_or_broken_source_is_a_stored_inert_failure",
+      "path": "tests/test_system.py",
+      "reasons": [
+        "isinstance:FallbackFailed",
+        "request-id-reuse"
+      ],
+      "site": "tests/test_system.py::test_missing_or_broken_source_is_a_stored_inert_failure",
+      "sites": 2,
+      "verdict": "RETAIN"
+    },
+    {
+      "lines": [
+        634,
+        637
+      ],
+      "measured": "MIGRATE",
+      "owner": "test_monotonic_feeds_survive_transitions_and_clock_rollback",
+      "path": "tests/test_system.py",
+      "reasons": [],
+      "site": "tests/test_system.py::test_monotonic_feeds_survive_transitions_and_clock_rollback",
+      "sites": 2,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        875,
+        879,
+        898,
+        907,
+        920,
+        924
+      ],
+      "measured": "RETAIN",
+      "owner": "test_operation_revision_invalidates_every_old_request_path",
+      "path": "tests/test_system.py",
+      "reasons": [
+        "calls:request_status",
+        "isinstance:FallbackFailed",
+        "isinstance:ReconciliationRequired",
+        "kwarg:retry_failed",
+        "result:inline"
+      ],
+      "site": "tests/test_system.py::test_operation_revision_invalidates_every_old_request_path",
+      "sites": 6,
+      "verdict": "RETAIN"
+    },
+    {
+      "lines": [
+        867
+      ],
+      "measured": "MIGRATE",
+      "owner": "test_operation_revision_retires_old_artifacts",
+      "path": "tests/test_system.py",
+      "reasons": [],
+      "site": "tests/test_system.py::test_operation_revision_retires_old_artifacts",
+      "sites": 1,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        378
+      ],
+      "measured": "MIGRATE",
+      "owner": "test_orphaned_binding_fails_closed_and_stays_distinct_from_an_absent_proposal",
+      "path": "tests/test_system.py",
+      "reasons": [],
+      "site": "tests/test_system.py::test_orphaned_binding_fails_closed_and_stays_distinct_from_an_absent_proposal",
+      "sites": 1,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        323
+      ],
+      "measured": "MIGRATE",
+      "owner": "test_proposal_content_hashes_fail_closed_on_storage_mutation",
+      "path": "tests/test_system.py",
+      "reasons": [],
+      "site": "tests/test_system.py::test_proposal_content_hashes_fail_closed_on_storage_mutation",
+      "sites": 1,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        344
+      ],
+      "measured": "MIGRATE",
+      "owner": "test_proposal_paths_translate_malformed_persisted_json",
+      "path": "tests/test_system.py",
+      "reasons": [],
+      "site": "tests/test_system.py::test_proposal_paths_translate_malformed_persisted_json",
+      "sites": 1,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        739,
+        740
+      ],
+      "measured": "RETAIN",
+      "owner": "test_public_scalar_validation_fails_with_domain_errors",
+      "path": "tests/test_system.py",
+      "reasons": [
+        "kwarg:retry_failed",
+        "result:inline"
+      ],
+      "site": "tests/test_system.py::test_public_scalar_validation_fails_with_domain_errors",
+      "sites": 2,
+      "verdict": "RETAIN"
+    },
+    {
+      "lines": [
+        573,
+        584
+      ],
+      "measured": "RETAIN",
+      "owner": "test_quarantined_artifact_cannot_replay_an_old_idempotency_key",
+      "path": "tests/test_system.py",
+      "reasons": [
+        "attr:artifact_id",
+        "isinstance:ReconciliationRequired",
+        "request-id-reuse"
+      ],
+      "site": "tests/test_system.py::test_quarantined_artifact_cannot_replay_an_old_idempotency_key",
+      "sites": 2,
+      "verdict": "RETAIN"
+    },
+    {
+      "lines": [
+        803
+      ],
+      "measured": "MIGRATE",
+      "owner": "test_receipt_can_bind_individually_valid_large_input_and_output",
+      "path": "tests/test_system.py",
+      "reasons": [],
+      "site": "tests/test_system.py::test_receipt_can_bind_individually_valid_large_input_and_output",
+      "sites": 1,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        615,
+        616,
+        620,
+        624
+      ],
+      "measured": "RETAIN",
+      "owner": "test_request_idempotency_and_partition_isolation",
+      "path": "tests/test_system.py",
+      "reasons": [
+        "request-id-reuse"
+      ],
+      "site": "tests/test_system.py::test_request_idempotency_and_partition_isolation",
+      "sites": 4,
+      "verdict": "RETAIN"
+    },
+    {
+      "lines": [
+        1222
+      ],
+      "measured": "MIGRATE",
+      "owner": "test_review_rejects_cross_table_state_corruption",
+      "path": "tests/test_system.py",
+      "reasons": [],
+      "site": "tests/test_system.py::test_review_rejects_cross_table_state_corruption",
+      "sites": 1,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        940
+      ],
+      "measured": "RETAIN",
+      "owner": "test_revision_cancels_in_flight_old_generation",
+      "path": "tests/test_system.py",
+      "reasons": [
+        "result:inline"
+      ],
+      "site": "tests/test_system.py::test_revision_cancels_in_flight_old_generation",
+      "sites": 1,
+      "verdict": "RETAIN"
+    },
+    {
+      "lines": [
+        827
+      ],
+      "measured": "MIGRATE",
+      "owner": "test_runtime_integrity_failure_quarantines_then_falls_back",
+      "path": "tests/test_system.py",
+      "reasons": [],
+      "site": "tests/test_system.py::test_runtime_integrity_failure_quarantines_then_falls_back",
+      "sites": 1,
+      "verdict": "MIGRATE"
+    },
+    {
+      "lines": [
+        281,
+        290
+      ],
+      "measured": "RETAIN",
+      "owner": "test_supervised_miss_to_exact_artifact_hit",
+      "path": "tests/test_system.py",
+      "reasons": [
+        "attr:artifact_id",
+        "attr:output",
+        "attr:source"
+      ],
+      "site": "tests/test_system.py::test_supervised_miss_to_exact_artifact_hit",
+      "sites": 2,
+      "verdict": "RETAIN"
+    },
+    {
+      "lines": [
+        1157
+      ],
+      "measured": "RETAIN",
+      "owner": "test_terminal_build_does_not_block_safe_recompilation",
+      "path": "tests/test_system.py",
+      "reasons": [
+        "result:inline"
+      ],
+      "site": "tests/test_system.py::test_terminal_build_does_not_block_safe_recompilation",
+      "sites": 1,
+      "verdict": "RETAIN"
+    },
+    {
+      "lines": [
+        4591
+      ],
+      "measured": "MIGRATE",
+      "owner": "test_verify_drafts_requalifies_older_build_after_revocation",
+      "path": "tests/test_system.py",
+      "reasons": [],
+      "site": "tests/test_system.py::test_verify_drafts_requalifies_older_build_after_revocation",
+      "sites": 1,
+      "verdict": "MIGRATE"
+    }
+  ],
+  "kind": "m3u6a1-consumer-census",
+  "totals": {
+    "definitions": 49,
+    "measured_migrate": 29,
+    "measured_retain": 20,
+    "overrides": 3,
+    "ruled_migrate": 27,
+    "ruled_migrate_resolve": 1,
+    "ruled_retain": 21,
+    "sites": 79
+  }
+}
