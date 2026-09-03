@@ -1749,10 +1749,15 @@ class RemovalObligationBatteryTests(unittest.TestCase):
             {"DEFAULT_MAX_BYTES", "PROVENANCE_MAX_BYTES", "_SUBMISSION_FRAMING"}.issubset(strings)
         )
         self.assertIn("self.assertEqual(len(cli_literals), 0)", code)
-        self.assertIn("node.name == '_source'", code)
-        self.assertIn("self.assertEqual(len(source_helpers), 0)", code)
+        # The property is DERIVATION, not the presence of any `_source` check: the cap must be
+        # built from the exported constants rather than restated as a literal. The frame locates
+        # its own `SUBMISSION_MAX_BYTES` assignment and asserts the three names it reads.
+        self.assertIn("cap_assignment", code)
+        self.assertIn("cap_names", code)
+        self.assertTrue(
+            {"DEFAULT_MAX_BYTES", "PROVENANCE_MAX_BYTES", "_SUBMISSION_FRAMING"}.issubset(strings)
+        )
         self.assertIn("self.assertEqual(system_uses, 3)", code)
-        self.assertNotIn("next((node for node in ast.walk(cli_tree)", code)
 
     def test_d18h_test_cli_channels_py_2605_x21_preserve_both_new_leaves(self) -> None:
         """D18h obligation
@@ -1812,11 +1817,16 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         # D19 INVERTS this frame: `_source` is named only to be denied.
         self.assertIn("_source", strings)
         self.assertIn("self.assertFalse(hasattr(cement_cli, '_source'))", code)
-        self.assertIn("_parser_nodes(cement_cli._parser())", code)
-        self.assertIn("self.assertEqual(len(leaves), 28)", code)
-        self.assertIn("self.assertEqual(source_option_owners, set())", code)
+        # Both new leaves, each reached by name, and the omission asserted as an EMPTY
+        # intersection against the source-option set. A census belongs to X22, not here.
+        self.assertIn("self.parser_node('resolve')", code)
+        self.assertIn("self.parser_node('proposal', 'submit')", code)
+        self.assertIn("source_options = {'source_command', 'source_id', 'source_timeout'}", code)
+        self.assertIn("{action.dest for action in node._actions} & source_options, set()", code)
+        # `_source` is a counter KEY here for the same reason D19 keeps it: the dict binds the
+        # symbol's absence alongside the two call counts, so all three ride one assertion.
         self.assertIn(
-            frozenset({"System.propose", "source.propose"}),
+            frozenset({"System.propose", "source.propose", "_source"}),
             counter_key_sets,
         )
         self.assertIn("self.assertIn(resolved.status, (0, 6))", code)
@@ -1881,12 +1891,15 @@ class RemovalObligationBatteryTests(unittest.TestCase):
 
         self.assertIn(frozenset({"handle", "request"}), string_sets)
         self.assertIn(frozenset({"proposal submit", "resolve"}), string_sets)
-        self.assertIn(26, integers)
+        # D02 re-bases this census to SET assertions. Both cardinalities stay 28 over DIFFERENT
+        # sets, so the two differences carry the claim and 26 never appears; a surviving 30 would
+        # mean the frame still counted the pre-removal tree.
         self.assertGreaterEqual(integers.count(28), 2)
         self.assertNotIn(30, integers)
+        self.assertNotIn(26, integers)
         self.assertIn("baseline_paths - current_paths", code)
         self.assertIn("current_paths - baseline_paths", code)
-        self.assertIn("baseline_paths & current_paths", code)
+        self.assertIn("self.assertEqual(len(current_paths), 28)", code)
 
     def test_d18j_test_cli_channels_py_2801_2811_x26_preserve_inverted_c(self) -> None:
         """D18j obligation
@@ -2008,15 +2021,10 @@ class RemovalObligationBatteryTests(unittest.TestCase):
             and all(isinstance(key, ast.Constant) and isinstance(key.value, str) for key in node.keys)
         }
         # D19 INVERTS this frame: `_source` stays a counter KEY bound to a denial.
-        expected = frozenset(
-            {
-                "System.propose",
-                "CandidateSource.propose",
-                "System.resolve",
-                "System.submit_proposal",
-                "_source",
-            }
-        )
+        # The counter dict carries the three DENIAL keys. `System.resolve` and
+        # `System.submit_proposal` are positive-path counts and ride a separate tuple assertion,
+        # pinned below through `resolve.call_count` / `submit.call_count`.
+        expected = frozenset({"System.propose", "CandidateSource.propose", "_source"})
 
         self.assertIn(expected, counter_key_sets)
         self.assertIn("_source", strings)
@@ -2134,7 +2142,11 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         self.assertIn("self.assertFalse(hasattr(cement_cli, '_source'))", code)
         self.assertNotIn("source_builder", code)
         self.assertIn("constructor.call_args.args, (str(path),)", code)
-        self.assertIn("constructor.call_args.kwargs, {}", code)
+        # An empty-kwargs equality would also pass if the constructor grew an unrelated keyword.
+        # The frame asserts the one keyword the obligation is about, backed by a source whose
+        # every attribute access raises.
+        self.assertIn("constructor.call_args.kwargs.get('candidate_source')", code)
+        self.assertIn("_ExplodingSource()", code)
         self.assertIn("fake.resolve.assert_called_once_with", code)
         self.assertIn("fake.verify_function.assert_not_called()", code)
         self.assertIn("fake.propose.assert_not_called()", code)
@@ -2351,9 +2363,13 @@ class RemovalObligationBatteryTests(unittest.TestCase):
 
         self.assertIn(frozenset({"handle", "request"}), string_sets)
         self.assertIn(frozenset({"proposal submit", "resolve"}), string_sets)
-        self.assertGreaterEqual(count_pairs.count((28, 35)), 2)
+        # D02 re-bases this census the same way X22 is re-based: the equal cardinality is a
+        # CONSEQUENCE of the two named swaps, so it is asserted between the two measurements
+        # instead of against a literal pair. A surviving `(30, 37)` would be the stale count.
         self.assertNotIn((30, 37), count_pairs)
-        self.assertIn("base_leaves & current_leaves", code)
+        self.assertNotIn((28, 35), count_pairs)
+        self.assertIn("self.assertEqual(len(current_leaves), len(base_leaves))", code)
+        self.assertIn("self.assertEqual(current_nodes, base_nodes)", code)
         self.assertIn("abbreviation_map", code)
         self.assertIn("base_abbreviation", code)
         self.assertIn("current_abbreviation", code)
@@ -2429,14 +2445,20 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         self.assertIn("SCHEMA_VERSION", code)
         self.assertTrue({"events", "proposals", "requests"}.issubset(strings))
         self.assertTrue(any("imports" in assertion for assertion in zero_assertions))
+        # D19 inverts this block, so the zero-assertions name the two DELETED things directly.
+        # Matching on a variable name would grade the author's choice of identifier.
+        self.assertTrue(any("'_source'" in assertion for assertion in zero_assertions))
         self.assertTrue(
-            any("source_function" in assertion or "helpers" in assertion for assertion in zero_assertions)
+            any("CommandCandidateSource" in assertion for assertion in zero_assertions)
         )
         self.assertEqual(leaf_paths, {("resolve",), ("proposal", "submit")})
         self.assertIn("cement_cli._UsageError", code)
         self.assertIn("handle", strings)
         self.assertTrue({"--submission", "--expected-function-hash"}.issubset(strings))
-        self.assertGreaterEqual(code.count("self.assertEqual((status, stdout), (2, ''))"), 2)
+        # The frame drives both cross-probes through ONE subTest loop, so the usage-error shape
+        # is written once. Counting occurrences would grade the author for not unrolling it.
+        self.assertIn("self.assertEqual((status, stdout), (2, ''))", code)
+        self.assertIn("cross_probes", code)
 
     def test_d18r_test_cli_channels_battery_py_3059_d27_preserve_b02_fro(self) -> None:
         """D18r obligation
@@ -2692,10 +2714,12 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         ]
 
         self.assertEqual(len(submissions), 1)
-        self.assertEqual(
-            set(json.loads(submissions[0].submission)),
-            {"input", "output", "provenance"},
-        )
+        # `provenance` is OPTIONAL, so the quick start legitimately shows the minimal form.
+        # Grade the envelope against the shipped key tuple: required keys present, no key
+        # outside it. Demanding all three would pin the quick start to the fullest example.
+        submission_keys = set(json.loads(submissions[0].submission))
+        self.assertTrue({"input", "output"}.issubset(submission_keys))
+        self.assertTrue(submission_keys.issubset(set(cement_cli._SUBMISSION_KEYS)))
         self.assertEqual(
             [namespace.command for namespace in parsed if namespace.command in REMOVED_LEAVES],
             [],
@@ -3044,11 +3068,16 @@ class RemovalObligationBatteryTests(unittest.TestCase):
             "use",
         }
         units: list[str] = []
+        # The register bounds a SENTENCE. A table cell routinely holds several, so cells are
+        # split into cells FIRST and then into sentences; measuring a whole cell reports a
+        # compliant pair of sentences as one oversized one.
         for paragraph in changed_paragraphs:
             if paragraph.startswith("|"):
-                units.extend(cell.strip() for cell in paragraph.split("|") if cell.strip())
+                pieces = [cell.strip() for cell in paragraph.split("|") if cell.strip()]
             else:
-                units.extend(re.split(r"(?<=[.!?])\s+", paragraph))
+                pieces = [paragraph]
+            for piece in pieces:
+                units.extend(re.split(r"(?<=[.!?])\s+", piece))
         root_description = cement_cli._parser().description or ""
         units.append(root_description)
         for sentence in units:
