@@ -975,6 +975,47 @@ Measured gaps driving the arc:
     survivor set). Every gate reruns from the committed tip with its SHA recorded. The verdict table's
     `action` column carries the encode instruction per row; `GATE-SPEC` rows bind construction, not
     assertions.
+    S3 CHECKPOINT 1, `main=` 85% 204K/240K. Shipped `6598e54` (validator + harness + 48-row seed) +
+    `69ce360` (witness fix). Gates rerun from tip `69ce360`, tree clean: gate 1 = 901 tests / OK /
+    74.832 s · gate 4 = rc 0 over 19 CHECK · gate 5 = rc 0 over 6 CHECK.
+    ONE CATALOGUE SERVES BOTH RESPECIFIED GATES. Section 11 demands a per-obligation RED control (gate 2)
+    and a reinsertion sweep (gate 3); those are the same instrument read two ways, so
+    `m3u5b-mutants.json` carries one row per battery clause tagged `reinsertion` or `sensitivity` and
+    `m3u5b-mutants.py` runs both. It isolates in a `git worktree`, which closes the standing defect that
+    a sweep contaminates `git status` for its whole run and strands a live mutant when killed.
+    KILLED IS NOW ATTRIBUTED, NOT COUNTED. The harness separates `killed` (the row's OWN `target_test`
+    went red) from `misdirected` (the run went red without it). A control that reddens some other test
+    certifies nothing about the obligation it was aimed at, and a plain kill count cannot see the
+    difference. `MISDIRECTED` and `PATCH-NOOP` both fail the gate.
+    48 CLAUSES, NOT 28 OBLIGATIONS. X39 rules D15/D18/D22 compound, and the validator DERIVES their
+    clause sets from the contract's own text rather than a hand list: D15 by the section 10 correction's
+    6-runtime/12-example split, D18 one clause per row of its own table (18), D22 one per DIRECTION plus
+    the protected ` ```text ` fence. `CORRECTION-UNCITED` is the `AMENDMENT-UNCITED` analog and guards
+    the same defect - section 10 OVERRIDES the bullet above it, so a body encoding the literal bullet
+    goes red against correct code. It fires on all eight corrected obligations (D03 D14 D15 D17 D18 D22
+    D27 D28).
+    THE SEED CREDENTIAL IS NOW MECHANICAL. `--self-test` grades both ways from committed state: filled
+    pair PASS rc 0, and 11 negative controls ALL FIRING. M3.5a graded its validator by hand and recorded
+    the result in prose, which cannot rerun from a clean checkout; this one can.
+    D04'S PROCEDURAL CREDENTIAL IS DISCHARGED, and section 11 called it unverifiable. Replaying
+    `apply_stage(pathlib.Path('.'), 2)` over the committed `EDITS` in a detached `36f7890` worktree
+    reproduces the shipped `cli.py` to EXACTLY TWO diff hunks / 9 lines - the two help-string edits the
+    section 10 "explicit capture help" fork ruled TAKEN and recorded as outside the seven `EDITS`. So the
+    limit as written is too strong: the staged apply is not distinguishable from a direct edit, but the
+    replay DOES bound the manual surface to the ruled exceptions, and a third unrecorded edit would show
+    as a third hunk.
+    Teammates: `test-m3u5b-2` (`.scratch/worktrees/test-m3u5b-2`, branch at `4e33cc6` + current
+    `.agent/decisions/` + the seeded stub, marker `TEST-M3U5B-2-DONE-1`) filling the 48-clause diff-blind
+    battery; `gate-m3u5b-1` (`.scratch/worktrees/gate-m3u5b-1`, branch at `69ce360`, marker
+    `GATE-M3U5B-1-DONE-1`) filling the 48-row catalogue and running the PRE-BATTERY baseline sweep.
+    THE BATTERY STUB STAYS OFF `main`. 48 `self.fail` bodies in `tests/` would turn gate 1 red, so the
+    seed lives on the teammate's branch alone; only the catalogue seed, which is evidence rather than a
+    test, is committed here.
+    NOT EVERY OBLIGATION CAN BE RED AT BASELINE, and demanding it would corrupt the battery. M3.5a's
+    30/30 red worked because every obligation described a NEW leaf; M3.5b's D12-D16, D21, D27 and D28 are
+    PRESERVATION obligations that legitimately hold at `4e33cc6`. That is exactly why section 11 requires
+    an independent red control per obligation: the catalogue generalises the baseline-red credential to
+    obligations no baseline can redden. Report the split; never force it.
   - M3.6a tier=kernel tags=- depends=M3.5b - delete public lifecycle methods, leases, result models and
     exports; retain only the private v2 binding plumbing.
   - M3.6b tier=kernel tags=prod depends=M3.6a - the sole schema cut v2->v3: direct proposal columns,
