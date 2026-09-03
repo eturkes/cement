@@ -37,9 +37,12 @@ from unittest import mock
 
 from cement_runtime import cli as cement_cli
 from cement_runtime.function import FunctionMatch
-from cement_runtime.models import FunctionCheck, FunctionResolution, FunctionVerification
+from cement_runtime.models import (
+    FunctionCheck,
+    FunctionResolution,
+    FunctionVerification,
+)
 from cement_runtime.system import System
-
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 REMOVED_LEAVES = frozenset({"handle", "request"})
@@ -291,7 +294,7 @@ def _constructed_candidate_sources() -> dict[str, object | None]:
                 positional_source = args[1] if len(args) > 1 else None
                 source = kwargs.get("candidate_source", positional_source)
                 instance = _DispatchSystem(source)
-                constructor_calls.append(instance)
+                constructor_calls.append(instance)  # noqa: B023 - called within iteration
                 return instance
 
             namespace = parser.parse_args(
@@ -336,7 +339,7 @@ def _module_from_git(revision: str) -> types.ModuleType:
     module.__package__ = "cement_runtime"
     sys.modules[name] = module
     source = _git_bytes(revision, "src/cement_runtime/cli.py")
-    exec(compile(source, module.__file__, "exec"), module.__dict__)
+    exec(compile(source, module.__file__, "exec"), module.__dict__)  # noqa: S102
     return module
 
 
@@ -557,8 +560,7 @@ def _shell_commands(markdown: str) -> list[list[str]]:
         pending: list[str] = []
         for raw_line in block.splitlines():
             line = raw_line.strip()
-            if line.startswith("$ "):
-                line = line[2:]
+            line = line.removeprefix("$ ")
             if not line or (not pending and line.startswith("#")):
                 continue
             continued = line.endswith("\\")
@@ -1264,6 +1266,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
             cwd=ROOT,
             capture_output=True,
             text=True,
+            check=False,
         )
         report = json.loads(completed.stdout)
         check_lines = [line for line in completed.stderr.splitlines() if line.startswith("CHECK")]
@@ -2645,7 +2648,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         module = ast.Module(body=[nested[0]], type_ignores=[])
         ast.fix_missing_locations(module)
         namespace: dict[str, object] = {"argparse": argparse, "hashlib": hashlib}
-        exec(compile(module, "<independent-parser-shape>", "exec"), namespace)
+        exec(compile(module, "<independent-parser-shape>", "exec"), namespace)  # noqa: S102
         oracle = namespace["parser_shape"]
         parser = cement_cli._parser()
         before = oracle(parser)
@@ -2942,7 +2945,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
                 invocations.append((relative, argv))
                 try:
                     namespace = parser.parse_args(argv)
-                except BaseException as error:
+                except BaseException as error:  # noqa: BLE001 - any parser refusal is data
                     failures.append((relative, argv, f"{type(error).__name__}: {error}"))
                     continue
                 if namespace.command in REMOVED_LEAVES:
