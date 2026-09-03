@@ -67,7 +67,9 @@ DEFAULT_VERDICT = (
     "tests.test_cli",
     "tests.test_submission_battery",
 )
-WITNESS = re.compile(r"^(?:FAIL|ERROR): (\w+) \(([\w.]+)\)", re.M)
+# The parenthesised group is already the FULL dotted path, test name included; pairing it with
+# the leading bare name would render every witness twice.
+WITNESS = re.compile(r"^(?:FAIL|ERROR): \w+ \(([\w.]+)\)", re.M)
 
 
 def _purge_pycache(root: pathlib.Path) -> None:
@@ -86,7 +88,7 @@ def _run(tree: pathlib.Path, modules: list[str]) -> tuple[bool, str]:
 
 
 def _witnesses(output: str) -> list[str]:
-    return sorted({f"{module}.{name}" for name, module in WITNESS.findall(output)})
+    return sorted(set(WITNESS.findall(output)))
 
 
 def _load() -> list[dict[str, str]]:
