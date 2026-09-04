@@ -1544,6 +1544,70 @@ Measured gaps driving the arc:
     a `SIGKILL`-seeded acceptance check.
     GATE 1 DECISIVE, from committed state at `8bad017`: `Ran 979 tests in 458.691s`, `OK`, rc 0.
     979 = 978 + D29.
+    S7 DONE, gate-9 instrument session, `main=` 87% 208K/240K. NO teammate dispatched: a session
+    that BUILDS a grader cannot also dispatch and harvest it, which is S4's own measurement
+    reproduced one wave later. Shipped `88e18c9`. Only a docstring changed under `tests/`, so
+    gate 1 is unmoved at `8bad017`'s 979 and was not rerun; the battery grader, its `--self-test`
+    and the D29 test were.
+    THE UNIT IS EIGHT SESSIONS against the plan line's three - `est 3 -> 8`, ratio 2.67, the
+    largest overrun on this project and the second unprecedented-shape unit to exceed 2.33. The
+    driver is unchanged from S4 and S5: entry cost. MAIN read this contract plus the battery's
+    clause set and was at 66% before the first line of the harness existed.
+    GATE 9 IS BUILT AND GRADED BOTH WAYS FROM COMMITTED STATE, so S8 opens on dispatch rather
+    than on tooling. `m3u6a1-mutants.py` derives its clause set from the shipped battery's own
+    AST and the contract's own obligation spelling, so the seed cannot drift from either:
+    `CLAUSES: 30`, 29 rows, 1 grounded exclusion. `--emit-stub` ADDS missing rows and never
+    rewrites filled ones, `no-op` on run 2 - the frozen-evidence rule applied to the seeder.
+    `--self-test` PASS with 12 controls ALL FIRING. The catalogue is RED at seed by construction
+    at `UNFILLED: 29`, which is its own credential.
+    D28 CARRIES NO ROW AND THE GROUNDS ARE STRUCTURAL, NEVER BUDGETARY. Its subject is the commit
+    set `git rev-list 6fb4d92..HEAD -- ...` returns, and every mutation this catalogue can express
+    edits the WORKING TREE alone, so no reversion or sensitivity row can turn it red and a row for
+    it would certify only that the clause ignores the mutation. It was RED at the `6fb4d92`
+    baseline, so it already holds the credential gate 9 exists to supply to the six clauses green
+    there (D04, D22, D24-D27). Its ~340 s cost and its one nested worktree per revision are
+    consequences of the exclusion, not its reason. `unittest` has no negative selector, so the
+    exclusion is spelled as an explicit test-id selection and PRINTED on every control line.
+    BASELINE-DEFECT IS THE COUNTER M3.5b PAID FOR: that unit's gate teammate filled 48/48 controls
+    and honestly annotated three with their own failed verdicts, and the catalogue still graded
+    CLEAN because notes are free text. `--validate` now reads each row's `note` for a recorded
+    baseline verdict and fails on `baseline=survived`/`misdirected`/`noop`.
+    TWO CLAIM DEFECTS IN MAIN'S OWN TEXT, tenth consecutive unit, both found by writing the
+    instrument the text describes. C20 - section 7 called the catalogue "gate 3 for this unit"
+    while section 6's own table assigns gate 3 to the ruling-sync check; the 3 is M3.5b's, where
+    gate 3 WAS the reinsertion sweep, so a reader following section 7 would have graded closure on
+    `m3u6a1-rule-census.py --check` and recorded a sweep that never ran. C10's rule one namespace
+    wider: a GATE number is not a key across contracts either. C21 - section 12 calls the battery
+    29 tests; D29 landed one session later under C19 and the shipped module holds 30.
+    C20 AND C21 FIRST BOUND FOUR OBLIGATIONS THEY DO NOT CORRECT, which is C10's own defect
+    reproduced by MAIN one correction after recording it. The binder scans bare `D\d+` tokens, so
+    C20's illustrative `D25` and C21's `D01-D29 plus D14a` range each became a binding and
+    `CORRECTION-UNCITED` went 0 -> 7 against a correct battery. Reworded until only the intended
+    binding scans: C20 binds NO obligation (its subject is section 7, and a correction may
+    legitimately bind none), C21 binds D29 alone. PROSE ILLUSTRATING A RULE MUST NOT SPELL AN ID
+    THE RULE'S OWN PARSER READS.
+    S8 ENTRY STATE, dispatch-ready. Contract sections 1-13 bind, 30 obligations, 21 corrections;
+    gate 9 is section 6's ninth row and section 7's catalogue.
+    · Dispatch `gate-m3u6a1-1` into `.scratch/worktrees/gate-m3u6a1-1` on a branch at the S7 tip.
+      NOT diff-blind - a catalogue author must read the shipped tree to write anchors that resolve
+      - which is why it is a `gate` role and not a second `test`. Marker `GATE-M3U6A1-1-DONE-1`,
+      report INLINE as the final assistant message, the committed artifact
+      `.agent/decisions/m3u6a1-mutants.json` being the real deliverable. Brief it to fill all 29
+      rows and to run the PRE-BATTERY baseline sweep, graded by
+      `uv run python .agent/decisions/m3u6a1-mutants.py --validate` (rc 0, every counter 0), with
+      an explicit RETARGET clause: a compound clause earns extra rows, and extension rows have
+      outnumbered seeds in every wave this project has run.
+    · Each row is a REVERSION (restore the `handle` call, the `request_id` argument, the dead
+      `prefix` parameter, a pre-migration demo act) or a SENSITIVITY control on one of the six
+      preservation obligations. The M3.5b defect to name in the brief: a control must aim at the
+      test that OWNS the property, and where a clause is a STATIC check on another frame's source
+      the mutation target is that FRAME, not production code - 13 of M3.5b's 48 controls carried
+      exactly that defect at once.
+    · Then MAIN runs the decisive sweep itself (`--json`), rules every survivor by name, and
+      closes: re-grade the contract's own gate text against what the campaign measured, name the
+      ruled tables and the two `wt/` branch tips in the contract, set the unit DONE with
+      `est 3 -> 8`, and set M3 IMPLEMENTED only when M3.6a2, M3.6a3, M3.6b and M3.7-M3.9b are also
+      DONE - M3.6a1 alone does not close the milestone.
   - M3.6a2 tier=kernel tags=- depends=M3.6a1 - delete `handle`, `request_status`, `_outcome`,
     `_fail_generation` and `_request_revision_is_current`; delete the `generation_lease_seconds`
     constructor knob, `self._lease_us` and the clock bound named after it; delete request cancellation on
