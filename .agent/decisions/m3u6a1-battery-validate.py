@@ -44,7 +44,9 @@ BATTERY_RELPATH = pathlib.Path("tests") / "test_migration_battery.py"
 # the digit boundary on M3.5a, which is the fail-open shape of a forbidden list.
 OBLIGATION = re.compile(r"^- \*\*(D\d+[a-z]?)\*\*\s*(.*)$")
 CORRECTION = re.compile(r"^- \*\*(C\d+)\b\s*(.*)$")
-BULLET_CONT = re.compile(r"^  \S")
+# Any indent, not exactly two: a nested sub-bullet indents its own continuation deeper, and
+# `^  \S` stopped the fold there, silently dropping every id after the first nested one.
+BULLET_CONT = re.compile(r"^ {2,}\S")
 ID_TOKEN = re.compile(r"\b(D\d+[a-z]?)\b")
 # `M3.5b's D25` is ANOTHER unit's obligation, and its number collides with a live
 # local id. A bare token scan binds it here and a diff-blind author then encodes a

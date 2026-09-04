@@ -388,8 +388,25 @@ because a verdict set is not quotable without the clauses it omits.
   measurement S4 made and named: a session that BUILDS a grader cannot also
   dispatch and harvest it. Entry cost is the driver — MAIN read this contract and
   the battery's clause set and was at 66% before the first line of the harness.
-- **S8** — fill the catalogue, run the decisive sweep, rule its survivors, and
-  close the unit.
+- **S8** DONE — the catalogue filled to 92 rows, MAIN's decisive sweep, C22-C26,
+  and closure. Section 14 is the sweep record. All nine gates green from
+  committed state:
+
+  | # | result |
+  | --- | --- |
+  | 1 | `Ran 979 tests in 352.354s`, `OK` — floor 949 met |
+  | 2 | `SURVIVING-MIGRATE: 0`; `MEASURE-DRIFT`, `UNGROUNDED-OVERRIDE`, `BAD-VERDICT` all 0; 23 definitions / 45 sites / 23 RETAIN; `RESULT: PASS` |
+  | 3 | `IN-SYNC` |
+  | 4 | `RESULT: PASS` |
+  | 5 | `RESULT: PASS`; P1's one differing cell is `events.rows:row1.payload_json`; P2 reproduces both halves |
+  | 6 | `no-op` on both runs, tree clean afterwards |
+  | 7 | rc 0, UNCHANGED — 28 leaves / 35 nodes, `parser_shape` 151 / `ebd2ac811bd9776d` |
+  | 8 | rc 0, every check ok |
+  | 9 | `CONTROL: GREEN`, 92 mutants, `KILLED: 92`, `MISDIRECTED: 0`, `SURVIVORS: 0`, `PATCH-NOOP: 0`, `RESULT: PASS` |
+
+  Section 12's grader re-run after C22-C26: `OBLIGATIONS: 30`, `TESTS: 30`,
+  `CORRECTION-UNCITED: 0`, `RESULT: PASS`, self-test all controls firing.
+  The unit closes at EIGHT sessions against a plan of three.
 
 ---
 
@@ -642,8 +659,13 @@ closed on claim defects in MAIN's own text.
   subject grows, read as evidence every run before it degraded.
 - **C24 — three battery clauses assert subproperties they cannot observe.**
   Surfaced by the reversion sweep, then verified from committed artifacts rather
-  than from the report that raised them:
-  - **D17's migrated-definition loop is vacuous BECAUSE gate 2 passes.** It walks
+  than from the report that raised them. **This correction binds no obligation,
+  and the omission is deliberate: all three obligations are unchanged, and what is
+  defective is the METHOD ENCODING each of them.** The steering targets are
+  therefore named as test methods with their line numbers, and the repairs are
+  registered in `.agent/polish.md` rather than folded into obligation text:
+  - **`test_d17_multi_line_anchors_...` (`tests/test_migration_battery.py:1036`)
+    holds a migrated-definition loop that is vacuous BECAUSE gate 2 passes.** It walks
     `_census()["definitions"]` and `continue`s on every verdict outside
     `{MIGRATE, MIGRATE-RESOLVE}`; the committed `m3u6a1-census.json` holds 23
     rows, all `RETAIN`. The body never executes. Gate 2's acceptance IS
@@ -651,13 +673,17 @@ closed on claim defects in MAIN's own text.
     certifies empty — dead at the moment that gate goes green. Standing rule: a
     battery clause must never draw its work list from a post-state census whose
     emptiness is another gate's acceptance criterion.
-  - **D20's `assertNotIn("becomes one exportable function")` never had a
+  - **`test_d20_act_5_keeps_export_and_identity_...`
+    (`tests/test_migration_battery.py:1152`) asserts
+    `assertNotIn("becomes one exportable function")`, which never had a
     subject.** The baseline heading at
     `6fb4d92:examples/hospital_ocr/run_demo.py:348` reads "both promoted layouts
     **become** one exportable function". The asserted string differs by one
     character and existed at neither end, so the conjunct held vacuously at
     baseline and holds vacuously at HEAD.
-  - **D15 reports on two different artifacts under one clause.** Its idempotence
+  - **`test_d15_the_migration_lands_through_one_idempotent_script_m3u6a1`
+    (`tests/test_migration_battery.py:950`) reports on two different artifacts
+    under one clause.** Its idempotence
     half runs `repaired / SURGERY.relative_to(ROOT)` — the script COMMITTED
     inside the detached worktree — while its cardinality half runs
     `_copy_surgery()`, which copies the WORKING-TREE script. An edit to the
@@ -671,6 +697,36 @@ closed on claim defects in MAIN's own text.
   `.agent/polish.md` with acceptance checks, they do not gate closure, and they
   must not be repaired silently, because every repair edits the battery and
   invalidates gate 9's committed-state binding.
+- **C25 — section 7's coverage sentence and section 12's floor arithmetic both
+  stop one obligation short.** Binds no obligation; its subjects are two prose
+  surfaces. Section 7 describes the battery as one test per obligation over a
+  range ending at the twenty-eighth, so the lettered obligation added in S2 and
+  the thirtieth added in S6 under C19 both sit OUTSIDE the sentence that defines
+  the battery's own coverage. Section 12's ruling on the whole-gate red then
+  prints the suite floor as `978 - 29` where the shipped pair is `979 - 30`. The
+  floor is 949 either way, which is exactly why the arithmetic survived three
+  sessions unread: a stale term inside an expression whose VALUE is still right
+  leaves no failing check anywhere. Measured at closure by
+  `m3u6a1-battery-validate.py`: `OBLIGATIONS: 30`, `TESTS: 30`, `UNCOVERED: 0`,
+  and gate 1 `Ran 979 tests in 352.354s, OK`. The battery covers everything; the
+  prose describing it does not. C21 corrected the COUNT in section 12 and left
+  the RANGE in section 7 and the arithmetic in section 12's own ruling standing —
+  a correction repairs the sentence it was written against, never the family.
+- **C26 — the correction-binder's fold stopped at the first NESTED sub-bullet, so
+  a correction naming three clauses bound one.** Binds no obligation; its subject
+  is `m3u6a1-battery-validate.py`. `BULLET_CONT` was `^  \S` — a continuation
+  line indented EXACTLY two spaces. A nested sub-bullet indents its own
+  continuation deeper, so folding C24 stopped 265 characters in, at the first
+  four-space line, and the binder saw only the ids appearing before that point.
+  It then reported `IN SYNC` on a binding it had silently truncated: the counter
+  cannot see an id it never read, which is the fail-open shape this project
+  already rules against for forbidden lists and closed allowlists, arriving in a
+  text folder. Fixed to `^ {2,}\S`. Measured both ways before and after: under
+  the widened rule every correction from C01 to C21 binds an IDENTICAL set, so
+  the defect had never once bitten — C24 is the first correction in this contract
+  written with nested sub-bullets, and it found the bug by being the first input
+  of a shape the folder never had. An instrument that has only ever seen one
+  input shape holds no credential for the next one.
 
 ---
 
@@ -812,3 +868,86 @@ owning `parser_shape`'s field set; Y08 belongs to M3.5b's doc parser and its
 corpus. Neither leaves this unit exposed: D04's whole-`src` byte pin is stricter
 than gate 7 on the premise Y07 threatens, and this unit ships no new command
 prose.
+
+## 14. Reversion sweep — DECISIVE (S8)
+
+Catalogue = `.agent/decisions/m3u6a1-mutants.json`, **92 rows over 29 clauses**
+(53 `reversion`, 39 `sensitivity`, every row `expect: killed`). MAIN seeded 29
+rows at S7; `gate-m3u6a1-1` filled them and extended to 92 at
+`wt/gate-m3u6a1-1` @ `96d155d`, harvested into `0e91de9` by targeted checkout
+proven sha256-identical. Structural grade `RESULT: PASS`; `--self-test`
+`RESULT: PASS` with 12/12 controls firing after C23's repair.
+
+**MAIN's decisive rerun, from committed state at `0340631`, on a box with no
+other job running:**
+
+    uv run python .agent/decisions/m3u6a1-mutants.py --json /tmp/m3u6a1-decisive.json
+
+    VERDICT-MODULES: tests.test_migration_battery
+    VERDICT-TARGETS: 29          D28 excluded, grounds printed on the control line
+    CONTROL: GREEN
+    MUTANTS: 92
+    KILLED: 92
+    MISDIRECTED: 0 []
+    SURVIVORS: 0 []
+    NAMED-SURVIVOR-SET: 0 []
+    PATCH-NOOP: 0 []
+    UNEXPECTED-SURVIVORS: 0 []
+    RESULT: PASS
+
+97 min 23 s wall over 93 battery runs (1 control + 92 mutants) = **62.8 s per
+run against the 78.3 s S8 measured before dispatch**. The sizing miss is the ROW
+COUNT, not the cost: S8 sized ~40 min for 30 runs, per-run cost came in 20 % under
+forecast, and the catalogue tripled underneath it. A sweep is sized by the
+catalogue the FILL produces, never by the one the seed ships (C22).
+
+**The empty named-survivor set is the strongest form, not an unfilled field.**
+The standing rule replaces a "zero survivors" predicate with a NAMED survivor set
+so a later fifth survivor fails while the ruled four do not. Here the named set is
+empty because no clause was granted equivalence: every row declares
+`expect: killed` and every row killed, so `UNEXPECTED-SURVIVORS` and `SURVIVORS`
+coincide and any future survivor fails the gate outright.
+
+**Three rows were retargeted before the decisive run, and the retargets are this
+campaign's whole return.** Each first verdict was a true finding about the SHIPPED
+clause, ruled at C24 and registered for repair; each row was then aimed at a
+reachable conjunct of the same obligation, so coverage of all 29 clauses survived.
+
+| row | clause | first verdict | blind subproperty of the shipped clause | retargeted onto |
+| --- | --- | --- | --- | --- |
+| M16 | D15 | `misdirected` | idempotence half runs the script COMMITTED in a detached worktree, so a working-tree mutation cannot reach it; the duplicated `main` then aborts in `_qualified()` before TEXT cardinality runs | the exit contract — convert the surgery abort to rc 0 and D15's repeated-fragment probe goes silently green |
+| M21 | D20 | `misdirected` | asserts `"becomes one exportable function"`; the baseline heading reads `become`, so the conjunct held at both ends | the ordered lifecycle spine — restore the pre-migration act flow and `propose`, checkpoint and `resolve` leave D20's ordering |
+| M66 | D17 | `survived` | the "all migrated definitions" loop reads the POST-migration census, which gate 2 certifies holds zero `MIGRATE` rows, so deleting a `SITES` rule passes vacuously | the second-run no-op guarantee — an unchanged tree prints `applied:` instead of `no-op` |
+
+Measured chain, restated here because its `/tmp` outputs are not tracked: base
+29-row sweep **27 killed / 2 misdirected** (M16, M21); focused 92-row diagnostic
+**91 killed / 1 survived** (M66); per-row repair runs then returned M21 killed on
+9 witnesses, M16 and M62 killed on 1 each, M66 killed on 1. M21's nine witnesses
+are worth naming: restoring a whole demo act flow reddens nine clauses at once, so
+the row proves D20 is AMONG its killers rather than that D20 uniquely owns the
+property. A blunt row still satisfies `killed`; it is weaker evidence than a
+one-witness row and the catalogue does not currently distinguish them.
+
+**Instruments and evidence this unit's closure rests on, all committed:**
+
+| artifact | what it holds |
+| --- | --- |
+| `m3u6a1-census.json` + `m3u6a1-census.py` + `m3u6a1-rule-census.py` | gates 2-3; 23 definitions, 45 sites, `SURVIVING-MIGRATE: 0` |
+| `m3u6a1-fallback.json` + `m3u6a1-fallback.py` | gate 4, the frozen 72-site shape attribution |
+| `m3u6a1-premise.py` | gate 5, P1 and P2 graded rather than printed (C19) |
+| `m3u6a1-surgery.py` | gate 6, the one idempotent migration script |
+| `m3u6a1-mutants.json` + `m3u6a1-mutants.py` | gate 9, this section |
+| `m3u6a1-verdicts.json` + `m3u6a1-battery-validate.py` | section 12's battery verdict table |
+| `m3u6a1-attack.json` + `m3u6a1-rule-attack.py` | section 13's 36 ruled attack rows, `--check` in sync |
+
+**Retained `wt/` branch tips — MILESTONE-REVIEW dispatches from these.** Their
+worktrees are removed; the branches stay because they are the only refs keeping
+these SHAs resolvable, and no ruling rests on them — every ground is restated
+above as a measured fact.
+
+| branch | tip | based at | what it carries |
+| --- | --- | --- | --- |
+| `wt/test-m3u6a1-1` | `5e604b7` | `6fb4d92` | the diff-blind battery as authored, before MAIN's V01-V08 reconciliation |
+| `wt/rev-m3u6a1-1` | `82e1a2e` | `6fb4d92` | the 36-row attack table as filled, before MAIN's dispositions |
+| `wt/gate-m3u6a1-1` | `96d155d` | `915c91e` | the 92-row catalogue as filled, plus its 22 fill commits |
+| `wt/scout-m3u6a2` | `03b5da9` | `915c91e` | M3.6a2's re-measured deletion burden and the repaired `m3u6a-burden.py` |
