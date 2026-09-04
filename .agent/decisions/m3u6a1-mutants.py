@@ -433,7 +433,10 @@ def self_test(document: dict, clauses: dict[str, str]) -> int:
         return ok
 
     def _drop_row(doc: dict) -> None:
-        doc["rows"] = doc["rows"][1:]
+        # Drop the whole covering set, not row 0: once a clause carries several rows the
+        # single-row drop leaves it covered and the control reports SILENT on a live check.
+        clause = doc["rows"][0]["target_test"]
+        doc["rows"] = [row for row in doc["rows"] if row["target_test"] != clause]
 
     def _unfill(doc: dict) -> None:
         doc["rows"][0]["anchor"] = UNKNOWN
