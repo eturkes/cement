@@ -1429,6 +1429,11 @@ class MigrationBatteryTests(unittest.TestCase):
     def test_d28_gate_1_stays_green_at_every_commit_never_only_at_the_last(self) -> None:
         """D28 — Gate 1 stays green at every commit, never only at the last one. A migration
         that lands red and is repaired later forfeits the axis's own guarantee.
+
+        This battery is the instrument, not part of what it measures: every checkout drops
+        `tests/test_migration_battery.py` before the inner run. Keeping it turns D28 into its
+        own subject — each battery-bearing revision re-enters this method, and the nesting
+        alone exhausts the timeout.
         """
         revision_result = _run(
             [
@@ -1448,6 +1453,7 @@ class MigrationBatteryTests(unittest.TestCase):
         self.assertTrue(revisions, "no migration commit exists after the opening commit")
         for revision in revisions:
             with self.subTest(revision=revision), _detached_worktree(revision) as tree:
+                (tree / "tests" / pathlib.Path(__file__).name).unlink(missing_ok=True)
                 result = _run(
                     [
                         sys.executable,

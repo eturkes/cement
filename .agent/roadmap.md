@@ -1449,12 +1449,17 @@ Measured gaps driving the arc:
     round to 0 over 10 docstrings. Two corrections also had to GAIN explicit obligation citations
     first (C13 -> D13, D14; C14 -> D13), because C10's own rule says a correction naming no obligation
     is invisible to the counter that exists to steer the author.
-    V08 IS OPEN AND IS AN INSTRUMENT SELF-REFERENCE: D28 runs the FULL suite as a subprocess, and the
-    battery is now a MEMBER of that suite, so the run is self-recursive and timing-sensitive - 221 s
-    green before the battery was committed, 890 s and one `subprocess.TimeoutExpired` after. Gate 1 as
-    a whole measured OK at 978 tests / 299.230 s from committed state at `f548f88`, so the PROPERTY
-    holds and the instrument is what needs re-scoping. A test inside gate 1 cannot verify gate 1 about
-    itself.
+    V08 WAS AN INSTRUMENT SELF-REFERENCE AND IS REPAIRED IN S6: D28 runs the FULL suite as a
+    subprocess, and the battery is a MEMBER of that suite, so every battery-bearing revision re-entered
+    D28 and the nesting alone exhausted the 600 s timeout. S5 read gate 1 as OK at `f548f88` (978
+    tests / 299.230 s) and concluded THE PROPERTY HOLDS, only the instrument needs re-scoping - that
+    conclusion was an artefact of recursion DEPTH, not evidence. Cost scales with the count of
+    battery-bearing revisions: one of three at `f548f88`, two of four at `abb6b06`, and the whole gate
+    went red - `Ran 978 tests in 997.691s`, `FAILED (errors=1)`. Repair = each checkout drops
+    `tests/test_migration_battery.py` before the inner run, which is what D28's pre-existing floor of
+    949 (= 978 - 29) already assumed. A CHECK WHOSE COST SCALES WITH THE THING IT CHECKS IS UNSTABLE,
+    AND A GREEN READING FROM AN UNSTABLE CHECK IS NOT EVIDENCE - ruling on an instrument's SHAPE never
+    waits for it to go red.
     GATES 1-8 GREEN FROM COMMITTED STATE at `f548f88`: 1 = 978 tests / OK / 299.230 s · 2 =
     `SURVIVING-MIGRATE 0`, UNRULED/STALE/MEASURE-DRIFT/UNGROUNDED-OVERRIDE/BAD-VERDICT all 0, PASS ·
     3 = `IN-SYNC` · 4 = RESULT PASS, TARGETS 45 · 6 = `no-op` · 7 = rc 0 · 8 = rc 0. Both graders
@@ -1471,13 +1476,19 @@ Measured gaps driving the arc:
     with the control still clean), Y07 (gate 7's `parser_shape` omits action `type`/`choices`/`help`,
     which duplicates an OPEN M3.5b polish row rather than opening a new one), and Y10 (a source-byte
     plus callable pin does not force RUNTIME method preservation: mutating
-    `System.handle.__kwdefaults__` passes all three P06 spans and M3.5b's D01). Repair V08. Then the
-    reversion catalogue and closure. THE UNIT IS SEVEN SESSIONS.
-    WORKTREES RETAINED, both teammates still live at harvest time: `wt/test-m3u6a1-1` @ `5e604b7` and
+    `System.handle.__kwdefaults__` passes all three P06 spans and M3.5b's D01). Then the reversion
+    catalogue and closure. THE UNIT IS SEVEN SESSIONS.
+    GATES RE-MEASURED AT THE V08 REPAIR: 1 = 978 tests / OK / 613.518 s (`uv run python -m unittest
+    discover -s tests -t .`; D28 alone = 338.592 s over 4 revisions at ~85 s each, so the honest cost
+    of the per-commit axis is HALF the gate) · 6 = `no-op`, confirming the battery sits outside the
+    surgery replay domain · battery grader RESULT PASS, all six counters 0.
+    WORKTREES RETAINED, both teammates STOPPED in S6: `wt/test-m3u6a1-1` @ `5e604b7` and
     `wt/rev-m3u6a1-1` @ `82e1a2e` carry the delivered artifacts, both already harvested by TARGETED
     CHECKOUT - `git diff --name-status main..wt/<name>` renders `m3u6a1-surgery.py` as DELETED and the
-    whole migration as reverted on both branches, so squash-merge was never available. S6 stops both,
-    reads each worktree's status in its own call, and removes them.
+    whole migration as reverted on both branches, so squash-merge was never available. Post-stop status
+    read per worktree in its own call: both `git status --porcelain` EMPTY at the tips above, nothing
+    stranded mid-write, no watcher processes surviving. S6 removes the worktrees, the `wt/` branches
+    and the detached `.scratch/worktrees/m3u6a1-baseline` at closure.
   - M3.6a2 tier=kernel tags=- depends=M3.6a1 - delete `handle`, `request_status`, `_outcome`,
     `_fail_generation` and `_request_revision_is_current`; delete the `generation_lease_seconds`
     constructor knob, `self._lease_us` and the clock bound named after it; delete request cancellation on

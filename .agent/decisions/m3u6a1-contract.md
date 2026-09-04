@@ -551,7 +551,7 @@ first and a repair second.
 | V04 | D14 `_unused_parameters(helper) == {'self'}` | SUITE + CONTRACT | C13, same helper defect. |
 | V05 | D13 baseline calls 6 vs 7 and 3 vs 4 | CONTRACT | C14. Section 1's counts for these three helpers are def-inclusive fixed-string counts; the AST counts are binding. |
 | V06 | D21 `\b35\b` absent from the refusal test | **CODE** | The shipped `tests/test_hospital_ocr_example.py:909` still read "erase all 38 of them" while the migrated demo holds 35 `ast.Assert` nodes. S3 recorded "D21's verdict count re-derived 38 -> 35"; that re-derivation reached the roadmap and never reached the shipped surface. Fixed. |
-| V08 | D28 `subprocess.TimeoutExpired` on a nested `unittest discover`, module-alone run only | OPEN (S6) | D28 runs the FULL suite as a subprocess, and the battery is now a MEMBER of that suite, so the run is self-recursive and its cost is timing-sensitive: 221 s green before the battery was committed, 890 s and one ERROR after. Gate 1 as a whole measured OK at 978 tests / 299.230 s from committed state, so the property holds; the INSTRUMENT is what needs re-scoping. A test inside gate 1 cannot verify gate 1 about itself — S6 either excludes its own module from the inner discover or moves the obligation to MAIN's gate discipline. |
+| V08 | D28 `subprocess.TimeoutExpired` on a nested `unittest discover` — WHOLE-GATE red at `abb6b06` | INSTRUMENT-REPAIRED (S6) | D28 runs the FULL suite as a subprocess, and the battery is a MEMBER of that suite, so every battery-bearing revision re-entered D28 and the nesting alone exhausted the 600 s timeout. Cost grows with the count of battery-bearing revisions, so S5's reading that gate 1 "measured OK, the property holds" was an artefact of depth: at `f548f88` one of three revisions carried the battery; at `abb6b06` two of four did, and the whole gate went red — `Ran 978 tests in 997.691s`, `FAILED (errors=1)`. Repair = each checkout drops `tests/test_migration_battery.py` before the inner run, which is what the pre-existing floor of 949 (= 978 − 29) already assumed. D28 alone: `Ran 1 test in 338.592s`, `OK`, 4 revisions at ~85 s each. |
 | V07 | D16 replay divergence on `tests/test_hospital_ocr_example.py` | INSTRUMENT-CORRECT | D16 fired because V06's fix was a HAND edit outside `m3u6a1-surgery.py`. Routed into `TEXT` with its expected-count assertion; gate 6 reports `no-op` on the second run and the replay reproduces the shipped tree. |
 
 **V06 is the wave's whole return and the class the battery exists to reach.**
@@ -566,6 +566,16 @@ MAIN's own text — and the first in this unit where one of them had reached cod
 exactly what C05 forbids, and the replay obligation caught it within one gate
 run. The generalisation is the project's own standing rule, now with a measured
 instance: a repair to a script-generated artifact lands IN the script.
+
+**V08 is the one finding a green gate concealed.** An instrument that includes
+itself in its own subject does not fail at the boundary it crosses; it fails when
+the population it measures grows one member past the timeout, and every earlier
+run reads as evidence that the property holds. S5 had the whole diagnosis —
+"a test inside gate 1 cannot verify gate 1 about itself" — and still deferred,
+because the gate was green THAT run. The rule the deferral broke: a check whose
+cost scales with the thing it checks is not stable, and a green reading from an
+unstable check is not evidence. Ruling on the instrument's SHAPE never needs to
+wait for it to go red.
 
 ## 13. Attack table — PENDING (S6)
 
