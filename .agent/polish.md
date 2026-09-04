@@ -635,3 +635,40 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   die: `assertFalse(resolution.match.matched)` weakened to `assertIsNotNone(resolution.match)`,
   `assertEqual(payload, {"request_id": rid})` weakened to `assertIn("request_id", payload)`, and
   `assert source.calls == before` weakened to `>=`.
+
+- `pri=2` `size=S` — D17's migrated-definition loop is VACUOUS at HEAD and dead precisely because
+  gate 2 passes. `tests/test_migration_battery.py:1036` walks `_census()["definitions"]` and
+  `continue`s on every verdict outside `{MIGRATE, MIGRATE-RESOLVE}`; the committed
+  `m3u6a1-census.json` holds 23 rows, all `RETAIN`, so the body never executes. Gate 2's acceptance
+  IS `SURVIVING-MIGRATE: 0`, so the clause iterates the set another gate certifies empty. M3.6a1 C24.
+  Acceptance: D17's line-shifted replay check draws its work list from the BASELINE census
+  (`git show 6fb4d92:.agent/decisions/m3u6a1-census.json`, or the frozen opening set) so the loop has
+  a non-empty subject at HEAD, and a seeded control confirms it — delete one `SITES` rule from
+  `m3u6a1-surgery.py` and require D17 to go red, which it does not today.
+
+- `pri=2` `size=XS` — D20 asserts a string that never existed at either end.
+  `tests/test_migration_battery.py:1152` runs `assertNotIn("becomes one exportable function", ...)`
+  while the baseline heading at `6fb4d92:examples/hospital_ocr/run_demo.py:348` reads "both promoted
+  layouts **become** one exportable function" — one character apart, so the conjunct held vacuously
+  at baseline and holds vacuously at HEAD. M3.6a1 C24. Acceptance: the asserted literal is re-derived
+  from the baseline blob rather than retyped, and a seeded control confirms sensitivity — restore the
+  baseline act-5 heading in a detached worktree and require D20 to go red.
+
+- `pri=3` `size=S` — D15 reports on two different artifacts under one clause.
+  `tests/test_migration_battery.py:950` runs its idempotence half against
+  `repaired / SURGERY.relative_to(ROOT)`, the script COMMITTED inside the detached worktree, while
+  its cardinality half runs `_copy_surgery()`, which copies the WORKING-TREE script. An edit to the
+  working-tree script moves the second half and cannot move the first, so the clause cannot go red
+  during development and no mutation instrument that edits the working tree can reach half of it.
+  M3.6a1 C24. Acceptance: both halves name one source explicitly — `_copy_surgery()` for
+  working-tree sensitivity, or a stated committed-artifact reading for both — and a seeded control
+  confirms it: mutate the working-tree `m3u6a1-surgery.py` so its second run prints `applied:`
+  instead of `no-op` and require D15 to go red, which it does not today.
+
+- `pri=3` `size=S` — no check grades this contract's own gate text against what its instruments
+  measured, which is why closure sessions keep finding claim defects in MAIN's text by hand (C11,
+  C12, C14, C17, C20, C21, C22, C23 — eight of twenty-four corrections are the contract restating a
+  number or a shape its own artifact contradicts). Acceptance: a committed checker reads every
+  contract sentence carrying a count or a gate identifier, resolves it against the named committed
+  artifact, and exits nonzero on divergence; seeded both ways — restate one count wrong and require
+  a nonzero exit, run it on the shipped contract and require zero.

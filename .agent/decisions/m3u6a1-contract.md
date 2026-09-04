@@ -617,6 +617,60 @@ closed on claim defects in MAIN's own text.
   the reason a closure session re-derives every number the contract asserts
   rather than quoting its own earlier text. Binds D29, whose late arrival is the
   cause.
+- **C22 — section 7's "one row per battery clause" undercounts the instrument
+  threefold.** Section 7 specifies "One row per battery clause, tagged
+  `reversion` or `sensitivity`", and the S7 seed encoded exactly that at 29 rows.
+  The sweep refuted it: a clause is a CONJUNCTION, so reverting one conjunct
+  leaves the others asserting and a one-row-per-clause catalogue certifies only
+  that each clause holds SOME live content. The delivered catalogue is 92 rows
+  over 29 clauses — 53 `reversion`, 39 `sensitivity`, one row per SUBPROPERTY.
+  The instrument was already subproperty-compatible: `CLAUSE-UNCOVERED` demands
+  every clause be covered and nothing forbids a second row, so the prose was the
+  only surface that disagreed. Read section 7's rule as ONE ROW PER SUBPROPERTY,
+  with every clause covered at least once. Binds section 7's row rule.
+- **C23 — the catalogue's own both-ways credential was row-count dependent, and
+  12/12 was really 11/12.** `--self-test`'s `dropped row` control removed
+  `rows[0]` and expected `CLAUSE-UNCOVERED`. That expectation holds only while
+  rows are 1:1 with clauses. Once several rows covered one clause the drop left
+  it covered, the control reported SILENT, and the instrument still printed a
+  full 12/12 credential on the strength of the other eleven. Fixed at `0e91de9`:
+  the control now drops the first row's WHOLE covering set, which is row-count
+  independent; 12/12 fire at 92 rows. The generalisable rule — a control that
+  mutates `rows[0]` is valid only where one row is the whole of the property it
+  checks, and the scale-up that kills it is exactly what filling the catalogue
+  does. Same family as V08: an instrument whose credential degrades as its own
+  subject grows, read as evidence every run before it degraded.
+- **C24 — three battery clauses assert subproperties they cannot observe.**
+  Surfaced by the reversion sweep, then verified from committed artifacts rather
+  than from the report that raised them:
+  - **D17's migrated-definition loop is vacuous BECAUSE gate 2 passes.** It walks
+    `_census()["definitions"]` and `continue`s on every verdict outside
+    `{MIGRATE, MIGRATE-RESOLVE}`; the committed `m3u6a1-census.json` holds 23
+    rows, all `RETAIN`. The body never executes. Gate 2's acceptance IS
+    `SURVIVING-MIGRATE: 0`, so the clause iterates precisely the set another gate
+    certifies empty — dead at the moment that gate goes green. Standing rule: a
+    battery clause must never draw its work list from a post-state census whose
+    emptiness is another gate's acceptance criterion.
+  - **D20's `assertNotIn("becomes one exportable function")` never had a
+    subject.** The baseline heading at
+    `6fb4d92:examples/hospital_ocr/run_demo.py:348` reads "both promoted layouts
+    **become** one exportable function". The asserted string differs by one
+    character and existed at neither end, so the conjunct held vacuously at
+    baseline and holds vacuously at HEAD.
+  - **D15 reports on two different artifacts under one clause.** Its idempotence
+    half runs `repaired / SURGERY.relative_to(ROOT)` — the script COMMITTED
+    inside the detached worktree — while its cardinality half runs
+    `_copy_surgery()`, which copies the WORKING-TREE script. An edit to the
+    working-tree script moves the second half and cannot move the first.
+
+  None of the three clauses is wholly dead; each retains live conjuncts, which is
+  why M16, M21 and M66 were retargeted onto reachable failures and the catalogue
+  still covers all 29 clauses. Section 7's acceptance bar is OBLIGATION-level —
+  the battery "must fail when one obligation remains undone" — and that bar is
+  met. These are CONJUNCT-level weaknesses: they are registered in
+  `.agent/polish.md` with acceptance checks, they do not gate closure, and they
+  must not be repaired silently, because every repair edits the battery and
+  invalidates gate 9's committed-state binding.
 
 ---
 
