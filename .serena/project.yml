@@ -72,7 +72,13 @@ ls_additional_workspace_folders: []
 #     - "**/bin/**"
 #     - "**/obj/**"
 # Note: global ignored_paths from serena_config.yml are also applied additively.
-ignored_paths: []
+# Project rule (CLAUDE.md "Read cost control"): committed data files + LSP-hostile paths. Narrows
+# Serena alone; never gates Read/Bash, which reach these bytes through bounded queries. Gitignored
+# trees need no entry (ignore_all_files_in_gitignore). No LSP-hostile path measured here: yaml, toml
+# and markdown all answer documentSymbol in <=0.10s across every tracked file.
+ignored_paths:
+- ".agent/decisions/*.json"
+- "uv.lock"
 
 # whether the project is in read-only mode
 # If set to true, all editing tools will be disabled and attempts to use them will result in an error

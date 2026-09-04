@@ -1,11 +1,32 @@
 # Polish register
 
 Deferred-perfection items, off the milestone spine. `/session-polish` = sole consumer; protocol lives
-there. Rows are born at deferral with the acceptance check already written.
+there. Rows are born at deferral with the acceptance check and the priority already written.
 
 Gate for every row unless it says otherwise: `uv run python -m unittest discover -s tests -t .` plus
 `uv build`. Scope sources, assurance tiers and the unit set stay fixed — a row needing any of those
 changed is spine work, not polish.
+
+- `pri=2` `size=L` — NO deterministic checker is configured, against the standing rule that deterministic
+  checks own every rule a tool can decide and that proven checkers are configured before a judgment pass
+  spends attention on what they would have caught. The sole gate is the unittest suite; `ruff` sits on the
+  machine and is run by hand (M3.5b ran it over one battery and three instruments), no repo config exists,
+  and `mypy` is absent from the environment entirely. Measured at this row's writing: `ruff` 0.16.6 at
+  defaults over the tracked trees reports rc 1 and 759 findings — `src` 15, `tests` 186, `examples` 5,
+  `.agent/decisions` 553 — with 14 rule classes marked auto-fixable and 17 `RUF100` unused-`noqa`, so the
+  suppressions already in the tree were written against a rule selection nothing records. `src` at 15 is
+  the cheap staged entry; the register's standing gate line is what this row changes, so it is spine-
+  adjacent by construction. DEFERRED FOR ONE REASON, not for cost: every M3 unit's acceptance contract
+  pins a NUMBERED gate list (M3.6a1 ran gates 1-8) and each closure claim reruns it, so a gate added
+  inside an open unit invalidates those pins instead of strengthening them — land it at a milestone
+  boundary through `/session-roadmap`, which owns the gate set. Tool selection stays OPEN and takes the
+  CLAUDE.md tooling route (web-search for SOTA agent fit, owner preselection authoritative): `ruff` covers
+  lint plus format, while the type checker is a real fork — `mypy`, `pyright`, `ty` and `pyrefly` all
+  exist, and Serena's own language-server list already names `python_ty` and `python_pyrefly`. Acceptance:
+  `pyproject.toml` carries an explicit rule selection per tool rather than a default, one documented gate
+  command runs lint plus type check and exits 0 from a clean checkout, every surviving suppression is
+  inline and carries its reason, `RUF100` reports zero, and one seeded violation per tool turns that gate
+  red while the suite gate stays green.
 
 - `pri=1` `size=M` — port the mutant replay driver to committed state. `.scratch/main-replay/replay.py`
   produced u4b's recorded mutation verdicts and is gitignored, so a gate backing a durable roadmap claim
@@ -519,7 +540,7 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
 
 ## M3.5a deferrals
 
-- Argparse option abbreviation is live on EVERY parser node, not only the root. Measured at `4783eed`
+- `pri=3` `size=S` — argparse option abbreviation is live on EVERY parser node, not only the root. Measured at `4783eed`
   by `.agent/decisions/m3u5a-s2-probe.py`: root `--part` resolves to `--partition` and nested
   `function eval --bun`/`--in` resolve to `--bundle`/`--input`, while abbreviated LEAF names
   (`function ev`, `proposal sho`) are rejected. M3.5a scopes `allow_abbrev=False` to its two new
@@ -535,7 +556,7 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   parser node constructed in `_parser()` sets `allow_abbrev=False`, one census-derived test walking
   `_parser()` asserts `--part`, `--bun` and `--in` each return exit 2 with `unrecognized arguments`,
   and the break is stated in `README.md` where the grammar is described.
-- No public existing-only or read-only `System` construction exists. `Store.__init__` opens an absent
+- `pri=2` `size=M` — no public existing-only or read-only `System` construction exists. `Store.__init__` opens an absent
   path with `O_CREAT|O_EXCL` and `_initialize` then opens a WRITABLE connection, begins IMMEDIATE and
   commits even for an existing ledger (`m3u5a-map.json` `X02`); a probe measured ordinary
   construction turning an absent path into a 208,896-byte v2 ledger. M3.5a's D13 answers the operator
@@ -546,7 +567,7 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   creates nothing and answers 5, asserted without the `mock.patch.object` pattern that
   `tests/test_read_capability_battery.py:425` uses, which constructs `System` first and therefore
   cannot see this defect. Owner: M3.6b, which reworks construction.
-- Every WRITE leaf still creates a ledger on a typo'd `--db`. Both M3.5a spikes measured it
+- `pri=2` `size=M` — every WRITE leaf still creates a ledger on a typo'd `--db`. Both M3.5a spikes measured it
   independently (`Z15` in `m3u5a-spike-flags.json` and `m3u5a-spike-envelope.json`): a misspelled
   path exits 3 for an unregistered operation while leaving a fresh v2 database behind, so the
   diagnosis names the operation when the real defect is the path. D13 fixes the read verb only,
@@ -559,7 +580,7 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   `System.__init__` 1, `sqlite3.connect` >= 1 and a ~208 KiB ledger left behind, with
   `Store.transaction` 0 and `System.submit_proposal` 0. Fold this case into the same ruling; the
   acceptance test per leaf must use a malformed argument value as well as a misspelled path.
-- 49 of `m3u5a-map.json`'s 55 rows are attention-directing only. MAIN re-derived six findings in
+- `pri=4` `size=S` — 49 of `m3u5a-map.json`'s 55 rows are attention-directing only. MAIN re-derived six findings in
   `m3u5a-s2-probe.py` and consumed the rest as pointers; a validator grade proves each anchor
   resolves and each cell is filled, never that a finding is true. Acceptance: any row promoted to a
   durable claim in a contract, doc or roadmap line is re-derived against HEAD first, and the
