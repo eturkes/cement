@@ -1178,13 +1178,69 @@ Measured gaps driving the arc:
     bare measurement - two different shapes - and failed for a reason unrelated to the property; the
     property that matters is that emit is IDEMPOTENT over its own output, so a recorded ruling survives
     regeneration byte for byte.
-    S2 ENTRY STATE: write the acceptance contract from these rulings, then implement. The census is the
-    acceptance gate and must reach `SURVIVING-MIGRATE: 0`. Tripwires to number as obligations in S2
-    rather than meet as regressions - `test_d03...` and `test_b30...` pin the `{"request_id": ...}`
-    payload and must stay RETAIN and green; `_promote_scope`'s `prefix` parameter goes dead once
-    `_confirm_scope` drops `request_id`, so rule whether it is removed or kept; the README transcript
-    regenerates against a demo whose act structure moved, so both dynamic-value masks and their
-    occurrence counts move with it.
+    S2 DONE, shape-attribution + contract session, `main=` 91% 217K/240K at close. NO teammate
+    dispatched; shape arbitration plus contract authoring is MAIN-retained work, the same shape as
+    M3.4 S4 and M3.5a S2. Shipped `4db71a9` (`m3u6a1-fallback.py` + `m3u6a1-fallback.json` + two
+    re-rulings) + `77a3da0` (`.agent/decisions/m3u6a1-contract.md`, 11 written sections, 29
+    obligations D01-D28 plus D14a, sections 12-13 PENDING). No shipped code touched, so the gate is
+    unmoved at `1146421`'s 949 tests and was not rerun.
+    RE-SIZED TO FOUR SESSIONS, not the plan line's three, under the calibration ruling's route 2 -
+    read the gauge at contract close and open implementation only if it fits. S3 = implementation,
+    S4 = battery + closure. The plan budgeted three because it read the migration as mechanical; S2
+    measured a semantic fork the census could not see.
+    THE CENSUS RULE IS BLIND TO SIDE EFFECTS, which is the session's whole finding. It classifies a
+    consumer by what the enclosing definition does with the call's RETURN VALUE, so it read one
+    population where three exist. `m3u6a1-fallback.py` attributes all 72 test-tree sites by what the
+    `handle` call actually CLAIMS: ACTOR 2, MISS-GUARDED 4, HIT 9, FACTORY 51, UNOBSERVED 6.
+    TWO SITES ARE NOT MIGRATABLE AND WERE RE-RULED MIGRATE -> RETAIN with grounds
+    (`test_system.py:1044`, `:2698`): the same-input artifact is `promoted` before the call and
+    `suspended` after it, so the call PERFORMS the dispatch-time integrity quarantine the test
+    asserts. `propose` never consults an artifact and `resolve` is read-only, reporting `passed=False`
+    at both, so no post-trim method reproduces the transition. Census overrides 3 -> 5, ruled_migrate
+    27 -> 25, SURVIVING-MIGRATE 28 -> 26.
+    FOUR SITES CARRY A CLAIM `propose` CANNOT EXPRESS (`test_system.py` 541, 608, 827, 867): every
+    execution sees a once-promoted artifact for that exact input which still declines to answer,
+    `suspended` or `retired`. Migrating them to a bare `propose` would delete a preserved invariant
+    while the gate stayed green - the exact failure this project's removal standard names. `resolve`
+    measures `passed=True match=False` at all four, so D06-D08 pin the verified-miss assertion in the
+    surviving vocabulary and D07 KEEPS the `propose` call even where its id is unused, because P1's
+    equivalence is a claim about ROW STATE.
+    BOTH SHAPE QUALIFIERS WERE DERIVED, NEVER ASSUMED, and each one moved the answer. `handle` looks
+    up `status = 'promoted'` alone, so a `draft`/`verified` artifact is invisible to it; and a claim a
+    SITE makes must hold at EVERY execution of that site, which drops the two shared fixture helpers
+    (15 of 1273 and 2 of 78 once-promoted hits) back to FACTORY. Adding the outcome class then split
+    HIT from MISS-GUARDED - without it, nine sites where `handle` ANSWERED from the artifact would
+    have been prescribed a verified-miss assertion.
+    THREE PROBE DEFECTS, EACH PRINTING LIKE A CLEAN RESULT. The digest was derived as
+    `_digest_strings("cement-input-v1", ...)` instead of `canonicalize(v).digest`, so all 30 sites
+    reported FACTORY - the grader now FAILS on a uniform verdict, and a per-call positive control
+    re-derives the digest from the input the ledger stored for the proposal just created (1853
+    checked, 0 failed, 0 unreadable). The record was appended AFTER `_real_handle`, so every
+    deliberately-raising call lost its row: 4 sites observed of 30. And targeting MIGRATE alone would
+    have erased the ACTOR rows the moment their ruling landed, taking the ruling's own evidence with
+    it, so every test-tree consumer is a target whatever its verdict.
+    TWO CONTRACT GROUND-STATE FACTS WERE WRONG IN THE FIRST DRAFT and were corrected by measuring
+    rather than reading: `_promote_scope` has 14 call sites, not 15, and `confirm` is defined at :226.
+    The second measurement found a hazard no map would have surfaced - `tests/test_system.py` holds
+    TWO definitions named `confirm`, the method at :226 called as `self.confirm(...)` 41 times and a
+    nested function at :14452 shadowing it with a different signature and its own lifecycle site at
+    :14461. D14a forbids a bare `confirm(` anchor, which spans both.
+    ALL THREE ROADMAP-FLAGGED TRIPWIRES ARE NUMBERED: the two `{"request_id": ...}` payload pins at
+    D24, `_promote_scope`'s dead `prefix` RULED REMOVE at D12 + D14, the transcript mask counts at
+    D22. Contract section 5 adds M3.3's P06 byte-span freeze with its three slicing conventions
+    (D25), M3.5b's D01 still-ships pin (D26) and D15a's six-module freeze (D27). B02 and gate 4 are
+    NOT tripwires here because the unit edits no production source - asserted by rerunning them.
+    F1 CARRIED TO THE OWNER, contract section 8: M3 loses dispatch-time quarantine, not quarantine.
+    `handle` owns two suspension writers (`system.py:1135` duplicate-promoted, `:1166` integrity
+    failure) that M3.6a2 deletes; `verify`, `review`, `challenge`, `revoke_example` and
+    `suspend_artifact` keep independent ones. Coherent with the trim - after it there is no dispatch
+    and `resolve` is a pure read - and recorded so M3.6a2 states it deliberately.
+    S3 ENTRY STATE: contract sections 1-11 are binding; open with the surgery script, not with hand
+    edits. Land the migration through ONE idempotent, count-asserted `m3u6a1-surgery.py` (D15-D17),
+    rewrite the demo's seven sites onto `propose`/`resolve` with the set checkpoint moved after each
+    artifact promotion (D18-D21), regenerate the example README transcript (D22-D23), and take gates
+    1-8 green from committed state. The census is the acceptance gate and must reach
+    `SURVIVING-MIGRATE: 0`; it is RED at baseline by construction at 26.
   - M3.6a2 tier=kernel tags=- depends=M3.6a1 - delete `handle`, `request_status`, `_outcome`,
     `_fail_generation` and `_request_revision_is_current`; delete the `generation_lease_seconds`
     constructor knob, `self._lease_us` and the clock bound named after it; delete request cancellation on
