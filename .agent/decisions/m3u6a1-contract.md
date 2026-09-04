@@ -300,9 +300,13 @@ than assumed: gate 4 reruns green.
 | 6 | Surgery idempotence | `uv run python .agent/decisions/m3u6a1-surgery.py` twice | second run `no-op` |
 | 7 | Parser census + shape | gate 4 of M3.5b | rc 0, unchanged |
 | 8 | Doc parse | `m3u5b-doc-parse.py` | rc 0 |
+| 9 | Reversion sweep | `uv run python .agent/decisions/m3u6a1-mutants.py` | `RESULT: PASS`, named survivor set, control GREEN |
 
 Every gate reruns from committed state with its SHA recorded. Gate 2 is the
 acceptance gate and is RED at baseline by construction (`SURVIVING-MIGRATE: 26`).
+Gate 9 is section 7's catalogue; it carries its own structural grade
+(`--validate`) and its own both-ways credential (`--self-test`), so the
+instrument is checkable before any verdict it reports.
 
 ---
 
@@ -319,10 +323,19 @@ generalises the baseline-red credential to them through an independent red
 control per obligation, exactly as M3.5b section 11 established. Report the
 split; never force it.
 
-Gate 3 for this unit is a REVERSION catalogue: a migration is bound by restoring
+Gate 9 for this unit is a REVERSION catalogue: a migration is bound by restoring
 what was migrated away, never by mutating what remains. One row per battery
 clause, tagged `reversion` or `sensitivity`, each row's `target_test` named, and
-`killed` attributed separately from `misdirected`.
+`killed` attributed separately from `misdirected`. See C20 for the number.
+
+One clause carries no row. D28's subject is the commit set
+`git rev-list 6fb4d92..HEAD -- ...` returns, so every mutation this catalogue can
+express edits the working tree alone and leaves that history byte-identical: the
+clause is INSENSITIVE by construction, and a row for it would certify only that
+it ignores the mutation. It was also red at baseline, so it already holds the
+credential this instrument supplies to clauses that are green there. The
+exclusion is grounded in `m3u6a1-mutants.json` and printed on every control line,
+because a verdict set is not quotable without the clauses it omits.
 
 ---
 
@@ -362,9 +375,21 @@ clause, tagged `reversion` or `sensitivity`, each row's `target_test` named, and
   sessions here: MAIN reached 82% having read only this contract and authored the
   two graders, so a session that BUILDS the graders cannot also dispatch and
   harvest them. Entry cost, not the work, is the driver.
-- **S5** — dispatch wave 2, harvest, run the battery red-at-baseline /
-  green-at-HEAD, and rule sections 12-13.
-- **S6** — reversion catalogue + closure.
+- **S5** DONE — wave-2 dispatch, harvest, the red-at-baseline / green-at-HEAD
+  battery run, and section 12. `main=` 98% 236K/240K, `mate=` 73% 174K/240K.
+  Section 13 stayed PENDING: ruling 36 attack rows is a session of MAIN-only
+  judgment, so the plan's single wave-2 session was two.
+- **S6** DONE — attack ruling (36 rows, 5 ACCEPTED) plus the three instrument
+  repairs those rulings forced (C18, C19) and the V08 repair. `main=` 88%.
+  The unit re-sized to SEVEN sessions here.
+- **S7** DONE — gate 9's instrument: `m3u6a1-mutants.py` plus the 29-row seed,
+  graded both ways with 12 controls firing, D28's exclusion grounded. `main=` 87%
+  208K/240K, no teammate dispatched. Re-sized to EIGHT sessions on the same
+  measurement S4 made and named: a session that BUILDS a grader cannot also
+  dispatch and harvest it. Entry cost is the driver — MAIN read this contract and
+  the battery's clause set and was at 66% before the first line of the harness.
+- **S8** — fill the catalogue, run the decisive sweep, rule its survivors, and
+  close the unit.
 
 ---
 
@@ -572,6 +597,26 @@ closed on claim defects in MAIN's own text.
   green rc and must already know the answer to read it. D29 now requires the probe
   to grade its expected findings and exit nonzero on divergence, and the verdict
   lines are restated positively so the printed value is the claim.
+- **C20 — a GATE NUMBER is not a key across contracts either.** Section 7 called
+  the reversion catalogue "gate 3 for this unit" while section 6's own table
+  assigns gate 3 to the ruling-sync check. The 3 is M3.5b's, where gate 3 WAS the
+  reinsertion sweep, and it collided with a live local number exactly as C10's
+  cross-contract obligation citation did: a reader following section 7 would have
+  graded closure on `m3u6a1-rule-census.py --check` and recorded a sweep that
+  never ran. The catalogue is gate 9. Same standing rule, one namespace wider —
+  cite another unit's gate with its unit name attached, because the number alone
+  is not a key. This correction binds no obligation; its subject is section 7,
+  and a correction may legitimately bind none.
+- **C21 — the battery is THIRTY tests, and section 12 says 29.** The count was
+  written in S5 and the thirtieth obligation landed in S6 under C19, so the
+  number was stale one session after it was recorded. Measured from the shipped
+  module by `m3u6a1-mutants.py --emit-stub`: `CLAUSES: 30`. The reversion
+  catalogue covers 29 of them, the difference being section 7's one grounded
+  exclusion. A count written before the last obligation lands is a denominator no
+  later reader can audit — C17's defect arriving from the other direction, and
+  the reason a closure session re-derives every number the contract asserts
+  rather than quoting its own earlier text. Binds D29, whose late arrival is the
+  cause.
 
 ---
 

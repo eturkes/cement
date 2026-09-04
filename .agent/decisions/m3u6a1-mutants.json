@@ -1,0 +1,336 @@
+{
+  "unit": "M3.6a1",
+  "gate": 9,
+  "clause_source": "tests/test_migration_battery.py",
+  "verdict_modules": [
+    "tests.test_migration_battery"
+  ],
+  "excluded": [
+    {
+      "test": "test_d28_gate_1_stays_green_at_every_commit_never_only_at_the_last",
+      "obligation": "D28",
+      "grounds": "INSENSITIVE BY CONSTRUCTION. D28's subject is the commit set `git rev-list 6fb4d92..HEAD -- .agent/decisions/m3u6a1-surgery.py tests examples` returns, and every mutation this catalogue can express edits the WORKING TREE alone, leaving that history byte-identical. No reversion or sensitivity row can turn it red, so a row for it would certify only that the clause ignores the mutation. It was also RED at the `6fb4d92` baseline, so it already holds the red credential this instrument exists to supply for clauses that are green there. Its ~340 s cost and its one nested worktree per revision are consequences of the exclusion, never its grounds."
+    }
+  ],
+  "rows": [
+    {
+      "id": "M01",
+      "obligation": "D01",
+      "kind": "unknown",
+      "target_test": "test_d01_m3u6a1_census_py_reports_surviving_migrate_0_with_unruled",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M02",
+      "obligation": "D02",
+      "kind": "unknown",
+      "target_test": "test_d02_m3u6a1_rule_census_py_check_reports_in_sync",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M03",
+      "obligation": "D03",
+      "kind": "unknown",
+      "target_test": "test_d03_no_definition_ruled_retain_is_edited_to_remove_its",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M04",
+      "obligation": "D04",
+      "kind": "unknown",
+      "target_test": "test_d04_system_handle_and_system_request_status_still_ship",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M05",
+      "obligation": "D05",
+      "kind": "unknown",
+      "target_test": "test_d05_the_surviving_lifecycle_consumers_after_this_unit_are",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M06",
+      "obligation": "D06",
+      "kind": "unknown",
+      "target_test": "test_d06_each_of_the_four_miss_guarded_sites_carries_a_resolve_call",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M07",
+      "obligation": "D07",
+      "kind": "unknown",
+      "target_test": "test_d07_each_of_the_four_miss_guarded_sites_retains_a_propose_call",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M08",
+      "obligation": "D08",
+      "kind": "unknown",
+      "target_test": "test_d08_no_factory_site_gains_a_resolve_call_a_verified_miss",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M09",
+      "obligation": "D09",
+      "kind": "unknown",
+      "target_test": "test_d09_m3u6a1_fallback_py_reruns_from_committed_state_and_reports",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M10",
+      "obligation": "D10",
+      "kind": "unknown",
+      "target_test": "test_d10_tests_test_system_py_confirm_loses_its_request_id",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M11",
+      "obligation": "D11",
+      "kind": "unknown",
+      "target_test": "test_d11_tests_test_system_py_confirm_scope_loses_its_request_id",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M12",
+      "obligation": "D12",
+      "kind": "unknown",
+      "target_test": "test_d12_tests_test_system_py_promote_scope_loses_its_prefix",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M13",
+      "obligation": "D13",
+      "kind": "unknown",
+      "target_test": "test_d13_tests_test_resolve_battery_py_confirm_tests_test_proposal",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M14",
+      "obligation": "D14",
+      "kind": "unknown",
+      "target_test": "test_d14_no_migrated_helper_retains_a_parameter_that_no_statement",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M15",
+      "obligation": "D14a",
+      "kind": "unknown",
+      "target_test": "test_d14a_tests_test_system_py_holds_two_definitions_named_confirm",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M16",
+      "obligation": "D15",
+      "kind": "unknown",
+      "target_test": "test_d15_the_migration_lands_through_one_idempotent_script_m3u6a1",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M17",
+      "obligation": "D16",
+      "kind": "unknown",
+      "target_test": "test_d16_the_script_is_replayable_from_a_clean_base_applying_it_to",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M18",
+      "obligation": "D17",
+      "kind": "unknown",
+      "target_test": "test_d17_multi_line_anchors_wherever_a_fragment_repeats_a_count_1",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M19",
+      "obligation": "D18",
+      "kind": "unknown",
+      "target_test": "test_d18_examples_hospital_ocr_run_demo_py_s_seven_system_handle",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M20",
+      "obligation": "D19",
+      "kind": "unknown",
+      "target_test": "test_d19_the_walkthrough_promotes_its_function_set_immediately",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M21",
+      "obligation": "D20",
+      "kind": "unknown",
+      "target_test": "test_d20_act_5_keeps_export_and_identity_and_loses_its_becomes_one",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M22",
+      "obligation": "D21",
+      "kind": "unknown",
+      "target_test": "test_d21_the_demo_still_refuses_to_run_under_o_oo_and_its_assert",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M23",
+      "obligation": "D22",
+      "kind": "unknown",
+      "target_test": "test_d22_the_example_readme_s_text_transcript_block_is_regenerated",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M24",
+      "obligation": "D23",
+      "kind": "unknown",
+      "target_test": "test_d23_examples_hospital_ocr_readme_md_208_and_216_name_the",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M25",
+      "obligation": "D24",
+      "kind": "unknown",
+      "target_test": "test_d24_tests_test_proposal_binding_battery_py_test_b30_and_the",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M26",
+      "obligation": "D25",
+      "kind": "unknown",
+      "target_test": "test_d25_m3_3_s_p06_byte_span_freeze_on_system_handle_stays_green",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M27",
+      "obligation": "D26",
+      "kind": "unknown",
+      "target_test": "test_d26_m3_5b_s_d01_pin_at_tests_test_cli_removal_battery_py_617",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M28",
+      "obligation": "D27",
+      "kind": "unknown",
+      "target_test": "test_d27_m3_5b_s_d15a_six_module_byte_identity_freeze_stays_green",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    },
+    {
+      "id": "M29",
+      "obligation": "D29",
+      "kind": "unknown",
+      "target_test": "test_d29_m3u6a1_premise_py_grades_its_two_premises_rather_than",
+      "path": "unknown",
+      "anchor": "unknown",
+      "replacement": "unknown",
+      "expect": "killed",
+      "note": "unknown"
+    }
+  ]
+}

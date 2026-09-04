@@ -1506,7 +1506,7 @@ class MigrationBatteryTests(unittest.TestCase):
         names the findings it expects, reports `RESULT: PASS`, and exits nonzero on any
         divergence.
 
-        CORRECTED-BY C19
+        CORRECTED-BY C19, C21
         """
         probe = ROOT / ".agent" / "decisions" / "m3u6a1-premise.py"
         result = _run([sys.executable, str(probe)], timeout=600)
