@@ -1469,26 +1469,81 @@ Measured gaps driving the arc:
     across four polls with a MOVING gauge (29 -> 32 -> 39 -> 44%), took ONE flush directive that
     re-ordered fill-before-refine and named a cheap-first obligation ordering, and committed five
     batches within two polls. A moving gauge is not progress on the graded artifact.
-    S6 ENTRY STATE: contract sections 1-12 bind. Rule all 36 attack rows into section 13 through an
-    idempotent `--check` patcher asserting the id set (pattern `m3u5b-rule-attack.py`); three rows
-    arrived with reproductions already stated and are the first to read - A19 (gate 4's per-call
-    control runs only for `ReviewRequired` and is not site-attributed, so a HIT site flips to FACTORY
-    with the control still clean), Y07 (gate 7's `parser_shape` omits action `type`/`choices`/`help`,
-    which duplicates an OPEN M3.5b polish row rather than opening a new one), and Y10 (a source-byte
-    plus callable pin does not force RUNTIME method preservation: mutating
-    `System.handle.__kwdefaults__` passes all three P06 spans and M3.5b's D01). Then the reversion
-    catalogue and closure. THE UNIT IS SEVEN SESSIONS.
+    S6 DONE, attack-ruling + instrument-repair session. Contract sections 1-13 bind; 30 obligations,
+    19 corrections. All 36 attack rows disposed through `m3u6a1-rule-attack.py` (idempotent,
+    `--check` = `IN SYNC: 36 rows disposed`): 5 ACCEPTED, 27 SCOPED, 2 CLEARED, 2 DEFERRED.
+    THE DISCRIMINATOR THAT MADE 36 ROWS RULEABLE: nearly every row proves a gate predicate is
+    NECESSARY AND NOT SUFFICIENT, which for a tripwire is the normal condition and not a defect - it
+    becomes one exactly where the contract calls the tripwire a proof. So disposition splits on the
+    ARTIFACT, not on the attack's strength: ACCEPTED where something shipped is FALSE TODAY, SCOPED
+    where the wording outran the instrument. Without that rule the table reads as 34 defects.
+    FIVE ACCEPTED, all repaired in-session, each credited by a mutation that must fail. A16: gate 4
+    keyed HIT on `outcomes != {ReviewRequired}`, collapsing "answered" with "refused to choose", and
+    printed `HIT: 9` while binding correction C01 says seven -> `AMBIGUOUS` split, HIT 7 / AMBIGUOUS 2
+    at `tests/test_system.py:481` and `:582`. A19: `m3u6a1-fallback.py:130` gated the digest control
+    on `isinstance(outcome, ReviewRequired)`, so 24 of 46 calls ran uncontrolled and one global
+    counter named no site -> control reads `requests.input_hash` for every RETURNING call and
+    attributes each verdict to its site. Credited by A19's own repro: a wrong digest at
+    `tests/test_system.py:277` now prints `CONTROL-SITE-FAILED` + `RESULT: FAIL` rc 1 with the shape
+    flipping HIT 7 -> 6 / FACTORY 28 -> 29; before the repair it left every counter clean. Y05: gate 5
+    exited 0 while printing both verdicts `False` and NO obligation ran it - which is why the S5 gate
+    list records 1-4 and 6-8 and silently skips 5 -> new obligation D29 requires it to grade its
+    findings and exit nonzero, pinned by running a mutated copy and requiring rc 1. A14 -> C16 and
+    A18 -> C17, below.
+    A18 IS THE ROW THAT TAUGHT SOMETHING NEW. Seed census `8592c34` = 23 RETAIN / 44 sites, shipped =
+    23 / 45, and the whole increment is
+    `tests/test_system.py::test_operation_revision_invalidates_every_old_request_path`, 6 -> 7,
+    gaining `tests/test_system.py:880`. `self.confirm("old-confirmed")` was inlined into the direct
+    `handle` + `review` pair it always was underneath, because migrated `confirm` cannot carry a
+    caller-chosen request id and that test's SUBJECT is that route. The call became VISIBLE, not new.
+    ONE EVENT MOVES TWO DENOMINATORS IN OPPOSITE DIRECTIONS - `confirm` callers 41 -> 40, RETAIN sites
+    44 -> 45 - and the contract recorded the second without its cause. A denominator that moves
+    without its cause recorded is a number no later reader can audit.
+    THE FROZEN-EVIDENCE RULE, learned by nearly destroying it. Committed `m3u6a1-fallback.json` is the
+    OPENING attribution (72 targets vs the migrated tree's 45) and the source of section 3's counts; a
+    casual `--emit` overwrote it with post-migration state and D07 went red at `_shape_owners
+    ("MISS-GUARDED") == 0 != 4`, which is how the freeze was discovered to be load-bearing. Restored
+    from git, then repaired the RIGHT way: `--reclassify` replays the extracted `_shape()` over the
+    table's OWN records and touches no measurement - 2 sites relabelled, `:485` and `:584`, exactly
+    C01's two, ACTOR 2 / MISS-GUARDED 4 / FACTORY 51 unmoved, 0 on a second run. A CORRECTED RULE
+    REPLAYED OVER FROZEN EVIDENCE IS A REPAIR; A FRESH MEASUREMENT WRITTEN OVER IT IS A LOSS.
+    WAVE-2 CROSS-CHECK, the design's own payoff: two teammates who never saw each other's work, and
+    the attacker's evasions are answered by obligations the diff-blind encoder wrote INDEPENDENTLY,
+    in four cases asserting more than the contract sentence it encoded. D04 pins the WHOLE `src` tree
+    against `6fb4d92` (closes Y10/Y11/Y12 where D25/D26/D27 only claim it); D05 pins a qualified-name
+    -> count map (A03); D03 pins each RETAIN definition's AST count against the COMMITTED census
+    (A02); D16 replays from an explicit detached baseline (A09, Y06); D28 is the per-commit ledger
+    A13 demands. MAIN's first reading of A06/Y04 said the frozen opening site set was missing; it is
+    not - the committed attribution table IS that set, read by `_shape_owners`, which is why D07
+    resolves four MISS-GUARDED owners while the live gate reports zero. Both rulings corrected.
+    THE ONE CLASS NO INSTRUMENT IN THIS UNIT CAN CLOSE: the census and shape table are RE-DERIVED, so
+    a DELETED consumer and a MIGRATED one leave identical evidence (A01, A06, Y02, Y03, Y04). No
+    re-derived census will ever close it. M3.6a2 closes it STRUCTURALLY - once `handle` and
+    `request_status` do not exist, every evasion spelling raises `AttributeError` and absence stops
+    being measured. Section 7 must read `no measured direct call survives`, never `every consumer
+    stopped`. M3.6a2 also inherits the REPLACEMENT-side half of Y04 (assert what stands at each frozen
+    site today), Y11's reachability pin (it must flip from passing to failing at deletion), Y15's
+    prose scan (the event kinds only vanish there), and Y03's independent ruling anchor. Y07 and Y08
+    are DEFERRED to the polish register against existing M3.5b rows.
+    Then the reversion catalogue and closure. THE UNIT IS SEVEN SESSIONS.
     GATES RE-MEASURED AT THE V08 REPAIR: 1 = 978 tests / OK / 613.518 s (`uv run python -m unittest
     discover -s tests -t .`; D28 alone = 338.592 s over 4 revisions at ~85 s each, so the honest cost
     of the per-commit axis is HALF the gate) · 6 = `no-op`, confirming the battery sits outside the
     surgery replay domain · battery grader RESULT PASS, all six counters 0.
-    WORKTREES RETAINED, both teammates STOPPED in S6: `wt/test-m3u6a1-1` @ `5e604b7` and
-    `wt/rev-m3u6a1-1` @ `82e1a2e` carry the delivered artifacts, both already harvested by TARGETED
-    CHECKOUT - `git diff --name-status main..wt/<name>` renders `m3u6a1-surgery.py` as DELETED and the
-    whole migration as reverted on both branches, so squash-merge was never available. Post-stop status
-    read per worktree in its own call: both `git status --porcelain` EMPTY at the tips above, nothing
-    stranded mid-write, no watcher processes surviving. S6 removes the worktrees, the `wt/` branches
-    and the detached `.scratch/worktrees/m3u6a1-baseline` at closure.
+    WAVE CLOSED IN S6. Both teammates STOPPED; post-stop `git status --porcelain` read per worktree in
+    its OWN call, both EMPTY at `wt/test-m3u6a1-1` @ `5e604b7` and `wt/rev-m3u6a1-1` @ `82e1a2e`,
+    nothing stranded mid-write, no watcher processes surviving. Artifacts were harvested earlier by
+    TARGETED CHECKOUT - `git diff --name-status main..wt/<name>` renders `m3u6a1-surgery.py` as DELETED
+    and the whole migration as reverted on both branches, so squash-merge was never available. All
+    three worktrees removed (both teammates + the detached `m3u6a1-baseline`). THE `wt/` BRANCHES ARE
+    KEPT DELIBERATELY, against the earlier plan to delete them: they are the only pointers that keep
+    the recorded teammate SHAs resolvable for MILESTONE-REVIEW, and two refs cost nothing.
+    ALSO RECLAIMED: 25 orphaned `/tmp/cement-m3u6a1-*/tree` worktree registrations, ~275 MB, leaked by
+    `_detached_worktree` when D16/D28 runs died before their `finally`. `git worktree prune` does NOT
+    reclaim them because the directories still exist - both halves need removing. Polish row filed with
+    a `SIGKILL`-seeded acceptance check.
+    GATE 1 DECISIVE, from committed state at `8bad017`: `Ran 979 tests in 458.691s`, `OK`, rc 0.
+    979 = 978 + D29.
   - M3.6a2 tier=kernel tags=- depends=M3.6a1 - delete `handle`, `request_status`, `_outcome`,
     `_fail_generation` and `_request_revision_is_current`; delete the `generation_lease_seconds`
     constructor knob, `self._lease_us` and the clock bound named after it; delete request cancellation on

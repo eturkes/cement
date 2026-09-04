@@ -589,3 +589,28 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   README. Acceptance: `docs/adapter-protocol.md` names the shipped stub and shows one runnable
   invocation of it, and one check asserts every runtime module under `src/cement_runtime/` that ships
   as an operator-facing example is named in at least one shipped document.
+
+## M3.6a1 deferrals
+
+- `pri=2` `size=S` — the battery's `_detached_worktree` leaks a git worktree REGISTRATION and an
+  11 MB temp tree whenever the process dies before its `finally`. Measured at M3.6a1 S6: 25 orphaned
+  `/tmp/cement-m3u6a1-*/tree` registrations, ~275 MB, survivors of one 600 s `TimeoutExpired` and
+  several killed runs. `git worktree prune` does not reclaim them because the DIRECTORIES still
+  exist, so `git worktree list` stays polluted until someone removes both halves by hand, and a
+  future `worktree add` at the same path fails. D16 and D28 together create one worktree per
+  migration revision, so the leak scales with history. Acceptance: the helper registers its worktree
+  under a path inside the repo's own scratch tree with a run-scoped prefix, and a `--clean` entry
+  point removes every stale registration plus its directory in one call; seeded check = kill a run
+  mid-checkout with `SIGKILL`, then require the next battery run to report zero orphans and
+  `git worktree list` to name the primary tree alone.
+
+- `pri=3` `size=M` — no mutation oracle exists for assertion STRENGTH in the migrated bodies
+  (attack Y01, instantiated by Y09 on D24's two payload pins and by A11 on the demo's verdicts). The
+  wave-2 battery is a real independent oracle — diff-blind, 23 red of 29 at `6fb4d92`, green at HEAD —
+  but it pins the assertions it was told about, not the ones a later author might weaken. Measured
+  instance: V06 shipped a stale `38` against 35 `ast.Assert` nodes because nothing bound the prose to
+  the module. Acceptance: a committed mutation campaign over the migrated test bodies and the demo's
+  verdicts kills every mutant with a named battery obligation, and at least these three survive-then-
+  die: `assertFalse(resolution.match.matched)` weakened to `assertIsNotNone(resolution.match)`,
+  `assertEqual(payload, {"request_id": rid})` weakened to `assertIn("request_id", payload)`, and
+  `assert source.calls == before` weakened to `>=`.
