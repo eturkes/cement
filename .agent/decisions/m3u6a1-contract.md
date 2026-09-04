@@ -344,9 +344,15 @@ clause, tagged `reversion` or `sensitivity`, each row's `target_test` named, and
   sites, 3 helpers, ~132 call sites, the demo and the transcript, so seeding a
   validator plus skeleton before a diff-blind dispatch would not have left room
   to finish. Sections 12-13 stay PENDING.
-- **S4** — wave 2 (`test` diff-blind battery, `rev`/`rev2` prep) + sections
-  12-13.
-- **S5** — reversion catalogue + closure.
+- **S4** DONE — wave-2 STAGING. Both graders authored and graded both ways from
+  committed state, the attack table seeded, and two diff-blind worktrees staged
+  at `6fb4d92`. `main=` 85% 205K/240K, no teammate dispatched. Re-sized to SIX
+  sessions here: MAIN reached 82% having read only this contract and authored the
+  two graders, so a session that BUILDS the graders cannot also dispatch and
+  harvest them. Entry cost, not the work, is the driver.
+- **S5** — dispatch wave 2, harvest, run the battery red-at-baseline /
+  green-at-HEAD, and rule sections 12-13.
+- **S6** — reversion catalogue + closure.
 
 ---
 

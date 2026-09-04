@@ -1338,6 +1338,76 @@ Measured gaps driving the arc:
     str)` insertion re-applied on every run because its replacement contained its own anchor; the
     fix widens the anchor to the preceding line, and `run()` now REFUSES any `TEXT` rule with
     `old in new` at startup, so the rule set cannot regress into it again.
+    S4 DONE, wave-2 STAGING session, `main=` 85% 205K/240K at close. NO teammate dispatched. Shipped
+    `364d62b` (both graders + attack seed + contract C10) plus two staged worktrees. No shipped code
+    touched, so gate 1 is unmoved at `4e72692`'s 949 tests and was not rerun.
+    THE UNIT IS SIX SESSIONS, and the driver is the ENTRY COST, not the work. MAIN reached 82%
+    197K/240K having read only the contract and authored two validators - no dispatch, no harvest, no
+    ruling. M3.5a's correction already said to budget ~70K of MAIN on top of entry and to treat entry
+    as the thing to cut; this session prices the next consequence: a session that BUILDS the graders
+    cannot also dispatch and harvest them, because the graders alone are ~900 lines of MAIN-authored
+    judgment-bearing code. S5 = dispatch + harvest + sections 12-13, S6 = reversion catalogue +
+    closure. The S3 record's "FIVE sessions" line is superseded.
+    BOTH GRADERS ARE BUILT AND GRADED BOTH WAYS FROM COMMITTED STATE, so S5 opens on dispatch, not on
+    tooling - the M3.5a shape that made its own S4 dispatch-ready. `m3u6a1-battery-validate.py` parses
+    the contract itself (29 obligations D01-D28 + D14a, 11 corrections C01-C11, 12 bound obligations)
+    so the seed cannot drift from the spec; `--self-test` PASS with 10 controls firing.
+    `m3u6a1-attack-validate.py` seeds 30 lens SUBJECTS (A01-A18 claim attack, Y01-Y12 evasion matrix
+    over gates 1-8 plus the four preservation obligations); `--self-test` PASS with 12 controls firing.
+    A CROSS-CONTRACT ID CITATION COLLIDED WITH A LIVE LOCAL ID, and only the grader saw it. C08 read
+    "D25's register gate"; that is M3.5b's D25, while THIS contract's D25 is M3.3's `System.handle`
+    byte-span freeze. The binder therefore bound C08 to D25, and a diff-blind author would have
+    encoded the register gate into the byte-span test and gone red against correct code. C07's `D15b`
+    and `D22b` are foreign too but name nothing local, so they read as foreign; the C08 collision does
+    not. Fixed by qualifying all three with their owning unit and teaching the parser that an
+    `M<n>.<n><x>` qualifier marks an id foreign. STANDING RULE: cite another unit's obligation with
+    its unit name attached - the number alone is not a key.
+    C10 ASSIGNED, closing section 10's own numbering gap. The gap was drafting residue (C01-C09 + C11
+    = ten corrections), and an unassigned number reads as a lost correction; C10 now carries the
+    citation-collision finding. C02 and C11 also gained the obligation citations they were already
+    load-bearing for (C02 -> D01, D15; C11 -> D01, D05), because a correction that binds no obligation
+    is invisible to the `CORRECTION-UNCITED` counter and therefore to the author it exists to steer.
+    THREE GRADER DEFECTS CAUGHT BY THE BOTH-WAYS GRADING ITSELF, one of them AFTER the seed was
+    already committed: adding C02's and C11's obligation citations gave D01 a SECOND correction, so
+    the dropped-`CORRECTED-BY` control's hardcoded expectation of 1 became 2 and the control read as
+    not firing. The count is now DERIVED from the victim obligation's own binding. This is the seed
+    credential expiring with its contract, arriving one edit after the credential was earned - re-run
+    `--self-test` after every contract edit, not only after a grader edit. The other two: `.upper()`
+    mangles `D14a` into `D14A`,
+    so the whole lettered-suffix obligation read as an ORPHAN over an UNCOVERED id - normalise through
+    the contract's own spelling, never by case transform; and a bare `D\d+` token scan binds a foreign
+    unit's obligation to a live local id. Neither is visible to a validator run once.
+    S5 ENTRY STATE, dispatch-ready. Both worktrees are STAGED, clean, and based at `6fb4d92` - the
+    last commit before the surgery script `8592c34` and the migration `4e72692`, so `m3u6a1-surgery.py`
+    is ABSENT from both by construction and the `tests/`/`examples/` trees are pre-migration.
+    Each carries the CURRENT contract (`364d62b`) overlaid on that baseline, which is required rather
+    than optional: section 10's corrections ARE the spec, and a plain `6fb4d92` tree has none of them.
+    · `test-m3u6a1-1` — `.scratch/worktrees/test-m3u6a1-1`, branch `wt/test-m3u6a1-1` at `0497d65`,
+      marker `TEST-M3U6A1-1-DONE-1`. Fills `tests/test_migration_battery.py`, seeded RED at
+      OBLIGATIONS 29 / TESTS 29 / UNFILLED 29 / BOUND-OBLIGATIONS 12, graded by
+      `uv run python .agent/decisions/m3u6a1-battery-validate.py`.
+    · `rev-m3u6a1-1` — `.scratch/worktrees/rev-m3u6a1-1`, branch `wt/rev-m3u6a1-1` at `23d3030`,
+      marker `REV-M3U6A1-1-DONE-1`. Fills `.agent/decisions/m3u6a1-attack.json`, seeded RED at
+      ROWS 30 / UNKNOWN-CELLS 150, graded by
+      `uv run python .agent/decisions/m3u6a1-attack-validate.py`.
+    THE DIFF-BLIND BOUNDARY HAS TWO COUNTS HERE AND BOTH MUST BE AUDITED SEPARATELY, per M3.5a: the
+    worktree's own `6fb4d92` baseline is READ-PERMITTED and the contract's obligations require reading
+    it; the primary tree's `src/`/`tests/`/`examples/`, `.agent/decisions/m3u6a1-surgery.py`,
+    `git show main:` and `git diff main` are FORBIDDEN. Audit each count over the transcript under a
+    positive control that lists the worktree's own paths.
+    THE BRIEF MUST CARRY THE M3.5b PARAPHRASE RULE VERBATIM, because this unit's obligations are
+    almost all of the form "frame F preserves property P" and that is exactly where a diff-blind
+    author pins F's CODE - helper names, variable names, occurrence counts, assertion spellings - and
+    goes red against correct code with zero code defects found. Write each clause against the
+    PROPERTY, derived from the shipped tree by AST or by running the named gate; take a name only from
+    the contract or from the worktree's own baseline definition.
+    Report INLINE as the final assistant message with the marker as its last line; the committed
+    artifact is the real deliverable. Batch the two spawns in one block.
+    S5 also owes three MAIN-only items the wave cannot produce: run the battery against the `6fb4d92`
+    baseline AND against HEAD (red-then-green is its credential, and D04/D24-D27 are PRESERVATION
+    obligations that legitimately hold at baseline - report the split, never force it); rule every red
+    as SUITE / CODE / CONTRACT defect into contract section 12; and rule every attack row into section
+    13 through an idempotent `--check` patcher asserting the id set, pattern `m3u5b-rule-attack.py`.
   - M3.6a2 tier=kernel tags=- depends=M3.6a1 - delete `handle`, `request_status`, `_outcome`,
     `_fail_generation` and `_request_revision_is_current`; delete the `generation_lease_seconds`
     constructor knob, `self._lease_us` and the clock bound named after it; delete request cancellation on

@@ -415,11 +415,14 @@ def self_test() -> int:
         assert bound, "self-test needs at least one corrected obligation"
         victim = sorted(bound)[0]
         dropped = filled.replace(f"CORRECTED-BY {', '.join(bound[victim])}", "", 1)
+        # One dropped block un-cites EVERY correction bound to that obligation, so the
+        # expected count is derived. A hardcoded 1 passed until an obligation gained a
+        # second correction, which is the seed credential expiring with the contract.
         check(
-            "control dropped CORRECTED-BY -> CORRECTION-UNCITED",
+            f"control dropped CORRECTED-BY -> CORRECTION-UNCITED ({victim}, {len(bound[victim])})",
             dropped,
             1,
-            ["CORRECTION-UNCITED: 1"],
+            [f"CORRECTION-UNCITED: {len(bound[victim])}"],
         )
         check(
             "control duplicate test -> ORPHAN",
