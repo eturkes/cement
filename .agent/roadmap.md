@@ -1241,6 +1241,59 @@ Measured gaps driving the arc:
     artifact promotion (D18-D21), regenerate the example README transcript (D22-D23), and take gates
     1-8 green from committed state. The census is the acceptance gate and must reach
     `SURVIVING-MIGRATE: 0`; it is RED at baseline by construction at 26.
+    S3 CHECKPOINT 1, `main=` 96% 231K/240K. Shipped `m3u6a1-surgery.py`, idempotent from a clean
+    base: run 1 `applied` over five files, runs 2 and 3 `no-op`. The test-tree migration is IN THE
+    WORKING TREE, uncommitted, at 949 tests / 3 failures / 2 errors; D28 forbids a red commit, so
+    only the script lands here.
+    WAVE 2 MOVES TO S4. MAIN entered S3 at 73% after attached state plus the ground-state read, and
+    the implementation is 26 sites, 3 helpers, ~132 call sites, the demo and the transcript. Seeding
+    a validator plus skeleton before a diff-blind dispatch would not have left room to finish, so
+    contract sections 12-13 stay PENDING and S4 becomes wave 2 + battery + closure. Re-sized to FIVE
+    sessions.
+    A FOURTH BLINDNESS AXIS, and it is the one that costs code. The census reads RETURN VALUES;
+    `m3u6a1-fallback.py` reads ARTIFACT SIDE EFFECTS; neither sees that `request_id` is a
+    caller-chosen PRIMARY KEY the consumer controls. Both `propose` and `submit_proposal` mint
+    `_new_id("req")` internally and neither returns it, so no public route sets or reads it. Four
+    MIGRATE sites depend on the value: three use it as a raw-SQL key (`test_system.py` 344 `UPDATE
+    requests SET input_json`, 378 `DELETE FROM requests`, 1222 `UPDATE requests SET status`), each
+    closed by recovering the row through `(SELECT request_id FROM proposals WHERE id = ?)`.
+    THE FOURTH IS THE REAL ONE. `test_function_report_pending_request_join_is_like_and_case_exact`
+    plants five request ids that are DELIBERATE COLLIDERS - `pending_join_1` against
+    `pendingXjoinX1` under `LIKE`, `PendingCase` against `pendingcase` under case folding - against
+    the `r.id = p.request_id` join at `system.py:534/547/574/591`. A minted `req_<32hex>` id is
+    lowercase hex whose only `_` sits in the prefix, so migrating this site plainly would leave
+    `=` -> `LIKE` and case-folding mutants ALIVE with every assertion still green: a preserved
+    invariant deleted with its pin, which is the exact failure the removal standard names. The
+    colliders are re-planted after submission by raw `UPDATE` under `PRAGMA foreign_keys = OFF`.
+    FIVE REDS, ALL THE SAME AXIS ONE LEVEL UP, and this is S3's open work. `confirm` planted a
+    caller-chosen request id that RETAIN tests then consume:
+    `test_confirmed_request_cache_is_bound_to_immutable_example` (2 subtests, `request_status` on
+    that id), `test_operation_revision_invalidates_every_old_request_path` (2, replays `handle` on
+    `old-confirmed` expecting `ReconciliationRequired`) and
+    `test_unknown_resolved_source_kind_fails_closed_at_storage`. Migrating a SHARED FIXTURE HELPER
+    changes what it plants, so a RETAIN consumer of that helper breaks even though its own lifecycle
+    call is untouched - D03 pins the RETAIN definition and says nothing about its fixtures. Fix
+    shape: each RETAIN test plants its own request row through `handle` directly, which it is
+    entitled to do because it is RETAIN.
+    A CONTRACT CLAIM DEFECT, section 3: "HIT - 9 sites. `handle` answered from the artifact." FALSE
+    for 2 of the 9. `tests/test_system.py:485` and `:584` carry `outcomes: ["ReconciliationRequired"]`
+    in `m3u6a1-fallback.json`, which is the ambiguity branch, not an artifact answer; `:584` reads
+    `before=['suspended']` with `resolve -> passed=True match=False`, the MISS-GUARDED signature.
+    The shape rule keys HIT on `outcomes != {"ReviewRequired"}`, so it collapses "answered" with
+    "refused to choose". Both are RETAIN, so no migration changes; section 10 correction only.
+    A GROUND-STATE COUNT WRITTEN FROM TRUNCATED OUTPUT WAS WRONG: the bare `confirm(` call count is
+    11, not the 21 first written into `PARAMS`. The count assertion caught it on the first dry run,
+    which is the whole reason every rule carries one.
+    SITES ARE KEYED BY QUALIFIED NAME AND ORDINAL, NEVER BY LINE. A line-keyed table cannot be
+    idempotent: the first pass moves every line below its own first edit, so the second pass reads a
+    stale address and D15's `no-op` is unreachable - measured as `ABORT: no enclosing function at
+    line 608` on run 2. The dotted name also separates `SystemTests.confirm` from the nested
+    `...reaches_every_compiler_block_reason_through_public_apis.confirm`, which is D14a discharged by
+    construction rather than by a forbidden anchor.
+    THE ANCHOR-INSIDE-REPLACEMENT DEFECT REPRODUCED AND IS NOW GATED. The `assertIsInstance(pending,
+    str)` insertion re-applied on every run because its replacement contained its own anchor; the
+    fix widens the anchor to the preceding line, and `run()` now REFUSES any `TEXT` rule with
+    `old in new` at startup, so the rule set cannot regress into it again.
   - M3.6a2 tier=kernel tags=- depends=M3.6a1 - delete `handle`, `request_status`, `_outcome`,
     `_fail_generation` and `_request_revision_is_current`; delete the `generation_lease_seconds`
     constructor knob, `self._lease_us` and the clock bound named after it; delete request cancellation on
