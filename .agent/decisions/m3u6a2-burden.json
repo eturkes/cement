@@ -1,0 +1,55 @@
+{
+  "unit": "M3.6a2",
+  "question": "Did M3.6a1's consumer migration strip M3.6a2's deletion burden, and by how much?",
+  "harness": ".agent/decisions/m3u6a-burden.py",
+  "baseline_artifact": ".agent/decisions/m3u6a-burden.json",
+  "baseline_head": "1146421b2dbf4d94f1b9b7ded07ab8e672f0fbb2",
+  "head": "unknown",
+  "frame_key_rule": "unknown",
+  "reanchors": "unknown",
+  "verdict": "unknown",
+  "rows": [
+    {
+      "id": "S1",
+      "stage": 1,
+      "label": "methods",
+      "pre_broken": 296,
+      "pre_ran": 943,
+      "pre_frames": 48,
+      "post_broken": "unknown",
+      "post_ran": "unknown",
+      "post_frames": "unknown",
+      "frames_gone": "unknown",
+      "frames_new": "unknown",
+      "note": "unknown"
+    },
+    {
+      "id": "S5",
+      "stage": 5,
+      "label": "request",
+      "pre_broken": 57,
+      "pre_ran": 601,
+      "pre_frames": 34,
+      "post_broken": "unknown",
+      "post_ran": "unknown",
+      "post_frames": "unknown",
+      "frames_gone": "unknown",
+      "frames_new": "unknown",
+      "note": "unknown"
+    },
+    {
+      "id": "S6",
+      "stage": 6,
+      "label": "imports",
+      "pre_broken": 314,
+      "pre_ran": 921,
+      "pre_frames": 54,
+      "post_broken": "unknown",
+      "post_ran": "unknown",
+      "post_frames": "unknown",
+      "frames_gone": "unknown",
+      "frames_new": "unknown",
+      "note": "unknown"
+    }
+  ]
+}
