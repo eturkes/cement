@@ -672,3 +672,19 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   contract sentence carrying a count or a gate identifier, resolves it against the named committed
   artifact, and exits nonzero on divergence; seeded both ways — restate one count wrong and require
   a nonzero exit, run it on the shipped contract and require zero.
+
+- `pri=3` `size=S` — the pre-battery baseline sweep M3.6a1 S8 ordered was never run, so no
+  measurement supports the claim that `tests/test_migration_battery.py` is each reversion's SOLE
+  killer. The decisive sweep proves the battery kills all 92 rows; it cannot separate a reversion
+  the pre-existing suite already catches from one only the battery catches. Run
+  `m3u6a1-mutants.py` with `--verdict` naming the four owning modules (`test_system`,
+  `test_resolve_battery`, `test_proposal_binding_battery`, `test_hospital_ocr_example`) and the
+  battery ABSENT; ~18 min for 30 runs, ~55 min at 92. The verdict vocabulary INVERTS there and a
+  reader who misses this collects a table of misread rows: with no `target_test` reachable among
+  the witnesses, `killed` is impossible by construction, `survived` is the DESIRED outcome (the
+  old suite is blind, the battery is the sole killer), and `misdirected` means the old suite
+  already catches it. That split must not reach the `note` field — `--validate`'s
+  `BASELINE-DEFECT` counter greps `note` for `baseline=survived|misdirected|noop` and would fail
+  the gate on an honest measurement. Acceptance: the run is committed as a script plus its output,
+  every row carries its pre-battery verdict in a dedicated FIELD rather than in prose, and the
+  count of rows the pre-existing suite already catches is stated in the contract.

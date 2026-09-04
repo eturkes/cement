@@ -1118,7 +1118,7 @@ Measured gaps driving the arc:
     ROADMAP CORRECTION: M3.7's `depends` gains M3.6a3, which deletes `CandidateRequest.request_id`. The
     prior line had M3.7 running alongside M3.6 on `depends=M3.3,M3.5b` while M3.7's own retained protocol
     names that field, which the M3 track order already flagged and no dependency edge recorded.
-  - M3.6a1 tier=kernel tags=- depends=M3.5b - migrate every consumer off the lifecycle API while it still
+  - M3.6a1 DONE tier=kernel tags=- depends=M3.5b - migrate every consumer off the lifecycle API while it still
     ships. Re-base the four `handle`-driven fixture helpers plus `test_hospital_ocr_example.py`
     `_promoted_example_ledger` onto `propose`/`get_proposal`/`review` through scripted, count-asserted,
     idempotent surgery; drop the now-dead `request_id` argument from ~217 helper call sites in the same
@@ -1586,34 +1586,11 @@ Measured gaps driving the arc:
     binding scans: C20 binds NO obligation (its subject is section 7, and a correction may
     legitimately bind none), C21 binds D29 alone. PROSE ILLUSTRATING A RULE MUST NOT SPELL AN ID
     THE RULE'S OWN PARSER READS.
-    S8 ENTRY STATE, dispatch-ready. Contract sections 1-13 bind, 30 obligations, 21 corrections;
-    gate 9 is section 6's ninth row and section 7's catalogue.
-    · Dispatch `gate-m3u6a1-1` into `.scratch/worktrees/gate-m3u6a1-1` on a branch at the S7 tip.
-      NOT diff-blind - a catalogue author must read the shipped tree to write anchors that resolve
-      - which is why it is a `gate` role and not a second `test`. Marker `GATE-M3U6A1-1-DONE-1`,
-      report INLINE as the final assistant message, the committed artifact
-      `.agent/decisions/m3u6a1-mutants.json` being the real deliverable. Brief it to fill all 29
-      rows and to run the PRE-BATTERY baseline sweep, graded by
-      `uv run python .agent/decisions/m3u6a1-mutants.py --validate` (rc 0, every counter 0), with
-      an explicit RETARGET clause: a compound clause earns extra rows, and extension rows have
-      outnumbered seeds in every wave this project has run.
-    · Each row is a REVERSION (restore the `handle` call, the `request_id` argument, the dead
-      `prefix` parameter, a pre-migration demo act) or a SENSITIVITY control on one of the six
-      preservation obligations. The M3.5b defect to name in the brief: a control must aim at the
-      test that OWNS the property, and where a clause is a STATIC check on another frame's source
-      the mutation target is that FRAME, not production code - 13 of M3.5b's 48 controls carried
-      exactly that defect at once.
-    · Then MAIN runs the decisive sweep itself (`--json`), rules every survivor by name, and
-      closes: re-grade the contract's own gate text against what the campaign measured, name the
-      ruled tables and the two `wt/` branch tips in the contract, set the unit DONE with
-      `est 3 -> 8`, and set M3 IMPLEMENTED only when M3.6a2, M3.6a3, M3.6b and M3.7-M3.9b are also
-      DONE - M3.6a1 alone does not close the milestone.
-    S8 CHECKPOINT 1, wave dispatched, `main=` 84% 202K/240K at dispatch. Shipped `915c91e`.
-    Two teammates LIVE, both worktree-isolated at `915c91e`, both seeded by a MAIN-committed
-    both-ways-graded validator: `gate-m3u6a1-1` (`.scratch/worktrees/gate-m3u6a1-1`, marker
-    `GATE-M3U6A1-1-DONE-1`) filling the 29-row reversion catalogue; `scout-m3u6a2`
-    (`.scratch/worktrees/scout-m3u6a2`, marker `SCOUT-M3U6A2-DONE-1`) re-measuring M3.6a2's
-    deletion burden at post-migration HEAD.
+    S8 DONE - the catalogue, MAIN's decisive sweep, C22-C26 and closure. UNIT DONE at
+    `est 3 -> 8`. M3 stays IN-PROGRESS: M3.6a2, M3.6a3, M3.6b and M3.7-M3.9b remain.
+    Two teammates ran worktree-isolated at `915c91e`, each seeded by a MAIN-committed
+    both-ways-graded validator: `gate-m3u6a1-1` filled the reversion catalogue,
+    `scout-m3u6a2` re-measured M3.6a2's deletion burden at post-migration HEAD.
     ENTRY COST CONSUMED THE WINDOW BEFORE THE FIRST DISPATCH, fourth session on this measurement
     and the sharpest instance: attached state plus this unit's ground-state read spent ~150K, so
     MAIN reached 84% having read the contract, sized both sweeps and authored one 150-line
@@ -1651,12 +1628,51 @@ Measured gaps driving the arc:
     frame-key normalisation trap (a key embeds a line number and the migration moved thousands of
     lines, so a raw set difference is noise) and the hidden-module trap (a cumulative stage
     reporting FEWER breaks than its predecessor has broken a module at import).
-    S8 REMAINING WORK, in order: harvest by TARGETED CHECKOUT after reading
-    `git diff --name-status main..wt/<name>`; MAIN reruns the decisive sweep itself and rules every
-    survivor BY NAME; gates 1-8 from committed state, gate 1 LAST because it is load-sensitive and
-    a concurrent sweep manufactures phantom failures; re-grade sections 6-7's gate text against
-    what the campaign measured; name the ruled tables and the `wt/test-m3u6a1-1` @ `5e604b7` +
-    `wt/rev-m3u6a1-1` @ `82e1a2e` tips in the contract; unit DONE at `est 3 -> 8`.
+    THE SEED SIZED THE SWEEP AND THE FILL TRIPLED IT. The 29-row seed became 92 rows over the
+    same 29 clauses (53 reversion / 39 sensitivity) once the RETARGET clause was exercised,
+    because a clause is a CONJUNCTION and reverting one conjunct leaves the others asserting.
+    MAIN's decisive rerun: `CONTROL: GREEN`, 92 mutants, 92 killed, 0 misdirected, 0 survivors,
+    0 patch-noop, `RESULT: PASS`, 97 min 23 s over 93 battery runs = 62.8 s/run against the
+    78.3 s forecast. Per-run cost came in 20% UNDER forecast and the sweep still ran 2.4x its
+    estimate: size a sweep by the catalogue the FILL produces, never by the one the seed ships.
+    THREE CLAUSES ASSERT SUBPROPERTIES THEY CANNOT OBSERVE, the campaign's whole return, ruled
+    conjunct-level at C24 and registered for repair rather than fixed in the closing session -
+    every such repair edits the battery and voids gate 9's committed-state binding. D17's
+    migrated-definition loop is vacuous BECAUSE gate 2 passes (it iterates the set gate 2
+    certifies empty: 23 definitions, all RETAIN); D20 asserts `"becomes one exportable function"`
+    where the baseline heading reads `become`; D15 runs one half against the COMMITTED script and
+    the other against the WORKING-TREE copy. Each clause keeps live conjuncts, so all three rows
+    were retargeted onto reachable failures and coverage of all 29 clauses survived.
+    C26 IS THE INSTRUMENT DEFECT MAIN'S OWN CORRECTION EXPOSED. Writing C24 with nested
+    sub-bullets broke the correction binder: `BULLET_CONT` was `^  \S`, so the fold stopped at the
+    first four-space line and the binder read one of three clause ids, then reported IN SYNC on a
+    truncated binding. Fail-open in a text folder. Fixed and measured both ways - C01-C21 bind an
+    IDENTICAL set under the widened rule, so it had never bitten. An instrument that has only ever
+    seen one input shape holds no credential for the next one.
+    THE PRE-BATTERY BASELINE SWEEP WAS NOT RUN and the gap is disclosed, not papered over. The
+    brief ordered it; the teammate delivered a target-only diagnostic instead and MAIN took the
+    decisive full-battery run over rerunning the missing one. It is not closure-blocking - section
+    12 already holds the red-at-baseline / green-at-HEAD credential - but the stronger claim it
+    would have bought, that the battery is each reversion's SOLE killer, is unmeasured. Registered
+    in `.agent/polish.md`.
+    STOP THE TEAMMATE BEFORE KILLING THE PROCESS IT OWNS. The teammate's own sweep had died
+    silently (0-byte log, no process, worktree registration stranded); MAIN killed its stale poll
+    loop and sent a stand-down, but `SendMessage` drains only at the next tool round, so the
+    teammate relaunched and two full-suite sweeps ran seconds apart. Both were killed, quiescence
+    was proved, and MAIN restarted clean - a load-induced phantom failure in a mutation sweep
+    reads as a FALSE KILL, the one error a survivor count cannot expose. Correct order:
+    `TaskStop`, kill strays by PID, prove quiescence, then start MAIN's run.
+    HARVEST BY TARGETED CHECKOUT, and the branch's `.agent/roadmap.md` delta was correctly NOT
+    taken: based at `915c91e`, it renders MAIN's later checkpoint block as a pure deletion. Only
+    `m3u6a1-mutants.json` was taken, sha256-proven identical to `96d155d`.
+    ALL NINE GATES GREEN from committed state, gate 1 last on an idle box: `Ran 979 tests in
+    352.354s, OK` (floor 949); gate 7 UNCHANGED at 28 leaves / 35 nodes, `parser_shape` 151 /
+    `ebd2ac811bd9776d`; gate 9 as above. Contract section 14 is the sweep record and names the
+    four retained tips - `wt/test-m3u6a1-1` @ `5e604b7`, `wt/rev-m3u6a1-1` @ `82e1a2e`,
+    `wt/gate-m3u6a1-1` @ `96d155d`, `wt/scout-m3u6a2` @ `03b5da9` - with every ground restated as
+    a measured fact, since no ruling may rest on a local-only ref.
+    `main=` 82% 198K/240K at close, one compaction boundary crossed. `mate=` 86% 206K/240K
+    (`gate-m3u6a1-1`, stopped at its 22-commit tip), 73% (`scout-m3u6a2`, complete).
   - M3.6a2 tier=kernel tags=- depends=M3.6a1 - delete `handle`, `request_status`, `_outcome`,
     `_fail_generation` and `_request_revision_is_current`; delete the `generation_lease_seconds`
     constructor knob, `self._lease_us` and the clock bound named after it; delete request cancellation on
@@ -1671,6 +1687,31 @@ Measured gaps driving the arc:
     as library methods. M3.5b D15a freezes six runtime modules byte-identical. B02 is NOT a tripwire here:
     its frozen tuple is `_command_supervisor.py` and `example_adapter.py` alone, `system.py` having never
     been a member.
+    BURDEN RE-MEASURED AT POST-MIGRATION HEAD by `scout-m3u6a2` (`wt/scout-m3u6a2` @ `03b5da9`),
+    because M3.6a's split FORECAST this relief and nothing had rerun the harness on a migrated
+    tree. Raw / (normalised) per stage, pre -> post: stage 1 methods 296/943/48 (46) ->
+    50/979/48 (47); stage 5 request 57/601/34 (33) -> 79/659/41 (40); stage 6 imports
+    314/921/54 (52) -> 99/979/59 (58). VERDICT: CONCENTRATION COLLAPSED, THE WORK LIST DID NOT.
+    Stage 1 breaks fall ~6x while its normalised frames go 46 -> 47. This project sizes a removal
+    by FRAME COUNT and explicitly not by break count, so M3.6a1 did NOT reduce this unit's
+    governing burden - SIZE M3.6a2 AGAINST 47 NORMALISED STAGE-1 FRAMES, not against the split's
+    forecast of relief. What M3.6a1 erased is four fixture-helper cascades (`_confirm_scope` 189,
+    `_confirm` 23, `_promoted_conflict_fixture` 11, `_promoted_example_ledger` 2), leaving many
+    small independent frames in their place. The surviving 34-break concentration is NOT this
+    unit's: `PlanAdapterTests.request` (`tests/test_hospital_ocr_example.py:357`) and
+    `CommandCandidateSourceTests.request` (`tests/test_source.py:17`) are stage-5
+    `CandidateRequest.request_id` burden, owned by M3.6a3.
+    EVERY FRAME COUNT TRAVELS WITH ITS CONVENTION from here: RAW keys are `file:line in name`,
+    NORMALISED keys are `file in name`. The two differ by roughly 5-10% and comparing across them
+    manufactures a defect out of nothing - MAIN did exactly that inside S8 and withdrew it.
+    THE HARNESS ITSELF WAS DEFECTIVE and is repaired at `c3f6d83`. `m3u6a-burden.py` sized each
+    stage by grepping `Ran N` and `FAIL:`/`ERROR:` headers out of pytest text, but D28, D15 and
+    D16 replay whole suite runs as subprocess output, so nested summaries impersonated outer
+    failures. Authored at `1146421`, before `tests/test_migration_battery.py` existed, which is
+    why the PRE columns predate the battery and stay trusted. Repair = structural collection
+    through `traceback.extract_tb`, never string parsing, plus two hard aborts (`broken <= ran`;
+    no duplicate test ids). Both readings ship: corrected numbers in the graded fields, the
+    contaminated triple in `note`.
   - M3.6a3 tier=kernel tags=- depends=M3.6a2 - delete `Resolved`, `InProgress`, `FallbackFailed`,
     `Rejected`, `ReconciliationRequired`, the `Outcome` alias and every import and `__all__` entry naming
     them; delete `CandidateRequest.request_id`, minting the private request-row id inside
@@ -1678,6 +1719,14 @@ Measured gaps driving the arc:
     loses its last producer when M3.6a2 deletes `handle`, so its retention is this unit's first ruling
     rather than the plan draft's assumption. Measured burden: 10 frames, `test_source.py` `request` (9
     breaks) the only shared one.
+    THAT 10-FRAME FIGURE PREDATES M3.6a1 AND MUST BE RE-MEASURED BEFORE THIS UNIT OPENS, and it is
+    NOT comparable to the burden harness's stage-5 numbers, whose stages are CUMULATIVE and carry
+    stages 1-4's deletions inside them. What the post-migration re-measurement does establish is
+    OWNERSHIP: the 34-break concentration surviving M3.6a1 - `PlanAdapterTests.request`
+    (`tests/test_hospital_ocr_example.py:357`) and `CommandCandidateSourceTests.request`
+    (`tests/test_source.py:17`) - is `CandidateRequest.request_id` burden and lands HERE, not in
+    M3.6a2. Re-run `m3u6a-burden.py` scoped to this unit's own deletion set, state the convention
+    beside the count, and size from that.
   - M3.6b tier=kernel tags=prod depends=M3.6a - the sole schema cut v2->v3: direct proposal columns,
     adapter swap, `requests` plus index deletion, refusal fixtures, package 0.2.0.
   - M3.7 tier=kernel tags=prod depends=M3.3,M3.5b,M3.6a3 - relocate the command runtime to an optional example

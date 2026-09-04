@@ -928,6 +928,18 @@ the row proves D20 is AMONG its killers rather than that D20 uniquely owns the
 property. A blunt row still satisfies `killed`; it is weaker evidence than a
 one-witness row and the catalogue does not currently distinguish them.
 
+**One measurement the campaign did NOT make.** S8's brief ordered a PRE-BATTERY
+baseline sweep — the same catalogue run with the battery absent from the verdict
+modules, where `killed` is unreachable by construction and `survived` means the
+pre-existing suite is blind to that reversion, so the battery is its sole killer.
+The teammate delivered a target-only diagnostic instead, and MAIN spent the
+remaining window on the decisive full-battery run rather than on the missing one.
+It is not closure-blocking: section 12 already carries the red-at-baseline /
+green-at-HEAD credential, and section 6's gate 9 acceptance says nothing about
+sole killership. What is unmeasured is the STRONGER claim — that each reversion's
+only killer is this battery rather than a pre-existing test — and it is registered
+in `.agent/polish.md` rather than asserted here.
+
 **Instruments and evidence this unit's closure rests on, all committed:**
 
 | artifact | what it holds |
