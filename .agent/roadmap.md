@@ -1608,6 +1608,50 @@ Measured gaps driving the arc:
       ruled tables and the two `wt/` branch tips in the contract, set the unit DONE with
       `est 3 -> 8`, and set M3 IMPLEMENTED only when M3.6a2, M3.6a3, M3.6b and M3.7-M3.9b are also
       DONE - M3.6a1 alone does not close the milestone.
+    S8 CHECKPOINT 1, wave dispatched, `main=` 84% 202K/240K at dispatch. Shipped `915c91e`.
+    Two teammates LIVE, both worktree-isolated at `915c91e`, both seeded by a MAIN-committed
+    both-ways-graded validator: `gate-m3u6a1-1` (`.scratch/worktrees/gate-m3u6a1-1`, marker
+    `GATE-M3U6A1-1-DONE-1`) filling the 29-row reversion catalogue; `scout-m3u6a2`
+    (`.scratch/worktrees/scout-m3u6a2`, marker `SCOUT-M3U6A2-DONE-1`) re-measuring M3.6a2's
+    deletion burden at post-migration HEAD.
+    ENTRY COST CONSUMED THE WINDOW BEFORE THE FIRST DISPATCH, fourth session on this measurement
+    and the sharpest instance: attached state plus this unit's ground-state read spent ~150K, so
+    MAIN reached 84% having read the contract, sized both sweeps and authored one 150-line
+    validator. S4 and S7 each priced a session that BUILDS a grader; S8 prices the one that
+    DISPATCHES. The term to cut is the attached set, not the work.
+    BOTH SWEEP COSTS MEASURED BEFORE DISPATCH, which is what made the brief sizeable rather than
+    hopeful: the battery minus D28 runs 29 tests in 78.3 s, and the four owning modules
+    (`test_system`, `test_resolve_battery`, `test_proposal_binding_battery`,
+    `test_hospital_ocr_example`) run 406 tests in 36.3 s. So the decisive sweep is ~40 min over 30
+    runs and the pre-battery baseline ~18 min. D28's exclusion is what buys this - unexcluded it
+    would add ~340 s per mutant, ~2.7 h to a single sweep.
+    THE PRE-BATTERY SWEEP'S VERDICT VOCABULARY INVERTS, and a brief that omits this collects a
+    table of misread rows. With the battery absent from the verdict modules no row's `target_test`
+    can appear among the witnesses, so `killed` is unreachable BY CONSTRUCTION: `survived` means
+    the pre-existing suite is BLIND to that reversion and the battery is its sole killer - the
+    desired outcome and the battery's whole justification - while `misdirected` means the old
+    suite already catches it. The brief also forbids that split from reaching the `note` field,
+    because `--validate`'s `BASELINE-DEFECT` counter greps `note` for exactly
+    `baseline=survived|misdirected|noop` and would fail the gate on an honest measurement.
+    A ROADMAP CLAIM DEFECT FOUND BY SEEDING THE SCOUT'S FROZEN COLUMNS, eleventh consecutive unit
+    on that pattern: the M3.6a split record states 46 frame keys for stage 1 and 52 for stage 6,
+    while the committed `m3u6a-burden.json` holds 48 and 54. Caught because the seed's `PRE-DRIFT`
+    check re-derives every pre column from that artifact rather than accepting a copied number.
+    Nothing rests on the wrong pair - the split's 3.2x ruling holds at 48 against M3.5b's 17 - but
+    a denominator no later reader can audit is what the scout's whole re-measurement exists to fix.
+    THE SCOUT IS SPECULATIVE AND MUST NOT BLOCK CLOSE, per the roadmap's own speculation rule. Its
+    question is decisive for M3.6a2's sizing and unmeasured by anyone: M3.6a's split ruled that
+    migrating consumers first strips the deletion unit's shared-frame burden, M3.6a1 landed that
+    migration, and no instrument has since rerun the burden harness. Its brief carries the
+    frame-key normalisation trap (a key embeds a line number and the migration moved thousands of
+    lines, so a raw set difference is noise) and the hidden-module trap (a cumulative stage
+    reporting FEWER breaks than its predecessor has broken a module at import).
+    S8 REMAINING WORK, in order: harvest by TARGETED CHECKOUT after reading
+    `git diff --name-status main..wt/<name>`; MAIN reruns the decisive sweep itself and rules every
+    survivor BY NAME; gates 1-8 from committed state, gate 1 LAST because it is load-sensitive and
+    a concurrent sweep manufactures phantom failures; re-grade sections 6-7's gate text against
+    what the campaign measured; name the ruled tables and the `wt/test-m3u6a1-1` @ `5e604b7` +
+    `wt/rev-m3u6a1-1` @ `82e1a2e` tips in the contract; unit DONE at `est 3 -> 8`.
   - M3.6a2 tier=kernel tags=- depends=M3.6a1 - delete `handle`, `request_status`, `_outcome`,
     `_fail_generation` and `_request_revision_is_current`; delete the `generation_lease_seconds`
     constructor knob, `self._lease_us` and the clock bound named after it; delete request cancellation on
