@@ -12,8 +12,8 @@
       "reproduction": "After migration, replace `proposal_id = self.system.propose(...)` in `tests/test_system.py::confirm` with `legacy = self.system.handle; proposal_id = legacy(..., request_id=\"hidden\").proposal_id`; regenerate the census and run gates 1-3. The alias call is live but absent from `survey()`.",
       "severity": "blocking",
       "verdict": "DEFECT — `SURVIVING-MIGRATE: 0` proves absence only for one direct-call AST spelling, not every lifecycle consumer.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "The census and the shape table are REGENERATED from the current tree, so a consumer that was DELETED and a consumer that was MIGRATED leave identical evidence, and a migrated definition leaves the attribution population at the moment its replacement most needs inspecting. The attack is correct and the obligation is a TRIPWIRE, not a completeness proof: `SURVIVING-MIGRATE: 0` says no direct-attribute lifecycle call remains under `tests/` or `examples/`, which is the property a future edit is likely to break by accident. It cannot exclude a bound method, `getattr`, wrapper or descriptor, and no re-derived census ever will. The real closure is STRUCTURAL and belongs to M3.6a2: once `handle` and `request_status` do not exist, every spelling in this attack raises `AttributeError` and the absence stops being measured. Contract section 7 must read `no measured direct call survives`, not `every consumer stopped`."
     },
     {
       "id": "A02",
@@ -24,8 +24,8 @@
       "reproduction": "In `test_submission_battery.py::test_d23_the_eight_named_seams_still_expose`, remove the `request_status` entry and change `len(exposed)` from 3 to 2; retain the `handle` entry. Regenerate via `m3u6a1-rule-census.py`, then run gates 1-3: the row remains RETAIN while `sites` falls 2→1.",
       "severity": "blocking",
       "verdict": "DEFECT — no immutable expected call count backs D03; the implementation-controlled census can ratify a weakened RETAIN test.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "Lands against the contract's wording and is already discharged by the battery. D03's shipped test pins each RETAIN definition BOTH ways the attack asks for: `_lifecycle_count(definition) == row['sites']` compares the shipped AST against the COMMITTED census row, and every retained name is then re-run by `_run_test_methods`. Removing one `request_status` entry drops the AST count while the committed JSON still reads 2, so D03 goes red before any regeneration. The residual is the attack's real root and it is Y03's, not D03's: an author who also regenerates the table restores agreement. Rule at Y03."
     },
     {
       "id": "A03",
@@ -36,8 +36,8 @@
       "reproduction": "Replace `tests/test_system.py::test_request_idempotency_and_partition_isolation` with a one-assertion `request_status` smoke test under a new qualified name, keep the suite test count constant, regenerate the ruled census, and run gates 1-3. `ruled_retain` stays 23 although the survivor set changed.",
       "severity": "material",
       "verdict": "DEFECT — “exactly” needs the qualified-name set and per-name site counts; `23` alone permits a survivor swap.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "Lands against D05's WORDING and is discharged by D05's shipped test, which asserts more than the obligation says. `self.assertEqual(_consumer_map(ROOT), retained)` compares a qualified-name -> site-count map derived from source against the committed census, so the survivor-swap this attack describes fails on the name set, not on the cardinality. The contract sentence states a cardinality and should state the map; the instrument is already right."
     },
     {
       "id": "A04",
@@ -48,8 +48,8 @@
       "reproduction": "At `tests/test_system.py::test_counterexample_and_revocation_quarantine`, delete the same-input artifact row before the new `resolve` call, or resolve `{\"x\": 2}` instead of `{\"x\": 1}`; retain the two D06 assertions. Run that test and inspect whether `passed=True, matched=False` survives without the claimed quarantined subject.",
       "severity": "material",
       "verdict": "DEFECT — D06 needs a positive precondition pin for artifact identity, canonical input, and suspended/retired status.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "Correct that `passed is True` plus `matched is False` is weaker than the conclusion drawn from it, and the missing premise is the same one Y13 names. The pair proves resolution examined its state and selected nothing; it does not prove a same-input once-promoted artifact exists in the required status. The domain that makes it sound is the SITE, not the assertion: `m3u6a1-fallback.py` establishes `_ONCE_PROMOTED` membership per site before the shape is assigned, and only sites carrying that evidence were ruled MISS-GUARDED. The obligation should cite that precondition instead of re-deriving it from two booleans. Y13 owns the execution half."
     },
     {
       "id": "A05",
@@ -60,8 +60,8 @@
       "reproduction": "In the migrated `test_counterexample_and_revocation_quarantine`, keep its correct `resolve(\"tenant-a\", \"echo\", {\"x\": 1})` check but call `propose(\"tenant-a\", \"echo\", {\"x\": 2})`; discard the identifier. Run that test plus gates 2-5. D07’s call exists, but the request/proposal rows bind the wrong input.",
       "severity": "blocking",
       "verdict": "DEFECT — D07 asserts syntax where its stated property is a site-specific ledger equivalence over exact arguments and multiplicity.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "Correct: call presence is not ledger equivalence, and D07's own sentence claims the stronger property. The bounded reading is that D07 preserves the SHAPE of each MISS-GUARDED site - a proposal is still created there - while P1 supplies the row-state result for a matched pair of routes, measured once in `m3u6a1-premise.py`, not site by site. Arguments and multiplicity at each site are carried by that site's own assertions under gate 1, which is exactly the oracle Y01 shows is not independent. Y01 owns the general defect."
     },
     {
       "id": "A06",
@@ -72,8 +72,8 @@
       "reproduction": "After migrating `tests/test_system.py::confirm`, insert and discard `self.system.resolve(\"tenant-a\", \"echo\", value)` immediately before `propose`. Run gates 1-5. The migrated definition is absent from gate 4’s handle-site targets, so no instrument attributes or rejects the added resolve call.",
       "severity": "material",
       "verdict": "DEFECT — the attribution population shrinks exactly when D08 must inspect it; a closed set of migrated FACTORY loci is required.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "The census and the shape table are REGENERATED from the current tree, so a consumer that was DELETED and a consumer that was MIGRATED leave identical evidence, and a migrated definition leaves the attribution population at the moment its replacement most needs inspecting. D08 is a negative obligation whose population empties as the migration succeeds, so it is unfalsifiable after the fact by construction. Its real value was as a RULE ON MAIN'S HAND at authoring time - do not write a verified-miss assertion where no once-promoted artifact exists - and it was honoured: gate 4 reports MISS-GUARDED 0 and FACTORY 28 with no FACTORY site carrying a resolve assertion. A durable complement needs the frozen opening site set that Y04 demands; rule there."
     },
     {
       "id": "A07",
@@ -84,8 +84,8 @@
       "reproduction": "Retain `_promote_scope(self, prefix, ...)` and its fourteen prefix arguments after migration; add `_ = prefix` as the first body statement. Run gate 1 and the proposed D14 AST probe. Confirm that a `Name(id=\"prefix\", ctx=Load())` exists although removing the parameter changes no behavior.",
       "severity": "material",
       "verdict": "DEFECT — D12 needs an exact signature and caller-arity pin; D14’s read predicate cannot establish that `prefix` is live.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "Correct, and the same lexical-versus-semantic gap as A08; rule there. Specific to D12: `prefix` existed only to build two request identifiers, and the migrated helper cannot accept a caller-chosen request id at all, so the parameter is not merely unread, it is UNBUILDABLE - there is no expression the body could form from it. That is a stronger and checkable property than `no statement reads it`, and it is what D12 should say."
     },
     {
       "id": "A08",
@@ -96,8 +96,8 @@
       "reproduction": "For any migrated helper, retain a dead `request_id` and add `if False: assert request_id`; keep all caller arguments. Parse with `ast.walk` and show one `Load` node, then run the helper’s tests. The AST letter passes while deleting the parameter and arguments is behavior-preserving.",
       "severity": "material",
       "verdict": "DEFECT — “body reads” is only a lexical condition; exact post-migration signatures are the enforceable property.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "Correct in full and the ceiling is real: no AST predicate decides reachability or observable effect, and `locals()[name]` reads without an `ast.Name` node. D14's defensible scope is the SHIPPED SIGNATURE SET, which is decidable: after migration no helper declares a parameter that no statement mentions. Every evasion in the attack requires ADDING a dead statement, which is a visible edit under review rather than a silent survival - that is the whole difference between this and the residue D14 exists to catch. A20 owns the variadic hole, which is the one evasion that adds nothing visible."
     },
     {
       "id": "A09",
@@ -108,8 +108,8 @@
       "reproduction": "On shipped HEAD run `git checkout -- tests/ examples/`, execute the surgery once, then run `git diff --exit-code -- tests examples`. This can pass solely because checkout restored shipped bytes. Repeat from explicit `6fb4d92` and compare every target byte; only the latter tests first-pass replay.",
       "severity": "blocking",
       "verdict": "DEFECT — bind replay to an explicit base SHA, an explicit script blob, the exact target path set, and byte equality with shipped HEAD.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "Lands against D16 and C05 as WRITTEN and is discharged by the battery, which supplies every pin the attack asks for. `tests/test_migration_battery.py` sets `BASELINE = \"6fb4d92\"` and D16 replays into a detached worktree at that commit, not through `git checkout --` against the current index. The tautology the attack describes is exactly what C05's prose recipe would have produced, so the prose is the defect and the instrument is not. Correct C05 to name the detached-worktree recipe it should always have specified."
     },
     {
       "id": "A10",
@@ -120,8 +120,8 @@
       "reproduction": "Run `uv run python .agent/decisions/m3u6a1-premise.py`; then, in isolated mutations, delete the post-layout-A checkpoint and the post-layout-B checkpoint from the migrated demo. Run the demo after each mutation and require the following `resolve` assertion to fail on `persisted-function-receipt`.",
       "severity": "cleared",
       "verdict": "HOLDS — P2 supplies a discriminating before/after state, subject to the battery killing each checkpoint deletion independently.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "CLEARED",
+      "main_note": "CLEARED. The reviewer found no defensible attack and MAIN concurs: the obligation rests on a discriminating before/after state that the premise probe measures directly, and each named mutation fails closed rather than vacuously."
     },
     {
       "id": "A11",
@@ -132,8 +132,8 @@
       "reproduction": "Change `assert source.calls == calls_before` after a resolved hit to `assert source.calls >= calls_before`; do not change the number of `assert` nodes. Run the demo, the `-O`/`-OO` test, and the count pin. Current behavior stays green, but a future adapter call is no longer rejected.",
       "severity": "material",
       "verdict": "DEFECT — pin the assertion subject set or behavior mutants, not only the aggregate `assert` count.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "Correct that an aggregate `assert` count collides across opposite semantics, and this unit already paid for the weaker half: V06 shipped a stale `38` against a measured 35 because nothing bound the prose to the module. D21's count is a DRIFT DETECTOR for act-structure edits, which is the change this unit makes, and it now fails loudly on one. Assertion STRENGTH is a different property with a different instrument - a mutation campaign over the demo's verdicts - and it is Y01's, not D21's. Rule there; the demo mutant set is polish-register work."
     },
     {
       "id": "A12",
@@ -144,8 +144,8 @@
       "reproduction": "In `run_demo.py`, change `Verified function hash: {function.function_hash}` to `Verified function hash: {report_a.scope_hash}`. Both values are 64-hex. Run `DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript`; expect one mask hit and identical normalized output.",
       "severity": "material",
       "verdict": "DEFECT — bind each masked token to its producer value before normalization; occurrence counts alone erase attribution.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "Correct: `[0-9a-f]{64}` proves a hex token occupies the position, not that it is the verified function hash, and the substitution in the reproduction would normalize identically. D22's domain is TRANSCRIPT REGENERATION - that the shipped block is the demo's own current output rather than a hand-edited relic - and for that the mask is correct and load-bearing. Binding a masked token to its producer value is a demo-assertion obligation: the demo already asserts the identity it prints, and Y01 owns whether that assertion is strong enough."
     },
     {
       "id": "A13",
@@ -156,8 +156,8 @@
       "reproduction": "Enumerate `git rev-list --reverse 6fb4d92..4e72692`; for each SHA create a detached worktree and run `uv run python -m unittest discover -s tests -t .`, recording rc, `Ran N`, and SHA. Compare that ledger with D28; any absent or red commit falsifies the claim.",
       "severity": "material",
       "verdict": "UNPROVEN — closure needs a complete range-bound per-commit gate ledger; the contract currently records endpoints only.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "Correct at the time it was written and now discharged by the battery, which built precisely the ledger the reproduction specifies: D28 enumerates `git rev-list --reverse 6fb4d92..HEAD` over the migration paths, checks each revision out detached, runs the full suite there, and requires rc 0 with `Ran N` >= 949. The endpoint-only record the attack indicts is gone. S6 also repaired D28's own self-reference (contract V08): the battery is the instrument, so every checkout drops it before the inner run."
     },
     {
       "id": "A14",
@@ -168,8 +168,8 @@
       "reproduction": "Run both routes into separate temporary databases, call `_dump()` without `_shape()`, and compare non-time cells. Observe at least `requests[0].id: \"r1\" != \"req_<hex>\"`, `proposals[0].request_id`, event subjects, receipt fields, and the stated payload difference.",
       "severity": "blocking",
       "verdict": "DEFECT — the defensible claim is one attributable difference after an explicit identity-isomorphism projection, not identical row state.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "ACCEPTED",
+      "main_note": "P1 as written is FALSE and the probe's own output says so. `m3u6a1-premise.py` prints six differing columns, classifies five VOLATILE and one ATTRIBUTABLE, and the volatile set includes `events.rows:row1.subject_id`, `row2.subject_id`, `row2.payload_json`, `examples.rows:row0.receipt_hash` and `receipt_json`. C02 separately concedes `requests.id` is caller-chosen under `handle` and internally minted under `propose`. So the literal row state differs in primary keys, foreign keys, event subjects and receipts. The defensible claim is the one the probe computes: after an identity-isomorphism projection that drops minted identifiers and their dependents, EXACTLY ONE attributable difference remains, `events.rows:row1.payload_json`. Correction C16 restates P1 in those terms; the projection is the claim's premise and must be stated with it, never assumed."
     },
     {
       "id": "A15",
@@ -180,8 +180,8 @@
       "reproduction": "Mutate `cement_runtime.function.evaluate` so its hit branch keeps `matched=True` but returns `output={\"wrong\": True}` and another entry’s `artifact_hash`; run `m3u6a1-premise.py`. Its `resolve-after-set-promotion` and P2 after-hit booleans remain true despite divergent payload.",
       "severity": "material",
       "verdict": "DEFECT — compare canonical output and artifact identity between `handle` and `resolve`, or narrow P2 to match existence only.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "Correct: `premise_2()` compares neither the post-promotion match output nor `artifact_hash` against the preceding `handle` result, so `after_hit` proves a match EXISTS. P2's role is a feasibility premise - after set promotion `resolve` can answer where `handle` answered from the artifact - and that is what the unit needed to justify migrating two demo sites. Output equivalence is asserted where it belongs, in the demo's own verdicts on the migrated acts. Narrow P2's sentence to match existence; the equivalence claim is D18's and Y14 owns its site mapping."
     },
     {
       "id": "A16",
@@ -192,8 +192,8 @@
       "reproduction": "Run `m3u6a1-fallback.py`, then inspect JSON sites `tests/test_system.py:485` and `:584`: each has only `ReconciliationRequired` outcomes while `shape` is `HIT`; totals still print `HIT: 9` and `RESULT: PASS`. Require HIT outcomes to include `Resolved` explicitly.",
       "severity": "material",
       "verdict": "DEFECT — C01 repairs prose but not the gate; gate 4 remains green on two known misclassifications.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "ACCEPTED",
+      "main_note": "Confirmed against the shipped gate. `m3u6a1-fallback.py` keys HIT on `outcomes != {ReviewRequired}`, which collapses `Resolved` with `ReconciliationRequired`, and it still prints `HIT: 9` and `RESULT: PASS`. Binding correction C01 already declares two of those nine not hits. An instrument that certifies a taxonomy its own contract calls FALSE is the V08 class exactly: the green reading is not evidence. C01 repaired the prose and left the gate, which is the half that outlives the session. Repair: split the ambiguity branch out of HIT so the printed partition matches C01. No migration ruling changes - both sites are RETAIN - so this is instrument truth, not a re-migration."
     },
     {
       "id": "A17",
@@ -204,8 +204,8 @@
       "reproduction": "In each rewritten test, change the scalar subquery predicate to `id = \"prop_absent\"`; run `test_proposal_paths_translate_malformed_persisted_json`, `test_orphaned_binding_fails_closed_and_stays_distinct_from_an_absent_proposal`, and `test_review_rejects_cross_table_state_corruption`. Each must go red.",
       "severity": "cleared",
       "verdict": "HOLDS — the downstream failure assertions are positive controls for row selection; retain the proposal-id lookup.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "CLEARED",
+      "main_note": "CLEARED. The reviewer found no defensible attack and MAIN concurs: the obligation rests on a discriminating before/after state that the premise probe measures directly, and each named mutation fails closed rather than vacuously."
     },
     {
       "id": "A18",
@@ -216,8 +216,8 @@
       "reproduction": "Run `jq \"[.definitions[]|select(.verdict==\"RETAIN\")|.sites]|add\" m3u6a1-census.json` at the seed and shipped states; seed returns 44. If shipped returns 45, diff `[site, lines, sites]` and name the added locus in C11; if it returns 44, correct the claim.",
       "severity": "material",
       "verdict": "UNRESOLVED — `45` is neither derivable from the bound seed nor accompanied by the set that would make the new denominator auditable.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "ACCEPTED",
+      "main_note": "Confirmed and RESOLVED with the locus C11 failed to name. Seed census 8592c34 totals 23 RETAIN definitions over 44 sites; shipped totals 23 over 45. The entire increment is `tests/test_system.py::test_operation_revision_invalidates_every_old_request_path`, 6 sites -> 7, gaining `tests/test_system.py:880`. Cause: that test's subject IS the caller-chosen request-id route, and migrated `confirm` can no longer carry a request id, so `self.confirm(\"old-confirmed\")` was inlined into the direct `self.system.handle(..., request_id=\"old-confirmed\")` plus `self.system.review(...)` pair it always was underneath. The call did not appear; it became VISIBLE. One event moves two denominators in opposite directions - `confirm`'s callers 41 -> 40, measured at 40 today, and RETAIN sites 44 -> 45 - and C11 recorded the second without its cause. Correction C17 names the locus and binds both movements to it."
     },
     {
       "id": "Y01",
@@ -228,8 +228,8 @@
       "reproduction": "In the migrated `test_counterexample_and_revocation_quarantine`, replace `assertFalse(resolution.match.matched)` with `assertIsNotNone(resolution.match)` or delete it. Run gate 1: the same test still counts and current behavior stays green, but a false-positive artifact match is no longer rejected.",
       "severity": "material",
       "verdict": "EVADED — green plus a test-count floor cannot prove that rebased tests assert at least their prior properties.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "The deepest row in the table and the one this unit already paid for. Correct that a green suite validates only surviving assertions, that expected and implementation code move together here, and that no independent assertion-strength oracle exists - V06 is the measured instance, a stale `38` that no gate could see. It does not land against shipped state: the wave-2 battery IS the independent oracle the attack says is missing, written diff-blind against the contract and the pre-implementation baseline, and it went red 23 of 29 at that baseline before going green at HEAD. That red-then-green transition is the assertion-strength credential a suite alone cannot produce. The residual - mutation testing over the migrated bodies - is polish-register work, and gate 1's own wording must stop implying the floor proves preservation."
     },
     {
       "id": "Y02",
@@ -240,8 +240,8 @@
       "reproduction": "After migrating all other rows, replace the body of `tests/test_cli.py::test_function_inspect_emits_the_tail_beyond_one_hundred_entries` with `self.assertTrue(True)`, regenerate the ruled census, and run gates 1-2. The test count is unchanged and no MIGRATE row survives.",
       "severity": "blocking",
       "verdict": "EVADED — completeness needs a frozen pre-migration qualified-name set with per-row dispositions, not a population re-derived after deletion.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "The census and the shape table are REGENERATED from the current tree, so a consumer that was DELETED and a consumer that was MIGRATED leave identical evidence, and a migrated definition leaves the attribution population at the moment its replacement most needs inspecting. This is A01 from the erasure side and it is the sharper telling: replacing a MIGRATE body with a tautology deletes its census row legitimately while gate 1's count floor holds. It does not land against shipped state, because the battery's D05 pins the qualified-name -> count map of every survivor and D03 re-runs each retained test by name. What neither pins is the frozen PRE-migration MIGRATE set with per-row dispositions, which is the artifact this attack correctly demands and which only Y03's ruling can supply."
     },
     {
       "id": "Y03",
@@ -252,8 +252,8 @@
       "reproduction": "Add `tests/test_cli.py::test_function_inspect_emits_the_tail_beyond_one_hundred_entries` to `RULINGS` as RETAIN with boilerplate grounds, leave its `handle` call unchanged, run the writer, then `--check` and gate 2. Gate 3 prints `IN-SYNC`; gate 2 no longer counts that call as MIGRATE.",
       "severity": "blocking",
       "verdict": "EVADED — pin the exact opening ruling map or grade each changed ruling independently; self-consistency is not ruling integrity.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "Correct and it is the root A02 and Y02 both reduce to: `--check` compares hard-coded `RULINGS` against JSON regenerated FROM those rulings, so the pair is self-consistent by construction and synchronization is not integrity. The honest reading of `IN-SYNC` is that the committed table matches the committed rulings - a real property, since it fails when either moves alone - and nothing more. The independent anchor the attack wants exists but sits outside gate 3: the seed census at 8592c34 is committed and immutable, and A18's own resolution was derived by diffing shipped against it. Recording that seed as gate 3's reference is the closure; M3.6a2 must carry it, because that unit re-rules the whole population."
     },
     {
       "id": "Y04",
@@ -264,8 +264,8 @@
       "reproduction": "From a migrated tree, delete both the new `resolve` assertions and the discarded `propose` call in `test_counterexample_and_revocation_quarantine`; retain its artifact-status assertion. Run gates 1 and 4. The old site is absent from gate 4 targets, so attribution can still report PASS.",
       "severity": "blocking",
       "verdict": "EVADED — gate 4 must grade a frozen opening site set and inspect replacement AST/runtime behavior, not only surviving handle calls.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "The census and the shape table are REGENERATED from the current tree, so a consumer that was DELETED and a consumer that was MIGRATED leave identical evidence, and a migrated definition leaves the attribution population at the moment its replacement most needs inspecting. Correct and structural: a successfully migrated definition has no `handle` call, so it leaves gate 4's target set exactly when its replacement needs inspecting, and the surviving RETAIN sites keep the control nonzero and nonuniform so the gate looks healthy. Gate 4's defensible claim is about the RETAINED population only - it attributes shapes to sites that still call `handle` - and that is the population M3.6a2 deletes. A frozen opening site set with replacement-side assertions is the correct instrument and its natural owner is M3.6a2, which must prove every deleted site's replacement rather than re-derive a shrinking one. A06 and A19 attach here."
     },
     {
       "id": "Y05",
@@ -276,8 +276,8 @@
       "reproduction": "Run `uv run python .agent/decisions/m3u6a1-premise.py; printf \"%s\\n\" $?` and observe rc 0 beside false final verdicts. Then remove a migrated consumer’s `propose` call and rerun: output is byte-equivalent apart from random IDs because the probe never imports that consumer.",
       "severity": "material",
       "verdict": "EVADED — gate 5 reproduces API premises, not their application; machine-check expected semantic fields and bind consumer-specific obligations elsewhere.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "ACCEPTED",
+      "main_note": "Confirmed by running it: `m3u6a1-premise.py` exits 0 while printing `VERDICT P1 propose-equals-handle-row-state: False` and `VERDICT P2 resolve-replaces-artifact-hit: False`. Both False values are CORRECT - P1's projection leaves one attributable difference and P2 answers True only after set promotion - which makes the defect worse, not better: a reader is handed two `False` lines beside a green rc and must already know the answer to read it. A command that returns 0 for every possible output is not a gate; it cannot fail, so its rc carries no information and recording it as a passing gate asserts a check that never ran. Repair: assert the expected findings and exit nonzero on divergence, and rename the verdict lines so their polarity states the claim rather than negating it. The attack's second half - the probe is invariant under consumer edits - is correct and by design: it measures the API premises, and consumer obligations are the battery's."
     },
     {
       "id": "Y06",
@@ -288,8 +288,8 @@
       "reproduction": "On an isolated opening tree, delete one old anchor without installing its replacement, then run the script twice. If absence is interpreted as “already migrated,” the second run prints `no-op` although the target span is malformed. Compare the first-run tree byte-for-byte with shipped targets to expose it.",
       "severity": "material",
       "verdict": "EVADED — idempotence is necessary but not sufficient; pair it with explicit-base completeness and replacement-side anchor assertions.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "Correct that second-run stability cannot constrain first-run correctness, and discharged by the battery: D16 replays from the explicit detached baseline and compares the produced tree against shipped bytes, which is exactly the distinguishing test the attack names. Gate 6's `no-op` keeps its own narrow job - the script is idempotent, so a rerun cannot double-apply - and V07 proved it live when a hand repair outside the script made the replay diverge within one gate run. Necessary and not sufficient, with the sufficient half already shipped elsewhere."
     },
     {
       "id": "Y07",
@@ -300,8 +300,8 @@
       "reproduction": "Change `events.add_argument(\"--limit\", type=int, default=1_000)` to use `type=str`, or change an unpinned help string; run `m3u5a-s2-probe.py`. `parser_census` and `parser_shape` remain 28/35 and `151/ebd2ac811bd9776d` although parsing behavior or help changed.",
       "severity": "material",
       "verdict": "EVADED — serialize every behavior-bearing parser field or pair the probe with a range-scoped `cli.py` byte-identity pin.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "DEFERRED",
+      "main_note": "Correct: `parser_shape` omits `type`, `choices`, `const`, `metavar` and `help`, so a behaviour-bearing change to any of them leaves every serialized line, count and digest identical. This is not a new finding - it duplicates an OPEN M3.5b polish row that already owns the serializer's field set - and opening a second record would split the fix across two registers. The unit-local premise it threatens, `no production source changes`, is independently pinned harder than gate 7 could: battery D04 runs `git diff --exit-code 6fb4d92 -- src`, which fails on any byte of `cli.py`. Route to the existing polish row; nothing is unprotected meanwhile."
     },
     {
       "id": "Y08",
@@ -312,8 +312,8 @@
       "reproduction": "Add ``Run `cement --db d --partition p handle op --input {}`.`` to `README.md`, or place it in a `````text`` fence; run `m3u5b-doc-parse.py`. The stale command is shipped and executable-looking but is never yielded by `shell_blocks()`, so rc remains 0.",
       "severity": "material",
       "verdict": "EVADED — command absence must scan a complement-defined prose corpus, including inline and non-shell code forms.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "DEFERRED",
+      "main_note": "Correct: the extractor yields only fenced blocks whose bare info string is one of four shell labels, so inline code, indented code, `text` fences, HTML blocks and attributed fences are all outside the corpus, and a stale invocation on any of them leaves rc 0. The gate and its corpus are M3.5b's, not this unit's - `m3u5b-doc-parse.py` - and widening the corpus is a change to that unit's instrument with its own controls to re-derive. This unit ships no new command prose, so the exposure it adds is zero. Route to the polish register against the M3.5b doc-parser row; Y15 carries the adjacent prose-scanning gap."
     },
     {
       "id": "Y09",
@@ -324,8 +324,8 @@
       "reproduction": "In `test_b30_the_six_owned_event_payloads_are_2`, replace `assertEqual(json.loads(event[\"payload_json\"]), {\"request_id\": request_id})` with `assertIn(\"request_id\", json.loads(...))`; make the analogous D03 assertion key-only. Run gate 1 and census/ruling gates: all stay green.",
       "severity": "material",
       "verdict": "EVADED — preserve the exact assertion AST/behavior mutant, not merely the test names and handle-call counts.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "Correct and it is Y01 instantiated on two specific tests: name, lifecycle call count and RETAIN classification all survive a weakening from exact payload equality to key presence. It does not land against shipped state - both assertions are the exact-equality form today - and the battery's D24 re-runs both tests by name rather than trusting the census row. D24's wording claims an `exact durable record`, which is the overreach; the record is durable against DELETION and not against WEAKENING. Mutation coverage is Y01's residual and belongs to the polish register."
     },
     {
       "id": "Y10",
@@ -336,8 +336,8 @@
       "reproduction": "Add `System.handle.__kwdefaults__[\"retry_failed\"] = True` in `src/cement_runtime/__init__.py` after importing `System`; run the three P06 span tests and the D26 still-ships test. Hashes and callability remain unchanged while the public default changes from false to true.",
       "severity": "blocking",
       "verdict": "EVADED — pin runtime signature/defaults and method identity, and freeze every module allowed to rebind the class export.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "Correct in principle - source bytes do not determine a runtime callable's defaults or binding, and the three P06 spans plus D26's `callable` check all pass under `__kwdefaults__` mutation - and DISCHARGED against shipped state by an obligation the attack did not see. The reproduction writes to `src/cement_runtime/__init__.py`, and battery D04 runs `git diff --exit-code 6fb4d92 -- src`: any byte in the whole tree, that file included, fails it. The gap is therefore real for D25's WORDING, which claims the spans prove the method unchanged, and closed in fact for this unit, which changes no production source at all. A runtime signature/identity pin is the right instrument for a unit that DOES edit `src`; that is M3.6a2, which deletes both methods and needs the inverse pin."
     },
     {
       "id": "Y11",
@@ -348,8 +348,8 @@
       "reproduction": "After importing `System`, assign `System.request_status = lambda *args, **kwargs: (_ for _ in ()).throw(NotImplementedError())`; run only `test_d01_m3_5b_ships_system_handle_and_system_request_status_as`. `callable(...)` is true although every invocation fails.",
       "severity": "blocking",
       "verdict": "EVADED — assert the exact signature and execute one discriminating success path per method, including result type and ledger effect.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "Correct: `callable(getattr(System, name, None))` accepts a variadic stub that always raises, an alias to an unrelated method, or a changed-default wrapper, so the pin admits a name-shaped tombstone. It does not land against shipped state for the same reason as Y10 - D04's whole-`src` byte diff forbids the rebinding the reproduction performs, and the repro's own monkeypatch lives inside one test process rather than in shipped bytes. D26's wording, `still ship and remain reachable`, outruns `callable`; reachability needs one executed success path. That obligation matters most at the moment the methods are DELETED, so M3.6a2 inherits it as the pin that must flip from passing to failing."
     },
     {
       "id": "Y12",
@@ -360,8 +360,8 @@
       "reproduction": "Modify `src/cement_runtime/__init__.py` to rebind `System.handle`, or modify `function.py:evaluate`; run `test_d15a_the_six_runtime_modules_stay_byte_identical_to_their_3`. Each of the six comparisons still passes because neither changed path belongs to `protected`.",
       "severity": "material",
       "verdict": "EVADED — assert the complete production-source path set and byte identity per member, or narrow the contract claim to the six files only.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "Correct that a six-file allowlist is not the complement of production source - it omits `__init__.py`, `cli.py`, `function.py` and `json_value.py`, each able to alter exports, parsing or match evaluation - and fully discharged here. D27 inherits M3.5b's six-module freeze and this unit does not rely on it: battery D04 pins the ENTIRE `src` tree byte-for-byte against 6fb4d92, so both reproduction edits fail immediately. The correct record is that D27 is a borrowed pin with a known-partial domain, retained for continuity, while D04 is the one this unit's no-production-source premise actually rests on."
     },
     {
       "id": "A19",
@@ -372,8 +372,8 @@
       "reproduction": "In `_spy`, after `_call_site()`, set `digest = \"0\" * 64` only for `tests/test_system.py:281`, whose outcome is `Resolved`; run `m3u6a1-fallback.py`. The HIT becomes FACTORY, no proposal control runs for that outcome, totals remain nonuniform, and global control failures stay zero.",
       "severity": "blocking",
       "verdict": "DEFECT — “per-call” is false and the global count is unattributed; independently validate the digest at every target call, including hits, reconciliation, failures, and raises.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "ACCEPTED",
+      "main_note": "Confirmed at the source. `m3u6a1-fallback.py:130` reads `if isinstance(outcome, ReviewRequired): _control['checked'] += 1`, so every `Resolved`, `ReconciliationRequired`, `FallbackFailed`, `InProgress` and raising path skips the digest control entirely; the run reports 24 checked over 17 site rows. D09's battery docstring calls this a `per-call positive control` and that is FALSE as written. Worse for the taxonomy, the one global counter is not attributed to sites, so a site-selective wrong digest on an uncontrolled HIT flips its shape to FACTORY with every counter clean - which is the same blind spot A16 reaches from the other side. Repair: run the control on every observed call, attribute failures to their site, and correct D09's wording to whatever the instrument then does."
     },
     {
       "id": "A20",
@@ -384,8 +384,8 @@
       "reproduction": "Define migrated `confirm(self, *legacy_ids, reviewer=..., ...)`, ignore `legacy_ids`, and change one caller to `self.confirm(*(\"scope-1\",))`; keep the other forty calls migrated. Run the suite and any check that searches only for a `request_id` parameter or fixed positional arity.",
       "severity": "material",
       "verdict": "DEFECT — pin the exact allowed signature, reject variadics, and inspect starred/expanded arguments at every caller.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "Correct and it is the one D14 evasion that adds no visible dead statement: `*legacy_ids` accepts the old argument shape while the named parameter and the ordinary positional both vanish lexically. It does not land against SHIPPED state - migrated `confirm` and `_confirm_scope` declare no variadics, and all 40 and 65 callers pass fixed arity - so nothing is false today. It is a real gap in D10/D11 as PREDICATES, and the cheap closure is a signature allowlist rather than a parameter-absence check. Owner is the polish register: M3.6a2 rewrites these helpers again when the lifecycle API is deleted, and a signature pin written now would be rewritten there."
     },
     {
       "id": "A21",
@@ -396,8 +396,8 @@
       "reproduction": "Print `Act 5 merges both promoted layouts into one exportable function` without using the old exact phrase, regenerate the README transcript, and run the demo transcript test plus `m3u5b-doc-parse.py`. Both can pass while the forbidden temporal framing remains.",
       "severity": "material",
       "verdict": "DEFECT — assert the permitted Act 5 proposition or fail closed on equivalent temporal/aggregation claims, not one retired string.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "Correct that D20 bans a MEANING with no oracle, and no gate can hold a semantic ban - the doc parser reads command syntax and the transcript test reads bytes. D20's real domain is a one-time authoring obligation on MAIN's hand, discharged and verifiable by reading Act 5: the retired framing is gone and no equivalent temporal claim replaced it. The durable half is not a gate but a fact - M3.6a2 rewrites the walkthrough again - so the honest record is that D20 was satisfied once, not that it is enforced."
     },
     {
       "id": "Y13",
@@ -408,8 +408,8 @@
       "reproduction": "Wrap the new resolve call and its `passed`/`matched` assertions in `if False:` immediately before `propose` at `test_counterexample_and_revocation_quarantine`; run the suite and a source-order checker. Current behavior stays green and lexical order holds, but no miss is verified.",
       "severity": "blocking",
       "verdict": "EVADED — require runtime call tracing or a control-flow dominance check with a positive execution count per seeded site.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "Confirmed at the source and correct: battery D06 orders resolve before propose by `call.lineno` alone (`resolve_line < line < propose_line`), so wrapping the block in `if False:` preserves every line relation while nothing executes. It does not land against shipped state - the four sites run under gate 1 and their assertions would fail if the resolve never ran, since `resolution` would be unbound - which is the dominance evidence the lexical check omits but the suite supplies. The wording is the defect: D06 claims execution order and checks source order. A runtime execution count per site is the right instrument and it is the same spy gate 4 already implements, so A19's repair is where it should be built. Recorded against MISS-GUARDED 0 today: the population is empty post-migration, so the obligation is historical for this unit and live for M3.6a2."
     },
     {
       "id": "Y14",
@@ -420,8 +420,8 @@
       "reproduction": "At Act 1’s A01 locus create both `proposal_a_01` and `proposal_a_02` with two `propose` calls; at A02 only review the saved second ID. Leave B01, B02, C01 and both resolves unchanged. Run the demo: totals remain five/two although the A02 lifecycle site vanished.",
       "severity": "material",
       "verdict": "EVADED — assert the qualified original-locus→replacement mapping and exact arguments, not route totals alone.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "Correct: five/two are ROUTE totals and cannot preserve a locus mapping, and the two byte-identical A signatures make the described collapse invisible in the final ledger. It does not land against shipped state - D18's five propose and two resolve calls sit at the seven original loci, and the demo's per-act assertions bind each to its own narrative step - but the obligation as written is an aggregate and would ratify the swap. The qualified original-locus -> replacement mapping the attack asks for is cheap and belongs with D18's own wording; owner is the polish register, since M3.6a2 rewrites the walkthrough and would inherit any mapping written now."
     },
     {
       "id": "Y15",
@@ -432,8 +432,8 @@
       "reproduction": "Add `The demo emits request.resolved_by_artifact for known layouts.` to `docs/architecture.md` outside a shell fence; regenerate no transcript and run gates 1-8. The doc parser sees no command, while transcript equality remains local to the example README.",
       "severity": "material",
       "verdict": "EVADED — enumerate the complete shipped-prose path set and assert the forbidden event token’s complement over every text unit.",
-      "disposition": "unknown",
-      "main_note": "unknown"
+      "disposition": "SCOPED",
+      "main_note": "Correct: transcript regeneration removes the two known lines and nothing scans shipped prose for the retired event vocabulary, so the same sentence in another document leaves every gate green. It does not land against shipped state - the event still EXISTS in this unit, since production source is unchanged, so naming it elsewhere would be accurate rather than stale. The absence obligation only becomes true at M3.6a2, where `request.resolved_by_artifact` and `request.fallback_failed` are deleted; a complement-defined prose scan is that unit's gate and would be asserting a falsehood if written here. D23's scope is correctly the pinned transcript."
     }
   ]
 }
