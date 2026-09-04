@@ -1,0 +1,976 @@
+{
+  "control": {
+    "checked": 1853,
+    "errors": 0,
+    "failed": 0
+  },
+  "kind": "m3u6a1-fallback-attribution",
+  "migrate_sites": [
+    "tests/test_cli.py:2289",
+    "tests/test_hospital_ocr_example.py:624",
+    "tests/test_proposal_binding_battery.py:272",
+    "tests/test_resolve_battery.py:75",
+    "tests/test_system.py:1222",
+    "tests/test_system.py:13645",
+    "tests/test_system.py:1422",
+    "tests/test_system.py:14461",
+    "tests/test_system.py:15487",
+    "tests/test_system.py:15690",
+    "tests/test_system.py:16700",
+    "tests/test_system.py:16820",
+    "tests/test_system.py:235",
+    "tests/test_system.py:311",
+    "tests/test_system.py:323",
+    "tests/test_system.py:344",
+    "tests/test_system.py:378",
+    "tests/test_system.py:4591",
+    "tests/test_system.py:541",
+    "tests/test_system.py:556",
+    "tests/test_system.py:592",
+    "tests/test_system.py:608",
+    "tests/test_system.py:634",
+    "tests/test_system.py:637",
+    "tests/test_system.py:803",
+    "tests/test_system.py:827",
+    "tests/test_system.py:867",
+    "tests/test_system.py:979"
+  ],
+  "sites": {
+    "tests/test_cli.py:2289": {
+      "after": [],
+      "before": [],
+      "calls": 242,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_cli_channels_battery.py:2667": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "FallbackFailed"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_hospital_ocr_example.py:624": {
+      "after": [],
+      "before": [],
+      "calls": 12,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_proposal_binding_battery.py:2471": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_proposal_binding_battery.py:272": {
+      "after": [],
+      "before": [],
+      "calls": 24,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_resolve_battery.py:249": {
+      "after": [
+        "promoted"
+      ],
+      "before": [
+        "promoted"
+      ],
+      "calls": 1,
+      "hits": 1,
+      "outcomes": [
+        "Resolved"
+      ],
+      "promoted_hits": 1,
+      "resolutions": [
+        "AssertionError: handle constructed FunctionResolution"
+      ],
+      "shape": "HIT"
+    },
+    "tests/test_resolve_battery.py:75": {
+      "after": [],
+      "before": [],
+      "calls": 148,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_submission.py:921": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_submission_battery.py:1480": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_submission_battery.py:1486": {
+      "shape": "UNOBSERVED"
+    },
+    "tests/test_submission_battery.py:451": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:1044": {
+      "after": [
+        "suspended"
+      ],
+      "before": [
+        "promoted"
+      ],
+      "calls": 1,
+      "hits": 1,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 1,
+      "resolutions": [
+        "passed=False match=None failed=['current-promotion-receipts', 'persisted-function-receipt']"
+      ],
+      "shape": "ACTOR"
+    },
+    "tests/test_system.py:1157": {
+      "after": [
+        "promoted",
+        "retired",
+        "suspended"
+      ],
+      "before": [
+        "promoted",
+        "retired",
+        "suspended"
+      ],
+      "calls": 1,
+      "hits": 1,
+      "outcomes": [
+        "Resolved"
+      ],
+      "promoted_hits": 1,
+      "resolutions": [
+        "passed=False match=None failed=['persisted-function-receipt']"
+      ],
+      "shape": "HIT"
+    },
+    "tests/test_system.py:1222": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:13645": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:1422": {
+      "after": [
+        "draft",
+        "retired",
+        "verified"
+      ],
+      "before": [
+        "draft",
+        "retired",
+        "verified"
+      ],
+      "calls": 1273,
+      "hits": 15,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 6,
+      "resolutions": [
+        "passed=True match=False failed=[]"
+      ],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:14461": {
+      "after": [],
+      "before": [],
+      "calls": 11,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:14934": {
+      "after": [],
+      "before": [],
+      "calls": 3,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:14952": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:14969": {
+      "after": [],
+      "before": [],
+      "calls": 4,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:15487": {
+      "after": [],
+      "before": [],
+      "calls": 3,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:15690": {
+      "after": [],
+      "before": [],
+      "calls": 3,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:16700": {
+      "after": [],
+      "before": [],
+      "calls": 3,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:16820": {
+      "after": [],
+      "before": [],
+      "calls": 5,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:235": {
+      "after": [
+        "draft",
+        "verified"
+      ],
+      "before": [
+        "draft",
+        "verified"
+      ],
+      "calls": 78,
+      "hits": 2,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [
+        "passed=True match=False failed=[]"
+      ],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:2698": {
+      "after": [
+        "suspended"
+      ],
+      "before": [
+        "promoted"
+      ],
+      "calls": 1,
+      "hits": 1,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 1,
+      "resolutions": [
+        "passed=False match=None failed=['duplicate-input-digests', 'function-hash-matches-snapshot', 'persisted-function-receipt']"
+      ],
+      "shape": "ACTOR"
+    },
+    "tests/test_system.py:281": {
+      "after": [
+        "promoted"
+      ],
+      "before": [
+        "promoted"
+      ],
+      "calls": 1,
+      "hits": 1,
+      "outcomes": [
+        "Resolved"
+      ],
+      "promoted_hits": 1,
+      "resolutions": [
+        "passed=False match=None failed=['persisted-function-receipt']"
+      ],
+      "shape": "HIT"
+    },
+    "tests/test_system.py:290": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:304": {
+      "after": [
+        "promoted"
+      ],
+      "before": [
+        "promoted"
+      ],
+      "calls": 1,
+      "hits": 1,
+      "outcomes": [
+        "Resolved"
+      ],
+      "promoted_hits": 1,
+      "resolutions": [
+        "AssertionError: dispatch rehashed sealed tests"
+      ],
+      "shape": "HIT"
+    },
+    "tests/test_system.py:3090": {
+      "after": [
+        "promoted"
+      ],
+      "before": [
+        "promoted"
+      ],
+      "calls": 1,
+      "hits": 1,
+      "outcomes": [
+        "Resolved"
+      ],
+      "promoted_hits": 1,
+      "resolutions": [
+        "AssertionError: dispatch rehashed sealed tests"
+      ],
+      "shape": "HIT"
+    },
+    "tests/test_system.py:311": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:323": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:344": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:378": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:443": {
+      "shape": "UNOBSERVED"
+    },
+    "tests/test_system.py:446": {
+      "after": [],
+      "before": [],
+      "calls": 2,
+      "hits": 0,
+      "outcomes": [
+        "ReconciliationRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:4591": {
+      "after": [
+        "draft"
+      ],
+      "before": [
+        "draft"
+      ],
+      "calls": 1,
+      "hits": 1,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [
+        "passed=True match=False failed=[]"
+      ],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:465": {
+      "after": [
+        "promoted"
+      ],
+      "before": [
+        "promoted"
+      ],
+      "calls": 2,
+      "hits": 2,
+      "outcomes": [
+        "Resolved"
+      ],
+      "promoted_hits": 2,
+      "resolutions": [
+        "passed=False match=None failed=['persisted-function-receipt']"
+      ],
+      "shape": "HIT"
+    },
+    "tests/test_system.py:481": {
+      "shape": "UNOBSERVED"
+    },
+    "tests/test_system.py:485": {
+      "after": [
+        "promoted"
+      ],
+      "before": [
+        "promoted"
+      ],
+      "calls": 2,
+      "hits": 2,
+      "outcomes": [
+        "ReconciliationRequired"
+      ],
+      "promoted_hits": 2,
+      "resolutions": [
+        "passed=False match=None failed=['persisted-function-receipt']"
+      ],
+      "shape": "HIT"
+    },
+    "tests/test_system.py:541": {
+      "after": [
+        "suspended"
+      ],
+      "before": [
+        "suspended"
+      ],
+      "calls": 1,
+      "hits": 1,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 1,
+      "resolutions": [
+        "passed=True match=False failed=[]"
+      ],
+      "shape": "MISS-GUARDED"
+    },
+    "tests/test_system.py:556": {
+      "after": [],
+      "before": [],
+      "calls": 2,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:573": {
+      "after": [
+        "promoted"
+      ],
+      "before": [
+        "promoted"
+      ],
+      "calls": 1,
+      "hits": 1,
+      "outcomes": [
+        "Resolved"
+      ],
+      "promoted_hits": 1,
+      "resolutions": [
+        "passed=False match=None failed=['persisted-function-receipt']"
+      ],
+      "shape": "HIT"
+    },
+    "tests/test_system.py:584": {
+      "after": [
+        "suspended"
+      ],
+      "before": [
+        "suspended"
+      ],
+      "calls": 1,
+      "hits": 1,
+      "outcomes": [
+        "ReconciliationRequired"
+      ],
+      "promoted_hits": 1,
+      "resolutions": [
+        "passed=True match=False failed=[]"
+      ],
+      "shape": "HIT"
+    },
+    "tests/test_system.py:592": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:608": {
+      "after": [
+        "suspended"
+      ],
+      "before": [
+        "suspended"
+      ],
+      "calls": 1,
+      "hits": 1,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 1,
+      "resolutions": [
+        "passed=True match=False failed=[]"
+      ],
+      "shape": "MISS-GUARDED"
+    },
+    "tests/test_system.py:615": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:616": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:620": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "<raised>"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:624": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:634": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:637": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:677": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:682": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "InProgress"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:702": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:708": {
+      "shape": "UNOBSERVED"
+    },
+    "tests/test_system.py:713": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:724": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "FallbackFailed"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:726": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "FallbackFailed"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:739": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "<raised>"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:740": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "<raised>"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:803": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:827": {
+      "after": [
+        "suspended"
+      ],
+      "before": [
+        "suspended"
+      ],
+      "calls": 1,
+      "hits": 1,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 1,
+      "resolutions": [
+        "passed=True match=False failed=[]"
+      ],
+      "shape": "MISS-GUARDED"
+    },
+    "tests/test_system.py:867": {
+      "after": [
+        "retired"
+      ],
+      "before": [
+        "retired"
+      ],
+      "calls": 1,
+      "hits": 1,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 1,
+      "resolutions": [
+        "passed=True match=False failed=[]"
+      ],
+      "shape": "MISS-GUARDED"
+    },
+    "tests/test_system.py:875": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:879": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "FallbackFailed"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:898": {
+      "after": [],
+      "before": [],
+      "calls": 3,
+      "hits": 0,
+      "outcomes": [
+        "ReconciliationRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:907": {
+      "shape": "UNOBSERVED"
+    },
+    "tests/test_system.py:920": {
+      "shape": "UNOBSERVED"
+    },
+    "tests/test_system.py:924": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:940": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReconciliationRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    },
+    "tests/test_system.py:979": {
+      "after": [],
+      "before": [],
+      "calls": 1,
+      "hits": 0,
+      "outcomes": [
+        "ReviewRequired"
+      ],
+      "promoted_hits": 0,
+      "resolutions": [],
+      "shape": "FACTORY"
+    }
+  },
+  "totals": {
+    "actor": 2,
+    "factory": 51,
+    "hit": 9,
+    "miss_guarded": 4,
+    "targets": 72,
+    "unobserved": 6
+  }
+}

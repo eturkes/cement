@@ -50,6 +50,24 @@ RULINGS: dict[str, tuple[str, str]] = {
         "only as a `ReviewRequired` type check, which the rule reads as a fixture "
         "route. M3.6a2 deletes this test with the method.",
     ),
+    "tests/test_system.py::test_activation_requires_an_integrity_valid_promotion_receipt": (
+        "RETAIN",
+        "`handle` is the ACTOR, not a proposal factory: "
+        "`m3u6a1-fallback.py` measures the same-input artifact `promoted` before "
+        "the call and `suspended` after it, so the call PERFORMS the dispatch-time "
+        "integrity quarantine the test asserts. `propose` never consults an "
+        "artifact and `resolve` is read-only, so no post-trim method reproduces "
+        "the transition. Measured MIGRATE because the mechanical rule reads the "
+        "RETURN VALUE and is blind to a call's side effects on other state. "
+        "M3.6a2 owns it with `handle`'s two suspension writers.",
+    ),
+    "tests/test_system.py::test_function_verification_duplicate_gate_and_runtime_defenses": (
+        "RETAIN",
+        "Second ACTOR site, same grounds and the same measurement: `promoted` "
+        "before, `suspended` after, this time through `handle`'s duplicate-promoted "
+        "artifact writer. `resolve` reports `passed=False` here rather than a "
+        "verified miss, so it cannot even state the post-condition. M3.6a2 owns it.",
+    ),
     "tests/test_proposal_binding_battery.py::test_b30_the_six_owned_event_payloads_are_2": (
         "RETAIN",
         "Pins the handle-route `proposal.created` payload as `{\"request_id\": ...}` "
