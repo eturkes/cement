@@ -337,9 +337,16 @@ clause, tagged `reversion` or `sensitivity`, each row's `target_test` named, and
   migration, and S2 measured a semantic fork the census could not see, which
   costs six sites of per-site judgment plus four new obligations (D06-D09).
   The contract is S3's entry state.
-- **S3** — implementation: the surgery script, the demo rewrite, the transcript
-  regeneration, gates 1-8 green.
-- **S4** — battery + reversion catalogue + closure.
+- **S3** DONE — implementation: the surgery script, the test-tree migration, the
+  demo rewrite, the transcript regeneration, gates 1-8 green at `4e72692`.
+  `main=` 83% 200K/240K. Re-sized to FIVE sessions here: MAIN entered S3 at 73%
+  after attached state plus the ground-state read, and the implementation is 28
+  sites, 3 helpers, ~132 call sites, the demo and the transcript, so seeding a
+  validator plus skeleton before a diff-blind dispatch would not have left room
+  to finish. Sections 12-13 stay PENDING.
+- **S4** — wave 2 (`test` diff-blind battery, `rev`/`rev2` prep) + sections
+  12-13.
+- **S5** — reversion catalogue + closure.
 
 ---
 
@@ -349,6 +356,97 @@ Filled as the unit runs. A closure session must re-grade this section's gate
 text against what the instruments actually measured; no instrument grades the
 contract against its own results, which is why seven consecutive units have
 closed on claim defects in MAIN's own text.
+
+- **C01 — section 3's HIT claim is FALSE for 2 of its 9 sites.** "HIT — 9 sites.
+  `handle` answered from the artifact" holds for 7. `tests/test_system.py:485`
+  and `:584` carry `outcomes: ["ReconciliationRequired"]` in
+  `m3u6a1-fallback.json`, which is the ambiguity branch: `handle` refused to
+  choose, it did not answer. `:584` reads `before=['suspended']` with
+  `resolve -> passed=True match=False`, the MISS-GUARDED signature exactly. The
+  shape rule keys HIT on `outcomes != {"ReviewRequired"}`, so it collapses
+  "answered" with "refused to choose". Both sites are RETAIN, so nothing
+  migrates differently; the claim, not the ruling, was wrong.
+- **C02 — a FOURTH blindness axis, and it is the one that costs code.** The
+  census reads RETURN VALUES and the shape table reads ARTIFACT SIDE EFFECTS.
+  Neither sees that `request_id` is a caller-chosen PRIMARY KEY. `propose`
+  (`system.py:987`) and `submit_proposal` (`:940`) both mint `_new_id("req")`
+  internally and neither returns it, so no public route sets or reads it. Four
+  MIGRATE sites depended on the value: `test_system.py:344`, `:378` and `:1222`
+  use it as a raw-SQL key, closed by
+  `(SELECT request_id FROM proposals WHERE id = ?)`; and
+  `test_function_report_pending_request_join_is_like_and_case_exact` plants five
+  DELIBERATE COLLIDERS (`pending_join_1` against `pendingXjoinX1` under `LIKE`,
+  `PendingCase` against `pendingcase` under case folding) against the
+  `r.id = p.request_id` join at `system.py:534/547/574/591`. A minted
+  `req_<32hex>` id is lowercase hex whose only `_` sits in the prefix, so
+  migrating that site plainly would leave the `=` -> `LIKE` and case-folding
+  mutants ALIVE with every assertion green. The colliders are re-planted after
+  submission by raw `UPDATE` under `PRAGMA foreign_keys = OFF`.
+- **C03 — D03 pins the RETAIN definition and says nothing about its FIXTURES.**
+  Migrating a shared fixture helper changes what it PLANTS, so a RETAIN consumer
+  of that helper breaks with its own lifecycle call untouched. Five reds, three
+  definitions: `test_confirmed_request_cache_is_bound_to_immutable_example`,
+  `test_unknown_resolved_source_kind_fails_closed_at_storage` and
+  `test_operation_revision_invalidates_every_old_request_path`. Rule for a later
+  unit: a fixture helper's ruling is not local to it, so migrating one obliges a
+  re-read of every consumer, RETAIN included.
+- **C04 — one of those reds would have passed vacuously in the other
+  direction.** `test_unknown_resolved_source_kind_fails_closed_at_storage`
+  asserts that a CHECK constraint raises on `source_kind='mystery'`. A zero-row
+  UPDATE raises nothing, so the moment its target row stopped existing the test
+  was one edit away from green-and-vacuous rather than red. It now asserts
+  `count(*) == 1` on the target row before the raising UPDATE. Generalisation: a
+  test whose subject is a constraint needs a positive control that the
+  constrained ROW exists.
+- **C05 — D15 and D16 are read as covering the WHOLE migration, demo, prose and
+  transcript included, with no section-10 exception claimed.** The demo rewrite
+  is not a rename, so it lands as `TEXT` anchors, and the README transcript
+  lands as a fourth family that RUNS the migrated demo and rewrites the fenced
+  block under D22's two mask-count assertions. `git checkout -- tests/ examples/`
+  plus one script run reproduces the shipped tree exactly.
+- **C06 — D17's "multi-line anchors wherever a fragment repeats" is discharged
+  by the AST for `SITES` and `PARAMS`, not by anchors.** A call addressed by
+  NODE cannot hit the occurrence-index trap, because nothing is matched by text.
+  What replaces the count assertion is stronger: every site asserts that the
+  enclosing function's remaining references to the bound name are plain loads,
+  so a site consuming anything beyond `.proposal_id` ABORTS instead of migrating
+  silently. `SITES` is keyed by QUALIFIED NAME and ordinal, never by line: a
+  line-keyed table cannot be idempotent, because pass 1 moves every line below
+  its own first edit. That keying also discharges D14a by construction.
+- **C07 — TWO M3.5b OBLIGATIONS INVERT, and neither was numbered in section 5.**
+  D15b ("the twelve `examples/` files stay byte-identical to `36f7890`") and
+  D22b ("every library-API locus is byte-identical, so this unit pre-empts no
+  M3.6a doc work") are claims about M3.5b's OWN DIFF, asserted by comparing the
+  WORKING TREE against the pre-unit baseline. That comparison is an over-claim
+  which holds only until a later unit legitimately enters the scope, and
+  D18-D23 are that unit. Both re-scoped to `36f7890` -> `1146421`, M3.5b's own
+  range. D22b's own table dispositions
+  `examples/hospital_ocr/README.md` `System.handle(...)` as KEEP **for M3.6a**,
+  and the roadmap's M3.6a2 doc list (README 18 lines, `docs/architecture.md` 7,
+  `docs/adapter-protocol.md` 8, `docs/threat-model.md` 4) does not name the
+  example README, so this unit owns it. STANDING RULE for section 5 of any later
+  contract: a scope pin asserted against the working tree expires; only a
+  range-scoped assertion survives the next unit.
+- **C08 — D25's register gate is discharged by CLASSIFYING, never by
+  defaulting.** It treats an unclassified sentence opener as a failure, and it
+  diffs by PARAGRAPH, so rewriting one bullet of a list drags every sibling
+  bullet in. Five imperative openers (`canonicalize`, `export`, `isolate`,
+  `keep`, `treat`) and 23 descriptive openers were classified. The gate working
+  as designed.
+- **C09 — the demo's own verification count was a NAMING device, and it is
+  re-derived rather than relaxed.**
+  `test_the_offline_phase_runs_on_the_verified_bytes_after_teardown` pinned
+  `len(verifications) == 1` to name the document Act 6 carries. D19 makes it 4:
+  one checkpoint per artifact promotion, one `resolve` per answering act. The
+  re-derivation adds the one-entry-versus-two-entry inequality, which is the
+  assertion that PROVES the checkpoint moved.
+- **C11 — `SURVIVING-MIGRATE` counts DEFINITIONS; section 3's "26 sites" does
+  not.** The gate-2 baseline of 26 is 25 test-tree definitions plus the demo,
+  measured as STALE 25 + SURVIVING-MIGRATE 1 the moment the test tree landed.
+  Those 25 definitions hold 28 `handle` CALL SITES, which is why `SITES` has 28
+  rows. Post-migration the census reads 23 RETAIN definitions over 45 surviving
+  lifecycle sites. Three different denominators, all live in this unit's prose:
+  quote the unit with its noun.
 
 ---
 

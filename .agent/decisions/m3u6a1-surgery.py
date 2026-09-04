@@ -11,16 +11,16 @@ D15 requires ONE idempotent script that asserts the expected occurrence count of
 every anchor before applying it and prints `no-op` on a second run. D17 requires
 multi-line anchors wherever a fragment repeats.
 
-Three rule families, and the split is deliberate.
+Four rule families, and the split is deliberate.
 
 `SITES` drives the `handle` -> `propose` rewrite through the AST, never through
-text. Every one of the 26 sites is the same shape (contract section 3), and an
-AST rule addresses the call by NODE, so the occurrence-index trap D17 guards
-against cannot arise: there is nothing to count because nothing is matched by
-text. What replaces the count assertion is stronger -- each site asserts that the
-enclosing function's remaining references to the bound name are plain loads, so a
-site consuming anything beyond `.proposal_id` ABORTS instead of migrating
-silently.
+text: 28 call sites across the 25 test-tree definitions the census rules
+MIGRATE. An AST rule addresses the call by NODE, so the occurrence-index trap
+D17 guards against cannot arise: there is nothing to count because nothing is
+matched by text. What replaces the count assertion is stronger -- each site
+asserts that the enclosing function's remaining references to the bound name are
+plain loads, so a site consuming anything beyond `.proposal_id` ABORTS instead of
+migrating silently.
 
 `PARAMS` drops a positional parameter from a fixture helper and the matching
 argument from every call, also through the AST, with the call count asserted
@@ -28,9 +28,19 @@ against the contract's own table (section 1). `self.confirm(...)` and a bare
 `confirm(...)` are two different functions in one file (D14a), so the rule
 carries the qualifier and a bare anchor is never used.
 
-`TEXT` carries the bespoke edits, each with an exact expected occurrence count.
-These are the sites where the migration is NOT a rename, because the call's
-`request_id` ARGUMENT was a durable ledger key the test controlled.
+`TEXT` carries every edit that is not a rename, each with an exact expected
+occurrence count: the sites where the call's `request_id` ARGUMENT was a durable
+ledger key the test controlled, the demo's act restructure (D18-D21), the
+example README prose the reframed Act 5 falsifies, and the consequential repairs
+in tests the migration reaches only through a shared fixture or a scope pin.
+`run()` refuses any rule whose replacement contains its own anchor, because such
+a rule re-applies on every run and reports `applied` where it owes `no-op`.
+
+The README transcript is a family of its own, and it is GENERATED, not anchored:
+D22 pins the block to the demo's own output, so the script RUNS the migrated
+demo, asserts one match per dynamic mask, and rewrites the fenced block. It runs
+last, and under `--check` only when no source file is still pending, because a
+pending demo would pin the pre-migration output.
 """
 
 from __future__ import annotations
