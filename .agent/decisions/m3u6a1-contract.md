@@ -381,7 +381,9 @@ closed on claim defects in MAIN's own text.
   `req_<32hex>` id is lowercase hex whose only `_` sits in the prefix, so
   migrating that site plainly would leave the `=` -> `LIKE` and case-folding
   mutants ALIVE with every assertion green. The colliders are re-planted after
-  submission by raw `UPDATE` under `PRAGMA foreign_keys = OFF`.
+  submission by raw `UPDATE` under `PRAGMA foreign_keys = OFF`. This binds D01
+  and D15: completeness is not "no site still calls the old method", it is that
+  every migrated site still forces what it forced before.
 - **C03 — D03 pins the RETAIN definition and says nothing about its FIXTURES.**
   Migrating a shared fixture helper changes what it PLANTS, so a RETAIN consumer
   of that helper breaks with its own lifecycle call untouched. Five reds, three
@@ -414,9 +416,9 @@ closed on claim defects in MAIN's own text.
   line-keyed table cannot be idempotent, because pass 1 moves every line below
   its own first edit. That keying also discharges D14a by construction.
 - **C07 — TWO M3.5b OBLIGATIONS INVERT, and neither was numbered in section 5.**
-  D15b ("the twelve `examples/` files stay byte-identical to `36f7890`") and
-  D22b ("every library-API locus is byte-identical, so this unit pre-empts no
-  M3.6a doc work") are claims about M3.5b's OWN DIFF, asserted by comparing the
+  M3.5b's D15b ("the twelve `examples/` files stay byte-identical to `36f7890`")
+  and M3.5b's D22b ("every library-API locus is byte-identical, so this unit
+  pre-empts no M3.6a doc work") are claims about M3.5b's OWN DIFF, by comparing the
   WORKING TREE against the pre-unit baseline. That comparison is an over-claim
   which holds only until a later unit legitimately enters the scope, and
   D18-D23 are that unit. Both re-scoped to `36f7890` -> `1146421`, M3.5b's own
@@ -427,7 +429,7 @@ closed on claim defects in MAIN's own text.
   example README, so this unit owns it. STANDING RULE for section 5 of any later
   contract: a scope pin asserted against the working tree expires; only a
   range-scoped assertion survives the next unit.
-- **C08 — D25's register gate is discharged by CLASSIFYING, never by
+- **C08 — M3.5b's D25 register gate is discharged by CLASSIFYING, never by
   defaulting.** It treats an unclassified sentence opener as a failure, and it
   diffs by PARAGRAPH, so rewriting one bullet of a list drags every sibling
   bullet in. Five imperative openers (`canonicalize`, `export`, `isolate`,
@@ -440,13 +442,29 @@ closed on claim defects in MAIN's own text.
   one checkpoint per artifact promotion, one `resolve` per answering act. The
   re-derivation adds the one-entry-versus-two-entry inequality, which is the
   assertion that PROVES the checkpoint moved.
+- **C10 — a CROSS-CONTRACT obligation citation collides with a live local id,
+  and the collision is invisible to a reader who knows the local numbering.**
+  C07 cited `D15b` and `D22b` and C08 cited `D25`, all three of them M3.5b's
+  obligations. `D15b` and `D22b` name nothing here, so they read as foreign; this
+  contract's own D25 is M3.3's P06 byte-span freeze, so C08 read as correcting a
+  freeze it never mentions. Found by `m3u6a1-battery-validate.py`, which binds a
+  correction to every obligation id its text names and therefore bound C08 to
+  D25: a diff-blind author would then have encoded the register gate into the
+  byte-span test and gone red against correct code. All three citations now carry
+  their owning unit, and the parser treats a `M<n>.<n><x>` qualifier as marking
+  the id foreign. STANDING RULE: cite another unit's obligation with its unit
+  name attached, because the number alone is not a key. C10 was also the id this
+  section skipped in drafting; assigning it here closes the gap rather than
+  leaving an unassigned number that reads as a lost correction.
 - **C11 — `SURVIVING-MIGRATE` counts DEFINITIONS; section 3's "26 sites" does
   not.** The gate-2 baseline of 26 is 25 test-tree definitions plus the demo,
   measured as STALE 25 + SURVIVING-MIGRATE 1 the moment the test tree landed.
   Those 25 definitions hold 28 `handle` CALL SITES, which is why `SITES` has 28
   rows. Post-migration the census reads 23 RETAIN definitions over 45 surviving
   lifecycle sites. Three different denominators, all live in this unit's prose:
-  quote the unit with its noun.
+  quote the unit with its noun. This binds D01, whose `SURVIVING-MIGRATE: 0` is a
+  count of DEFINITIONS, and D05, whose "23 RETAIN definitions" is a third
+  denominator again.
 
 ---
 
