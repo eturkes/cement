@@ -1408,6 +1408,76 @@ Measured gaps driving the arc:
     obligations that legitimately hold at baseline - report the split, never force it); rule every red
     as SUITE / CODE / CONTRACT defect into contract section 12; and rule every attack row into section
     13 through an idempotent `--check` patcher asserting the id set, pattern `m3u5b-rule-attack.py`.
+    S5 DONE, wave-2 dispatch + harvest + battery ruling session, ran past one compaction
+    boundary. `main=` 98% 236K/240K; `mate=` 73% 174K/240K (`test-m3u6a1-1`; `rev-m3u6a1-1`
+    64% 154K/240K). Shipped `f548f88` plus this commit. Contract section 12 is WRITTEN;
+    section 13 stays PENDING for S6.
+    BOTH TEAMMATES DELIVERED, both graded PASS from committed state: `test-m3u6a1-1` filled
+    all 29 obligation tests (`UNFILLED/UNCOVERED/ORPHAN/ASSERTIONLESS/SKIPPED/CORRECTION-UNCITED`
+    all 0); `rev-m3u6a1-1` filled 36 attack rows (30 seeded + 6 extension, every graded counter 0).
+    Extension rows outnumbered nothing this time but still arrived unprompted, and the reviewer
+    caught its own dead control mid-flight (A19 re-bound after a survivor probe).
+    THE CREDENTIAL IS RED-AT-BASELINE / GREEN-AT-HEAD, REPORTED NOT FORCED: 23 red / 6 green at
+    `6fb4d92` in a detached worktree with the CURRENT `.agent/decisions/` overlaid (`Ran 29 in
+    64.365s`), then 7 failures over 5 distinct tests at HEAD. Contract section 7 predicted FIVE
+    preservation obligations (D04, D24-D27); the run measured SIX - D22 holds at baseline too,
+    because the shipped transcript test asserts one match per mask on both sides of the act
+    structure. Derive the split from the run, never from the contract's list (C15).
+    ONE CODE DEFECT, and it is the wave's whole return. V06: `tests/test_hospital_ocr_example.py:909`
+    still read "erase all 38 of them" while the migrated demo holds 35 `ast.Assert` nodes. S3's own
+    record claims "D21's verdict count re-derived 38 -> 35" - that re-derivation reached THIS FILE and
+    never reached shipped bytes, because nothing pinned a comment. A NUMBER IN A COMMENT IS CARRIED BY
+    CONSTRUCTION: no gate can see it, so the re-derivation obligation is discharged only when an
+    instrument binds the prose to the measurement. D21's clause now compares that comment against the
+    module's own `ast.Assert` count.
+    V07 IS D16 FIRING CORRECTLY, not a defect: the V06 repair was a HAND edit outside
+    `m3u6a1-surgery.py`, so the replay diverged by exactly that line within one gate run. Routed into
+    `TEXT` with its expected-count assertion; second run reports `no-op`. A repair to a script-generated
+    tree lands IN the script - the project's own standing rule, now with a measured instance.
+    THE OTHER SIX REDS WERE MAIN'S TEXT, ninth consecutive unit on that pattern, all corrected as
+    C12-C15: D10/D14a's "41 call sites" is the BASELINE population that C03's own third repair reduces
+    to 40 (the battery now pins WHICH owner left - `test_operation_revision_invalidates_every_old_
+    request_path` - so an accidental deletion elsewhere still fails); `self`/`cls` are protocol-bound
+    receivers outside D14's domain; and section 1's "Call sites" column carried TWO unlabeled
+    conventions, three rows AST-true and three def-inclusive fixed-string counts (7 for 6, 4 for 3,
+    2 for 1). Same family as P06's slicing table and the `parser_shape` digest rule.
+    ADDING A CORRECTION MID-UNIT EXPIRES THE BATTERY'S SEED CREDENTIAL, measured one unit after M3.5a
+    named it: writing C12-C15 turned `CORRECTION-UNCITED` from 0 to 9 against an unchanged, correct
+    battery, because the grader binds each correction to the obligations its text names and the
+    docstrings were authored against C01-C11. The MECHANICAL half is an amender that reads the
+    grader's own output and edits BOTTOM-UP so earlier line numbers stay valid; it converged in one
+    round to 0 over 10 docstrings. Two corrections also had to GAIN explicit obligation citations
+    first (C13 -> D13, D14; C14 -> D13), because C10's own rule says a correction naming no obligation
+    is invisible to the counter that exists to steer the author.
+    V08 IS OPEN AND IS AN INSTRUMENT SELF-REFERENCE: D28 runs the FULL suite as a subprocess, and the
+    battery is now a MEMBER of that suite, so the run is self-recursive and timing-sensitive - 221 s
+    green before the battery was committed, 890 s and one `subprocess.TimeoutExpired` after. Gate 1 as
+    a whole measured OK at 978 tests / 299.230 s from committed state at `f548f88`, so the PROPERTY
+    holds and the instrument is what needs re-scoping. A test inside gate 1 cannot verify gate 1 about
+    itself.
+    GATES 1-8 GREEN FROM COMMITTED STATE at `f548f88`: 1 = 978 tests / OK / 299.230 s · 2 =
+    `SURVIVING-MIGRATE 0`, UNRULED/STALE/MEASURE-DRIFT/UNGROUNDED-OVERRIDE/BAD-VERDICT all 0, PASS ·
+    3 = `IN-SYNC` · 4 = RESULT PASS, TARGETS 45 · 6 = `no-op` · 7 = rc 0 · 8 = rc 0. Both graders
+    PASS and `--self-test` PASS with every control firing.
+    SEEDING, tenth and eleventh datapoints, both confirming the standing rule. `rev-m3u6a1-1` flushed
+    unprompted every batch and reached PASS at 60% of its window. `test-m3u6a1-1` sat at 0 of 29
+    across four polls with a MOVING gauge (29 -> 32 -> 39 -> 44%), took ONE flush directive that
+    re-ordered fill-before-refine and named a cheap-first obligation ordering, and committed five
+    batches within two polls. A moving gauge is not progress on the graded artifact.
+    S6 ENTRY STATE: contract sections 1-12 bind. Rule all 36 attack rows into section 13 through an
+    idempotent `--check` patcher asserting the id set (pattern `m3u5b-rule-attack.py`); three rows
+    arrived with reproductions already stated and are the first to read - A19 (gate 4's per-call
+    control runs only for `ReviewRequired` and is not site-attributed, so a HIT site flips to FACTORY
+    with the control still clean), Y07 (gate 7's `parser_shape` omits action `type`/`choices`/`help`,
+    which duplicates an OPEN M3.5b polish row rather than opening a new one), and Y10 (a source-byte
+    plus callable pin does not force RUNTIME method preservation: mutating
+    `System.handle.__kwdefaults__` passes all three P06 spans and M3.5b's D01). Repair V08. Then the
+    reversion catalogue and closure. THE UNIT IS SEVEN SESSIONS.
+    WORKTREES RETAINED, both teammates still live at harvest time: `wt/test-m3u6a1-1` @ `5e604b7` and
+    `wt/rev-m3u6a1-1` @ `82e1a2e` carry the delivered artifacts, both already harvested by TARGETED
+    CHECKOUT - `git diff --name-status main..wt/<name>` renders `m3u6a1-surgery.py` as DELETED and the
+    whole migration as reverted on both branches, so squash-merge was never available. S6 stops both,
+    reads each worktree's status in its own call, and removes them.
   - M3.6a2 tier=kernel tags=- depends=M3.6a1 - delete `handle`, `request_status`, `_outcome`,
     `_fail_generation` and `_request_revision_is_current`; delete the `generation_lease_seconds`
     constructor knob, `self._lease_us` and the clock bound named after it; delete request cancellation on

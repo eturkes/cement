@@ -488,7 +488,8 @@ closed on claim defects in MAIN's own text.
   `tests/test_resolve_battery.py::_confirm` is a method whose migrated body never
   touches `self`. Removing a bound receiver rewrites the call convention of every
   caller and is not a migration residue, so the literal reading over-quantifies.
-  D14's domain is the parameters the migration itself could drop.
+  D14's domain is the parameters the migration itself could drop. Binds D13 and
+  D14, whose shared helper made the same over-quantification twice.
 - **C14 — section 1's "Call sites" column carries TWO measurement conventions and
   labels neither.** The three `tests/test_system.py` rows are AST-true (`confirm`
   41, `_confirm_scope` 65, `_promote_scope` 14). The other three are fixed-string
@@ -496,7 +497,8 @@ closed on claim defects in MAIN's own text.
   calls, `_promoted_example_ledger` 4 for 3, `_confirm` 2 for 1. Same family as
   P06's slicing-convention table and the `parser_shape` digest-algorithm rule —
   state the algorithm beside every recorded number, because a consumer of the
-  wrong convention reports correct code as stale. The AST counts are binding.
+  wrong convention reports correct code as stale. The AST counts are binding, and
+  this correction binds D13, whose per-helper call expectations read that column.
 - **C15 — section 7's preservation set is FIVE and the measured set is SIX.** The
   baseline run makes it D04, D22, D24, D25, D26 and D27 green at `6fb4d92`, 23
   red. D22 belongs there: the shipped transcript test asserts exactly one match
@@ -549,6 +551,7 @@ first and a repair second.
 | V04 | D14 `_unused_parameters(helper) == {'self'}` | SUITE + CONTRACT | C13, same helper defect. |
 | V05 | D13 baseline calls 6 vs 7 and 3 vs 4 | CONTRACT | C14. Section 1's counts for these three helpers are def-inclusive fixed-string counts; the AST counts are binding. |
 | V06 | D21 `\b35\b` absent from the refusal test | **CODE** | The shipped `tests/test_hospital_ocr_example.py:909` still read "erase all 38 of them" while the migrated demo holds 35 `ast.Assert` nodes. S3 recorded "D21's verdict count re-derived 38 -> 35"; that re-derivation reached the roadmap and never reached the shipped surface. Fixed. |
+| V08 | D28 `subprocess.TimeoutExpired` on a nested `unittest discover`, module-alone run only | OPEN (S6) | D28 runs the FULL suite as a subprocess, and the battery is now a MEMBER of that suite, so the run is self-recursive and its cost is timing-sensitive: 221 s green before the battery was committed, 890 s and one ERROR after. Gate 1 as a whole measured OK at 978 tests / 299.230 s from committed state, so the property holds; the INSTRUMENT is what needs re-scoping. A test inside gate 1 cannot verify gate 1 about itself — S6 either excludes its own module from the inner discover or moves the obligation to MAIN's gate discipline. |
 | V07 | D16 replay divergence on `tests/test_hospital_ocr_example.py` | INSTRUMENT-CORRECT | D16 fired because V06's fix was a HAND edit outside `m3u6a1-surgery.py`. Routed into `TEXT` with its expected-count assertion; gate 6 reports `no-op` on the second run and the replay reproduces the shipped tree. |
 
 **V06 is the wave's whole return and the class the battery exists to reach.**

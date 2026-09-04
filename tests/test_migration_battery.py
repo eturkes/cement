@@ -557,6 +557,8 @@ class MigrationBatteryTests(unittest.TestCase):
     def test_d04_system_handle_and_system_request_status_still_ship(self) -> None:
         """D04 — `System.handle` and `System.request_status` still ship, unchanged, and are
         still reachable. The unit deletes no production surface.
+
+        CORRECTED-BY C15
         """
         unchanged = _run(["git", "diff", "--exit-code", BASELINE, "--", "src"])
         self.assertEqual(unchanged.returncode, 0, _result(unchanged))
@@ -717,6 +719,8 @@ class MigrationBatteryTests(unittest.TestCase):
     def test_d10_tests_test_system_py_confirm_loses_its_request_id(self) -> None:
         """D10 — `tests/test_system.py::confirm` loses its `request_id` positional parameter.
         Every one of its 41 call sites drops the corresponding argument.
+
+        CORRECTED-BY C12
         """
         path = "tests/test_system.py"
         helper = _class_method(ROOT, path, "confirm")
@@ -771,6 +775,8 @@ class MigrationBatteryTests(unittest.TestCase):
         `tests/test_proposal_binding_battery.py::_promoted_conflict_fixture` and
         `tests/test_hospital_ocr_example.py::_promoted_example_ledger` migrate onto
         `propose`; any parameter that becomes unread is removed with its arguments.
+
+        CORRECTED-BY C13, C14
         """
         helpers = [
             ("tests/test_resolve_battery.py", "_confirm", True, 1),
@@ -806,6 +812,8 @@ class MigrationBatteryTests(unittest.TestCase):
     def test_d14_no_migrated_helper_retains_a_parameter_that_no_statement(self) -> None:
         """D14 — No migrated helper retains a parameter that no statement in its body reads.
         Checked over the shipped source by AST, not by grep.
+
+        CORRECTED-BY C13
         """
         helpers = [
             ("tests/test_system.py", _class_method(ROOT, "tests/test_system.py", "confirm")),
@@ -876,7 +884,7 @@ class MigrationBatteryTests(unittest.TestCase):
         different signatures and different lifecycle sites (`:235` and `:14461`), so each is
         migrated under its own anchor. A bare `confirm(` anchor spans both and is forbidden.
 
-        CORRECTED-BY C06
+        CORRECTED-BY C06, C12
         """
         path = "tests/test_system.py"
         tree = _tree(ROOT, path)
@@ -1203,7 +1211,7 @@ class MigrationBatteryTests(unittest.TestCase):
         `DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript` keeps
         asserting exactly one match per mask.
 
-        CORRECTED-BY C05
+        CORRECTED-BY C05, C15
         """
         result = _run_demo()
         self.assertEqual(result.returncode, 0, _result(result))
@@ -1260,6 +1268,8 @@ class MigrationBatteryTests(unittest.TestCase):
         payload pin stay RETAIN and stay green. They pin the `{"request_id": ...}` payload
         that P1 measures as the migration's sole attributable row difference, so retiring
         either would silently delete the record of that difference.
+
+        CORRECTED-BY C15
         """
         targets = [
             (
@@ -1289,7 +1299,7 @@ class MigrationBatteryTests(unittest.TestCase):
         B `1182130a2b3a`, 12,867 B `cd60036faf5c`, 12,862 B `c27e71b0b4c7`) are recorded
         here so a lens on the wrong row is checkable.
 
-        CORRECTED-BY C10
+        CORRECTED-BY C10, C15
         """
         path = "src/cement_runtime/system.py"
         source = _source(ROOT, path)
@@ -1384,6 +1394,8 @@ class MigrationBatteryTests(unittest.TestCase):
         """D26 — M3.5b's D01 pin at `tests/test_cli_removal_battery.py:617`, asserting
         `System.handle` and `System.request_status` still ship as library methods, stays
         green.
+
+        CORRECTED-BY C15
         """
         from cement_runtime import System
 
@@ -1401,6 +1413,8 @@ class MigrationBatteryTests(unittest.TestCase):
 
     def test_d27_m3_5b_s_d15a_six_module_byte_identity_freeze_stays_green(self) -> None:
         """D27 — M3.5b's D15a six-module byte-identity freeze stays green.
+
+        CORRECTED-BY C15
         """
         result = _run_test_methods(
             [
