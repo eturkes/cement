@@ -4,7 +4,10 @@ A vocabulary census cannot produce a work list: it names lines, not the tests th
 break. This stages the source-only deletion in throwaway `git worktree`s, runs the
 sole configured gate per stage, and groups every failure by its deepest `tests/`
 frame, because a break count collapses onto shared fixture helpers and overstates
-the work by an order of magnitude.
+the work by an order of magnitude. The staged runner collects unittest callbacks
+and real exception tracebacks: battery failures can embed nested suite output, so
+parsing rendered `Ran`, `FAIL`, or `ERROR` lines would count tests that never ran
+in the outer suite.
 
 Two edit kinds. `DELETIONS` removes a named definition through the AST, asserting
 exactly one match, so no anchor can drift onto a sibling. `EDITS` is the anchored
@@ -40,7 +43,6 @@ import ast
 import json
 import os
 import pathlib
-import re
 import shutil
 import subprocess
 import sys
@@ -215,9 +217,87 @@ EDITS: tuple[tuple[int, str, str, str, int], ...] = (
     (6, "tests/test_resolve_battery.py", "    Resolved,\n", "", 1),
 )
 
-GATE = ("uv", "run", "python", "-m", "unittest", "discover", "-s", "tests", "-t", ".")
-HEADER = re.compile(r"^(FAIL|ERROR): (\S+) \(([^)]+)\)")
-FRAME = re.compile(r'^  File "([^"]+)", line (\d+), in (\S+)')
+GATE = ("uv", "run", "python")
+BROKEN_OUTCOMES = {"error", "failure", "unexpected_success"}
+RUNNER_SOURCE = r'''from __future__ import annotations
+
+import io
+import json
+import pathlib
+import sys
+import traceback
+import unittest
+
+BROKEN_OUTCOMES = {"error", "failure", "unexpected_success"}
+
+
+class Result(unittest.TextTestResult):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.records = []
+
+    @staticmethod
+    def _frames(error):
+        if error is None:
+            return []
+        return [
+            {"filename": frame.filename, "lineno": frame.lineno, "name": frame.name}
+            for frame in traceback.extract_tb(error[2])
+        ]
+
+    def _record(self, test, outcome, error=None):
+        self.records.append(
+            {
+                "id": test.id(),
+                "display": str(test),
+                "outcome": outcome,
+                "traceback": self._frames(error),
+            }
+        )
+
+    def addSuccess(self, test):
+        self._record(test, "success")
+        super().addSuccess(test)
+
+    def addError(self, test, error):
+        self._record(test, "error", error)
+        super().addError(test, error)
+
+    def addFailure(self, test, error):
+        self._record(test, "failure", error)
+        super().addFailure(test, error)
+
+    def addSkip(self, test, reason):
+        self._record(test, "skip")
+        super().addSkip(test, reason)
+
+    def addExpectedFailure(self, test, error):
+        self._record(test, "expected_failure", error)
+        super().addExpectedFailure(test, error)
+
+    def addUnexpectedSuccess(self, test):
+        self._record(test, "unexpected_success")
+        super().addUnexpectedSuccess(test)
+
+    def addSubTest(self, test, subtest, error):
+        if error is not None:
+            outcome = "failure" if issubclass(error[0], test.failureException) else "error"
+            self._record(subtest, outcome, error)
+        super().addSubTest(test, subtest, error)
+
+
+suite = unittest.defaultTestLoader.discover("tests", top_level_dir=".")
+result = unittest.TextTestRunner(stream=io.StringIO(), resultclass=Result).run(suite)
+payload = {
+    "tests_ran": result.testsRun,
+    "broken": sum(record["outcome"] in BROKEN_OUTCOMES for record in result.records),
+    "records": result.records,
+}
+pathlib.Path(sys.argv[1]).write_text(
+    json.dumps(payload, indent=2, sort_keys=True) + "\n",
+    encoding="utf-8",
+)
+'''
 
 
 def _definition(tree: ast.Module, container: str | None, name: str) -> ast.AST:
@@ -283,43 +363,43 @@ def apply_stage(tree: pathlib.Path, stage: int) -> list[str]:
     return applied
 
 
-def run_gate(tree: pathlib.Path) -> tuple[int, str]:
-    completed = subprocess.run(
-        GATE,
-        cwd=tree,
-        capture_output=True,
-        text=True,
-        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
-    )
-    return completed.returncode, completed.stdout + completed.stderr
-
-
-def parse_failures(output: str) -> list[dict[str, str]]:
-    """Group each summary-header failure by its deepest `tests/` traceback frame.
-
-    The summary header is authoritative: a docstring moves the inline verbose
-    record's verdict onto the next line, so the inline form silently under-counts.
-    """
-    lines = output.splitlines()
-    failures: list[dict[str, str]] = []
-    index = 0
-    while index < len(lines):
-        match = HEADER.match(lines[index])
-        if match is None:
-            index += 1
+def _deepest_test_frame(tree: pathlib.Path, frames: list[dict[str, object]]) -> str:
+    tests = (tree / "tests").resolve()
+    deepest = ""
+    for frame in frames:
+        path = pathlib.Path(str(frame["filename"]))
+        candidate = path if path.is_absolute() else tree / path
+        try:
+            relative = candidate.resolve().relative_to(tests)
+        except ValueError:
             continue
-        kind, name, dotted = match.groups()
-        deepest = ""
-        cursor = index + 1
-        while cursor < len(lines) and not lines[cursor].startswith("====="):
-            frame = FRAME.match(lines[cursor])
-            if frame is not None and "/tests/" in frame.group(1):
-                relative = frame.group(1).split("/tests/", 1)[1]
-                deepest = f"tests/{relative}:{frame.group(2)} in {frame.group(3)}"
-            cursor += 1
-        failures.append({"kind": kind, "test": name, "dotted": dotted, "frame": deepest})
-        index = cursor
-    return failures
+        deepest = f"tests/{relative.as_posix()}:{int(frame['lineno'])} in {frame['name']}"
+    return deepest
+
+
+def run_gate(tree: pathlib.Path) -> tuple[int, dict[str, object]]:
+    """Run unittest through a structured outer-result collector."""
+    runner = tree / ".m3u6a-burden-runner.py"
+    result = tree / ".m3u6a-burden-result.json"
+    runner.write_text(RUNNER_SOURCE, encoding="utf-8")
+    try:
+        completed = subprocess.run(
+            (*GATE, str(runner), str(result)),
+            cwd=tree,
+            capture_output=True,
+            text=True,
+            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+        )
+        if completed.returncode != 0 or not result.is_file():
+            raise SystemExit(
+                f"GATE-RUNNER-FAIL: rc={completed.returncode}\n"
+                f"{completed.stdout}{completed.stderr}"
+            )
+        payload = json.loads(result.read_text(encoding="utf-8"))
+    finally:
+        runner.unlink(missing_ok=True)
+        result.unlink(missing_ok=True)
+    return (1 if payload["broken"] else 0), payload
 
 
 def measure(stage: int, keep: bool) -> dict[str, object]:
@@ -332,23 +412,52 @@ def measure(stage: int, keep: bool) -> dict[str, object]:
     )
     try:
         applied = apply_stage(tree, stage)
-        code, output = run_gate(tree)
-        failures = parse_failures(output)
+        code, payload = run_gate(tree)
+        tests_ran = int(payload["tests_ran"])
+        records = list(payload["records"])
+        ids = [str(record["id"]) for record in records]
+        seen: set[str] = set()
+        duplicate_ids: set[str] = set()
+        for test_id in ids:
+            if test_id in seen:
+                duplicate_ids.add(test_id)
+            seen.add(test_id)
+        if duplicate_ids:
+            duplicates = sorted(duplicate_ids)
+            raise SystemExit(f"DUPLICATE-TEST-ID stage {stage}: {duplicates}")
+        failures: list[dict[str, str]] = []
         frames: dict[str, int] = {}
         modules: dict[str, int] = {}
-        for failure in failures:
-            key = failure["frame"] or "(no tests/ frame)"
+        for record in records:
+            outcome = str(record["outcome"])
+            if outcome not in BROKEN_OUTCOMES:
+                continue
+            deepest = _deepest_test_frame(tree, list(record["traceback"]))
+            failure = {
+                "kind": outcome.upper(),
+                "test": str(record["display"]),
+                "dotted": str(record["id"]),
+                "frame": deepest,
+            }
+            failures.append(failure)
+            key = deepest or "(no tests/ frame)"
             frames[key] = frames.get(key, 0) + 1
             dotted = failure["dotted"]
             module = dotted.split(".")[1] if "." in dotted else dotted
             modules[module] = modules.get(module, 0) + 1
-        ran = re.search(r"^Ran (\d+) tests", output, re.MULTILINE)
+        broken = len(failures)
+        if broken != int(payload["broken"]):
+            raise SystemExit(
+                f"BROKEN-DRIFT stage {stage}: payload={payload['broken']} records={broken}"
+            )
+        if broken > tests_ran:
+            raise SystemExit(f"BROKEN-GT-RAN stage {stage}: broken={broken} ran={tests_ran}")
         return {
             "stage": stage,
             "edits_applied": applied,
             "gate_returncode": code,
-            "tests_ran": int(ran.group(1)) if ran else None,
-            "broken": len(failures),
+            "tests_ran": tests_ran,
+            "broken": broken,
             "distinct_frames": len(frames),
             "frames": dict(sorted(frames.items(), key=lambda item: (-item[1], item[0]))),
             "modules": dict(sorted(modules.items(), key=lambda item: (-item[1], item[0]))),

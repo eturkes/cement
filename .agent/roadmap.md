@@ -1633,12 +1633,17 @@ Measured gaps driving the arc:
     suite already catches it. The brief also forbids that split from reaching the `note` field,
     because `--validate`'s `BASELINE-DEFECT` counter greps `note` for exactly
     `baseline=survived|misdirected|noop` and would fail the gate on an honest measurement.
-    A ROADMAP CLAIM DEFECT FOUND BY SEEDING THE SCOUT'S FROZEN COLUMNS, eleventh consecutive unit
-    on that pattern: the M3.6a split record states 46 frame keys for stage 1 and 52 for stage 6,
-    while the committed `m3u6a-burden.json` holds 48 and 54. Caught because the seed's `PRE-DRIFT`
-    check re-derives every pre column from that artifact rather than accepting a copied number.
-    Nothing rests on the wrong pair - the split's 3.2x ruling holds at 48 against M3.5b's 17 - but
-    a denominator no later reader can audit is what the scout's whole re-measurement exists to fix.
+    MAIN'S OWN CLAIM DEFECT, RAISED AND THEN WITHDRAWN INSIDE ONE SESSION, and the withdrawal is
+    the finding. MAIN recorded at `915c91e` + `54b869f` that the M3.6a split record's 46 stage-1
+    and 52 stage-6 frame keys were a claim defect against `m3u6a-burden.json`'s 48 and 54.
+    `scout-m3u6a2` then normalised the frame keys and measured the pre triple as 46/33/52 - the
+    roadmap's exact pair. So the roadmap was never wrong: it recorded NORMALISED keys (`file in
+    name`) while the artifact records RAW ones (`file:line in name`). Two conventions, one word,
+    and the same family as P06's byte-span slicing table and the `parser_shape` digest rule - a
+    count is comparable only against its own convention. WITHDRAWN. The durable repair is not a
+    number but a label: every frame count now travels with its convention, in both the artifact
+    and this record. A defect found by comparing two numbers that were never comparable is the
+    cheapest kind to manufacture, and MAIN manufactured one.
     THE SCOUT IS SPECULATIVE AND MUST NOT BLOCK CLOSE, per the roadmap's own speculation rule. Its
     question is decisive for M3.6a2's sizing and unmeasured by anyone: M3.6a's split ruled that
     migrating consumers first strips the deletion unit's shared-frame burden, M3.6a1 landed that
