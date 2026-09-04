@@ -1184,7 +1184,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         )
         tracked = set(
             subprocess.run(
-                ["git", "ls-files", "--", "examples"],
+                ["git", "ls-tree", "-r", "--name-only", "1146421", "--", "examples"],
                 cwd=ROOT,
                 check=True,
                 capture_output=True,
@@ -1195,7 +1195,9 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         self.assertEqual(len(baseline), 12)
         for relative in sorted(baseline):
             with self.subTest(relative=relative):
-                self.assertEqual((ROOT / relative).read_bytes(), _git_bytes("36f7890", relative))
+                self.assertEqual(
+                    _git_bytes("1146421", relative), _git_bytes("36f7890", relative)
+                )
 
     def test_d16_proposal_submit_proposal_show_proposal_list_proposal_r(self) -> None:
         """D16 obligation
@@ -2798,13 +2800,16 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         CORRECTED-BY scope correction (D22's locus table is a FLOOR, never a census.), superseding the text above:
         It omitted two CLI-route sentences in the
         """
-        current_readme = (ROOT / "README.md").read_text()
+        # `current_*` is M3.5b's CLOSING tree, never the working tree: the claim is
+        # that M3.5b's own diff left the library route alone, and M3.6a1's D18-D23
+        # rewrite the example walkthrough this unit was holding open for it.
+        current_readme = _git_bytes("1146421", "README.md").decode()
         baseline_readme = _git_bytes("36f7890", "README.md").decode()
-        current_architecture = (ROOT / "docs/architecture.md").read_text()
+        current_architecture = _git_bytes("1146421", "docs/architecture.md").decode()
         baseline_architecture = _git_bytes("36f7890", "docs/architecture.md").decode()
-        current_threat = (ROOT / "docs/threat-model.md").read_text()
+        current_threat = _git_bytes("1146421", "docs/threat-model.md").decode()
         baseline_threat = _git_bytes("36f7890", "docs/threat-model.md").decode()
-        current_hospital = (ROOT / "examples/hospital_ocr/README.md").read_text()
+        current_hospital = _git_bytes("1146421", "examples/hospital_ocr/README.md").decode()
         baseline_hospital = _git_bytes("36f7890", "examples/hospital_ocr/README.md").decode()
 
         protected = {
@@ -2835,7 +2840,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         self.assertEqual(changed, [])
         self.assertEqual(len(protected), 4)
         self.assertEqual(
-            (ROOT / "docs/adapter-protocol.md").read_bytes(),
+            _git_bytes("1146421", "docs/adapter-protocol.md"),
             _git_bytes("36f7890", "docs/adapter-protocol.md"),
         )
 
@@ -3079,9 +3084,13 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         # bound. Adding prose therefore forces the classification rather than skipping it.
         imperatives = {
             "call",
+            "canonicalize",
             "capture",
+            "export",
             "generate",
             "inspect",
+            "isolate",
+            "keep",
             "list",
             "pass",
             "poll",
@@ -3091,32 +3100,55 @@ class RemovalObligationBatteryTests(unittest.TestCase):
             "review",
             "run",
             "submit",
+            "treat",
             "use",
         }
         descriptive = {
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
             "a",
+            "act",
+            "applyplan",
             "caller",
             "candidate",
             "cement",
+            "cement-json-v1",
+            "checkpointfunction",
             "compilation",
             "confirmed",
             "conflicts",
             "counterexamples",
             "current",
+            "distinct",
             "every",
             "fallbackfailed",
             "for",
+            "hospital",
             "if",
             "inprogress",
             "it",
             "its",
+            "layout",
+            "layoutsignature",
             "linux",
             "llm",
             "meaning",
+            "mercy-general",
             "no",
+            "ocr",
+            "on",
             "only",
             "operation",
+            "patient",
+            "planadapter",
+            "production",
             "promotion",
+            "resolveoffline",
+            "rundemo",
             "reconciliationrequired",
             "rejected",
             "request",
@@ -3127,6 +3159,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
             # never the imperative verb.
             "set",
             "status",
+            "structural",
             "supervised",
             "system",
             "that",

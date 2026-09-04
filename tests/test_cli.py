@@ -2286,17 +2286,10 @@ class CLITests(unittest.TestCase):
         )
         for index in range(121):
             for witness in (1, 2):
-                outcome = system.handle(
-                    "tenant",
-                    operation,
-                    {"x": index},
-                    request_id=f"inspect-tail-{index}-{witness}",
-                )
-                self.assertIsInstance(outcome, ReviewRequired)
-                assert isinstance(outcome, ReviewRequired)
+                outcome = system.propose("tenant", operation, {"x": index})
                 system.review(
                     "tenant",
-                    outcome.proposal_id,
+                    outcome,
                     reviewer=f"reviewer-{witness}",
                     decision="accept",
                 )

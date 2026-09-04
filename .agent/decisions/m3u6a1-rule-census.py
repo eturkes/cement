@@ -31,17 +31,6 @@ _spec.loader.exec_module(census)
 # site -> (verdict, grounds). Every entry overrides the mechanical verdict, so
 # each one states why the measurement is not the ruling.
 RULINGS: dict[str, tuple[str, str]] = {
-    "examples/hospital_ocr/run_demo.py::main": (
-        "MIGRATE-RESOLVE",
-        "Owner ruling: the walkthrough promotes its function set right after each "
-        "artifact promotion, so Acts 2 and 3 answer through `resolve`. Five sites "
-        "re-base onto `propose`; the two `Resolved(source=\"artifact\")` sites "
-        "re-base onto `resolve`. Measured RETAIN because the mechanical rule reads "
-        "`.source`/`.output` consumption and cannot name a second migration target. "
-        "`m3u6a1-premise.py` P2 measures that `resolve` fails on check "
-        "`persisted-function-receipt` at the Act-2 ledger state and matches once the "
-        "set is promoted, which is why the checkpoint moves rather than the assertion.",
-    ),
     "tests/test_submission.py::test_handle_still_answers_on_a_system_that_submitted_directly": (
         "RETAIN",
         "The method under test IS `handle`: the test asserts that a system which "

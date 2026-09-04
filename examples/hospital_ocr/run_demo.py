@@ -6,8 +6,9 @@ Cement can return a reviewed plan deterministically for a known layout
 signature, but the adapter and reviewer remain responsible for whether that
 plan extracts future documents correctly.
 
-The closing acts seal every promoted layout into one verified function and then
-resolve a document from those exported bytes after the ledger is deleted.
+Each artifact promotion is sealed into the verified function set immediately, so
+the next document of a known layout resolves from that set. The closing act
+answers one document from the exported bytes alone, after the ledger is deleted.
 """
 
 from __future__ import annotations
@@ -24,8 +25,6 @@ from cement_runtime import (
     CompilePolicy,
     FunctionDocument,
     FunctionMatch,
-    Resolved,
-    ReviewRequired,
     System,
     evaluate,
     parse_function,
@@ -175,33 +174,21 @@ def main() -> None:
         assert _signature_bytes(a_signature_02) == _signature_bytes(a_signature_03)
         print("Three patients share one byte-identical, patient-free layout signature.")
 
-        outcome_a_01 = system.handle(
-            PARTITION,
-            OPERATION,
-            a_signature_01,
-            request_id="a-note-01",
-        )
-        assert isinstance(outcome_a_01, ReviewRequired)
+        proposal_a_01 = system.propose(PARTITION, OPERATION, a_signature_01)
         print("A01: adapter proposed a plan; records-supervisor review is required.")
         system.review(
             PARTITION,
-            outcome_a_01.proposal_id,
+            proposal_a_01,
             reviewer="records-supervisor",
             decision="accept",
         )
         print("A01: supervisor accepted the proposed layout-A plan.")
 
-        outcome_a_02 = system.handle(
-            PARTITION,
-            OPERATION,
-            a_signature_02,
-            request_id="a-note-02",
-        )
-        assert isinstance(outcome_a_02, ReviewRequired)
+        proposal_a_02 = system.propose(PARTITION, OPERATION, a_signature_02)
         print("A02: the same layout recurred; its plan again requires supervision.")
         system.review(
             PARTITION,
-            outcome_a_02.proposal_id,
+            proposal_a_02,
             reviewer="records-supervisor",
             decision="accept",
         )
@@ -222,21 +209,22 @@ def main() -> None:
             f"Layout A: compiled, verified ({report_a.tests} tests), and promoted "
             f"as {artifact_a}."
         )
+        function = checkpoint_function(system)
+        print(
+            f"Function set: {len(function.input_hashes)} verified entry promoted; "
+            "layout A now answers from the set."
+        )
 
         print("\n=== Act 2: known layout A resolves without the adapter ===")
         calls_before = source.calls
-        resolved_a = system.handle(
-            PARTITION,
-            OPERATION,
-            a_signature_03,
-            request_id="a-note-03",
-        )
-        assert isinstance(resolved_a, Resolved)
-        assert resolved_a.source == "artifact"
+        resolution_a = system.resolve(PARTITION, OPERATION, a_signature_03)
+        assert resolution_a.verification.passed
+        assert resolution_a.match is not None
+        assert resolution_a.match.matched
         assert source.calls == calls_before
-        extracted_a = pipeline.apply_plan(resolved_a.output, a_text_03)
+        extracted_a = pipeline.apply_plan(resolution_a.match.output, a_text_03)
         assert extracted_a["mrn"] == "MG-100913"
-        print("A03: promoted artifact returned the confirmed plan; adapter calls stayed flat.")
+        print("A03: the verified set returned the confirmed plan; adapter calls stayed flat.")
         print(f"A03 patient JSON: {json.dumps(extracted_a, sort_keys=True)}")
 
         print("\n=== Act 3: genuinely new layout B follows the same lifecycle ===")
@@ -245,31 +233,19 @@ def main() -> None:
         assert _signature_bytes(b_signature_01) == _signature_bytes(b_signature_02)
         assert _signature_bytes(b_signature_01) != _signature_bytes(a_signature_01)
 
-        outcome_b_01 = system.handle(
-            PARTITION,
-            OPERATION,
-            b_signature_01,
-            request_id="b-intake-01",
-        )
-        assert isinstance(outcome_b_01, ReviewRequired)
+        proposal_b_01 = system.propose(PARTITION, OPERATION, b_signature_01)
         system.review(
             PARTITION,
-            outcome_b_01.proposal_id,
+            proposal_b_01,
             reviewer="records-supervisor",
             decision="accept",
         )
         print("B01: unseen intake-form layout used the same supervised fallback.")
 
-        outcome_b_02 = system.handle(
-            PARTITION,
-            OPERATION,
-            b_signature_02,
-            request_id="b-intake-02",
-        )
-        assert isinstance(outcome_b_02, ReviewRequired)
+        proposal_b_02 = system.propose(PARTITION, OPERATION, b_signature_02)
         system.review(
             PARTITION,
-            outcome_b_02.proposal_id,
+            proposal_b_02,
             reviewer="records-supervisor",
             decision="accept",
         )
@@ -287,18 +263,19 @@ def main() -> None:
             scope_hash=report_b.scope_hash,
             promoted_by="informatics-lead",
         )
+        function = checkpoint_function(system)
+        print(
+            f"Function set: {len(function.input_hashes)} verified entries, one per "
+            "promoted layout."
+        )
 
         calls_before = source.calls
-        resolved_b = system.handle(
-            PARTITION,
-            OPERATION,
-            b_signature_01,
-            request_id="b-intake-recur",
-        )
-        assert isinstance(resolved_b, Resolved)
-        assert resolved_b.source == "artifact"
+        resolution_b = system.resolve(PARTITION, OPERATION, b_signature_01)
+        assert resolution_b.verification.passed
+        assert resolution_b.match is not None
+        assert resolution_b.match.matched
         assert source.calls == calls_before
-        extracted_b = pipeline.apply_plan(resolved_b.output, b_text_01)
+        extracted_b = pipeline.apply_plan(resolution_b.match.output, b_text_01)
         assert extracted_b["insurance_id"] == "HZN-774201"
         print("Layout B: promoted and then resolved with no adapter invocation.")
         print(f"B01 patient JSON: {json.dumps(extracted_b, sort_keys=True)}")
@@ -309,16 +286,10 @@ def main() -> None:
         assert _signature_bytes(c_signature_01) != _signature_bytes(a_signature_01)
         assert _signature_bytes(c_signature_01) != _signature_bytes(b_signature_01)
 
-        outcome_c_01 = system.handle(
-            PARTITION,
-            OPERATION,
-            c_signature_01,
-            request_id="c-lab-01",
-        )
-        assert isinstance(outcome_c_01, ReviewRequired)
+        proposal_c_01 = system.propose(PARTITION, OPERATION, c_signature_01)
         system.review(
             PARTITION,
-            outcome_c_01.proposal_id,
+            proposal_c_01,
             reviewer="records-supervisor",
             decision="accept",
         )
@@ -345,12 +316,11 @@ def main() -> None:
         print("Layout C: reviewed once but not promoted; policy still gates it.")
         print("Gate reasons: " + "; ".join(str(reason) for reason in reasons))
 
-        print("\n=== Act 5: both promoted layouts become one exportable function ===")
-        function = checkpoint_function(system)
+        print("\n=== Act 5: the verified set exports as portable bytes ===")
         bundle_text = function.text
         print(
-            f"Function checkpoint: {len(function.input_hashes)} verified entries, "
-            "one per promoted layout."
+            f"Exported set: {len(function.input_hashes)} verified entries, promoted "
+            "before Acts 2 and 3 resolved against them."
         )
         print(f"Verified function hash: {function.function_hash}")
         print(

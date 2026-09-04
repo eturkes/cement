@@ -225,42 +225,38 @@ class SystemTests(unittest.TestCase):
 
     def confirm(
         self,
-        request_id: str,
         *,
         reviewer="alice",
         corrected=None,
         input_value=None,
     ):
         value = {"x": 1} if input_value is None else input_value
-        outcome = self.system.handle(
-            "tenant-a", "echo", value, request_id=request_id
-        )
-        self.assertIsInstance(outcome, ReviewRequired)
-        proposal = self.system.get_proposal("tenant-a", outcome.proposal_id)
+        outcome = self.system.propose("tenant-a", "echo", value)
+        proposal = self.system.get_proposal("tenant-a", outcome)
         self.assertEqual(proposal.proposed_output, {"echo": value})
         if corrected is None:
             return self.system.review(
-                "tenant-a", outcome.proposal_id, reviewer=reviewer, decision="accept"
+                "tenant-a", outcome, reviewer=reviewer, decision="accept"
             )
         return self.system.review(
             "tenant-a",
-            outcome.proposal_id,
+            outcome,
             reviewer=reviewer,
             decision="correct",
             corrected_output=corrected,
         )
 
     def mature_and_promote(self):
-        self.confirm("r1", reviewer="alice")
+        self.confirm(reviewer="alice")
         self.clock.advance(5)
-        self.confirm("r2", reviewer="bob")
+        self.confirm(reviewer="bob")
         too_early = self.system.compile("tenant-a", "echo")
         self.assertFalse(too_early.created)
         self.assertTrue(
             any("span" in reason for reason in too_early.blocked[0]["reasons"])
         )
         self.clock.advance(5)
-        self.confirm("r3", reviewer="alice")
+        self.confirm(reviewer="alice")
         build = self.system.compile("tenant-a", "echo")
         self.assertEqual(len(build.created), 1)
         report = self.system.verify("tenant-a", build.created[0])
@@ -308,11 +304,11 @@ class SystemTests(unittest.TestCase):
 
     def test_candidate_never_appears_in_consumer_outcome_and_rejection_is_not_evidence(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
-        pending = self.system.handle("tenant-a", "echo", {"x": 1}, request_id="reject-me")
-        self.assertIsInstance(pending, ReviewRequired)
+        pending = self.system.propose("tenant-a", "echo", {"x": 1})
+        self.assertIsInstance(pending, str)
         self.assertFalse(hasattr(pending, "proposed_output"))
         rejected = self.system.review(
-            "tenant-a", pending.proposal_id, reviewer="alice", decision="reject"
+            "tenant-a", pending, reviewer="alice", decision="reject"
         )
         self.assertEqual(rejected.status, "rejected")
         self.assertEqual(self.system.examples("tenant-a", "echo"), [])
@@ -320,48 +316,42 @@ class SystemTests(unittest.TestCase):
 
     def test_proposal_content_hashes_fail_closed_on_storage_mutation(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
-        pending = self.system.handle(
-            "tenant-a", "echo", {"x": 1}, request_id="proposal-tamper"
-        )
+        pending = self.system.propose("tenant-a", "echo", {"x": 1})
         connection = sqlite3.connect(self.database)
         try:
             connection.execute(
                 "UPDATE proposals SET proposed_output_json = ? WHERE id = ?",
-                ('{"tampered":true}', pending.proposal_id),
+                ('{"tampered":true}', pending),
             )
             connection.commit()
         finally:
             connection.close()
         with self.assertRaises(IntegrityError):
-            self.system.get_proposal("tenant-a", pending.proposal_id)
+            self.system.get_proposal("tenant-a", pending)
         with self.assertRaises(IntegrityError):
             self.system.review(
-                "tenant-a", pending.proposal_id, reviewer="alice", decision="accept"
+                "tenant-a", pending, reviewer="alice", decision="accept"
             )
 
     def test_proposal_paths_translate_malformed_persisted_json(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
-        pending = self.system.handle(
-            "tenant-a",
-            "echo",
-            {"malformed": True},
-            request_id="malformed-proposal-input",
-        )
+        pending = self.system.propose("tenant-a", "echo", {"malformed": True})
         with self.system.store.transaction(write=True) as connection:
             connection.execute(
-                "UPDATE requests SET input_json = ? WHERE id = ?",
-                ("{", "malformed-proposal-input"),
+                "UPDATE requests SET input_json = ? WHERE id = "
+                "(SELECT request_id FROM proposals WHERE id = ?)",
+                ("{", pending),
             )
 
         invocations = {
             "get_proposal": lambda: self.system.get_proposal(
-                "tenant-a", pending.proposal_id
+                "tenant-a", pending
             ),
-            "proposal": lambda: self.system.proposal("tenant-a", pending.proposal_id),
+            "proposal": lambda: self.system.proposal("tenant-a", pending),
             "proposals": lambda: self.system.proposals("tenant-a"),
             "review": lambda: self.system.review(
                 "tenant-a",
-                pending.proposal_id,
+                pending,
                 reviewer="alice",
                 decision="accept",
             ),
@@ -375,9 +365,7 @@ class SystemTests(unittest.TestCase):
         self,
     ) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
-        pending = self.system.handle(
-            "tenant-a", "echo", {"x": 1}, request_id="orphan-me"
-        )
+        pending = self.system.propose("tenant-a", "echo", {"x": 1})
 
         # The control runs FIRST, on an intact ledger: a proposal that was never stored
         # is NotFoundError. Without it the orphan assertions below pass just as well
@@ -388,7 +376,11 @@ class SystemTests(unittest.TestCase):
         connection = sqlite3.connect(self.database)
         try:
             connection.execute("PRAGMA foreign_keys = OFF")
-            connection.execute("DELETE FROM requests WHERE id = ?", ("orphan-me",))
+            connection.execute(
+                "DELETE FROM requests WHERE id = "
+                "(SELECT request_id FROM proposals WHERE id = ?)",
+                (pending,),
+            )
             connection.commit()
         finally:
             connection.close()
@@ -397,13 +389,13 @@ class SystemTests(unittest.TestCase):
         # dropping it from the feed would be a silent one. An inner join produces both.
         invocations = {
             "get_proposal": lambda: self.system.get_proposal(
-                "tenant-a", pending.proposal_id
+                "tenant-a", pending
             ),
-            "proposal": lambda: self.system.proposal("tenant-a", pending.proposal_id),
+            "proposal": lambda: self.system.proposal("tenant-a", pending),
             "proposals": lambda: self.system.proposals("tenant-a"),
             "review": lambda: self.system.review(
                 "tenant-a",
-                pending.proposal_id,
+                pending,
                 reviewer="alice",
                 decision="accept",
             ),
@@ -420,14 +412,18 @@ class SystemTests(unittest.TestCase):
 
     def test_confirmed_request_cache_is_bound_to_immutable_example(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
-        for request_id, corrupted in (
+        for label, corrupted in (
             ("confirmed-cache-invalid", "{"),
             ("confirmed-cache-mismatch", '"tampered"'),
         ):
-            with self.subTest(request_id=request_id):
-                self.confirm(request_id)
+            with self.subTest(request_id=label):
+                confirmed = self.confirm()
                 connection = sqlite3.connect(self.database)
                 try:
+                    (request_id,) = connection.execute(
+                        "SELECT request_id FROM proposals WHERE id = ?",
+                        (confirmed.proposal_id,),
+                    ).fetchone()
                     connection.execute(
                         """
                         UPDATE requests SET output_json = ?
@@ -450,8 +446,8 @@ class SystemTests(unittest.TestCase):
 
     def test_artifact_request_cache_is_bound_to_current_execution(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
-        self.confirm("artifact-cache-evidence-1")
-        self.confirm("artifact-cache-evidence-2")
+        self.confirm()
+        self.confirm()
         artifact = self.system.compile("tenant-a", "echo").created[0]
         report = self.system.verify("tenant-a", artifact)
         self.system.promote(
@@ -490,23 +486,23 @@ class SystemTests(unittest.TestCase):
 
     def test_correction_is_the_fixture_and_conflicts_block_compilation(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
-        self.confirm("correct-1", corrected={"answer": "human"})
-        self.confirm("correct-2", corrected={"answer": "human"})
+        self.confirm(corrected={"answer": "human"})
+        self.confirm(corrected={"answer": "human"})
         first = self.system.compile("tenant-a", "echo")
         self.assertEqual(len(first.created), 1)
 
-        self.confirm("conflict", corrected={"answer": "changed"})
+        self.confirm(corrected={"answer": "changed"})
         conflict = self.system.compile("tenant-a", "echo")
         self.assertFalse(conflict.created)
         self.assertIn("conflict", " ".join(conflict.blocked[0]["reasons"]))
 
     def test_promotion_rechecks_evidence_snapshot(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
-        self.confirm("snapshot-1")
-        self.confirm("snapshot-2")
+        self.confirm()
+        self.confirm()
         build = self.system.compile("tenant-a", "echo")
         report = self.system.verify("tenant-a", build.created[0])
-        self.confirm("snapshot-3")
+        self.confirm()
         with self.assertRaisesRegex(StateError, "evidence snapshot changed"):
             self.system.promote(
                 "tenant-a",
@@ -517,8 +513,8 @@ class SystemTests(unittest.TestCase):
 
     def test_scope_hash_must_be_explicit(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
-        self.confirm("scope-1")
-        self.confirm("scope-2")
+        self.confirm()
+        self.confirm()
         artifact = self.system.compile("tenant-a", "echo").created[0]
         self.system.verify("tenant-a", artifact)
         with self.assertRaises(ConflictError):
@@ -538,10 +534,12 @@ class SystemTests(unittest.TestCase):
         )
         self.assertTrue(suspended)
         self.assertTrue(example_id.startswith("ex_"))
-        fallback = self.system.handle(
-            "tenant-a", "echo", {"x": 1}, request_id="after-challenge"
-        )
-        self.assertIsInstance(fallback, ReviewRequired)
+        resolution = self.system.resolve("tenant-a", "echo", {"x": 1})
+        self.assertTrue(resolution.verification.passed)
+        self.assertIsNotNone(resolution.match)
+        assert resolution.match is not None
+        self.assertFalse(resolution.match.matched)
+        self.system.propose("tenant-a", "echo", {"x": 1})
         self.assertEqual(self.system.artifact("tenant-a", artifact)["status"], "suspended")
 
         # A fresh fixture-derived artifact is also quarantined when evidence is revoked.
@@ -552,10 +550,10 @@ class SystemTests(unittest.TestCase):
             "tenant-a", "echo", policy=CompilePolicy(2, 1, 0)
         )
         evidence = []
-        for request_id in ("a", "b"):
-            pending = system.handle("tenant-a", "echo", 1, request_id=request_id)
+        for _ in range(2):
+            pending = system.propose("tenant-a", "echo", 1)
             resolved = system.review(
-                "tenant-a", pending.proposal_id, reviewer="alice", decision="accept"
+                "tenant-a", pending, reviewer="alice", decision="accept"
             )
             evidence.append(resolved.example_id)
         build = system.compile("tenant-a", "echo").created[0]
@@ -589,9 +587,9 @@ class SystemTests(unittest.TestCase):
 
     def test_late_review_counterexample_quarantines_promoted_scope(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
-        late = self.system.handle("tenant-a", "echo", {"x": 1}, request_id="late")
-        self.confirm("early-1")
-        self.confirm("early-2")
+        late = self.system.propose("tenant-a", "echo", {"x": 1})
+        self.confirm()
+        self.confirm()
         artifact = self.system.compile("tenant-a", "echo").created[0]
         report = self.system.verify("tenant-a", artifact)
         self.system.promote(
@@ -599,16 +597,18 @@ class SystemTests(unittest.TestCase):
         )
         self.system.review(
             "tenant-a",
-            late.proposal_id,
+            late,
             reviewer="auditor",
             decision="correct",
             corrected_output={"changed": True},
         )
         self.assertEqual(self.system.artifact("tenant-a", artifact)["status"], "suspended")
-        fresh = self.system.handle(
-            "tenant-a", "echo", {"x": 1}, request_id="after-late-review"
-        )
-        self.assertIsInstance(fresh, ReviewRequired)
+        resolution = self.system.resolve("tenant-a", "echo", {"x": 1})
+        self.assertTrue(resolution.verification.passed)
+        self.assertIsNotNone(resolution.match)
+        assert resolution.match is not None
+        self.assertFalse(resolution.match.matched)
+        self.system.propose("tenant-a", "echo", {"x": 1})
 
     def test_request_idempotency_and_partition_isolation(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
@@ -631,29 +631,25 @@ class SystemTests(unittest.TestCase):
 
     def test_monotonic_feeds_survive_transitions_and_clock_rollback(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
-        older = self.system.handle(
-            "tenant-a", "echo", {"x": "older"}, request_id="feed-older"
-        )
-        newer = self.system.handle(
-            "tenant-a", "echo", {"x": "newer"}, request_id="feed-newer"
-        )
+        older = self.system.propose("tenant-a", "echo", {"x": "older"})
+        newer = self.system.propose("tenant-a", "echo", {"x": "newer"})
         self.system.review(
-            "tenant-a", newer.proposal_id, reviewer="alice", decision="accept"
+            "tenant-a", newer, reviewer="alice", decision="accept"
         )
         accepted = self.system.proposals("tenant-a", status="accepted")
         cursor = int(accepted[-1]["sequence"])
         self.clock.now_us = 1
         self.system.review(
-            "tenant-a", older.proposal_id, reviewer="alice", decision="accept"
+            "tenant-a", older, reviewer="alice", decision="accept"
         )
         delta = self.system.proposals(
             "tenant-a", status="accepted", after_sequence=cursor
         )
-        self.assertEqual([item["id"] for item in delta], [older.proposal_id])
+        self.assertEqual([item["id"] for item in delta], [older])
 
         self.clock.now_us = 1_000_000
-        self.confirm("feed-report-1")
-        self.confirm("feed-report-2")
+        self.confirm()
+        self.confirm()
         artifact = self.system.compile("tenant-a", "echo").created[0]
         first_report = self.system.verify("tenant-a", artifact)
         first_stored = self.system.report("tenant-a", first_report.id)
@@ -779,16 +775,24 @@ class SystemTests(unittest.TestCase):
 
     def test_unknown_resolved_source_kind_fails_closed_at_storage(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
-        self.confirm("source-kind")
+        confirmed = self.confirm()
         connection = sqlite3.connect(self.database)
         try:
+            (planted,) = connection.execute(
+                "SELECT count(*) FROM requests WHERE partition = ? AND id = "
+                "(SELECT request_id FROM proposals WHERE id = ?)",
+                ("tenant-a", confirmed.proposal_id),
+            ).fetchone()
+            self.assertEqual(planted, 1)
             with self.assertRaises(sqlite3.IntegrityError):
                 connection.execute(
                     """
                     UPDATE requests SET source_kind = 'mystery', output_json = '"tampered"'
-                    WHERE partition = ? AND id = ?
+                    WHERE partition = ? AND id = (
+                        SELECT request_id FROM proposals WHERE id = ?
+                    )
                     """,
-                    ("tenant-a", "source-kind"),
+                    ("tenant-a", confirmed.proposal_id),
                 )
             connection.rollback()
         finally:
@@ -800,11 +804,9 @@ class SystemTests(unittest.TestCase):
         system.register_operation(
             "tenant-a", "large", policy=CompilePolicy(2, 1, 0)
         )
-        pending = system.handle(
-            "tenant-a", "large", "i" * 600_000, request_id="large-record"
-        )
+        pending = system.propose("tenant-a", "large", "i" * 600_000)
         resolved = system.review(
-            "tenant-a", pending.proposal_id, reviewer="alice", decision="accept"
+            "tenant-a", pending, reviewer="alice", decision="accept"
         )
         self.assertEqual(len(resolved.output), 600_000)
 
@@ -824,10 +826,12 @@ class SystemTests(unittest.TestCase):
         report = self.system.verify("tenant-a", artifact)
         self.assertFalse(report.passed)
         self.assertIn("integrity", report.failures[0])
-        outcome = self.system.handle(
-            "tenant-a", "echo", {"x": 1}, request_id="tamper-fallback"
-        )
-        self.assertIsInstance(outcome, ReviewRequired)
+        resolution = self.system.resolve("tenant-a", "echo", {"x": 1})
+        self.assertTrue(resolution.verification.passed)
+        self.assertIsNotNone(resolution.match)
+        assert resolution.match is not None
+        self.assertFalse(resolution.match.matched)
+        self.system.propose("tenant-a", "echo", {"x": 1})
         self.assertEqual(self.system.artifacts("tenant-a", "echo")[-1]["status"], "suspended")
 
     def test_challenge_quarantines_corrupt_promoted_artifact(self) -> None:
@@ -864,14 +868,21 @@ class SystemTests(unittest.TestCase):
         )
         self.assertEqual(revision, 2)
         self.assertEqual(self.system.artifact("tenant-a", artifact)["status"], "retired")
-        fallback = self.system.handle(
-            "tenant-a", "echo", {"x": 1}, request_id="new-revision"
-        )
-        self.assertIsInstance(fallback, ReviewRequired)
+        resolution = self.system.resolve("tenant-a", "echo", {"x": 1})
+        self.assertTrue(resolution.verification.passed)
+        self.assertIsNotNone(resolution.match)
+        assert resolution.match is not None
+        self.assertFalse(resolution.match.matched)
+        self.system.propose("tenant-a", "echo", {"x": 1})
 
     def test_operation_revision_invalidates_every_old_request_path(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
-        self.confirm("old-confirmed")
+        confirmed = self.system.handle(
+            "tenant-a", "echo", {"x": 1}, request_id="old-confirmed"
+        )
+        self.system.review(
+            "tenant-a", confirmed.proposal_id, reviewer="alice", decision="accept"
+        )
         pending = self.system.handle(
             "tenant-a", "echo", {"x": 2}, request_id="old-pending"
         )
@@ -973,14 +984,12 @@ class SystemTests(unittest.TestCase):
 
     def test_artifact_evidence_edges_are_database_immutable(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
-        self.confirm("edge-1")
-        self.confirm("edge-2")
+        self.confirm()
+        self.confirm()
         artifact = self.system.compile("tenant-a", "echo").created[0]
-        extra = self.system.handle(
-            "tenant-a", "echo", {"x": 2}, request_id="edge-unrelated"
-        )
+        extra = self.system.propose("tenant-a", "echo", {"x": 2})
         extra_example = self.system.review(
-            "tenant-a", extra.proposal_id, reviewer="alice", decision="accept"
+            "tenant-a", extra, reviewer="alice", decision="accept"
         ).example_id
         connection = sqlite3.connect(self.database)
         try:
@@ -1015,8 +1024,8 @@ class SystemTests(unittest.TestCase):
 
     def test_activation_requires_an_integrity_valid_promotion_receipt(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
-        self.confirm("activation-1")
-        self.confirm("activation-2")
+        self.confirm()
+        self.confirm()
         draft = self.system.compile("tenant-a", "echo").created[0]
         connection = sqlite3.connect(self.database)
         try:
@@ -1049,8 +1058,8 @@ class SystemTests(unittest.TestCase):
 
     def test_verification_recomputes_build_stability_metadata(self) -> None:
         self.register(confirmations=2, reviewers=2, span=0)
-        self.confirm("metadata-1", reviewer="alice")
-        self.confirm("metadata-2", reviewer="bob")
+        self.confirm(reviewer="alice")
+        self.confirm(reviewer="bob")
         artifact = self.system.compile("tenant-a", "echo").created[0]
         connection = sqlite3.connect(self.database)
         connection.row_factory = sqlite3.Row
@@ -1109,11 +1118,11 @@ class SystemTests(unittest.TestCase):
 
     def test_example_listing_cursor_survives_clock_rollback(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
-        first_id = self.confirm("example-page-1").example_id
+        first_id = self.confirm().example_id
         first_page = self.system.examples("tenant-a", "echo", limit=1)
         self.assertEqual(first_page[0]["id"], first_id)
         self.clock.now_us = 1
-        second_id = self.confirm("example-page-2").example_id
+        second_id = self.confirm().example_id
         second_page = self.system.examples(
             "tenant-a", "echo", after_sequence=first_page[0]["sequence"], limit=1
         )
@@ -1121,8 +1130,8 @@ class SystemTests(unittest.TestCase):
 
     def test_terminal_build_does_not_block_safe_recompilation(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
-        self.confirm("liveness-1")
-        self.confirm("liveness-2")
+        self.confirm()
+        self.confirm()
         first = self.system.compile("tenant-a", "echo").created[0]
         first_report = self.system.verify("tenant-a", first)
         self.system.promote(
@@ -1162,8 +1171,8 @@ class SystemTests(unittest.TestCase):
 
     def test_verification_records_are_database_immutable(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
-        self.confirm("report-1")
-        self.confirm("report-2")
+        self.confirm()
+        self.confirm()
         artifact = self.system.compile("tenant-a", "echo").created[0]
         report = self.system.verify("tenant-a", artifact)
         stored = self.system.report("tenant-a", report.id)
@@ -1195,8 +1204,8 @@ class SystemTests(unittest.TestCase):
 
     def test_report_feed_validates_the_complete_child_test_set(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
-        self.confirm("report-feed-1")
-        self.confirm("report-feed-2")
+        self.confirm()
+        self.confirm()
         artifact = self.system.compile("tenant-a", "echo").created[0]
         report = self.system.verify("tenant-a", artifact)
         connection = sqlite3.connect(self.database)
@@ -1219,21 +1228,20 @@ class SystemTests(unittest.TestCase):
 
     def test_review_rejects_cross_table_state_corruption(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
-        pending = self.system.handle(
-            "tenant-a", "echo", {"x": 1}, request_id="cross-state"
-        )
+        pending = self.system.propose("tenant-a", "echo", {"x": 1})
         connection = sqlite3.connect(self.database)
         try:
             connection.execute(
-                "UPDATE requests SET status = 'rejected' WHERE partition = ? AND id = ?",
-                ("tenant-a", "cross-state"),
+                "UPDATE requests SET status = 'rejected' WHERE partition = ? AND id = "
+                "(SELECT request_id FROM proposals WHERE id = ?)",
+                ("tenant-a", pending),
             )
             connection.commit()
         finally:
             connection.close()
         with self.assertRaises(IntegrityError):
             self.system.review(
-                "tenant-a", pending.proposal_id, reviewer="alice", decision="accept"
+                "tenant-a", pending, reviewer="alice", decision="accept"
             )
         self.assertEqual(self.system.examples("tenant-a", "echo"), [])
 
@@ -1414,29 +1422,24 @@ class SystemTests(unittest.TestCase):
         partition: str,
         operation: str,
         value,
-        request_id: str,
         *,
         reviewer: str,
         corrected=None,
     ) -> None:
-        outcome = self.system.handle(
-            partition, operation, value, request_id=request_id
-        )
-        self.assertIsInstance(outcome, ReviewRequired)
-        assert isinstance(outcome, ReviewRequired)
-        proposal = self.system.get_proposal(partition, outcome.proposal_id)
+        outcome = self.system.propose(partition, operation, value)
+        proposal = self.system.get_proposal(partition, outcome)
         self.assertEqual(proposal.proposed_output, {"echo": value})
         if corrected is None:
             self.system.review(
                 partition,
-                outcome.proposal_id,
+                outcome,
                 reviewer=reviewer,
                 decision="accept",
             )
         else:
             self.system.review(
                 partition,
-                outcome.proposal_id,
+                outcome,
                 reviewer=reviewer,
                 decision="correct",
                 corrected_output=corrected,
@@ -1447,7 +1450,6 @@ class SystemTests(unittest.TestCase):
         partition: str,
         operation: str,
         value,
-        prefix: str,
         *,
         corrected=None,
         checkpoint: bool = True,
@@ -1456,7 +1458,6 @@ class SystemTests(unittest.TestCase):
             partition,
             operation,
             value,
-            f"{prefix}-1",
             reviewer="alice",
             corrected=corrected,
         )
@@ -1464,7 +1465,6 @@ class SystemTests(unittest.TestCase):
             partition,
             operation,
             value,
-            f"{prefix}-2",
             reviewer="bob",
             corrected=corrected,
         )
@@ -1645,7 +1645,6 @@ class SystemTests(unittest.TestCase):
             "tenant-a",
             "echo",
             value,
-            prefix,
             corrected=corrected,
             checkpoint=checkpoint,
         )
@@ -1672,14 +1671,12 @@ class SystemTests(unittest.TestCase):
                 "tenant-a",
                 "echo",
                 {"x": value},
-                f"{prefix}-{value}-a",
                 reviewer="alice",
             )
             self._confirm_scope(
                 "tenant-a",
                 "echo",
                 {"x": value},
-                f"{prefix}-{value}-b",
                 reviewer="bob",
             )
         compiled = self.system.compile("tenant-a", "echo")
@@ -1726,7 +1723,6 @@ class SystemTests(unittest.TestCase):
                 partition,
                 operation,
                 {"x": value},
-                f"{prefix}-{index}",
                 checkpoint=False,
             )
         manifest = self.system.inspect_function_promotion(partition, operation)
@@ -2496,7 +2492,6 @@ class SystemTests(unittest.TestCase):
                             "tenant-a",
                             operation,
                             {"x": label},
-                            f"policy-entry-{label}",
                         )
                     connection = sqlite3.connect(self.database)
                     try:
@@ -3483,7 +3478,6 @@ class SystemTests(unittest.TestCase):
             "tenant-a",
             "echo",
             {"x": 99},
-            "membership-draft-1",
             reviewer="alice",
             corrected=shared_output,
         )
@@ -3491,7 +3485,6 @@ class SystemTests(unittest.TestCase):
             "tenant-a",
             "echo",
             {"x": 99},
-            "membership-draft-2",
             reviewer="bob",
             corrected=shared_output,
         )
@@ -3504,7 +3497,6 @@ class SystemTests(unittest.TestCase):
             "tenant-a",
             "other",
             {"x": 1},
-            "membership-other-operation",
             corrected=shared_output,
         )
         self.system.register_operation("tenant-b", "echo", policy=policy)
@@ -3512,7 +3504,6 @@ class SystemTests(unittest.TestCase):
             "tenant-b",
             "echo",
             {"x": 1},
-            "membership-other-partition",
             corrected=shared_output,
         )
 
@@ -3667,7 +3658,6 @@ class SystemTests(unittest.TestCase):
             "tenant-a",
             "report-identity",
             {"x": 1},
-            "function-report-identity",
         )
         old_hash, new_hash = self._insert_report_variant(
             artifact_id,
@@ -3719,13 +3709,11 @@ class SystemTests(unittest.TestCase):
             "tenant-a",
             "report-owner",
             {"x": "target"},
-            "function-report-owner-target",
         )
         foreign_owner, _, _ = self._promote_scope(
             "tenant-a",
             "report-owner",
             {"x": "foreign"},
-            "function-report-owner-foreign",
         )
         self._insert_report_variant(
             target,
@@ -3908,7 +3896,6 @@ class SystemTests(unittest.TestCase):
                     "tenant-a",
                     operation,
                     {"x": label},
-                    f"function-missing-report-{label}",
                 )
                 connection = sqlite3.connect(self.database)
                 try:
@@ -4543,7 +4530,6 @@ class SystemTests(unittest.TestCase):
             "tenant-a",
             "echo",
             middle_input,
-            "batch-middle-extra",
             reviewer="alice",
         )
         newer = self.system.compile("tenant-a", "echo")
@@ -4582,20 +4568,16 @@ class SystemTests(unittest.TestCase):
     def test_verify_drafts_requalifies_older_build_after_revocation(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
         self._confirm_scope(
-            "tenant-a", "echo", {"x": 1}, "requalify-a", reviewer="alice"
+            "tenant-a", "echo", {"x": 1}, reviewer="alice"
         )
         self._confirm_scope(
-            "tenant-a", "echo", {"x": 1}, "requalify-b", reviewer="bob"
+            "tenant-a", "echo", {"x": 1}, reviewer="bob"
         )
         older = self.system.compile("tenant-a", "echo").created[0]
-        pending = self.system.handle(
-            "tenant-a", "echo", {"x": 1}, request_id="requalify-extra"
-        )
-        self.assertIsInstance(pending, ReviewRequired)
-        assert isinstance(pending, ReviewRequired)
+        pending = self.system.propose("tenant-a", "echo", {"x": 1})
         resolved = self.system.review(
             "tenant-a",
-            pending.proposal_id,
+            pending,
             reviewer="alice",
             decision="accept",
         )
@@ -4625,10 +4607,10 @@ class SystemTests(unittest.TestCase):
     def test_verify_drafts_requires_exact_canonical_input_projection(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
         self._confirm_scope(
-            "tenant-a", "echo", {"x": 1}, "input-projection-a", reviewer="alice"
+            "tenant-a", "echo", {"x": 1}, reviewer="alice"
         )
         self._confirm_scope(
-            "tenant-a", "echo", {"x": 1}, "input-projection-b", reviewer="bob"
+            "tenant-a", "echo", {"x": 1}, reviewer="bob"
         )
         artifact_id = self.system.compile("tenant-a", "echo").created[0]
         connection = sqlite3.connect(self.database)
@@ -4663,28 +4645,28 @@ class SystemTests(unittest.TestCase):
         policy = CompilePolicy(2, 1, 0)
         self.system.register_operation("tenant-a", "echo", policy=policy)
         self._confirm_scope(
-            "tenant-a", "echo", {"x": 1}, "scope-target-a", reviewer="alice"
+            "tenant-a", "echo", {"x": 1}, reviewer="alice"
         )
         self._confirm_scope(
-            "tenant-a", "echo", {"x": 1}, "scope-target-b", reviewer="bob"
+            "tenant-a", "echo", {"x": 1}, reviewer="bob"
         )
         target = self.system.compile("tenant-a", "echo").created[0]
 
         self.system.register_operation("tenant-a", "other", policy=policy)
         self._confirm_scope(
-            "tenant-a", "other", {"x": 1}, "scope-other-a", reviewer="alice"
+            "tenant-a", "other", {"x": 1}, reviewer="alice"
         )
         self._confirm_scope(
-            "tenant-a", "other", {"x": 1}, "scope-other-b", reviewer="bob"
+            "tenant-a", "other", {"x": 1}, reviewer="bob"
         )
         other_operation = self.system.compile("tenant-a", "other").created[0]
 
         self.system.register_operation("tenant-b", "echo", policy=policy)
         self._confirm_scope(
-            "tenant-b", "echo", {"x": 1}, "scope-partition-a", reviewer="alice"
+            "tenant-b", "echo", {"x": 1}, reviewer="alice"
         )
         self._confirm_scope(
-            "tenant-b", "echo", {"x": 1}, "scope-partition-b", reviewer="bob"
+            "tenant-b", "echo", {"x": 1}, reviewer="bob"
         )
         other_partition = self.system.compile("tenant-b", "echo").created[0]
 
@@ -4748,10 +4730,10 @@ class SystemTests(unittest.TestCase):
         policy = CompilePolicy(2, 1, 0)
         self.system.register_operation("tenant-a", "echo", policy=policy)
         self._confirm_scope(
-            "tenant-a", "echo", {"x": 1}, "prior-revision-a", reviewer="alice"
+            "tenant-a", "echo", {"x": 1}, reviewer="alice"
         )
         self._confirm_scope(
-            "tenant-a", "echo", {"x": 1}, "prior-revision-b", reviewer="bob"
+            "tenant-a", "echo", {"x": 1}, reviewer="bob"
         )
         prior = self.system.compile("tenant-a", "echo").created[0]
 
@@ -4760,10 +4742,10 @@ class SystemTests(unittest.TestCase):
         )
         self.assertEqual(revision, 2)
         self._confirm_scope(
-            "tenant-a", "echo", {"x": 1}, "current-revision-a", reviewer="alice"
+            "tenant-a", "echo", {"x": 1}, reviewer="alice"
         )
         self._confirm_scope(
-            "tenant-a", "echo", {"x": 1}, "current-revision-b", reviewer="bob"
+            "tenant-a", "echo", {"x": 1}, reviewer="bob"
         )
         current = self.system.compile("tenant-a", "echo").created[0]
         with self.system.store.transaction(write=True) as connection:
@@ -4869,14 +4851,12 @@ class SystemTests(unittest.TestCase):
                 "tenant-a",
                 "echo",
                 value,
-                f"batch-order-{index}-a",
                 reviewer="alice",
             )
             self._confirm_scope(
                 "tenant-a",
                 "echo",
                 value,
-                f"batch-order-{index}-b",
                 reviewer="bob",
             )
             build = self.system.compile("tenant-a", "echo")
@@ -4927,10 +4907,10 @@ class SystemTests(unittest.TestCase):
         policy = CompilePolicy(2, 1, 0)
         self.system.register_operation("tenant-a", "echo", policy=policy)
         self._confirm_scope(
-            "tenant-a", "echo", {"x": "stale"}, "stale-input-a", reviewer="alice"
+            "tenant-a", "echo", {"x": "stale"}, reviewer="alice"
         )
         self._confirm_scope(
-            "tenant-a", "echo", {"x": "stale"}, "stale-input-b", reviewer="bob"
+            "tenant-a", "echo", {"x": "stale"}, reviewer="bob"
         )
 
         revision = self.system.revise_operation(
@@ -4939,10 +4919,10 @@ class SystemTests(unittest.TestCase):
         self.assertEqual(revision, 2)
         current_input = {"x": "current"}
         self._confirm_scope(
-            "tenant-a", "echo", current_input, "current-input-a", reviewer="alice"
+            "tenant-a", "echo", current_input, reviewer="alice"
         )
         self._confirm_scope(
-            "tenant-a", "echo", current_input, "current-input-b", reviewer="bob"
+            "tenant-a", "echo", current_input, reviewer="bob"
         )
         current = self.system.compile("tenant-a", "echo").created[0]
         current_hash = canonicalize(current_input).digest
@@ -4976,10 +4956,10 @@ class SystemTests(unittest.TestCase):
     def test_verify_drafts_skips_policy_blocked_current_projection(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
         self._confirm_scope(
-            "tenant-a", "echo", {"x": 1}, "blocked-current-a", reviewer="alice"
+            "tenant-a", "echo", {"x": 1}, reviewer="alice"
         )
         self._confirm_scope(
-            "tenant-a", "echo", {"x": 1}, "blocked-current-b", reviewer="bob"
+            "tenant-a", "echo", {"x": 1}, reviewer="bob"
         )
         artifact_id = self.system.compile("tenant-a", "echo").created[0]
         with self.system.store.transaction(write=False) as connection:
@@ -5028,10 +5008,10 @@ class SystemTests(unittest.TestCase):
     def test_verify_drafts_duplicate_eligible_rows_abort_full_ledger(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
         self._confirm_scope(
-            "tenant-a", "echo", {"x": 1}, "duplicate-batch-a", reviewer="alice"
+            "tenant-a", "echo", {"x": 1}, reviewer="alice"
         )
         self._confirm_scope(
-            "tenant-a", "echo", {"x": 1}, "duplicate-batch-b", reviewer="bob"
+            "tenant-a", "echo", {"x": 1}, reviewer="bob"
         )
         current = self.system.compile("tenant-a", "echo").created[0]
         with self.system.store.transaction(write=True) as connection:
@@ -5068,10 +5048,10 @@ class SystemTests(unittest.TestCase):
     def test_verify_drafts_missing_canonical_input_aborts_full_ledger(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
         self._confirm_scope(
-            "tenant-a", "echo", {"x": 1}, "missing-input-a", reviewer="alice"
+            "tenant-a", "echo", {"x": 1}, reviewer="alice"
         )
         self._confirm_scope(
-            "tenant-a", "echo", {"x": 1}, "missing-input-b", reviewer="bob"
+            "tenant-a", "echo", {"x": 1}, reviewer="bob"
         )
         current = self.system.compile("tenant-a", "echo").created[0]
         with self.system.store.transaction(write=True) as connection:
@@ -6954,14 +6934,12 @@ class SystemTests(unittest.TestCase):
                 "tenant-a",
                 "echo",
                 {"x": value},
-                f"function-growth-{value}-a",
                 reviewer="alice",
             )
             self._confirm_scope(
                 "tenant-a",
                 "echo",
                 {"x": value},
-                f"function-growth-{value}-b",
                 reviewer="bob",
             )
         compiled = self.system.compile("tenant-a", "echo")
@@ -7169,7 +7147,6 @@ class SystemTests(unittest.TestCase):
                 "tenant-a",
                 "echo",
                 {"x": value},
-                f"function-skipped-new-{value}",
                 reviewer="alice",
             )
         compiled = self.system.compile("tenant-a", "echo")
@@ -7839,14 +7816,12 @@ class SystemTests(unittest.TestCase):
                 "tenant-a",
                 "echo",
                 {"x": value},
-                f"function-event-bound-{value}-a",
                 reviewer="alice",
             )
             self._confirm_scope(
                 "tenant-a",
                 "echo",
                 {"x": value},
-                f"function-event-bound-{value}-b",
                 reviewer="bob",
             )
         compiled = self.system.compile("tenant-a", "echo")
@@ -8187,14 +8162,12 @@ class SystemTests(unittest.TestCase):
                 "tenant-a",
                 "echo",
                 {"x": value},
-                f"function-interleave-retained-{value}-a",
                 reviewer="alice",
             )
             self._confirm_scope(
                 "tenant-a",
                 "echo",
                 {"x": value},
-                f"function-interleave-retained-{value}-b",
                 reviewer="bob",
             )
         self.assertEqual(len(self.system.compile("tenant-a", "echo").created), 3)
@@ -8219,14 +8192,12 @@ class SystemTests(unittest.TestCase):
                 "tenant-a",
                 "echo",
                 {"x": value},
-                f"function-interleave-candidate-{value}-a",
                 reviewer="alice",
             )
             self._confirm_scope(
                 "tenant-a",
                 "echo",
                 {"x": value},
-                f"function-interleave-candidate-{value}-b",
                 reviewer="bob",
             )
         self.assertEqual(len(self.system.compile("tenant-a", "echo").created), 3)
@@ -8834,7 +8805,6 @@ class SystemTests(unittest.TestCase):
             "tenant-b",
             "echo",
             {"x": "foreign-partition"},
-            "function-retained-foreign-partition",
         )
         self.system.register_operation(
             "tenant-a",
@@ -8845,7 +8815,6 @@ class SystemTests(unittest.TestCase):
             "tenant-a",
             "other",
             {"x": "foreign-operation"},
-            "function-retained-foreign-operation",
         )
         decoy_ids = tuple(sorted((foreign_partition, foreign_operation)))
         with self.system.store.transaction(write=False) as connection:
@@ -8909,14 +8878,12 @@ class SystemTests(unittest.TestCase):
                 partition,
                 operation,
                 value,
-                f"{prefix}-a",
                 reviewer="alice",
             )
             self._confirm_scope(
                 partition,
                 operation,
                 value,
-                f"{prefix}-b",
                 reviewer="bob",
             )
             compiled = self.system.compile(partition, operation)
@@ -9039,14 +9006,12 @@ class SystemTests(unittest.TestCase):
             "tenant-a",
             "echo",
             value,
-            f"{prefix}-old-a",
             reviewer="alice",
         )
         self._confirm_scope(
             "tenant-a",
             "echo",
             value,
-            f"{prefix}-old-b",
             reviewer="bob",
         )
         old = self.system.compile("tenant-a", "echo")
@@ -9083,7 +9048,6 @@ class SystemTests(unittest.TestCase):
             "tenant-a",
             "echo",
             value,
-            f"{prefix}-current",
             reviewer="carol",
         )
         current = self.system.compile("tenant-a", "echo")
@@ -9118,7 +9082,6 @@ class SystemTests(unittest.TestCase):
                 "tenant-a",
                 "echo",
                 {"x": 4},
-                f"function-event-mixed-growth-{reviewer}",
                 reviewer=reviewer,
             )
         compiled = self.system.compile("tenant-a", "echo")
@@ -9218,7 +9181,6 @@ class SystemTests(unittest.TestCase):
                     "tenant-a",
                     "echo",
                     value,
-                    f"function-skipped-order-old-{index}-{reviewer}",
                     reviewer=reviewer,
                 )
             compiled = self.system.compile("tenant-a", "echo")
@@ -9247,7 +9209,6 @@ class SystemTests(unittest.TestCase):
                 "tenant-a",
                 "echo",
                 value,
-                f"function-skipped-order-current-{index}",
                 reviewer="carol",
             )
         current = self.system.compile("tenant-a", "echo")
@@ -10856,7 +10817,6 @@ class SystemTests(unittest.TestCase):
                 "tenant-a",
                 "legacy",
                 {"legacy": 1},
-                "receipt-read-only-legacy",
                 checkpoint=False,
             )
             empty = prove_read_only(
@@ -12086,7 +12046,6 @@ class SystemTests(unittest.TestCase):
                 "tenant-b",
                 "partition-target",
                 {"x": value},
-                f"p6-partition-decoy-{value}",
             )
         partition_result = self.system.verify_function(
             "tenant-a",
@@ -12105,7 +12064,6 @@ class SystemTests(unittest.TestCase):
                 "tenant-a",
                 "operation-decoy",
                 {"x": value},
-                f"p6-operation-decoy-{value}",
             )
         operation_result = self.system.verify_function(
             "tenant-a",
@@ -13642,20 +13600,12 @@ class SystemTests(unittest.TestCase):
     def test_function_report_projects_both_anchors_with_exact_counts_and_ordering(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
         manifest, promotion = self._promote_three_as_function("function-report-positive")
-        pending = self.system.handle(
-            "tenant-a",
-            "echo",
-            {"x": 40},
-            request_id="function-report-pending",
-        )
-        self.assertIsInstance(pending, ReviewRequired)
-        assert isinstance(pending, ReviewRequired)
+        pending = self.system.propose("tenant-a", "echo", {"x": 40})
         for value in (50, 60, 70):
             self._confirm_scope(
                 "tenant-a",
                 "echo",
                 {"x": value},
-                f"function-report-blocked-{value}",
                 reviewer="alice",
             )
 
@@ -13730,7 +13680,7 @@ class SystemTests(unittest.TestCase):
             now.pending_proposals,
             (
                 PendingProposalGap(
-                    proposal_id=pending.proposal_id,
+                    proposal_id=pending,
                     operation_revision=1,
                     input_hash=canonicalize({"x": 40}).digest,
                 ),
@@ -13829,7 +13779,6 @@ class SystemTests(unittest.TestCase):
                 "tenant-a",
                 "echo",
                 value,
-                f"function-report-anchor-build-{index}",
                 reviewer=reviewer,
             )
         build = self.system.compile("tenant-a", "echo")
@@ -13861,7 +13810,6 @@ class SystemTests(unittest.TestCase):
                 "tenant-a",
                 "echo",
                 value,
-                f"function-report-anchor-current-{index}",
                 reviewer=reviewer,
             )
 
@@ -13945,7 +13893,6 @@ class SystemTests(unittest.TestCase):
                     "tenant-a",
                     "echo",
                     {"row-source": value},
-                    f"function-report-row-source-{value}-{suffix}",
                     reviewer=reviewer,
                 )
         draft_ids = self.system.compile("tenant-a", "echo").created
@@ -14451,32 +14398,24 @@ class SystemTests(unittest.TestCase):
 
         def confirm(
             system: System,
-            request_id: str,
             *,
             input_value: object = None,
             reviewer: str = "alice",
             corrected: object = None,
         ) -> None:
             value = {"x": 1} if input_value is None else input_value
-            pending = system.handle(
-                "tenant-a",
-                "echo",
-                value,
-                request_id=request_id,
-            )
-            self.assertIsInstance(pending, ReviewRequired)
-            assert isinstance(pending, ReviewRequired)
+            pending = system.propose("tenant-a", "echo", value)
             if corrected is None:
                 system.review(
                     "tenant-a",
-                    pending.proposal_id,
+                    pending,
                     reviewer=reviewer,
                     decision="accept",
                 )
             else:
                 system.review(
                     "tenant-a",
-                    pending.proposal_id,
+                    pending,
                     reviewer=reviewer,
                     decision="correct",
                     corrected_output=corrected,
@@ -14488,7 +14427,7 @@ class SystemTests(unittest.TestCase):
         support.register_operation(
             "tenant-a", "echo", policy=CompilePolicy(2, 1, 0)
         )
-        confirm(support, "support-one")
+        confirm(support)
         probes.append(
             (
                 "support",
@@ -14504,8 +14443,8 @@ class SystemTests(unittest.TestCase):
         reviewers.register_operation(
             "tenant-a", "echo", policy=CompilePolicy(2, 2, 0)
         )
-        confirm(reviewers, "reviewers-one", reviewer="alice")
-        confirm(reviewers, "reviewers-two", reviewer="alice")
+        confirm(reviewers, reviewer="alice")
+        confirm(reviewers, reviewer="alice")
         probes.append(
             (
                 "reviewers",
@@ -14521,8 +14460,8 @@ class SystemTests(unittest.TestCase):
         span.register_operation(
             "tenant-a", "echo", policy=CompilePolicy(2, 1, 10)
         )
-        confirm(span, "span-one", reviewer="alice")
-        confirm(span, "span-two", reviewer="bob")
+        confirm(span, reviewer="alice")
+        confirm(span, reviewer="bob")
         probes.append(
             (
                 "span",
@@ -14538,10 +14477,9 @@ class SystemTests(unittest.TestCase):
         conflict.register_operation(
             "tenant-a", "echo", policy=CompilePolicy(2, 1, 0)
         )
-        confirm(conflict, "conflict-one", reviewer="alice")
+        confirm(conflict, reviewer="alice")
         confirm(
             conflict,
-            "conflict-two",
             reviewer="bob",
             corrected={"different": True},
         )
@@ -14567,8 +14505,8 @@ class SystemTests(unittest.TestCase):
         artifact.register_operation(
             "tenant-a", "echo", policy=CompilePolicy(2, 1, 0)
         )
-        confirm(artifact, "artifact-one", input_value=nested, reviewer="alice")
-        confirm(artifact, "artifact-two", input_value=nested, reviewer="alice")
+        confirm(artifact, input_value=nested, reviewer="alice")
+        confirm(artifact, input_value=nested, reviewer="alice")
         probes.append(
             (
                 "artifact",
@@ -14597,10 +14535,9 @@ class SystemTests(unittest.TestCase):
         ordered.register_operation(
             "tenant-a", "echo", policy=CompilePolicy(3, 3, 10)
         )
-        confirm(ordered, "ordered-one", reviewer="alice")
+        confirm(ordered, reviewer="alice")
         confirm(
             ordered,
-            "ordered-two",
             reviewer="alice",
             corrected={"different": True},
         )
@@ -14640,7 +14577,7 @@ class SystemTests(unittest.TestCase):
 
     def test_function_report_compile_integrity_failure_is_never_a_gap_reason(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
-        self.confirm("function-report-corrupt-example", reviewer="alice")
+        self.confirm(reviewer="alice")
         connection = sqlite3.connect(self.database)
         try:
             connection.execute("DROP TRIGGER examples_no_update")
@@ -14665,7 +14602,6 @@ class SystemTests(unittest.TestCase):
                 "tenant-a",
                 "echo",
                 {"null-report-passed": 1},
-                f"function-report-null-passed-{suffix}",
                 reviewer=reviewer,
             )
         extra_build = self.system.compile("tenant-a", "echo")
@@ -14771,7 +14707,6 @@ class SystemTests(unittest.TestCase):
                 "tenant-a",
                 "echo",
                 {"null-confirmed-at": 1},
-                f"function-report-null-confirmed-at-{suffix}",
                 reviewer=reviewer,
             )
         connection = sqlite3.connect(self.database)
@@ -14814,14 +14749,12 @@ class SystemTests(unittest.TestCase):
                 "tenant-a",
                 "echo",
                 {"x": value},
-                f"function-report-helper-{value}-a",
                 reviewer="alice",
             )
             self._confirm_scope(
                 "tenant-a",
                 "echo",
                 {"x": value},
-                f"function-report-helper-{value}-b",
                 reviewer="bob",
             )
         with self.system.store.transaction(write=False) as connection:
@@ -14866,7 +14799,6 @@ class SystemTests(unittest.TestCase):
                 "tenant-a",
                 "echo",
                 {"collision": value},
-                f"function-report-collision-{value}",
                 reviewer="alice",
             )
         first = canonicalize({"collision": 1})
@@ -15136,14 +15068,12 @@ class SystemTests(unittest.TestCase):
                 "tenant-a",
                 "echo",
                 {"status": value},
-                f"function-report-status-{value}-a",
                 reviewer="alice",
             )
             self._confirm_scope(
                 "tenant-a",
                 "echo",
                 {"status": value},
-                f"function-report-status-{value}-b",
                 reviewer="bob",
             )
         artifacts = self.system.compile("tenant-a", "echo").created
@@ -15302,14 +15232,12 @@ class SystemTests(unittest.TestCase):
                 "tenant-a",
                 "echo",
                 {"stale": value},
-                f"function-report-stale-{value}-a",
                 reviewer="alice",
             )
             self._confirm_scope(
                 "tenant-a",
                 "echo",
                 {"stale": value},
-                f"function-report-stale-{value}-b",
                 reviewer="bob",
             )
         artifacts = self.system.compile("tenant-a", "echo").created
@@ -15444,8 +15372,8 @@ class SystemTests(unittest.TestCase):
 
     def test_function_report_rejects_persisted_building_and_unknown_artifact_statuses(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
-        self.confirm("function-report-status-integrity-a", reviewer="alice")
-        self.confirm("function-report-status-integrity-b", reviewer="bob")
+        self.confirm(reviewer="alice")
+        self.confirm(reviewer="bob")
         artifact_id = self.system.compile("tenant-a", "echo").created[0]
         connection = sqlite3.connect(self.database)
         try:
@@ -15484,13 +15412,7 @@ class SystemTests(unittest.TestCase):
         self.register(confirmations=2, reviewers=1, span=0)
         self._promote_three_as_function("function-report-read-only")
         for index in range(3):
-            pending = self.system.handle(
-                "tenant-a",
-                "echo",
-                {"pending": index},
-                request_id=f"function-report-read-only-pending-{index}",
-            )
-            self.assertIsInstance(pending, ReviewRequired)
+            self.system.propose("tenant-a", "echo", {"pending": index})
 
         clock = mock.Mock(side_effect=AssertionError("clock consulted"))
         reader = System(self.database, clock_us=clock)
@@ -15687,13 +15609,11 @@ class SystemTests(unittest.TestCase):
             policy=CompilePolicy(2, 1, 0),
         )
         for index in range(3):
-            pending = self.system.handle(
+            self.system.propose(
                 "tenant-a",
                 "echo",
                 {"pending-validation": index},
-                request_id=f"pending-validation-{index}",
             )
-            self.assertIsInstance(pending, ReviewRequired)
         connection = sqlite3.connect(self.database)
         try:
             rows = connection.execute(
@@ -15965,7 +15885,6 @@ class SystemTests(unittest.TestCase):
                     partition,
                     operation,
                     value,
-                    f"report-scope-{partition}-{operation}-{suffix}",
                     reviewer=reviewer,
                 )
             result = self.system.compile(partition, operation)
@@ -16347,14 +16266,12 @@ class SystemTests(unittest.TestCase):
             active_hashes.append(canonicalize(value).digest)
             for suffix, reviewer in (("a", "alice"), ("b", "bob")):
                 self.confirm(
-                    f"current-helper-{value['active']}-{suffix}",
                     reviewer=reviewer,
                     input_value=value,
                 )
         revoked_ids: list[str] = []
         for index, reviewer in enumerate(("alice", "bob")):
             resolved = self.confirm(
-                f"current-helper-revoked-{index}",
                 reviewer=reviewer,
                 input_value={"revoked": True},
             )
@@ -16447,7 +16364,6 @@ class SystemTests(unittest.TestCase):
         self.register(confirmations=2, reviewers=1, span=0)
         for index in range(3):
             self.confirm(
-                f"current-helper-digest-{index}",
                 reviewer=("alice", "bob", "carol")[index],
                 input_value={"digest-group": True},
             )
@@ -16480,7 +16396,6 @@ class SystemTests(unittest.TestCase):
         self.register(confirmations=12, reviewers=1, span=0)
         for index in range(10):
             self.confirm(
-                f"function-report-decimal-support-{index}",
                 reviewer=f"reviewer-{index}",
                 input_value={"decimal-support": True},
             )
@@ -16697,13 +16612,11 @@ class SystemTests(unittest.TestCase):
             policy=CompilePolicy(2, 1, 0),
         )
         for index in range(3):
-            pending = self.system.handle(
+            self.system.propose(
                 "tenant-a",
                 "echo",
                 {"pending-row-fault": index},
-                request_id=f"pending-row-fault-{index}",
             )
-            self.assertIsInstance(pending, ReviewRequired)
         original_transaction = self.system.store.transaction
         fault_field = ""
         fault_position = 0
@@ -16807,7 +16720,7 @@ class SystemTests(unittest.TestCase):
             "echo_1",
             policy=CompilePolicy(2, 1, 0),
         )
-        pending_by_request: dict[str, ReviewRequired] = {}
+        pending_by_request: dict[str, str] = {}
         for index, request_id in enumerate(
             (
                 "pending_join_1",
@@ -16817,15 +16730,32 @@ class SystemTests(unittest.TestCase):
                 "pending_join_tail",
             )
         ):
-            pending = self.system.handle(
-                "tenant_a",
-                "echo_1",
-                {"pending-join": index},
-                request_id=request_id,
+            proposal_id = self.system.propose(
+                "tenant_a", "echo_1", {"pending-join": index}
             )
-            self.assertIsInstance(pending, ReviewRequired)
-            assert isinstance(pending, ReviewRequired)
-            pending_by_request[request_id] = pending
+            pending_by_request[request_id] = proposal_id
+
+        # `propose` mints its own request-row id, so the collider set this test
+        # exists to exercise has to be planted after submission. Every minted id
+        # is lowercase hex whose only `_` sits in the `req_` prefix, so without
+        # this a `=` -> `LIKE` or a case-folding mutation on the
+        # `r.id = p.request_id` join survives with the assertions below intact.
+        connection = sqlite3.connect(self.database)
+        try:
+            connection.execute("PRAGMA foreign_keys = OFF")
+            for request_id, proposal_id in pending_by_request.items():
+                connection.execute(
+                    "UPDATE requests SET id = ? WHERE id = "
+                    "(SELECT request_id FROM proposals WHERE id = ?)",
+                    (request_id, proposal_id),
+                )
+                connection.execute(
+                    "UPDATE proposals SET request_id = ? WHERE id = ?",
+                    (request_id, proposal_id),
+                )
+            connection.commit()
+        finally:
+            connection.close()
 
         report = self.system.function_report(
             "tenant_a",
@@ -16836,7 +16766,7 @@ class SystemTests(unittest.TestCase):
         self.assertEqual(len(report.operation_now.pending_proposals), 5)
         self.assertEqual(
             {gap.proposal_id for gap in report.operation_now.pending_proposals},
-            {pending.proposal_id for pending in pending_by_request.values()},
+            set(pending_by_request.values()),
         )
         for gap in report.operation_now.pending_proposals:
             self.assertRegex(gap.input_hash, r"\A[0-9a-f]{64}\Z")
@@ -16923,7 +16853,6 @@ class SystemTests(unittest.TestCase):
                     partition,
                     operation,
                     value,
-                    f"stale-scope-{partition}-{operation}-{suffix}",
                     reviewer=reviewer,
                 )
             compiled = self.system.compile(partition, operation)

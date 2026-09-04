@@ -1,6 +1,6 @@
 # Hospital OCR layout learning
 
-Hospital document layouts often lead to a new throwaway LLM extraction script for each run. This offline example turns that per-layout work into a durable pipeline. It derives a patient-independent layout signature. A supervisor reviews the extraction plan proposed for that signature. Cement then returns the promoted plan deterministically whenever the same layout recurs. The demo finally seals every promoted layout into one portable function and answers a document after the ledger is gone. The demo uses no LLM or network.
+Hospital document layouts often lead to a new throwaway LLM extraction script for each run. This offline example turns that per-layout work into a durable pipeline. It derives a patient-independent layout signature. A supervisor reviews the extraction plan proposed for that signature. Cement then returns the promoted plan deterministically whenever the same layout recurs. The demo seals each promoted layout into one portable function as it is promoted. It then answers a document after the ledger is gone. The demo uses no LLM or network.
 
 ## Boundary
 
@@ -17,9 +17,9 @@ Cement guarantees deterministic plan return only inside that exact valid scope. 
 ### Pipeline
 
 ```
-ocr(path) -> layout_signature(ocr_text) -> System.handle(...)
+ocr(path) -> layout_signature(ocr_text) -> System.resolve(...)
   promoted exact signature -> confirmed plan
-  miss -> PlanProposer.propose(...) -> supervisor review
+  miss -> System.propose(...) -> PlanProposer.propose(...) -> supervisor review
 confirmed plan + ocr_text -> apply_plan(...) -> patient JSON
 
 promoted set -> checkpoint_function(...) -> exported bundle
@@ -30,12 +30,12 @@ exported bundle + ocr_text -> resolve_offline(...) -> confirmed plan or miss
 
 1. `ocr(path)` reads simulated OCR text and normalizes line endings and blank lines.
 2. `layout_signature(ocr_text)` records the document type plus one ordered list of label and section keys. It uses block position, not the presence of filled values. Patient values and section body text never enter the signature, including prose with colons.
-3. `System.handle(...)` either returns the promoted exact-scope plan or asks `PlanProposer.propose(...)` for a supervised candidate.
+3. `System.resolve(...)` returns the promoted exact-scope plan. On a miss, `System.propose(...)` asks `PlanProposer.propose(...)` for a supervised candidate.
 4. `apply_plan(plan, ocr_text)` applies label and section locators and returns extracted strings.
-5. `checkpoint_function(system)` seals every promoted layout into one verified function and returns the exportable bundle.
+5. `checkpoint_function(system)` seals every promoted layout into one verified function and returns the exportable bundle. The demo calls it after each artifact promotion, so the next document of a known layout resolves from the set.
 6. `resolve_offline(bundle_text, ocr_text, expected_function_hash=...)` parses that bundle, checks it against the hash the operator holds, and resolves one layout without a ledger.
 
-`plan_adapter.py` defines `PlanProposer`, a `cement_runtime.CandidateSource`-compatible deterministic stand-in for a production provider adapter. It deliberately does not call an LLM. `run_demo.py` drives review, compilation, verification, promotion, exact resolution, extraction, and audit output. It then checkpoints the promoted set, deletes the ledger, and answers one more document from the exported bytes.
+`plan_adapter.py` defines `PlanProposer`, a `cement_runtime.CandidateSource`-compatible deterministic stand-in for a production provider adapter. It deliberately does not call an LLM. `run_demo.py` drives proposal, review, compilation, verification, artifact promotion, set promotion, exact resolution, extraction, and audit output. It then deletes the ledger and answers one more document from the exported bytes.
 
 ### Scope and policy
 
@@ -159,7 +159,7 @@ The driver uses the Python standard library plus `cement_runtime`, creates a tem
 
 ## Expected output
 
-Act 1 shows two reviewed confirmations for layout A, then deterministic compilation, verification, and explicit promotion. Act 2 sends a third patient's document through the same patient-free signature. Cement returns the promoted plan while adapter calls stay flat. Then `apply_plan` emits patient JSON. Act 3 shows that genuinely new layout B does not inherit layout A's plan. Layout B follows its own supervised lifecycle before it resolves without the adapter. Act 4 leaves layout C at one confirmation and reports the policy gate instead of promoting it. Act 5 seals both promoted layouts into one verified function and prints its hash and byte count. The trace then records the complete control-plane sequence. Act 6 runs after the ledger is deleted. It answers layout A from the exported bundle alone and reports layout C as a miss.
+Act 1 shows two reviewed confirmations for layout A, then deterministic compilation, verification, and explicit promotion of the artifact and of the verified set. Act 2 sends a third patient's document through the same patient-free signature. Cement returns the promoted plan while adapter calls stay flat. Then `apply_plan` emits patient JSON. Act 3 shows that genuinely new layout B does not inherit layout A's plan. Layout B follows its own supervised lifecycle before it resolves without the adapter. Act 4 leaves layout C at one confirmation and reports the policy gate instead of promoting it. Act 5 exports the verified set and prints its hash and byte count. The trace then records the complete control-plane sequence. Act 6 runs after the ledger is deleted. It answers layout A from the exported bundle alone and reports layout C as a miss.
 
 Two values change per run. The demo generates the layout-A artifact ID, and it computes a new function hash each time, because each entry seals its own run-specific evidence. The block masks the 32-hex artifact suffix as `art_<hex>` and the 64-hex digest as `<function-hash>`. Every other line is byte-stable. `tests/test_hospital_ocr_example.py` compares the masked demo output against this block.
 
@@ -176,14 +176,16 @@ A01: supervisor accepted the proposed layout-A plan.
 A02: the same layout recurred; its plan again requires supervision.
 A02: second confirmation reached the relaxed demo threshold.
 Layout A: compiled, verified (8 tests), and promoted as art_<hex>.
+Function set: 1 verified entry promoted; layout A now answers from the set.
 
 === Act 2: known layout A resolves without the adapter ===
-A03: promoted artifact returned the confirmed plan; adapter calls stayed flat.
+A03: the verified set returned the confirmed plan; adapter calls stayed flat.
 A03 patient JSON: {"assessment": "Tension-type headaches, improving.", "encounter_date": "2026-02-21", "mrn": "MG-100913", "patient_name": "Sofia Patel", "provider": "Dr. Amina Shah"}
 
 === Act 3: genuinely new layout B follows the same lifecycle ===
 B01: unseen intake-form layout used the same supervised fallback.
 B02: second confirmation made layout B eligible to compile.
+Function set: 2 verified entries, one per promoted layout.
 Layout B: promoted and then resolved with no adapter invocation.
 B01 patient JSON: {"allergies": "Penicillin", "current_medications": "Lisinopril 10 mg once daily\nMagnesium supplement once daily", "date_of_birth": "1988-07-19", "insurance_id": "HZN-774201", "patient_name": "Amelia Brooks", "primary_complaint": "Persistent headaches after long workdays"}
 
@@ -191,8 +193,8 @@ B01 patient JSON: {"allergies": "Penicillin", "current_medications": "Lisinopril
 Layout C: reviewed once but not promoted; policy still gates it.
 Gate reasons: support 1 is below required 2
 
-=== Act 5: both promoted layouts become one exportable function ===
-Function checkpoint: 2 verified entries, one per promoted layout.
+=== Act 5: the verified set exports as portable bytes ===
+Exported set: 2 verified entries, promoted before Acts 2 and 3 resolved against them.
 Verified function hash: <function-hash>
 Exported bundle: 3341 bytes carrying no ledger.
 
@@ -205,7 +207,7 @@ Exported bundle: 3341 bytes carrying no ledger.
 06. artifact.compiled
 07. artifact.verified
 08. artifact.promoted
-09. request.resolved_by_artifact
+09. function.promoted
 10. proposal.created
 11. proposal.accepted
 12. proposal.created
@@ -213,10 +215,9 @@ Exported bundle: 3341 bytes carrying no ledger.
 14. artifact.compiled
 15. artifact.verified
 16. artifact.promoted
-17. request.resolved_by_artifact
+17. function.promoted
 18. proposal.created
 19. proposal.accepted
-20. function.promoted
 
 === Act 6: the exported function answers with no ledger ===
 The temporary ledger and its audit trail are gone; only the bundle remains.
@@ -235,7 +236,7 @@ All checks passed.
 - Treat layout drift as an explicit edge case. A changed layout is a new canonical input, enters supervised fallback, and solidifies through the same lifecycle. Act 4 exposes the recurrence gate as `support 1 is below required 2` rather than applying an old template silently.
 - Isolate learning by partition. `mercy-general` scopes this evidence and its promoted artifacts to one hospital.
 - Keep demonstration policy visibly relaxed. Production defaults require more confirmations, more reviewers, and a real observation span.
-- Export the verified function to leave the ledger behind. Act 5 seals both promoted layouts into one self-verifying bundle. Act 6 resolves a document from that bundle with no database, adapter, or LLM. The bundle carries a new hash on every run, because each entry seals its own run-specific evidence.
+- Export the verified function to leave the ledger behind. Act 5 exports the promoted set as one self-verifying bundle. Act 6 resolves a document from that bundle with no database, adapter, or LLM. The bundle carries a new hash on every run, because each entry seals its own run-specific evidence.
 
 ## Pointers
 

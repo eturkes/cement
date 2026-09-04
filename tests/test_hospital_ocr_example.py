@@ -18,7 +18,6 @@ from cement_runtime import (
     FunctionDocument,
     FunctionMatch,
     IntegrityError,
-    ReviewRequired,
     System,
 )
 from cement_runtime.json_value import canonicalize
@@ -619,18 +618,12 @@ def _promoted_example_ledger(database: str) -> FunctionDocument:
         run_demo.OPERATION,
         policy=run_demo.DEMO_POLICY,
     )
-    for index, filename in enumerate(SEED_DOCUMENTS, start=1):
+    for filename in SEED_DOCUMENTS:
         signature = pipeline.layout_signature(_document(filename))
-        outcome = system.handle(
-            run_demo.PARTITION,
-            run_demo.OPERATION,
-            signature,
-            request_id=f"seed-{index:02d}",
-        )
-        assert isinstance(outcome, ReviewRequired)
+        outcome = system.propose(run_demo.PARTITION, run_demo.OPERATION, signature)
         system.review(
             run_demo.PARTITION,
-            outcome.proposal_id,
+            outcome,
             reviewer="records-supervisor",
             decision="accept",
         )
@@ -981,9 +974,15 @@ class DemoTranscriptTests(unittest.TestCase):
 
         self.assertEqual(len(directories), 1)
         self.assertFalse(os.path.exists(directories[0]))
-        self.assertEqual(len(verifications), 1)
-        document = verifications[0].document
-        self.assertIsNotNone(document)
+        self.assertEqual(len(verifications), 4)
+        documents = [record.document for record in verifications]
+        self.assertNotIn(None, documents)
+        # Act 1 checkpoints a one-entry set and Act 3 a two-entry set, so the
+        # first document differs from the last. Act 4 promotes nothing, which
+        # is why every verification from the second promotion on sees one set.
+        self.assertNotEqual(documents[0].text, documents[-1].text)
+        self.assertEqual({record.text for record in documents[2:]}, {documents[-1].text})
+        document = documents[-1]
         self.assertEqual(
             calls, [(document.text, False), (document.text, False)]
         )

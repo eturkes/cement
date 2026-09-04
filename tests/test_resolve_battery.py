@@ -19,7 +19,6 @@ from cement_runtime import (
     CompilePolicy,
     FunctionResolution,
     Resolved,
-    ReviewRequired,
     System,
 )
 
@@ -69,19 +68,12 @@ class ResolveBatteryTests(unittest.TestCase):
         partition: str,
         operation: str,
         input_value: object,
-        prefix: str,
     ) -> None:
-        for index, reviewer in enumerate(("alice", "bob"), start=1):
-            outcome = system.handle(
-                partition,
-                operation,
-                input_value,
-                request_id=f"{prefix}-{index}",
-            )
-            self.assertIs(type(outcome), ReviewRequired)
+        for reviewer in ("alice", "bob"):
+            outcome = system.propose(partition, operation, input_value)
             system.review(
                 partition,
-                outcome.proposal_id,
+                outcome,
                 reviewer=reviewer,
                 decision="accept",
             )
@@ -101,7 +93,6 @@ class ResolveBatteryTests(unittest.TestCase):
                 partition,
                 operation,
                 value,
-                f"{prefix}-{index}",
             )
         compiled = system.compile(partition, operation)
         self.assertEqual(len(compiled.created), len(values))

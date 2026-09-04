@@ -268,17 +268,11 @@ class ProposalBindingBatteryTests(unittest.TestCase):
             input_value={"index": 11},
             output={"different": True},
         )
-        for request_id in ("early-1", "early-2"):
-            pending = system.handle(
-                "tenant_a",
-                "echo_1",
-                {"index": 11},
-                request_id=request_id,
-            )
-            self.assertIsInstance(pending, ReviewRequired)
+        for _ in range(2):
+            pending = system.propose("tenant_a", "echo_1", {"index": 11})
             system.review(
                 "tenant_a",
-                typing.cast(ReviewRequired, pending).proposal_id,
+                pending,
                 reviewer="operator",
                 decision="accept",
             )

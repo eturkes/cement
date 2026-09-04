@@ -37,10 +37,25 @@ from __future__ import annotations
 
 import argparse
 import ast
+import contextlib
+import importlib
+import io
 import pathlib
+import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+DEMO_DIR = ROOT / "examples" / "hospital_ocr"
+TRANSCRIPT = "examples/hospital_ocr/README.md"
+
+# D22's two dynamic values, with the occurrence count each must keep. The demo
+# mints a fresh layout-A artifact id and a fresh function hash per run, and
+# `DemoTranscriptTests` asserts exactly one match per mask, so an extra or
+# missing dynamic token has to fail here rather than mask away silently.
+MASKS: tuple[tuple[re.Pattern[str], str, int], ...] = (
+    (re.compile(r"[0-9a-f]{64}"), "<function-hash>", 1),
+    (re.compile(r"art_[0-9a-f]{32}"), "art_<hex>", 1),
+)
 
 # ---------------------------------------------------------------- rule tables
 
@@ -219,6 +234,96 @@ TEXT: tuple[tuple[str, str, str, int], ...] = (
         '        for reviewer in ("alice", "bob"):\n',
         1,
     ),
+    # --- RETAIN consumers of a MIGRATED fixture -----------------------------
+    # `confirm` used to plant a caller-chosen request id; it no longer does.
+    # D03 pins RETAIN on the test's OWN lifecycle call and says nothing about
+    # its fixtures, so these three break with their own calls untouched. Each
+    # recovers the row it consumes instead of naming an id nothing mints.
+    (
+        "tests/test_system.py",
+        '        for request_id, corrupted in (\n'
+        '            ("confirmed-cache-invalid", "{"),\n'
+        '            ("confirmed-cache-mismatch", \'"tampered"\'),\n'
+        "        ):\n"
+        "            with self.subTest(request_id=request_id):\n"
+        "                self.confirm()\n"
+        "                connection = sqlite3.connect(self.database)\n"
+        "                try:\n"
+        "                    connection.execute(\n",
+        '        for label, corrupted in (\n'
+        '            ("confirmed-cache-invalid", "{"),\n'
+        '            ("confirmed-cache-mismatch", \'"tampered"\'),\n'
+        "        ):\n"
+        "            with self.subTest(request_id=label):\n"
+        "                confirmed = self.confirm()\n"
+        "                connection = sqlite3.connect(self.database)\n"
+        "                try:\n"
+        "                    (request_id,) = connection.execute(\n"
+        '                        "SELECT request_id FROM proposals WHERE id = ?",\n'
+        "                        (confirmed.proposal_id,),\n"
+        "                    ).fetchone()\n"
+        "                    connection.execute(\n",
+        1,
+    ),
+    # A zero-row UPDATE raises nothing, so the CHECK this test is named for
+    # would pass vacuously the moment its row stopped existing -- which is
+    # exactly what the fixture migration did. The count assertion is the
+    # positive control that makes the failure loud instead of silent.
+    (
+        "tests/test_system.py",
+        "        self.confirm()\n"
+        "        connection = sqlite3.connect(self.database)\n"
+        "        try:\n"
+        "            with self.assertRaises(sqlite3.IntegrityError):\n"
+        "                connection.execute(\n"
+        '                    """\n'
+        "                    UPDATE requests SET source_kind = 'mystery', output_json = '\"tampered\"'\n"
+        "                    WHERE partition = ? AND id = ?\n"
+        '                    """,\n'
+        '                    ("tenant-a", "source-kind"),\n'
+        "                )\n",
+        "        confirmed = self.confirm()\n"
+        "        connection = sqlite3.connect(self.database)\n"
+        "        try:\n"
+        "            (planted,) = connection.execute(\n"
+        '                "SELECT count(*) FROM requests WHERE partition = ? AND id = "\n'
+        '                "(SELECT request_id FROM proposals WHERE id = ?)",\n'
+        '                ("tenant-a", confirmed.proposal_id),\n'
+        "            ).fetchone()\n"
+        "            self.assertEqual(planted, 1)\n"
+        "            with self.assertRaises(sqlite3.IntegrityError):\n"
+        "                connection.execute(\n"
+        '                    """\n'
+        "                    UPDATE requests SET source_kind = 'mystery', output_json = '\"tampered\"'\n"
+        "                    WHERE partition = ? AND id = (\n"
+        "                        SELECT request_id FROM proposals WHERE id = ?\n"
+        "                    )\n"
+        '                    """,\n'
+        '                    ("tenant-a", confirmed.proposal_id),\n'
+        "                )\n",
+        1,
+    ),
+    # This one replays `old-confirmed` through `handle` and counts source calls,
+    # so a missing row is a silent extra candidate call rather than an error.
+    # It is RETAIN and already the file's heaviest `handle` consumer, so it
+    # plants its own confirmed request rather than borrowing the fixture's.
+    (
+        "tests/test_system.py",
+        "    def test_operation_revision_invalidates_every_old_request_path(self) -> None:\n"
+        "        self.register(confirmations=2, reviewers=1, span=0)\n"
+        "        self.confirm()\n"
+        "        pending = self.system.handle(\n",
+        "    def test_operation_revision_invalidates_every_old_request_path(self) -> None:\n"
+        "        self.register(confirmations=2, reviewers=1, span=0)\n"
+        "        confirmed = self.system.handle(\n"
+        '            "tenant-a", "echo", {"x": 1}, request_id="old-confirmed"\n'
+        "        )\n"
+        "        self.system.review(\n"
+        '            "tenant-a", confirmed.proposal_id, reviewer="alice", decision="accept"\n'
+        "        )\n"
+        "        pending = self.system.handle(\n",
+        1,
+    ),
     # --- a claim the rename would have made vacuous -------------------------
     # `propose` returns a bare identifier, so `hasattr` on a `str` is trivially
     # false. The claim survives only if the returned TYPE is pinned beside it.
@@ -229,6 +334,499 @@ TEXT: tuple[tuple[str, str, str, int], ...] = (
         '        pending = self.system.propose("tenant-a", "echo", {"x": 1})\n'
         "        self.assertIsInstance(pending, str)\n"
         '        self.assertFalse(hasattr(pending, "proposed_output"))\n',
+        1,
+    ),
+    # --- the demo: five sites onto `propose`, two onto `resolve` (D18) -------
+    # The checkpoint MOVES rather than the assertion weakening (D19): P2
+    # measures `resolve` failing `persisted-function-receipt` at the Act-2
+    # ledger state and matching once the set is promoted, so the walkthrough
+    # promotes its set right after each artifact promotion. Act 5 keeps export
+    # and identity and loses the "becomes one exportable function" framing,
+    # because by then the set has already answered twice (D20).
+    (
+        "examples/hospital_ocr/run_demo.py",
+        "The closing acts seal every promoted layout into one verified function and then\n"
+        "resolve a document from those exported bytes after the ledger is deleted.\n",
+        "Each artifact promotion is sealed into the verified function set immediately, so\n"
+        "the next document of a known layout resolves from that set. The closing act\n"
+        "answers one document from the exported bytes alone, after the ledger is deleted.\n",
+        1,
+    ),
+    (
+        "examples/hospital_ocr/run_demo.py",
+        "    FunctionMatch,\n    Resolved,\n    ReviewRequired,\n    System,\n",
+        "    FunctionMatch,\n    System,\n",
+        1,
+    ),
+    (
+        "examples/hospital_ocr/run_demo.py",
+        "        outcome_a_01 = system.handle(\n"
+        "            PARTITION,\n"
+        "            OPERATION,\n"
+        "            a_signature_01,\n"
+        '            request_id="a-note-01",\n'
+        "        )\n"
+        "        assert isinstance(outcome_a_01, ReviewRequired)\n"
+        '        print("A01: adapter proposed a plan; records-supervisor review is required.")\n'
+        "        system.review(\n"
+        "            PARTITION,\n"
+        "            outcome_a_01.proposal_id,\n",
+        "        proposal_a_01 = system.propose(PARTITION, OPERATION, a_signature_01)\n"
+        '        print("A01: adapter proposed a plan; records-supervisor review is required.")\n'
+        "        system.review(\n"
+        "            PARTITION,\n"
+        "            proposal_a_01,\n",
+        1,
+    ),
+    (
+        "examples/hospital_ocr/run_demo.py",
+        "        outcome_a_02 = system.handle(\n"
+        "            PARTITION,\n"
+        "            OPERATION,\n"
+        "            a_signature_02,\n"
+        '            request_id="a-note-02",\n'
+        "        )\n"
+        "        assert isinstance(outcome_a_02, ReviewRequired)\n"
+        '        print("A02: the same layout recurred; its plan again requires supervision.")\n'
+        "        system.review(\n"
+        "            PARTITION,\n"
+        "            outcome_a_02.proposal_id,\n",
+        "        proposal_a_02 = system.propose(PARTITION, OPERATION, a_signature_02)\n"
+        '        print("A02: the same layout recurred; its plan again requires supervision.")\n'
+        "        system.review(\n"
+        "            PARTITION,\n"
+        "            proposal_a_02,\n",
+        1,
+    ),
+    (
+        "examples/hospital_ocr/run_demo.py",
+        "        print(\n"
+        '            f"Layout A: compiled, verified ({report_a.tests} tests), and promoted "\n'
+        '            f"as {artifact_a}."\n'
+        "        )\n"
+        "\n"
+        '        print("\\n=== Act 2: known layout A resolves without the adapter ===")\n'
+        "        calls_before = source.calls\n"
+        "        resolved_a = system.handle(\n"
+        "            PARTITION,\n"
+        "            OPERATION,\n"
+        "            a_signature_03,\n"
+        '            request_id="a-note-03",\n'
+        "        )\n"
+        "        assert isinstance(resolved_a, Resolved)\n"
+        '        assert resolved_a.source == "artifact"\n'
+        "        assert source.calls == calls_before\n"
+        "        extracted_a = pipeline.apply_plan(resolved_a.output, a_text_03)\n",
+        "        print(\n"
+        '            f"Layout A: compiled, verified ({report_a.tests} tests), and promoted "\n'
+        '            f"as {artifact_a}."\n'
+        "        )\n"
+        "        function = checkpoint_function(system)\n"
+        "        print(\n"
+        '            f"Function set: {len(function.input_hashes)} verified entry promoted; "\n'
+        '            "layout A now answers from the set."\n'
+        "        )\n"
+        "\n"
+        '        print("\\n=== Act 2: known layout A resolves without the adapter ===")\n'
+        "        calls_before = source.calls\n"
+        "        resolution_a = system.resolve(PARTITION, OPERATION, a_signature_03)\n"
+        "        assert resolution_a.verification.passed\n"
+        "        assert resolution_a.match is not None\n"
+        "        assert resolution_a.match.matched\n"
+        "        assert source.calls == calls_before\n"
+        "        extracted_a = pipeline.apply_plan(resolution_a.match.output, a_text_03)\n",
+        1,
+    ),
+    (
+        "examples/hospital_ocr/run_demo.py",
+        '        print("A03: promoted artifact returned the confirmed plan; adapter calls stayed flat.")\n',
+        '        print("A03: the verified set returned the confirmed plan; adapter calls stayed flat.")\n',
+        1,
+    ),
+    (
+        "examples/hospital_ocr/run_demo.py",
+        "        outcome_b_01 = system.handle(\n"
+        "            PARTITION,\n"
+        "            OPERATION,\n"
+        "            b_signature_01,\n"
+        '            request_id="b-intake-01",\n'
+        "        )\n"
+        "        assert isinstance(outcome_b_01, ReviewRequired)\n"
+        "        system.review(\n"
+        "            PARTITION,\n"
+        "            outcome_b_01.proposal_id,\n",
+        "        proposal_b_01 = system.propose(PARTITION, OPERATION, b_signature_01)\n"
+        "        system.review(\n"
+        "            PARTITION,\n"
+        "            proposal_b_01,\n",
+        1,
+    ),
+    (
+        "examples/hospital_ocr/run_demo.py",
+        "        outcome_b_02 = system.handle(\n"
+        "            PARTITION,\n"
+        "            OPERATION,\n"
+        "            b_signature_02,\n"
+        '            request_id="b-intake-02",\n'
+        "        )\n"
+        "        assert isinstance(outcome_b_02, ReviewRequired)\n"
+        "        system.review(\n"
+        "            PARTITION,\n"
+        "            outcome_b_02.proposal_id,\n",
+        "        proposal_b_02 = system.propose(PARTITION, OPERATION, b_signature_02)\n"
+        "        system.review(\n"
+        "            PARTITION,\n"
+        "            proposal_b_02,\n",
+        1,
+    ),
+    (
+        "examples/hospital_ocr/run_demo.py",
+        "        system.promote(\n"
+        "            PARTITION,\n"
+        "            artifact_b,\n"
+        "            scope_hash=report_b.scope_hash,\n"
+        '            promoted_by="informatics-lead",\n'
+        "        )\n"
+        "\n"
+        "        calls_before = source.calls\n"
+        "        resolved_b = system.handle(\n"
+        "            PARTITION,\n"
+        "            OPERATION,\n"
+        "            b_signature_01,\n"
+        '            request_id="b-intake-recur",\n'
+        "        )\n"
+        "        assert isinstance(resolved_b, Resolved)\n"
+        '        assert resolved_b.source == "artifact"\n'
+        "        assert source.calls == calls_before\n"
+        "        extracted_b = pipeline.apply_plan(resolved_b.output, b_text_01)\n",
+        "        system.promote(\n"
+        "            PARTITION,\n"
+        "            artifact_b,\n"
+        "            scope_hash=report_b.scope_hash,\n"
+        '            promoted_by="informatics-lead",\n'
+        "        )\n"
+        "        function = checkpoint_function(system)\n"
+        "        print(\n"
+        '            f"Function set: {len(function.input_hashes)} verified entries, one per "\n'
+        '            "promoted layout."\n'
+        "        )\n"
+        "\n"
+        "        calls_before = source.calls\n"
+        "        resolution_b = system.resolve(PARTITION, OPERATION, b_signature_01)\n"
+        "        assert resolution_b.verification.passed\n"
+        "        assert resolution_b.match is not None\n"
+        "        assert resolution_b.match.matched\n"
+        "        assert source.calls == calls_before\n"
+        "        extracted_b = pipeline.apply_plan(resolution_b.match.output, b_text_01)\n",
+        1,
+    ),
+    (
+        "examples/hospital_ocr/run_demo.py",
+        "        outcome_c_01 = system.handle(\n"
+        "            PARTITION,\n"
+        "            OPERATION,\n"
+        "            c_signature_01,\n"
+        '            request_id="c-lab-01",\n'
+        "        )\n"
+        "        assert isinstance(outcome_c_01, ReviewRequired)\n"
+        "        system.review(\n"
+        "            PARTITION,\n"
+        "            outcome_c_01.proposal_id,\n",
+        "        proposal_c_01 = system.propose(PARTITION, OPERATION, c_signature_01)\n"
+        "        system.review(\n"
+        "            PARTITION,\n"
+        "            proposal_c_01,\n",
+        1,
+    ),
+    (
+        "examples/hospital_ocr/run_demo.py",
+        '        print("\\n=== Act 5: both promoted layouts become one exportable function ===")\n'
+        "        function = checkpoint_function(system)\n"
+        "        bundle_text = function.text\n"
+        "        print(\n"
+        '            f"Function checkpoint: {len(function.input_hashes)} verified entries, "\n'
+        '            "one per promoted layout."\n'
+        "        )\n",
+        '        print("\\n=== Act 5: the verified set exports as portable bytes ===")\n'
+        "        bundle_text = function.text\n"
+        "        print(\n"
+        '            f"Exported set: {len(function.input_hashes)} verified entries, promoted "\n'
+        '            "before Acts 2 and 3 resolved against them."\n'
+        "        )\n",
+        1,
+    ),
+    # --- example README prose the reframed Act 5 falsifies -------------------
+    # The transcript block regenerates from the demo's own output; these are the
+    # surrounding sentences no regeneration reaches.
+    (
+        TRANSCRIPT,
+        "The demo finally seals every promoted layout into one portable function and "
+        "answers a document after the ledger is gone.",
+        "The demo seals each promoted layout into one portable function as it is "
+        "promoted. It then answers a document after the ledger is gone.",
+        1,
+    ),
+    (
+        TRANSCRIPT,
+        "ocr(path) -> layout_signature(ocr_text) -> System.handle(...)\n"
+        "  promoted exact signature -> confirmed plan\n"
+        "  miss -> PlanProposer.propose(...) -> supervisor review\n",
+        "ocr(path) -> layout_signature(ocr_text) -> System.resolve(...)\n"
+        "  promoted exact signature -> confirmed plan\n"
+        "  miss -> System.propose(...) -> PlanProposer.propose(...) -> supervisor review\n",
+        1,
+    ),
+    (
+        TRANSCRIPT,
+        "3. `System.handle(...)` either returns the promoted exact-scope plan or asks "
+        "`PlanProposer.propose(...)` for a supervised candidate.",
+        "3. `System.resolve(...)` returns the promoted exact-scope plan. On a miss, "
+        "`System.propose(...)` asks `PlanProposer.propose(...)` for a supervised candidate.",
+        1,
+    ),
+    (
+        TRANSCRIPT,
+        "function and returns the exportable bundle.\n6. `resolve_offline(",
+        "function and returns the exportable bundle. The demo calls it after each "
+        "artifact promotion, so the next document of a known layout resolves from the "
+        "set.\n6. `resolve_offline(",
+        1,
+    ),
+    (
+        TRANSCRIPT,
+        "`run_demo.py` drives review, compilation, verification, promotion, exact "
+        "resolution, extraction, and audit output. It then checkpoints the promoted set, "
+        "deletes the ledger, and answers one more document from the exported bytes.",
+        "`run_demo.py` drives proposal, review, compilation, verification, artifact "
+        "promotion, set promotion, exact resolution, extraction, and audit output. It "
+        "then deletes the ledger and answers one more document from the exported bytes.",
+        1,
+    ),
+    (
+        TRANSCRIPT,
+        "then deterministic compilation, verification, and explicit promotion. Act 2 sends",
+        "then deterministic compilation, verification, and explicit promotion of the "
+        "artifact and of the verified set. Act 2 sends",
+        1,
+    ),
+    (
+        TRANSCRIPT,
+        "Act 5 seals both promoted layouts into one verified function and prints its "
+        "hash and byte count.",
+        "Act 5 exports the verified set and prints its hash and byte count.",
+        1,
+    ),
+    (
+        TRANSCRIPT,
+        "Act 5 seals both promoted layouts into one self-verifying bundle.",
+        "Act 5 exports the promoted set as one self-verifying bundle.",
+        1,
+    ),
+    # --- consequences the contract did not number ---------------------------
+    # The demo now verifies its set four times: the checkpoint after each
+    # artifact promotion, plus the `resolve` in Acts 2 and 3, which verifies the
+    # whole set per call. The count pinned the identity of "the document" Act 6
+    # carries, so it is RE-DERIVED, and the one-entry-versus-two-entry
+    # inequality is added because it is what proves the checkpoint moved.
+    (
+        "tests/test_hospital_ocr_example.py",
+        "        self.assertEqual(len(verifications), 1)\n"
+        "        document = verifications[0].document\n"
+        "        self.assertIsNotNone(document)\n"
+        "        self.assertEqual(\n"
+        "            calls, [(document.text, False), (document.text, False)]\n"
+        "        )\n",
+        "        self.assertEqual(len(verifications), 4)\n"
+        "        documents = [record.document for record in verifications]\n"
+        "        self.assertNotIn(None, documents)\n"
+        "        # Act 1 checkpoints a one-entry set and Act 3 a two-entry set, so the\n"
+        "        # first document differs from the last. Act 4 promotes nothing, which\n"
+        "        # is why every verification from the second promotion on sees one set.\n"
+        "        self.assertNotEqual(documents[0].text, documents[-1].text)\n"
+        "        self.assertEqual({record.text for record in documents[2:]}, {documents[-1].text})\n"
+        "        document = documents[-1]\n"
+        "        self.assertEqual(\n"
+        "            calls, [(document.text, False), (document.text, False)]\n"
+        "        )\n",
+        1,
+    ),
+    # M3.5b's D15b and D22b pinned "this unit touched no file under `examples/`"
+    # and "this unit pre-empted no M3.6a doc work" -- both claims about M3.5b's
+    # OWN DIFF -- by comparing the WORKING TREE against the pre-unit baseline.
+    # That reading is an over-claim that holds only until a later unit
+    # legitimately enters the scope, and D18-D23 are that unit. Re-scoped to
+    # M3.5b's own range, `36f7890` -> `1146421`, which is what each obligation
+    # actually asserts and stays true for every unit after this one.
+    (
+        "tests/test_cli_removal_battery.py",
+        '                ["git", "ls-files", "--", "examples"],\n',
+        '                ["git", "ls-tree", "-r", "--name-only", "1146421", "--", "examples"],\n',
+        1,
+    ),
+    (
+        "tests/test_cli_removal_battery.py",
+        "        self.assertEqual(tracked, baseline)\n"
+        "        self.assertEqual(len(baseline), 12)\n"
+        "        for relative in sorted(baseline):\n"
+        "            with self.subTest(relative=relative):\n"
+        '                self.assertEqual((ROOT / relative).read_bytes(), _git_bytes("36f7890", relative))\n',
+        "        self.assertEqual(tracked, baseline)\n"
+        "        self.assertEqual(len(baseline), 12)\n"
+        "        for relative in sorted(baseline):\n"
+        "            with self.subTest(relative=relative):\n"
+        "                self.assertEqual(\n"
+        '                    _git_bytes("1146421", relative), _git_bytes("36f7890", relative)\n'
+        "                )\n",
+        1,
+    ),
+    (
+        "tests/test_cli_removal_battery.py",
+        '        current_readme = (ROOT / "README.md").read_text()\n'
+        '        baseline_readme = _git_bytes("36f7890", "README.md").decode()\n'
+        '        current_architecture = (ROOT / "docs/architecture.md").read_text()\n'
+        '        baseline_architecture = _git_bytes("36f7890", "docs/architecture.md").decode()\n'
+        '        current_threat = (ROOT / "docs/threat-model.md").read_text()\n'
+        '        baseline_threat = _git_bytes("36f7890", "docs/threat-model.md").decode()\n'
+        '        current_hospital = (ROOT / "examples/hospital_ocr/README.md").read_text()\n'
+        '        baseline_hospital = _git_bytes("36f7890", "examples/hospital_ocr/README.md").decode()\n',
+        "        # `current_*` is M3.5b's CLOSING tree, never the working tree: the claim is\n"
+        "        # that M3.5b's own diff left the library route alone, and M3.6a1's D18-D23\n"
+        "        # rewrite the example walkthrough this unit was holding open for it.\n"
+        '        current_readme = _git_bytes("1146421", "README.md").decode()\n'
+        '        baseline_readme = _git_bytes("36f7890", "README.md").decode()\n'
+        '        current_architecture = _git_bytes("1146421", "docs/architecture.md").decode()\n'
+        '        baseline_architecture = _git_bytes("36f7890", "docs/architecture.md").decode()\n'
+        '        current_threat = _git_bytes("1146421", "docs/threat-model.md").decode()\n'
+        '        baseline_threat = _git_bytes("36f7890", "docs/threat-model.md").decode()\n'
+        '        current_hospital = _git_bytes("1146421", "examples/hospital_ocr/README.md").decode()\n'
+        '        baseline_hospital = _git_bytes("36f7890", "examples/hospital_ocr/README.md").decode()\n',
+        1,
+    ),
+    (
+        "tests/test_cli_removal_battery.py",
+        "        self.assertEqual(\n"
+        '            (ROOT / "docs/adapter-protocol.md").read_bytes(),\n'
+        '            _git_bytes("36f7890", "docs/adapter-protocol.md"),\n'
+        "        )\n",
+        "        self.assertEqual(\n"
+        '            _git_bytes("1146421", "docs/adapter-protocol.md"),\n'
+        '            _git_bytes("36f7890", "docs/adapter-protocol.md"),\n'
+        "        )\n",
+        1,
+    ),
+    # D25 classifies the sentence opener of every CHANGED paragraph and treats an
+    # unclassified opener as a failure, so rewriting one bullet of a list drags
+    # its whole paragraph in. That is the obligation working as designed: the
+    # openers below are classified rather than defaulted to the looser bound.
+    (
+        "tests/test_cli_removal_battery.py",
+        "        imperatives = {\n"
+        '            "call",\n'
+        '            "capture",\n'
+        '            "generate",\n'
+        '            "inspect",\n',
+        "        imperatives = {\n"
+        '            "call",\n'
+        '            "canonicalize",\n'
+        '            "capture",\n'
+        '            "export",\n'
+        '            "generate",\n'
+        '            "inspect",\n'
+        '            "isolate",\n'
+        '            "keep",\n',
+        1,
+    ),
+    (
+        "tests/test_cli_removal_battery.py",
+        '            "submit",\n            "use",\n        }\n',
+        '            "submit",\n            "treat",\n            "use",\n        }\n',
+        1,
+    ),
+    (
+        "tests/test_cli_removal_battery.py",
+        "        descriptive = {\n"
+        '            "a",\n'
+        '            "caller",\n'
+        '            "candidate",\n'
+        '            "cement",\n'
+        '            "compilation",\n'
+        '            "confirmed",\n'
+        '            "conflicts",\n'
+        '            "counterexamples",\n'
+        '            "current",\n'
+        '            "every",\n'
+        '            "fallbackfailed",\n'
+        '            "for",\n'
+        '            "if",\n'
+        '            "inprogress",\n'
+        '            "it",\n'
+        '            "its",\n'
+        '            "linux",\n'
+        '            "llm",\n'
+        '            "meaning",\n'
+        '            "no",\n'
+        '            "only",\n'
+        '            "operation",\n'
+        '            "promotion",\n',
+        "        descriptive = {\n"
+        '            "1",\n'
+        '            "2",\n'
+        '            "3",\n'
+        '            "4",\n'
+        '            "5",\n'
+        '            "6",\n'
+        '            "a",\n'
+        '            "act",\n'
+        '            "applyplan",\n'
+        '            "caller",\n'
+        '            "candidate",\n'
+        '            "cement",\n'
+        '            "cement-json-v1",\n'
+        '            "checkpointfunction",\n'
+        '            "compilation",\n'
+        '            "confirmed",\n'
+        '            "conflicts",\n'
+        '            "counterexamples",\n'
+        '            "current",\n'
+        '            "distinct",\n'
+        '            "every",\n'
+        '            "fallbackfailed",\n'
+        '            "for",\n'
+        '            "hospital",\n'
+        '            "if",\n'
+        '            "inprogress",\n'
+        '            "it",\n'
+        '            "its",\n'
+        '            "layout",\n'
+        '            "layoutsignature",\n'
+        '            "linux",\n'
+        '            "llm",\n'
+        '            "meaning",\n'
+        '            "mercy-general",\n'
+        '            "no",\n'
+        '            "ocr",\n'
+        '            "on",\n'
+        '            "only",\n'
+        '            "operation",\n'
+        '            "patient",\n'
+        '            "planadapter",\n'
+        '            "production",\n'
+        '            "promotion",\n'
+        '            "resolveoffline",\n'
+        '            "rundemo",\n',
+        1,
+    ),
+    (
+        "tests/test_cli_removal_battery.py",
+        '            "status",\n'
+        '            "supervised",\n'
+        '            "system",\n'
+        '            "that",\n',
+        '            "status",\n'
+        '            "structural",\n'
+        '            "supervised",\n'
+        '            "system",\n'
+        '            "that",\n',
         1,
     ),
 )
@@ -554,6 +1152,44 @@ def _prune_import(source: str) -> str:
     return "".join(kept)
 
 
+def _demo_transcript() -> str:
+    """Run the migrated demo and mask its per-run values, D22's own recipe.
+
+    Regenerated from the demo's OWN output rather than edited, because the two
+    `request.resolved_by_artifact` rows the migration removes sit inside the
+    pinned block and a hand edit could not know what replaced them.
+    """
+
+    sys.path.insert(0, str(DEMO_DIR))
+    try:
+        demo = importlib.import_module("run_demo")
+    finally:
+        sys.path.remove(str(DEMO_DIR))
+    stream = io.StringIO()
+    with contextlib.redirect_stdout(stream):
+        demo.main()
+    output = stream.getvalue()
+    for pattern, replacement, expected in MASKS:
+        found = len(pattern.findall(output))
+        if found != expected:
+            raise Abort(f"mask /{pattern.pattern}/ matched {found} times, expected {expected}")
+        output = pattern.sub(replacement, output)
+    return output
+
+
+def _replace_transcript(source: str, transcript: str) -> str:
+    """Swap the README's single fenced `text` block for the demo's output."""
+
+    opening = "```text\n"
+    if source.count(opening) != 1:
+        raise Abort(f"{TRANSCRIPT}: {source.count(opening)} ```text blocks, expected 1")
+    start = source.index(opening) + len(opening)
+    closing = source.find("\n```\n", start)
+    if closing < 0:
+        raise Abort(f"{TRANSCRIPT}: unterminated ```text block")
+    return source[:start] + transcript + source[closing + 1 :]
+
+
 def _apply(source: str, edits: list[tuple[int, int, str]]) -> str:
     ordered = sorted(edits, key=lambda edit: (-edit[0], -edit[1]))
     previous = len(source) + 1
@@ -581,30 +1217,32 @@ def run(check: bool) -> int:
         original = path.read_text()
 
         source = original
-        starts, tree = _offsets(source), ast.parse(source)
-        functions = _qualified(tree)
-        totals: dict[str, int] = {}
-        for site_path, qualname, _ordinal, _guarded in SITES:
-            if site_path == name:
-                totals[qualname] = totals.get(qualname, 0) + 1
-        edits: list[tuple[int, int, str]] = []
-        for site_path, qualname, ordinal, guarded in SITES:
-            if site_path == name:
-                edits.extend(
-                    _migrate_site(
-                        source, starts, functions, qualname, ordinal, guarded, totals[qualname]
+        # `TEXT` also carries prose, and the two AST families are Python-only.
+        if name.endswith(".py"):
+            starts, tree = _offsets(source), ast.parse(source)
+            functions = _qualified(tree)
+            totals: dict[str, int] = {}
+            for site_path, qualname, _ordinal, _guarded in SITES:
+                if site_path == name:
+                    totals[qualname] = totals.get(qualname, 0) + 1
+            edits: list[tuple[int, int, str]] = []
+            for site_path, qualname, ordinal, guarded in SITES:
+                if site_path == name:
+                    edits.extend(
+                        _migrate_site(
+                            source, starts, functions, qualname, ordinal, guarded, totals[qualname]
+                        )
                     )
-                )
-        source = _apply(source, edits)
+            source = _apply(source, edits)
 
-        starts, tree = _offsets(source), ast.parse(source)
-        edits = []
-        for param_path, function, qualifier, parameter, expected in PARAMS:
-            if param_path == name:
-                edits.extend(
-                    _drop_parameter(source, starts, tree, function, qualifier, parameter, expected)
-                )
-        source = _apply(source, edits)
+            starts, tree = _offsets(source), ast.parse(source)
+            edits = []
+            for param_path, function, qualifier, parameter, expected in PARAMS:
+                if param_path == name:
+                    edits.extend(
+                        _drop_parameter(source, starts, tree, function, qualifier, parameter, expected)
+                    )
+            source = _apply(source, edits)
 
         for text_path, old, new, expected in TEXT:
             if text_path != name:
@@ -617,16 +1255,31 @@ def run(check: bool) -> int:
             else:
                 raise Abort(f"{name}: anchor found {found} times, expected {expected}\n{old[:120]}")
 
-        source = _prune_import(source)
-        ast.parse(source)
+        if name.endswith(".py"):
+            source = _prune_import(source)
+            ast.parse(source)
         if source != original:
             changed.append(name)
             if not check:
                 path.write_text(source)
-    if changed:
-        print("applied: " + ", ".join(changed) if not check else "pending: " + ", ".join(changed))
-    else:
+
+    # Last, and only once the demo on disk is the migrated one: the transcript
+    # is generated by RUNNING that demo, so a pending source would pin the old
+    # output. Under `--check` with pending files the answer is already known.
+    if not (check and changed):
+        readme = ROOT / TRANSCRIPT
+        original = readme.read_text()
+        source = _replace_transcript(original, _demo_transcript())
+        if source != original:
+            if TRANSCRIPT not in changed:
+                changed.append(TRANSCRIPT)
+            if not check:
+                readme.write_text(source)
+
+    if not changed:
         print("no-op")
+    else:
+        print(("pending: " if check else "applied: ") + ", ".join(changed))
     return 0
 
 
