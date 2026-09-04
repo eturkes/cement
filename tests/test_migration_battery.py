@@ -575,7 +575,7 @@ class MigrationBatteryTests(unittest.TestCase):
         """D05 — The surviving lifecycle consumers after this unit are exactly: the 23 RETAIN
         definitions, the two ACTOR tests among them, and the library itself.
 
-        CORRECTED-BY C11
+        CORRECTED-BY C11, C17
         """
         retained = {
             row["site"]: row["sites"]
@@ -585,6 +585,17 @@ class MigrationBatteryTests(unittest.TestCase):
         self.assertEqual(len(retained), 23)
         self.assertEqual(sum(retained.values()), 45)
         self.assertEqual(_consumer_map(ROOT), retained)
+        # C17: the seed totals 44 and the whole increment is this one definition,
+        # 6 sites -> 7, because `self.confirm("old-confirmed")` was inlined into the
+        # direct `handle` call it always was. Binding 45 to its cause is what makes
+        # the denominator auditable; the aggregate alone survives an opposite swap.
+        self.assertEqual(
+            retained[
+                "tests/test_system.py::"
+                "test_operation_revision_invalidates_every_old_request_path"
+            ],
+            7,
+        )
 
         system_tree = _tree(ROOT, "src/cement_runtime/system.py")
         methods = {
@@ -631,6 +642,8 @@ class MigrationBatteryTests(unittest.TestCase):
     def test_d07_each_of_the_four_miss_guarded_sites_retains_a_propose_call(self) -> None:
         """D07 — Each of the four MISS-GUARDED sites retains a `propose` call, so P1's row-
         state equivalence holds site by site.
+
+        CORRECTED-BY C16
         """
         owners = _shape_owners("MISS-GUARDED")
         self.assertEqual(len(owners), 4)
@@ -691,8 +704,11 @@ class MigrationBatteryTests(unittest.TestCase):
 
     def test_d09_m3u6a1_fallback_py_reruns_from_committed_state_and_reports(self) -> None:
         """D09 — `m3u6a1-fallback.py` reruns from committed state and reports `RESULT: PASS`,
-        with its per-call positive control at 0 failed and 0 unreadable. After migration its
-        target population shrinks; the grader's `UNOBSERVED-MIGRATE` control stays 0.
+        with its positive control at 0 failed and 0 unreadable over EVERY returning call,
+        attributed to its site. After migration its target population shrinks; the grader's
+        `UNOBSERVED-MIGRATE` control stays 0.
+
+        CORRECTED-BY C18
         """
         result = _run(
             [sys.executable, str(ROOT / ".agent" / "decisions" / "m3u6a1-fallback.py")],
@@ -701,12 +717,22 @@ class MigrationBatteryTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, _result(result))
         self.assertIn("RESULT: PASS", result.stdout)
         control = _required_match(
-            r"(?m)^CONTROL-DIGESTS: (\d+) checked, (\d+) failed, (\d+) unreadable$",
+            r"(?m)^CONTROL-DIGESTS: (\d+) checked, (\d+) failed, (\d+) unreadable, "
+            r"(\d+) sites raise on every call and carry no request id$",
             result.stdout,
         )
-        checked, failed, unreadable = map(int, control.groups())
+        checked, failed, unreadable, _raising = map(int, control.groups())
         self.assertGreater(checked, 0)
         self.assertEqual((failed, unreadable), (0, 0))
+        # The control's coverage is the half C18 repaired: a global count that
+        # names no site cannot reject a site-selective corruption.
+        self.assertNotIn("CONTROL-UNATTRIBUTED", result.stdout)
+        self.assertNotIn("CONTROL-SITE-FAILED", result.stdout)
+        # C01 declares two of the nine former HIT rows not hits. Pinning the split
+        # is what stops the gate certifying a taxonomy the contract calls false.
+        hit = _required_match(r"(?m)^HIT: (\d+)$", result.stdout)
+        ambiguous = _required_match(r"(?m)^AMBIGUOUS: (\d+)$", result.stdout)
+        self.assertEqual((int(hit.group(1)), int(ambiguous.group(1))), (7, 2))
         targets = _required_match(r"(?m)^TARGETS: (\d+)$", result.stdout)
         retained_sites = sum(
             row["sites"]
@@ -1474,6 +1500,41 @@ class MigrationBatteryTests(unittest.TestCase):
                     r"(?m)^Ran (\d+) tests? in ", result.stdout + result.stderr
                 )
                 self.assertGreaterEqual(int(ran.group(1)), 949)
+
+    def test_d29_m3u6a1_premise_py_grades_its_two_premises_rather_than(self) -> None:
+        """D29 — `m3u6a1-premise.py` grades its two premises rather than printing them: it
+        names the findings it expects, reports `RESULT: PASS`, and exits nonzero on any
+        divergence.
+
+        CORRECTED-BY C19
+        """
+        probe = ROOT / ".agent" / "decisions" / "m3u6a1-premise.py"
+        result = _run([sys.executable, str(probe)], timeout=600)
+        self.assertEqual(result.returncode, 0, _result(result))
+        self.assertIn("RESULT: PASS", result.stdout)
+        self.assertIn(
+            "FINDING P1 propose-matches-handle-after-identity-projection-except: "
+            "['events.rows:row1.payload_json']",
+            result.stdout,
+        )
+        self.assertIn("FINDING P2 resolve-matches-after-function-set-promotion: True", result.stdout)
+
+        # The obligation is that the probe CAN fail. A copy with one expectation
+        # perturbed must report FAIL and exit nonzero, or rc 0 carries no
+        # information and recording it as a gate asserts a check that never ran.
+        source = probe.read_text(encoding="utf-8")
+        original = "EXPECTED_P2 = (True, False, True)"
+        self.assertIn(original, source)
+        with tempfile.TemporaryDirectory(prefix="cement-m3u6a1-d29-") as directory:
+            mutant = pathlib.Path(directory) / "premise_mutant.py"
+            mutant.write_text(
+                source.replace(original, "EXPECTED_P2 = (True, True, True)"),
+                encoding="utf-8",
+            )
+            mutated = _run([sys.executable, str(mutant)], timeout=600)
+        self.assertEqual(mutated.returncode, 1, _result(mutated))
+        self.assertIn("RESULT: FAIL", mutated.stdout)
+        self.assertIn("P2-DRIFT", mutated.stdout)
 
 
 if __name__ == "__main__":

@@ -125,13 +125,14 @@ RULINGS: dict[str, tuple[str, str]] = {
     "A06": (
         "SCOPED",
         _REDERIVED
-        + "D08 is a negative obligation whose population empties as the migration "
-        "succeeds, so it is unfalsifiable after the fact by construction. Its real value "
-        "was as a RULE ON MAIN'S HAND at authoring time - do not write a verified-miss "
-        "assertion where no once-promoted artifact exists - and it was honoured: gate 4 "
-        "reports MISS-GUARDED 0 and FACTORY 28 with no FACTORY site carrying a resolve "
-        "assertion. A durable complement needs the frozen opening site set that Y04 "
-        "demands; rule there.",
+        + "D08 is a negative obligation whose LIVE population empties as the migration "
+        "succeeds, and its real value was as a rule on MAIN's hand at authoring time - do "
+        "not write a verified-miss assertion where no once-promoted artifact exists. It "
+        "does not depend on the live gate, because the frozen opening set exists: the "
+        "committed `m3u6a1-fallback.json` records all 72 opening targets and 51 FACTORY "
+        "sites, and the battery's `_shape_owners` reads THAT table rather than a fresh "
+        "run. The obligation is therefore checkable against the opening population "
+        "permanently. Y04's ruling carries the same correction.",
     ),
     "A07": (
         "SCOPED",
@@ -322,14 +323,19 @@ RULINGS: dict[str, tuple[str, str]] = {
     "Y04": (
         "SCOPED",
         _REDERIVED
-        + "Correct and structural: a successfully migrated definition has no `handle` call, "
-        "so it leaves gate 4's target set exactly when its replacement needs inspecting, and "
-        "the surviving RETAIN sites keep the control nonzero and nonuniform so the gate "
-        "looks healthy. Gate 4's defensible claim is about the RETAINED population only - it "
-        "attributes shapes to sites that still call `handle` - and that is the population "
-        "M3.6a2 deletes. A frozen opening site set with replacement-side assertions is the "
-        "correct instrument and its natural owner is M3.6a2, which must prove every deleted "
-        "site's replacement rather than re-derive a shrinking one. A06 and A19 attach here.",
+        + "Correct that a successfully migrated definition has no `handle` call and so "
+        "leaves the LIVE target set exactly when its replacement needs inspecting. The "
+        "attack's remedy, a frozen opening site set, ALREADY EXISTS and MAIN's first "
+        "reading missed it: committed `m3u6a1-fallback.json` is the opening attribution, "
+        "72 targets against the migrated tree's 45, and `_shape_owners` in the battery "
+        "reads that table, not a fresh run - which is why D07's four MISS-GUARDED owners "
+        "resolve at all when the live gate reports MISS-GUARDED 0. What is genuinely "
+        "missing is the REPLACEMENT-side half: nothing asserts what stands at each frozen "
+        "site today. That is M3.6a2's, which must prove every deleted site's replacement. "
+        "A19's repair landed here in S6 - the control now covers every returning call and "
+        "names its site - and A16's split is replayed over the frozen table by "
+        "`--reclassify`, so the opening evidence carries the corrected taxonomy without "
+        "being re-measured.",
     ),
     "Y05": (
         "ACCEPTED",

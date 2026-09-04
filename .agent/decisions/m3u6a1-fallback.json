@@ -569,7 +569,7 @@
       "resolutions": [
         "passed=False match=None failed=['persisted-function-receipt']"
       ],
-      "shape": "HIT"
+      "shape": "AMBIGUOUS"
     },
     "tests/test_system.py:541": {
       "after": [
@@ -635,7 +635,7 @@
       "resolutions": [
         "passed=True match=False failed=[]"
       ],
-      "shape": "HIT"
+      "shape": "AMBIGUOUS"
     },
     "tests/test_system.py:592": {
       "after": [],
@@ -967,8 +967,9 @@
   },
   "totals": {
     "actor": 2,
+    "ambiguous": 2,
     "factory": 51,
-    "hit": 9,
+    "hit": 7,
     "miss_guarded": 4,
     "targets": 72,
     "unobserved": 6

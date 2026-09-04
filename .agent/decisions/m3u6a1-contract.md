@@ -28,7 +28,7 @@ At `4db71a9`, tree clean.
 | Ruled RETAIN | 23 | `totals.ruled_retain` |
 | Overrides | 5, each with grounds | `totals.overrides` |
 | `SURVIVING-MIGRATE` at baseline | 26 | `m3u6a1-census.py` |
-| Site shapes | ACTOR 2, MISS-GUARDED 4, HIT 9, FACTORY 51, UNOBSERVED 6 | `m3u6a1-fallback.json` |
+| Site shapes | ACTOR 2, MISS-GUARDED 4, HIT 7, AMBIGUOUS 2, FACTORY 51, UNOBSERVED 6 | `m3u6a1-fallback.json` |
 | `handle` suspension writers | `system.py:1135`, `system.py:1166` | AST attribution |
 | Independent suspension writers | `review` 1852, `_verify_row` 4046, `challenge` 5024 + 5120, `revoke_example` 5186, `suspend_artifact` 5233 | AST attribution |
 
@@ -125,10 +125,18 @@ even state the post-condition. Both are re-ruled RETAIN with grounds in
 `m3u6a1-census.json`; M3.6a2 owns them together with `handle`'s two suspension
 writers.
 
-### HIT — 9 sites
+### HIT — 7 sites
 
-`handle` answered from the artifact, so the site pins a hit. Every one is
-already RETAIN.
+`handle` ANSWERED from the artifact — a `Resolved` outcome — so the site pins a
+hit. Every one is already RETAIN.
+
+### AMBIGUOUS — 2 sites
+
+`tests/test_system.py:485` and `:584`. A once-promoted artifact was present and
+`handle` REFUSED TO CHOOSE, a `ReconciliationRequired` outcome. It neither
+answered nor supervised, so the site pins neither a hit nor a declared miss.
+Split out of HIT by C01 and C18; both are RETAIN, so no migration ruling depends
+on the split and the taxonomy's truth does.
 
 ---
 
@@ -249,6 +257,10 @@ already RETAIN.
 - **D28** Gate 1 stays green at every commit, never only at the last one. A
   migration that lands red and is repaired later forfeits the axis's own
   guarantee.
+- **D29** `m3u6a1-premise.py` GRADES its two premises rather than printing them:
+  it names the findings it expects, reports `RESULT: PASS`, and exits nonzero on
+  any divergence. A command that returns 0 for every possible output cannot fail,
+  so recording its rc as a passing gate asserts a check that never ran.
 
 ---
 
@@ -505,6 +517,61 @@ closed on claim defects in MAIN's own text.
   per mask both before and after the act structure moves, so the obligation holds
   at baseline exactly as the four freeze pins do. Report the split, never force
   it — and derive the set from the run rather than from the contract's list.
+- **C16 — P1's "exactly one differing cell" is FALSE without its projection.**
+  Attack A14. `m3u6a1-premise.py` reports SIX differing columns and classifies
+  five VOLATILE: `events.rows:row1.subject_id`, `row2.subject_id`,
+  `row2.payload_json`, `examples.rows:row0.receipt_hash` and `receipt_json`. C02
+  separately concedes `requests.id` is caller-chosen under `handle` and minted
+  internally under `propose`, so the literal row state differs in primary keys,
+  foreign keys, event subjects and receipts. P1 reads: after an identity
+  isomorphism that drops minted identifiers and every column derived from them,
+  EXACTLY ONE attributable difference survives, `events.rows:row1.payload_json`.
+  The projection is the claim's premise and is stated with it, never assumed.
+  Binds D07, which cites P1 for site-by-site row-state equivalence.
+- **C17 — C11's third denominator moved for a reason C11 does not give.** Attack
+  A18. The seed census at `8592c34` totals 23 RETAIN definitions over 44 sites;
+  shipped totals 23 over 45. The entire increment is
+  `tests/test_system.py::test_operation_revision_invalidates_every_old_request_path`,
+  6 sites → 7, gaining `tests/test_system.py:880`. Cause: that test's subject IS
+  the caller-chosen request-id route, and migrated `confirm` cannot carry a
+  request id, so `self.confirm("old-confirmed")` was inlined into the direct
+  `self.system.handle(..., request_id="old-confirmed")` plus `self.system.review(...)`
+  pair it always was underneath. The call did not appear — it became VISIBLE.
+  ONE event moves two denominators in opposite directions: `confirm`'s callers
+  41 → 40 (C12, measured 40 today) and RETAIN sites 44 → 45. A denominator that
+  moves without its cause recorded is a number no later reader can audit.
+- **C18 — D09's "per-call positive control" was false, and gate 4 certified a
+  taxonomy C01 calls false.** Attacks A19 and A16. `m3u6a1-fallback.py:130` gated
+  the digest control on `isinstance(outcome, ReviewRequired)`, so every
+  `Resolved`, `ReconciliationRequired`, `FallbackFailed`, `InProgress` and raising
+  path skipped it — 24 checked over 17 site rows — and the one global counter
+  named no site. Separately the shape rule keyed HIT on
+  `outcomes != {ReviewRequired}`, collapsing "answered" with "refused to choose",
+  and printed `HIT: 9` while C01 says seven. Both repaired: the control reads
+  `requests.input_hash` for every returning call and attributes each verdict to
+  its site (46 checked, 3 sites raise on every call and carry no request id), and
+  `AMBIGUOUS` splits the `ReconciliationRequired`-only sites out of HIT, giving
+  HIT 7 / AMBIGUOUS 2 at `tests/test_system.py:481` and `:582` — exactly C01's
+  two. Credited by mutation: a site-selective wrong digest at
+  `tests/test_system.py:277` now prints `CONTROL-SITE-FAILED` and `RESULT: FAIL`
+  while the shape flips HIT 7 → 6 and FACTORY 28 → 29. Before the repair that
+  same mutation left every counter clean.
+  The committed `m3u6a1-fallback.json` is the FROZEN OPENING attribution, not a
+  current-tree measurement: 72 targets against the migrated tree's 45, and the
+  source of section 3's counts. Re-running `--emit` against the migrated tree
+  destroys it. The corrected rule therefore reaches it through `--reclassify`,
+  which replays `_shape()` over the table's OWN recorded fields and touches no
+  measurement: 2 sites relabelled, `tests/test_system.py:485` and `:584` — again
+  exactly C01's two — with ACTOR 2, MISS-GUARDED 4 and FACTORY 51 unmoved, and 0
+  relabelled on a second run. A corrected rule replayed over frozen evidence is a
+  repair; a fresh measurement written over frozen evidence is a loss.
+- **C19 — gate 5 could not fail.** Attack Y05. `m3u6a1-premise.py` exited 0 while
+  printing both final verdicts as `False`, and no obligation ran it, which is why
+  the S5 gate list records gates 1-4 and 6-8 and skips it. Both `False` values
+  were correct, which makes it worse: a reader is handed two negations beside a
+  green rc and must already know the answer to read it. D29 now requires the probe
+  to grade its expected findings and exit nonzero on divergence, and the verdict
+  lines are restated positively so the printed value is the claim.
 
 ---
 
@@ -577,15 +644,72 @@ cost scales with the thing it checks is not stable, and a green reading from an
 unstable check is not evidence. Ruling on the instrument's SHAPE never needs to
 wait for it to go red.
 
-## 13. Attack table — PENDING (S6)
+## 13. Attack table — RULED (S6)
 
-Deliverable is COMPLETE and committed: `.agent/decisions/m3u6a1-attack.json`,
-36 rows (30 seeded A01-A18 + Y01-Y12, 6 extension), filled diff-blind by
-`rev-m3u6a1-1`, `RESULT: PASS` with `UNKNOWN-CELLS 0`, `SEED-DROPPED 0`,
-`UNRESOLVED-SECTION 0`, `BAD-SEVERITY 0`, `BAD-ID 0`, `DUPLICATE-ID 0`,
-`SHORT-ATTACK 0`, `UNREPRODUCED 0`. `disposition` and `main_note` are MAIN-owned
-and remain `unknown` by design; the grader exempts them, so a PASS says nothing
-about whether MAIN has ruled.
+`.agent/decisions/m3u6a1-attack.json`, 36 rows (30 seeded A01-A18 + Y01-Y12, 6
+extension A19-A21 + Y13-Y15), filled diff-blind by `rev-m3u6a1-1`. Every row is
+disposed through `m3u6a1-rule-attack.py`, idempotent, `--check` asserting the id
+set so a later row cannot go undisposed: `IN SYNC: 36 rows disposed`. Reviewer
+severities: 12 blocking, 22 material, 2 cleared. MAIN's dispositions: **5
+ACCEPTED, 27 SCOPED, 2 CLEARED, 2 DEFERRED**.
 
-S6 rules every row through an idempotent `--check` patcher asserting the id set
-(pattern `m3u5b-rule-attack.py`) and writes this section from it.
+**The discriminator.** Nearly every row proves the same thing: a gate predicate
+is NECESSARY and not SUFFICIENT. For a tripwire that is the normal condition, not
+a defect — it becomes one exactly where the contract calls the tripwire a proof.
+So the disposition splits on the ARTIFACT, not on the attack's strength. ACCEPTED
+where something shipped is false today; SCOPED where the wording outran the
+instrument, with the real domain named.
+
+**Five ACCEPTED, each verified before ruling and each repaired in S6.**
+
+| id | what was false | repair |
+| --- | --- | --- |
+| A16 | gate 4 printed `HIT: 9` and `RESULT: PASS` while C01 says seven | `AMBIGUOUS` split; frozen table reclassified; C18 |
+| A19 | D09 called the digest control `per-call`; it ran on `ReviewRequired` alone, 24 of 46 | control on every returning call, site-attributed; C18 |
+| Y05 | gate 5 exited 0 for every possible output and no obligation ran it | D29 + graded findings + `RESULT: PASS`/`FAIL`; C19 |
+| A14 | P1 claimed `exactly one differing cell`; the probe reports six | C16 states the identity projection as the claim's premise |
+| A18 | C11's `45` had no locus and the seed measures 44 | C17 names `tests/test_system.py:880` and its cause |
+
+**A18 is the one that taught something new.** The 44 → 45 increment is entirely
+`test_operation_revision_invalidates_every_old_request_path`, 6 sites → 7. That
+test's subject IS the caller-chosen request-id route, and migrated `confirm`
+cannot carry a request id, so `self.confirm("old-confirmed")` was inlined into
+the direct `handle` + `review` pair it always was underneath. The call did not
+appear — it became VISIBLE. ONE event moves two denominators in opposite
+directions, `confirm`'s callers 41 → 40 and RETAIN sites 44 → 45, and the
+contract recorded the second without its cause. A denominator that moves without
+its cause recorded is a number no later reader can audit.
+
+**The wave-2 design paid off where it was designed to.** Two teammates who never
+saw each other's work: the attacker's evasions are answered by obligations the
+diff-blind encoder wrote independently, and in four cases the encoder asserted
+MORE than the contract sentence it was encoding.
+
+| attack | answered by | how |
+| --- | --- | --- |
+| Y10, Y11, Y12 | D04 | `git diff --exit-code 6fb4d92 -- src`, the WHOLE tree, not D27's six-module allowlist |
+| A03 | D05 | `_consumer_map(ROOT) == retained`, a qualified-name → count map, not a cardinality |
+| A02 | D03 | each RETAIN definition's AST count against the COMMITTED census row |
+| A09, Y06 | D16 | replay from an explicit detached baseline, not `git checkout --` against the index |
+| A13 | D28 | the per-commit ledger the attack's own reproduction specifies |
+| A06, Y04 | frozen `m3u6a1-fallback.json` | 72 opening targets read by `_shape_owners`, not a fresh run |
+
+That last row corrects MAIN's own first reading of A06 and Y04, which said the
+frozen opening set was missing. It is not: the committed attribution table IS
+that set, which is why D07 resolves four MISS-GUARDED owners while the live gate
+reports zero. What is genuinely absent is the REPLACEMENT-side half — nothing
+asserts what stands at each frozen site today — and that belongs to M3.6a2.
+
+**The one class no instrument in this unit can close.** The census and the shape
+table are re-derived from the current tree, so a DELETED consumer and a MIGRATED
+one leave identical evidence (A01, A06, Y02, Y03, Y04). No re-derived census will
+ever close it. M3.6a2 does, structurally: once `handle` and `request_status` do
+not exist, every evasion spelling in A01 raises `AttributeError` and absence
+stops being measured. Section 7's language must read `no measured direct call
+survives`, never `every consumer stopped`.
+
+**Deferred, both to the polish register.** Y07 duplicates an OPEN M3.5b row
+owning `parser_shape`'s field set; Y08 belongs to M3.5b's doc parser and its
+corpus. Neither leaves this unit exposed: D04's whole-`src` byte pin is stricter
+than gate 7 on the premise Y07 threatens, and this unit ships no new command
+prose.

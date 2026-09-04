@@ -206,7 +206,7 @@ def premise_1() -> bool:
         print(f"   propose: {json.dumps(right.get(key), sort_keys=True)[:300]}")
 
     print(f"P1 attributable differences: {attributable or 'none'}")
-    return not attributable
+    return attributable
 
 
 def premise_2() -> bool:
@@ -289,18 +289,45 @@ def premise_2() -> bool:
     print(f"P2 handle-hits-artifact: {handle_hit}")
     print(f"P2 resolve-replaces-it-at-Act-2-state: {resolve_hit}")
     print(f"P2 resolve-replaces-it-after-set-promotion: {after_hit}")
-    return resolve_hit
+    return handle_hit, resolve_hit, after_hit
+
+
+# The findings this probe exists to establish. Naming them here is what lets the
+# command FAIL: a probe that returns 0 for every possible output cannot be a gate,
+# and recording its rc as green asserts a check that never ran.
+EXPECTED_P1_ATTRIBUTABLE = ["events.rows:row1.payload_json"]
+EXPECTED_P2 = (True, False, True)
 
 
 def main() -> int:
     print("=== M3.6a1 premise probe ===")
-    p1 = premise_1()
+    attributable = premise_1()
     print()
-    p2 = premise_2()
+    observed = premise_2()
     print()
-    print(f"VERDICT P1 propose-equals-handle-row-state: {p1}")
-    print(f"VERDICT P2 resolve-replaces-artifact-hit: {p2}")
-    return 0
+
+    failures: list[str] = []
+    if attributable != EXPECTED_P1_ATTRIBUTABLE:
+        failures.append(
+            f"P1-DRIFT: expected {EXPECTED_P1_ATTRIBUTABLE}, measured {attributable}"
+        )
+    if observed != EXPECTED_P2:
+        failures.append(f"P2-DRIFT: expected {EXPECTED_P2}, measured {observed}")
+
+    # Stated positively, so the printed value is the claim rather than its negation.
+    # P1 is an equivalence UNDER A PROJECTION: minted identifiers and every column
+    # derived from them are dropped first, and exactly one difference survives it.
+    print(
+        "FINDING P1 propose-matches-handle-after-identity-projection-except: "
+        f"{attributable}"
+    )
+    print(f"FINDING P2 handle-hits-artifact-at-Act-2-state: {observed[0]}")
+    print(f"FINDING P2 resolve-matches-at-Act-2-state: {observed[1]}")
+    print(f"FINDING P2 resolve-matches-after-function-set-promotion: {observed[2]}")
+    for failure in failures:
+        print(failure)
+    print("RESULT: " + ("PASS" if not failures else "FAIL"))
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":
