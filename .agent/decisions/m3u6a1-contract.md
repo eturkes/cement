@@ -9,7 +9,7 @@ depends on them. Nothing is deleted here. The gate stays green throughout, which
 is the whole point of the consumer-migration-before-deletion axis: the old and
 new APIs ship simultaneously, so the migration is verifiable against both.
 
-Sections 12 and 13 are PENDING; the S3 wave fills them.
+Section 12 is written (S5). Section 13 is PENDING; S6 rules it.
 
 ---
 
@@ -472,6 +472,38 @@ closed on claim defects in MAIN's own text.
   count of DEFINITIONS, and D05, whose "23 RETAIN definitions" is a third
   denominator again.
 
+- **C12 — D10's and D14a's "41 call sites" is the BASELINE population, and one
+  RETAIN consumer legitimately leaves it.** Measured by AST: `self.confirm(...)`
+  is 41 at `6fb4d92` and 40 at the shipped tree, and the single departing owner
+  is `test_operation_revision_invalidates_every_old_request_path` — C03's own
+  third repair, which re-bases that test onto a direct `handle` + `review` plant
+  because migrating `confirm` changed what it plants. So D10's real obligation is
+  that no SURVIVING `self.confirm(...)` call passes a `request_id` argument, over
+  all 40; the count 41 describes the population the migration started from. The
+  battery pins WHICH owner left rather than the arithmetic alone, which is
+  strictly stronger: an accidental deletion of any other call site fails it while
+  the recorded repair passes. Same correction carries D14a's identical literal.
+- **C13 — `self` and `cls` are outside D14's domain.** D14 reads "no migrated
+  helper retains a parameter that no statement in its body reads", and
+  `tests/test_resolve_battery.py::_confirm` is a method whose migrated body never
+  touches `self`. Removing a bound receiver rewrites the call convention of every
+  caller and is not a migration residue, so the literal reading over-quantifies.
+  D14's domain is the parameters the migration itself could drop.
+- **C14 — section 1's "Call sites" column carries TWO measurement conventions and
+  labels neither.** The three `tests/test_system.py` rows are AST-true (`confirm`
+  41, `_confirm_scope` 65, `_promote_scope` 14). The other three are fixed-string
+  counts that include the `def` line: `_promoted_conflict_fixture` reads 7 for 6
+  calls, `_promoted_example_ledger` 4 for 3, `_confirm` 2 for 1. Same family as
+  P06's slicing-convention table and the `parser_shape` digest-algorithm rule —
+  state the algorithm beside every recorded number, because a consumer of the
+  wrong convention reports correct code as stale. The AST counts are binding.
+- **C15 — section 7's preservation set is FIVE and the measured set is SIX.** The
+  baseline run makes it D04, D22, D24, D25, D26 and D27 green at `6fb4d92`, 23
+  red. D22 belongs there: the shipped transcript test asserts exactly one match
+  per mask both before and after the act structure moves, so the obligation holds
+  at baseline exactly as the four freeze pins do. Report the split, never force
+  it — and derive the set from the run rather than from the contract's list.
+
 ---
 
 ## 11. Interpretive grounds
@@ -492,6 +524,55 @@ Recorded where a later reader would otherwise re-litigate them.
 
 ---
 
-## 12. Verdict table — PENDING (S3)
+## 12. Battery verdict table (S5)
 
-## 13. Attack table — PENDING (S3)
+Battery = `tests/test_migration_battery.py`, 29 tests, one per obligation
+D01-D28 plus D14a, authored diff-blind by `test-m3u6a1-1` at
+`wt/test-m3u6a1-1` based at `6fb4d92`, graded by
+`m3u6a1-battery-validate.py` (`UNFILLED`, `UNCOVERED`, `ORPHAN`,
+`ASSERTIONLESS`, `SKIPPED`, `CORRECTION-UNCITED` all 0, `RESULT: PASS`).
+
+**Credential = red at baseline / green at HEAD, and the split is reported
+rather than forced.** At `6fb4d92` with the CURRENT `.agent/decisions/`
+overlaid: 23 red, 6 green (D04, D22, D24-D27), `Ran 29 in 64.365s`. At HEAD:
+7 failures over 5 distinct tests, all ruled below, then 29/29 green.
+
+Every red is classed SUITE (the battery is wrong), CONTRACT (MAIN's text is
+wrong) or CODE (the shipped tree is wrong). A red is a specification question
+first and a repair second.
+
+| id | red | class | ruling |
+| --- | --- | --- | --- |
+| V01 | D10 `len(current_calls) != len(baseline_calls)`, 40 vs 41 | CONTRACT | C12. 41 is the baseline population; C03's third repair moves one RETAIN consumer off `confirm`. Battery re-anchored to 40 and now pins the departing owner by name. |
+| V02 | D14a `len(_attribute_calls(tree, {"confirm"})) != 41` | CONTRACT | C12, same measurement. |
+| V03 | D13 `_unused_parameters(helper) == {'self'}` | SUITE + CONTRACT | C13. `self`/`cls` are protocol-bound receivers, outside D14's domain; the helper excludes them. |
+| V04 | D14 `_unused_parameters(helper) == {'self'}` | SUITE + CONTRACT | C13, same helper defect. |
+| V05 | D13 baseline calls 6 vs 7 and 3 vs 4 | CONTRACT | C14. Section 1's counts for these three helpers are def-inclusive fixed-string counts; the AST counts are binding. |
+| V06 | D21 `\b35\b` absent from the refusal test | **CODE** | The shipped `tests/test_hospital_ocr_example.py:909` still read "erase all 38 of them" while the migrated demo holds 35 `ast.Assert` nodes. S3 recorded "D21's verdict count re-derived 38 -> 35"; that re-derivation reached the roadmap and never reached the shipped surface. Fixed. |
+| V07 | D16 replay divergence on `tests/test_hospital_ocr_example.py` | INSTRUMENT-CORRECT | D16 fired because V06's fix was a HAND edit outside `m3u6a1-surgery.py`. Routed into `TEXT` with its expected-count assertion; gate 6 reports `no-op` on the second run and the replay reproduces the shipped tree. |
+
+**V06 is the wave's whole return and the class the battery exists to reach.**
+Six of seven reds were instrument or contract defects; one was a stale number in
+shipped bytes that no gate could see, because nothing pinned a comment. The
+battery's D21 clause now binds that prose to the module's own `ast.Assert`
+count, so a later act-structure change fails loudly instead of leaving the number
+behind. Eighth consecutive unit whose findings are dominated by claim defects in
+MAIN's own text — and the first in this unit where one of them had reached code.
+
+**V07 is D15/D16 working, not a defect.** A hand repair to a generated tree is
+exactly what C05 forbids, and the replay obligation caught it within one gate
+run. The generalisation is the project's own standing rule, now with a measured
+instance: a repair to a script-generated artifact lands IN the script.
+
+## 13. Attack table — PENDING (S6)
+
+Deliverable is COMPLETE and committed: `.agent/decisions/m3u6a1-attack.json`,
+36 rows (30 seeded A01-A18 + Y01-Y12, 6 extension), filled diff-blind by
+`rev-m3u6a1-1`, `RESULT: PASS` with `UNKNOWN-CELLS 0`, `SEED-DROPPED 0`,
+`UNRESOLVED-SECTION 0`, `BAD-SEVERITY 0`, `BAD-ID 0`, `DUPLICATE-ID 0`,
+`SHORT-ATTACK 0`, `UNREPRODUCED 0`. `disposition` and `main_note` are MAIN-owned
+and remain `unknown` by design; the grader exempts them, so a PASS says nothing
+about whether MAIN has ruled.
+
+S6 rules every row through an idempotent `--check` patcher asserting the id set
+(pattern `m3u5b-rule-attack.py`) and writes this section from it.

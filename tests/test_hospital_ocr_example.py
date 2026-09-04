@@ -906,7 +906,7 @@ class ShippedCommandRoundTripTests(unittest.TestCase):
 class DemoTranscriptTests(unittest.TestCase):
     def test_demo_refuses_to_run_where_python_removes_its_assertions(self) -> None:
         # Every verdict in the demo is an `assert`, so `-O` and `-OO` erase all
-        # 38 of them while the final success line still prints. The claim would
+        # 35 of them while the final success line still prints. The claim would
         # then be unbacked, so the demo must fail closed instead.
         for flag in ("-O", "-OO"):
             with self.subTest(flag=flag):

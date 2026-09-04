@@ -165,6 +165,18 @@ _COLLIDER = '''            proposal_id = self.system.propose(
 
 # (path, old, new, expected count). Multi-line wherever the fragment repeats.
 TEXT: tuple[tuple[str, str, str, int], ...] = (
+    # --- the demo's own verdict count is RE-DERIVED, never carried (D21) -----
+    # The act structure moved, so the `assert` population moved with it: 38 -> 35.
+    # Nothing pinned this comment, so the number was carried in prose while the
+    # measurement changed underneath it. The battery's D21 clause now binds the
+    # prose to the module's own `ast.Assert` count, so a later act change fails
+    # loudly instead of leaving a stale number behind.
+    (
+        "tests/test_hospital_ocr_example.py",
+        "        # 38 of them while the final success line still prints. The claim would\n",
+        "        # 35 of them while the final success line still prints. The claim would\n",
+        1,
+    ),
     # --- the request_id ARGUMENT was a durable ledger key -------------------
     # The census reads return values and the shape table reads artifact side
     # effects; neither sees that `request_id` is a caller-chosen PRIMARY KEY.
