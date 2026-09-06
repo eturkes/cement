@@ -1,0 +1,247 @@
+{
+  "kind": "attack",
+  "unit": "M3.6a2",
+  "note": "Seeded rows are a FLOOR, never a cap. Add extension rows with ids Y01, Y02, ... for any locus the seed missed; extensions have outnumbered seeds in every M3 wave. A cleared claim is a FILLED cell: write 'no defensible alternative: <reason>' rather than leaving unknown.",
+  "rows": [
+    {
+      "id": "A01",
+      "section": "L01",
+      "lens": "`system.py contains no def handle` is a text predicate: renaming satisfies it while the method ships - what structural pin forces the behaviour gone rather than the spelling",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A02",
+      "section": "L04",
+      "lens": "signature exactness against a `**kwargs` tail: does the pin fail when a catch-all silently swallows `generation_lease_seconds` instead of raising",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A03",
+      "section": "L05",
+      "lens": "token-absence cannot prove structural deletion - name a conforming tree where every occurrence count is zero and the behaviour survives",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A04",
+      "section": "L06",
+      "lens": "the widened clock band is ruled safe because no lease deadline is computed anywhere: audit that claim against every surviving consumer that derives a value from `_now`",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A05",
+      "section": "L07",
+      "lens": "L07's `generating` row probe may be reachable by no supported route once `handle` is gone; a fabricated row is legitimate evidence only if labelled - is it",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A06",
+      "section": "L08",
+      "lens": "a three-key SET assertion passes while every value is wrong, and the payload may be read from the event row or from a return value - which does the obligation bind",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A07",
+      "section": "L09",
+      "lens": "the CLOSED call-graph component claim: what makes closure checkable by counting, and does the count survive a dynamic reach (getattr, a registry, a string dispatch)",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A08",
+      "section": "L10",
+      "lens": "`no other import moves` - does the predicate see an import ADDED as well as removed, and does it see a re-export path change in `__init__.py`",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A09",
+      "section": "L11",
+      "lens": "the sixteen-kind derivation enumerates three spellings measured today: what happens when a fourth lands, and is the rule extensible or silently under-reporting again",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A10",
+      "section": "L11",
+      "lens": "`artifact.ambiguity_quarantined` losing its producer is a public behaviour change with no obligation of its own - compare with section 2.1, which gave the clock widening one",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A11",
+      "section": "L12",
+      "lens": "L12 freezes `models.py` while seven models lose their producers: the gate then certifies dead exported code as correct - state what that pin is actually protecting",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A12",
+      "section": "L13",
+      "lens": "count plus owner names: what does the pin report when a surviving site MOVES into a new helper that did not exist at `da70a56`",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A13",
+      "section": "L15",
+      "lens": "the whole-line span convention with line numbers moving: name a reformatting that preserves the compared bytes while changing the method, or prove none exists",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A14",
+      "section": "L16",
+      "lens": "the round trip proves `_write_proposal_request_status` untouched only if the probe actually exercises it - name the branch and what happens on the other one",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A15",
+      "section": "L18",
+      "lens": "`every surviving caller of _now is unchanged` - decided how, against which base object, and does it hold when a caller's line numbers move",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A16",
+      "section": "L19",
+      "lens": "the four prose obligations are judgment predicates: which of L19-L22 can a test decide mechanically and which need a ruling recorded instead of an assertion",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A17",
+      "section": "L23",
+      "lens": "`all 16 census pins green after the rewrite` is satisfiable by editing the pins - what stops the rewrite from repairing the instrument instead of the prose",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A18",
+      "section": "L24",
+      "lens": "the owned-hit-count-zero predicate cannot hold for every vocabulary token, since `requests` names a surviving private table - state the token subset it actually binds",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A19",
+      "section": "L26",
+      "lens": "retirement removes the only pin and records the frozen figures as PROSE - name what re-checks those figures, or concede the claim is unchecked after retirement",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A20",
+      "section": "L27",
+      "lens": "an inverted D01 asserts the absence L01 and L02 already assert: is it now a duplicate rather than a pin, and does that matter",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A21",
+      "section": "L29",
+      "lens": "widening `_freezes()` to see the P06 family while L26 RETIRES that family in the same unit: after both land the detector's target set is empty, so state what the control fires on",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A22",
+      "section": "G3",
+      "lens": "gate 3's expectation is re-emitted by the same script that grades it, so `--emit` blesses whatever the tree currently says - name what stops a wrong post-state from grading PASS",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A23",
+      "section": "G8",
+      "lens": "the reversion sweep needs one row per SUBPROPERTY and grounded exclusions: which of this unit's clauses are insensitive to every working-tree mutation, and why",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    },
+    {
+      "id": "A24",
+      "section": "S6",
+      "lens": "the gate list is fixed before implementation, yet gate 3's INSTRUMENT was repaired at S3 - argue whether that is an added gate under this contract's own rule",
+      "attack": "unknown",
+      "evidence": "unknown",
+      "severity": "unknown",
+      "disposition": null,
+      "main_note": null
+    }
+  ]
+}

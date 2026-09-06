@@ -61,8 +61,8 @@ class LifecycleRemovalBattery(unittest.TestCase):
 
         self.skipTest("SEED STUB: L10 has no predicate yet")
 
-    def test_l11_the_emitted_event_kind_vocabulary_is_exactly_the_thirteen(self) -> None:
-        """L11. the emitted event-kind vocabulary is EXACTLY the thirteen surviving kinds — `artifact.ambiguity_quarantined`, `artifact.compiled`, `artifact.counterexample`, `artifact.integrity_quarantined`, `artifact.promoted`, `artifact.suspended`, `artifact.verified`, `example.revoked`, `function.promoted`, `operation.registered`, `operation.revised`, `proposal.created`, `proposal.rejected` — and the `request.` prefix is gone from the namespace. Assert the whole SET, not the absence of the two deleted kinds: an absence assertion passes while a third kind is invented, and the project's own rule is to pin the complete vector rather than a derivative of it. `request.resolved_by_artifact` (`handle:1208`) and `request.fallback_failed` (`_fail_generation:1356`) are the only two emission sites either kind ever had."""
+    def test_l11_the_emitted_event_kind_vocabulary_is_exactly_the_sixteen(self) -> None:
+        """L11. the emitted event-kind vocabulary is EXACTLY the SIXTEEN surviving kinds — `artifact.challenged`, `artifact.compiled`, `artifact.counterexample`, `artifact.integrity_quarantined`, `artifact.promoted`, `artifact.suspended`, `artifact.verification_failed`, `artifact.verified`, `example.revoked`, `function.promoted`, `operation.registered`, `operation.revised`, `proposal.accepted`, `proposal.corrected`, `proposal.created`, `proposal.rejected` — and the `request.` prefix is gone from the namespace. Assert the whole SET, not the absence of the deleted kinds: an absence assertion passes while a further kind is invented, and the project's own rule is to pin the complete vector rather than a derivative of it. Corrected by C05; the count and three of the members moved. THE VOCABULARY HAS THREE SPELLINGS AND A RULE READING ONE IS BLIND TO THE REST. Every event is written by the module-level `_event(connection, *, kind=..., ...)` helper (`system.py:380`), called 20 times, and its `kind` argument takes three forms: a plain string constant; an `IfExp` whose two branches are both constants (`kind="artifact.verified" if passed else "artifact.verification_failed"` at `_verify_row:4065`, `kind="artifact.counterexample" if suspended else "artifact.challenged"` at `challenge:5129`); and one `JoinedStr`, `kind=f"proposal.{proposal_status}"` at `review:1881`, whose interpolation is annotated `Literal["accepted", "corrected"]` at `system.py:1770`. Derive the set from all three; a scan reading only the first reports 13 of the 16 and is what C05 corrects. THREE KINDS LOSE THEIR ONLY PRODUCER HERE, not two. `request.resolved_by_artifact` (`handle:1208`), `request.fallback_failed` (`_fail_generation:1356`) AND `artifact.ambiguity_quarantined` (`handle:1143`) are each emitted at exactly one site, all three inside deleted spans. Ambiguity quarantine is therefore a behaviour this unit removes, which section 2's deletion set and the prose census both now record."""
 
         self.skipTest("SEED STUB: L11 has no predicate yet")
 
@@ -72,7 +72,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
         self.skipTest("SEED STUB: L12 has no predicate yet")
 
     def test_l13_the_surviving_requests_sites_in_system_py_are_exactly(self) -> None:
-        """L13. the surviving `requests` sites in `system.py` are exactly eleven, in `_proposal_bindings`, `_write_proposal_request_status` and `_persist_proposal`. Pin the count AND the owning method names: a count alone passes when a site moves between methods."""
+        """L13. the surviving `requests` sites in `system.py` are exactly SEVEN — `_proposal_bindings` 4, `_write_proposal_request_status` 2, `_persist_proposal` 1. Pin the count AND the owning function names: a count alone passes when a site moves between functions. Corrected by C04 from `eleven`, which contradicted section 1's own inventory. The three owners are module-level FUNCTIONS, not `System` methods, so a scan walking the class body alone attributes six of the seven to the module."""
 
         self.skipTest("SEED STUB: L13 has no predicate yet")
 
@@ -121,8 +121,8 @@ class LifecycleRemovalBattery(unittest.TestCase):
 
         self.skipTest("SEED STUB: L22 has no predicate yet")
 
-    def test_l23_all_15_census_pins_in_section_5_are_green_after_the(self) -> None:
-        """L23. all 15 census pins in section 5 are green after the rewrite, each either satisfied by the new prose or re-scoped with grounds recorded in section 8."""
+    def test_l23_all_16_census_pins_in_section_5_are_green_after_the(self) -> None:
+        """L23. all 16 census pins in section 5 are green after the rewrite, each either satisfied by the new prose or re-scoped with grounds recorded in section 8. Sixteen, not fifteen, by C06."""
 
         self.skipTest("SEED STUB: L23 has no predicate yet")
 

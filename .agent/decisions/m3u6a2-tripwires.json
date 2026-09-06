@@ -1,5 +1,8 @@
 {
   "convention": "hit_lines counts DOCUMENT LINES matching `vocabulary`, not `handle` loci; M3.5b's D22 deferral table counted the latter, so the two are incomparable",
+  "excluded": [
+    "tests/test_lifecycle_removal_battery.py"
+  ],
   "freezes": [
     {
       "lines": 28,
@@ -26,7 +29,7 @@
       "test": "test_d22c_the_opening_text_handle_request_fence_is_protected_and"
     }
   ],
-  "head": "da70a56b35c7a15093ef5d7ff8359629bad9bee4",
+  "head": "c8c77bb397f0d6ab27deb79827e3b04e36f1a9d3",
   "pins": [
     {
       "lines": 76,
@@ -36,6 +39,17 @@
       "vocabulary": [
         "handle",
         "request"
+      ]
+    },
+    {
+      "lines": 49,
+      "locus": "tests/test_cli_channels.py:2940",
+      "scope": "WORKING-TREE",
+      "test": "test_x29_the_publication_grep_scope_is_ambiguous_between_a_document",
+      "vocabulary": [
+        "ambiguity",
+        "ambiguous",
+        "ambiguous_between_a_document"
       ]
     },
     {
@@ -112,7 +126,7 @@
     },
     {
       "lines": 22,
-      "locus": "tests/test_migration_battery.py:1269",
+      "locus": "tests/test_migration_battery.py:1282",
       "scope": "WORKING-TREE",
       "test": "test_d23_examples_hospital_ocr_readme_md_208_and_216_name_the",
       "vocabulary": [
@@ -191,13 +205,19 @@
     {
       "document": "README.md",
       "grounds": "the poll-state table, both lifecycle method names and the request-route section all describe surfaces this unit deletes; no line names a result model by class name",
-      "hit_lines": 25,
+      "hit_lines": 26,
       "hits": [
         {
           "line": 14,
           "tokens": [
             "handle",
             "request"
+          ]
+        },
+        {
+          "line": 49,
+          "tokens": [
+            "ambiguity"
           ]
         },
         {
@@ -505,8 +525,14 @@
     {
       "document": "docs/threat-model.md",
       "grounds": "`handle` request ID as an idempotency key, and lease recovery, both cease to exist",
-      "hit_lines": 2,
+      "hit_lines": 3,
       "hits": [
+        {
+          "line": 61,
+          "tokens": [
+            "ambiguity"
+          ]
+        },
         {
           "line": 78,
           "tokens": [
@@ -541,11 +567,11 @@
     }
   ],
   "totals": {
-    "pins": 15,
-    "pins_working_tree": 13,
+    "pins": 16,
+    "pins_working_tree": 14,
     "prose_documents_owned": 4,
-    "prose_hit_lines": 48
+    "prose_hit_lines": 50
   },
   "unit": "M3.6a2",
-  "vocabulary": "\\bhandle\\b|request_status|retry_failed|invalidated_generators|resolved_by_artifact|\\brequests?\\b|\\blease\\b|in_progress|fallback_failed|reconciliation_required"
+  "vocabulary": "\\bhandle\\b|request_status|retry_failed|invalidated_generators|resolved_by_artifact|\\brequests?\\b|\\blease\\b|in_progress|fallback_failed|reconciliation_required|[Aa]mbigu\\w*"
 }

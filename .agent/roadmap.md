@@ -259,10 +259,39 @@ Measured gaps driving the arc:
     compares against the tip's blobs. The seed's stub body SKIPS rather than fails, because M3.6a1's
     D28 asserts gate 1 green at EVERY commit in its range and history keeps a red revision after the
     unit that made it green closes. Contract corrections C01-C03 carry all three rulings.
-    S3 OPENS ON WAVE 2: dispatch `test-m3u6a2` phase 1 against contract section 3 and
-    `attack-m3u6a2` against the contract, in one block, contract copied into each worktree (`cp` +
-    `cmp`), each brief naming `m3u6a2-battery-validate.py` as the command its output must pass and
-    reporting INLINE with its marker as the final line.
+    S3 - THE CONTRACT'S OWN NUMBERS WERE VERIFIED BEFORE DISPATCH AND THREE WERE WRONG, all three
+    reachable only by running the count, and all three would have gone into a diff-blind battery as
+    red-against-correct-code. Corrections C04-C06 carry the rulings.
+    L13 read `exactly eleven` surviving `requests` sites while section 1 of the same contract
+    inventoried SEVEN and named all seven lines. Measured: 20 lines total, 13 deleted, 7 surviving -
+    and the three owners are module-level FUNCTIONS, so a class-body scan misattributes six of them.
+    L11 READ THIRTEEN SURVIVING EVENT KINDS AND THE MEASURED ANSWER IS SIXTEEN, wrong three ways
+    from ONE unrecorded fact: `artifact.ambiguity_quarantined` is emitted at `handle:1143` and
+    nowhere else, so deleting `handle` DELETES AMBIGUITY QUARANTINE. L11 kept that kind, and missed
+    four others because `kind=` has three spellings and a first-branch scan reads one -
+    `artifact.challenged` + `artifact.verification_failed` hide in `IfExp` second branches,
+    `proposal.accepted` + `proposal.corrected` hide in `kind=f"proposal.{proposal_status}"` whose
+    interpolation is annotated `Literal["accepted", "corrected"]`. Section 2's deletion set now says
+    THREE kinds lose their only producer, not two, and L11 states the derivation so the next reader
+    does not re-derive it under whichever spelling it knows.
+    GATE 3 WAS ALREADY RED AT HEAD AND NO S2 CLAIM SAW IT. `--check` reported DRIFT on `pins` and
+    `freezes` from the S2 commits themselves: the battery seed quotes the contract's obligation text
+    in its docstrings, so this unit's own battery entered its own census (PINS 15 -> 18, FREEZES
+    4 -> 5), and L30's repair moved the D23 pin `:1269` -> `:1282` without the table absorbing it.
+    Repair = exclude `tests/test_lifecycle_removal_battery.py` from both scanners, with a
+    SELF-REFERENCE check + control so a future re-entry fails loudly. Census also gains `ambigu`,
+    which is what reaches `README.md:49` and `docs/threat-model.md:61` - two lines promising the
+    quarantine this unit removes, invisible to every other token in the convention. `idempot` was
+    measured as a candidate and EXCLUDED with grounds: 9 of its 11 lines correctly describe the
+    SURVIVING proposal API, and a token whose hits cannot reach zero makes L24 unsatisfiable.
+    Post-repair census: PINS 16, PINS-WORKING-TREE 14, FREEZES 4, PROSE-HIT-LINES 50, self-test 7/7.
+    NO GATE WAS ADDED - gate 3's instrument was repaired and its expectation re-emitted.
+    WAVE 2 DISPATCHED with both graded artifacts committed BEFORE dispatch, since the seed is the
+    whole variable: `m3u6a2-wave2-validate.py` (self-test 8/8 firing, stubs FAIL at 150 and 72
+    unknown cells, MAIN-owned columns exempt and PRINTED) grades `m3u6a2-verdicts.json` (30 seeded
+    loci over L01-L29) and `m3u6a2-attack.json` (24 seeded lenses over obligations, gates and
+    sections). Row SUBJECTS are seeded, not just row ids - that is the difference measured at 0/96
+    against 96/96 - and `X`/`Y` extension ids are declared a floor rather than a cap.
     THE BURDEN HARNESS WAS DEFECTIVE AND IS REPAIRED AT `c3f6d83`, which M3.6a3's rerun inherits.
     `m3u6a-burden.py` sized each stage by grepping `Ran N` and `FAIL:`/`ERROR:` headers out of
     text, but D28, D15 and D16 replay whole suite runs as subprocess output, so nested summaries

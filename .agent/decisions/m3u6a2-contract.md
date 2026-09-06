@@ -8,7 +8,7 @@ deletes them and everything that exists only to serve them, then rewrites the fo
 documents that still describe the deleted surface. Nothing migrates here; every consumer already
 moved.
 
-Obligation ids are `L01..L29` — a letter no other contract uses. `d`, `b`, `x`, `v` and `p` are all
+Obligation ids are `L01..L30` — a letter no other contract uses. `d`, `b`, `x`, `v` and `p` are all
 live prefixes in `tests/`, and an id colliding across contracts is invisible to a reader who knows
 the local numbering. Cite another unit's obligation with its unit name attached.
 
@@ -52,7 +52,10 @@ Site ownership inside `system.py`, by the method that contains each line:
 - `_outcome`: called from `handle:1090, 1114, 1273, 1291`, `_fail_generation:1343` and
   `request_status:1559`; all three callers are deleted.
 - `_fail_generation`: called from `handle:1242, 1258, 1261` only.
-- `request.*` event kinds: emitted at `handle:1208` and `_fail_generation:1356` and nowhere else.
+- Single-producer event kinds inside the deleted spans: `request.resolved_by_artifact`
+  (`handle:1208`), `request.fallback_failed` (`_fail_generation:1356`) and
+  `artifact.ambiguity_quarantined` (`handle:1143`). Each has exactly one emission site repo-wide, so
+  all three lose their producer here (C05).
 - `requests` table: 20 lines over 7 methods. This unit removes 13 of them — `handle` 9,
   `_fail_generation` 2, `request_status` 1, `revise_operation` 1 — leaving exactly SEVEN over three
   methods: `_proposal_bindings` (534, 547, 574, 591), `_write_proposal_request_status` (643, 653)
@@ -104,26 +107,27 @@ manufactures a defect out of nothing.
 
 ### 1.2 Prose
 
-`m3u6a2-tripwires.json`, emitted by `m3u6a2-tripwires.py` at `da70a56`: PINS 15, FREEZES 4,
-PROSE-HIT-LINES 48 over five documents. Hit lines count DOCUMENT LINES matching the census
+`m3u6a2-tripwires.json`, emitted by `m3u6a2-tripwires.py`: PINS 16, FREEZES 4, PROSE-HIT-LINES 50
+over five documents, re-measured by C06 under the widened vocabulary and with this unit's own
+battery excluded from both scanners. Hit lines count DOCUMENT LINES matching the census
 vocabulary, not `handle` loci; M3.5b's D22 deferral table counted the latter, so its 18/7/8/4 and
 this table's numbers are INCOMPARABLE and neither corrects the other.
 
 | document | lines | hit lines | owner | grounds |
 |---|---|---|---|---|
-| `README.md` | 449 | 25 | M3.6a2 | the poll-state table, both lifecycle method names and the request-route section all describe surfaces this unit deletes |
+| `README.md` | 449 | 26 | M3.6a2 | the poll-state table, both lifecycle method names and the request-route section all describe surfaces this unit deletes |
 | `docs/architecture.md` | 211 | 13 | M3.6a2 | steps 1-3 describe `handle`; the lease paragraph describes the deleted knob |
 | `docs/adapter-protocol.md` | 61 | 7 | M3.6a2 | M3.7 relocates this document under BYTE EQUALITY and never rewrites a claim, so false `handle` prose left here would be RELOCATED, not deferred |
-| `docs/threat-model.md` | 114 | 2 | M3.6a2 | the `handle` request ID as an idempotency key, and lease recovery, both cease to exist |
+| `docs/threat-model.md` | 114 | 3 | M3.6a2 | the `handle` request ID as an idempotency key, and lease recovery, both cease to exist |
 | `examples/hospital_ocr/README.md` | 247 | 1 | M3.6a1 | already rewritten by M3.6a1's D22-D23 transcript regeneration; the surviving hit names no deleted surface |
 
 Owned hit lines, for the rewrite's own work list:
 
-- `README.md`: 14, 52, 70, 145, 256, 266, 281, 303, 325, 327, 332, 345, 346, 347, 351, 355, 356,
-  362, 363, 364, 365, 367, 368, 370, 444.
+- `README.md`: 14, 49, 52, 70, 145, 256, 266, 281, 303, 325, 327, 332, 345, 346, 347, 351, 355,
+  356, 362, 363, 364, 365, 367, 368, 370, 444.
 - `docs/architecture.md`: 11, 16, 17, 18, 61, 65, 67, 68, 97, 99, 124, 148, 149.
 - `docs/adapter-protocol.md`: 35, 36, 37, 52, 53, 56, 57.
-- `docs/threat-model.md`: 78, 90.
+- `docs/threat-model.md`: 61, 78, 90.
 
 ## 2. The deletion set
 
@@ -139,8 +143,11 @@ Owned hit lines, for the rewrite's own work list:
 6. `revise_operation`'s request cancellation: the `UPDATE requests SET status = 'failed',
    error_code = 'operation_revised' ...` statement, the `invalidated_generators` local it assigns,
    and that key in the `operation.revised` event payload.
-7. The two event kinds `request.resolved_by_artifact` and `request.fallback_failed`, which have no
-   emission site outside the deleted spans.
+7. The three event kinds `request.resolved_by_artifact` (`handle:1208`), `request.fallback_failed`
+   (`_fail_generation:1356`) and `artifact.ambiguity_quarantined` (`handle:1143`), each of which has
+   exactly one emission site and no emission site outside the deleted spans. Ambiguity quarantine is
+   a BEHAVIOUR this unit removes: `handle` was its only producer, `resolve` is read-only and cannot
+   quarantine, and two shipped prose lines still claim it. Added by C05.
 8. The seven now-unused `.models` imports in `system.py`.
 
 ### 2.1 The one behaviour change, ruled
@@ -187,24 +194,41 @@ Each obligation is a testable predicate. `L<n>` is the id; the battery test is `
 - **L10** `system.py`'s `from .models import (...)` list loses exactly `FallbackFailed`,
   `InProgress`, `Outcome`, `ReconciliationRequired`, `Rejected`, `Resolved`, `ReviewRequired` —
   seven names — and no other import moves. Compare the parsed import list, not the source text.
-- **L11** the emitted event-kind vocabulary is EXACTLY the thirteen surviving kinds —
-  `artifact.ambiguity_quarantined`, `artifact.compiled`, `artifact.counterexample`,
-  `artifact.integrity_quarantined`, `artifact.promoted`, `artifact.suspended`, `artifact.verified`,
-  `example.revoked`, `function.promoted`, `operation.registered`, `operation.revised`,
+- **L11** the emitted event-kind vocabulary is EXACTLY the SIXTEEN surviving kinds —
+  `artifact.challenged`, `artifact.compiled`, `artifact.counterexample`,
+  `artifact.integrity_quarantined`, `artifact.promoted`, `artifact.suspended`,
+  `artifact.verification_failed`, `artifact.verified`, `example.revoked`, `function.promoted`,
+  `operation.registered`, `operation.revised`, `proposal.accepted`, `proposal.corrected`,
   `proposal.created`, `proposal.rejected` — and the `request.` prefix is gone from the namespace.
-  Assert the whole SET, not the absence of the two deleted kinds: an absence assertion passes while
-  a third kind is invented, and the project's own rule is to pin the complete vector rather than a
-  derivative of it. `request.resolved_by_artifact` (`handle:1208`) and `request.fallback_failed`
-  (`_fail_generation:1356`) are the only two emission sites either kind ever had.
+  Assert the whole SET, not the absence of the deleted kinds: an absence assertion passes while a
+  further kind is invented, and the project's own rule is to pin the complete vector rather than a
+  derivative of it. Corrected by C05; the count and three of the members moved.
+
+  THE VOCABULARY HAS THREE SPELLINGS AND A RULE READING ONE IS BLIND TO THE REST. Every event is
+  written by the module-level `_event(connection, *, kind=..., ...)` helper (`system.py:380`), called
+  20 times, and its `kind` argument takes three forms: a plain string constant; an `IfExp` whose two
+  branches are both constants (`kind="artifact.verified" if passed else "artifact.verification_failed"`
+  at `_verify_row:4065`, `kind="artifact.counterexample" if suspended else "artifact.challenged"` at
+  `challenge:5129`); and one `JoinedStr`, `kind=f"proposal.{proposal_status}"` at `review:1881`, whose
+  interpolation is annotated `Literal["accepted", "corrected"]` at `system.py:1770`. Derive the set
+  from all three; a scan reading only the first reports 13 of the 16 and is what C05 corrects.
+
+  THREE KINDS LOSE THEIR ONLY PRODUCER HERE, not two. `request.resolved_by_artifact`
+  (`handle:1208`), `request.fallback_failed` (`_fail_generation:1356`) AND
+  `artifact.ambiguity_quarantined` (`handle:1143`) are each emitted at exactly one site, all three
+  inside deleted spans. Ambiguity quarantine is therefore a behaviour this unit removes, which
+  section 2's deletion set and the prose census both now record.
 - **L12** `src/cement_runtime/models.py` is byte-identical to its `da70a56` blob and
   `src/cement_runtime/__init__.py`'s `__all__` is unchanged. The seven models survive without
   producers; deleting them is M3.6a3's and doing it here would take that unit's measurement with it.
 
 ### Preserved invariants
 
-- **L13** the surviving `requests` sites in `system.py` are exactly eleven, in `_proposal_bindings`,
-  `_write_proposal_request_status` and `_persist_proposal`. Pin the count AND the owning method
-  names: a count alone passes when a site moves between methods.
+- **L13** the surviving `requests` sites in `system.py` are exactly SEVEN — `_proposal_bindings` 4,
+  `_write_proposal_request_status` 2, `_persist_proposal` 1. Pin the count AND the owning function
+  names: a count alone passes when a site moves between functions. Corrected by C04 from `eleven`,
+  which contradicted section 1's own inventory. The three owners are module-level FUNCTIONS, not
+  `System` methods, so a scan walking the class body alone attributes six of the seven to the module.
 - **L14** `SCHEMA_VERSION` stays 2 and `src/cement_runtime/store.py` is byte-identical to its
   `da70a56` blob.
 - **L15** `propose`, `submit_proposal`, `get_proposal`, `review` and `resolve` are byte-identical to
@@ -229,8 +253,8 @@ Each obligation is a testable predicate. `L<n>` is the id; the battery test is `
   equality, so it must be correct HERE.
 - **L22** `docs/threat-model.md` no longer claims a `handle` request ID as an idempotency key and no
   longer describes lease recovery; whatever replaces each claim describes surviving behaviour.
-- **L23** all 15 census pins in section 5 are green after the rewrite, each either satisfied by the
-  new prose or re-scoped with grounds recorded in section 8.
+- **L23** all 16 census pins in section 5 are green after the rewrite, each either satisfied by the
+  new prose or re-scoped with grounds recorded in section 8. Sixteen, not fifteen, by C06.
 - **L24** no human-facing surface gains a NEW claim about a deleted surface. Re-run the census
   (`gate 3`) against the rewritten documents and require the owned hit count to be zero for every
   vocabulary token naming a deleted surface.
@@ -316,10 +340,11 @@ alone, and `system.py` was never a member.
 | scope | test | locus |
 |---|---|---|
 | WORKING-TREE | `test_x20` | `tests/test_cli_channels.py:2491` |
+| WORKING-TREE | `test_x29` | `tests/test_cli_channels.py:2940` |
 | WORKING-TREE | `test_x30` | `tests/test_cli_channels.py:2990` |
 | WORKING-TREE | `test_d23` | `tests/test_cli_channels_battery.py:2488` |
 | WORKING-TREE | `test_d22a` | `tests/test_cli_removal_battery.py:2685` |
-| WORKING-TREE | `test_d23` | `tests/test_migration_battery.py:1269` |
+| WORKING-TREE | `test_d23` | `tests/test_migration_battery.py:1282` |
 | WORKING-TREE | `test_b25` | `tests/test_proposal_binding_battery.py:2088` |
 | WORKING-TREE | `test_b26` | `tests/test_proposal_binding_battery.py:2123` |
 | WORKING-TREE | `test_b27` | `tests/test_proposal_binding_battery.py:2176` |
@@ -331,8 +356,11 @@ alone, and `system.py` was never a member.
 | GIT-RANGE | `test_d22b` | `tests/test_cli_removal_battery.py:2766` |
 | GIT-RANGE | `test_d22c` | `tests/test_cli_removal_battery.py:2875` |
 
-The two GIT-RANGE rows assert a closed historical diff and are SAFE by construction. The thirteen
-others read the working tree and are L23's work list.
+The two GIT-RANGE rows assert a closed historical diff and are SAFE by construction. The fourteen
+others read the working tree and are L23's work list. `test_x29` entered under C06's widened
+vocabulary on an incidental `ambiguous` and is RETAINED rather than filtered: it reads shipped prose
+this unit rewrites, so it is a genuine work-list row whatever admitted it, and under-inclusion costs
+a red gate at closure where over-inclusion costs one verification.
 
 The census's own `FREEZES: 4` field names D15a, D15b, D22b and D22c — a set DISJOINT from the four
 P06 freezes above, sharing only the count. L29 is the repair.
@@ -422,6 +450,42 @@ stay out of any text a binder parses.
   id. The seed's stub body also SKIPS rather than fails, because M3.6a1's D28 asserts gate 1 is
   green at EVERY commit in its range and history keeps a red revision after the unit that made it
   green closes.
+
+- **C04** — binds L13 alone. L13 read "exactly eleven" surviving `requests` sites while section 1 of
+  this same contract inventoried SEVEN and named all seven line numbers. Measured at `da70a56`: 20
+  `requests` lines total, 13 inside deleted spans (`handle` 9, `_fail_generation` 2, `request_status`
+  1, `revise_operation` 1), 7 surviving at 534, 547, 574, 591 (`_proposal_bindings`), 643, 653
+  (`_write_proposal_request_status`) and 893 (`_persist_proposal`). A diff-blind author encoding
+  `eleven` would have gone red against correct code, which is the whole cost of an unverified number
+  in a contract.
+
+- **C05** — binds L11 and section 2's item 7. L11's set was wrong in three independent ways and the
+  root cause is one fact the contract never recorded: `artifact.ambiguity_quarantined` is emitted at
+  `handle:1143` and nowhere else, so deleting `handle` deletes ambiguity quarantine. L11 therefore
+  (a) RETAINED a kind that loses its only producer, (b) omitted `artifact.challenged` and
+  `artifact.verification_failed`, hidden because their `kind=` argument is an `IfExp` whose second
+  branch a first-branch scan never reads, and (c) omitted `proposal.accepted` and `proposal.corrected`,
+  hidden because their `kind=` argument is an f-string over a `Literal["accepted", "corrected"]`
+  annotation. Thirteen becomes SIXTEEN and the derivation is stated in L11 itself, because a set
+  obligation whose derivation is unstated is re-derived by every reader under whichever spelling it
+  happens to know. Section 2's "two event kinds" becomes three for the same reason.
+
+- **C06** — binds L23 and L24, and re-measures section 1.2 and section 5.2. Two repairs to
+  `m3u6a2-tripwires.py`, both grounded. FIRST, the vocabulary gains `ambigu`: by C05 the ambiguity
+  quarantine is a deleted surface, and `README.md:49` plus `docs/threat-model.md:61` each claim it
+  while no other token in the convention reaches either line, so the prose work list was missing two
+  lines and L24's owned-hit predicate could have read zero over a README that still promised the
+  behaviour. `idempot` was measured as a candidate and EXCLUDED with grounds: it adds 11 lines of
+  which 9 correctly describe the surviving proposal API, and a token whose hits cannot legitimately
+  reach zero makes L24 unsatisfiable. SECOND, the scanners now exclude
+  `tests/test_lifecycle_removal_battery.py`. This unit's battery quotes the contract's obligation
+  text in its docstrings, so committing the seed alone took PINS 15 -> 18 and FREEZES 4 -> 5 and left
+  GATE 3 RED from that commit onward — the census counted its own instrument, and it would have
+  drifted again on every battery edit through S4 and S5. Post-repair: PINS 16, PINS-WORKING-TREE 14,
+  FREEZES 4, PROSE-HIT-LINES 50, `--self-test` 7/7 firing with a new SELF-REFERENCE control. The
+  `test_migration_battery.py` D23 pin also moved `:1269` -> `:1282` under L30's own repair, which is
+  drift the committed table had never absorbed. No gate was added; gate 3's instrument was repaired
+  and its expectation re-emitted.
 
 ## 9. Session boundaries
 

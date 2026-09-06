@@ -53,9 +53,19 @@ DOCS: tuple[str, ...] = (
 )
 
 # The convention. Every count in the emitted table is taken under exactly this pattern.
+#
+# `ambigu` is here because `artifact.ambiguity_quarantined` is emitted at `handle:1143` and NOWHERE
+# else in `src/`, so ambiguity quarantine dies with the method: two shipped lines claim a behaviour
+# this unit removes and no other token reaches them (contract C05, C06).
+#
+# `idempot` was measured and EXCLUDED: it adds 11 lines of which 9 correctly describe the SURVIVING
+# proposal API ("Cement gives no idempotency here"). A token whose hits cannot legitimately reach
+# zero makes L24's owned-hit-count predicate unsatisfiable, so the deleted idempotency claims are
+# reached by L22 naming them and by the owned hit at README:52 instead.
 VOCAB = re.compile(
     r"\bhandle\b|request_status|retry_failed|invalidated_generators|resolved_by_artifact"
     r"|\brequests?\b|\blease\b|in_progress|fallback_failed|reconciliation_required"
+    r"|[Aa]mbigu\w*"
 )
 
 # A frame qualifies as a PIN when it reads one of these AND matches VOCAB.
@@ -92,6 +102,14 @@ OWNERS: dict[str, tuple[str, str]] = {
 }
 
 
+# This unit's OWN battery is excluded from both scanners. Its docstrings quote the contract's
+# obligation text verbatim, so every prose obligation registers as a pin and L29's obligation
+# registers as a freeze - the census would then count its own instrument and drift on every battery
+# edit. Measured: committing the seed alone took PINS 15 -> 18 and FREEZES 4 -> 5, and gate 3 was
+# red from that commit onward (contract C06).
+SELF = "test_lifecycle_removal_battery.py"
+
+
 def _frame_scope(segment: str) -> str:
     """Classify a pin by which endpoints it reads."""
     tree = bool(READS_TREE.search(segment))
@@ -106,6 +124,8 @@ def _frame_scope(segment: str) -> str:
 def _pins() -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for path in sorted((ROOT / "tests").glob("*.py")):
+        if path.name == SELF:
+            continue
         source = path.read_text(encoding="utf-8")
         tree = ast.parse(source)
         for node in ast.walk(tree):
@@ -130,6 +150,8 @@ def _freezes() -> list[dict[str, object]]:
     """Frames freezing a runtime module or method span this unit edits, by construction."""
     rows: list[dict[str, object]] = []
     for path in sorted((ROOT / "tests").glob("*.py")):
+        if path.name == SELF:
+            continue
         source = path.read_text(encoding="utf-8")
         tree = ast.parse(source)
         for node in ast.walk(tree):
@@ -182,6 +204,7 @@ def emit() -> dict[str, object]:
         "unit": "M3.6a2",
         "head": head,
         "vocabulary": VOCAB.pattern,
+        "excluded": [f"tests/{SELF}"],
         "convention": (
             "hit_lines counts DOCUMENT LINES matching `vocabulary`, not `handle` loci; "
             "M3.5b's D22 deferral table counted the latter, so the two are incomparable"
@@ -215,6 +238,12 @@ def validate(table: dict[str, object]) -> int:
     # A pin asserting a closed historical range survives this unit; a working-tree pin does not.
     # The unit is UNSTARTED while every working-tree pin is still green, so this is the red-at-
     # baseline credential: at least one must exist, or the census found nothing to protect.
+    leaked = sorted(
+        str(row["locus"]) for key in ("pins", "freezes") for row in table[key]
+        if SELF in str(row["locus"])
+    )
+    if leaked:
+        failures.append(f"SELF-REFERENCE: this unit's own battery entered the census: {leaked}")
     if int(table["totals"]["pins_working_tree"]) == 0:
         failures.append("NO-TRIPWIRE: no working-tree pin found; the scan is not discriminating")
     for label in ("pins", "prose_hit_lines"):
@@ -222,6 +251,7 @@ def validate(table: dict[str, object]) -> int:
             failures.append(f"EMPTY: `{label}` measured zero")
     for line in failures:
         print(line)
+    print(f"EXCLUDED: {', '.join(table.get('excluded', ())) or 'none'}")
     print(f"PINS: {table['totals']['pins']}")
     print(f"PINS-WORKING-TREE: {table['totals']['pins_working_tree']}")
     print(f"FREEZES: {len(table['freezes'])}")
@@ -262,6 +292,13 @@ def self_test() -> int:
     empty["prose"] = [dict(row, hits=[], hit_lines=0) for row in empty["prose"]]
     empty["totals"]["prose_hit_lines"] = 0
     controls.append(("no prose hits", empty, "EMPTY"))
+
+    mirror = json.loads(json.dumps(base))
+    mirror["pins"] = mirror["pins"] + [
+        {"locus": f"tests/{SELF}:1", "test": "test_l19_x", "scope": "WORKING-TREE",
+         "vocabulary": ["handle"], "lines": 3}
+    ]
+    controls.append(("battery counted as a pin", mirror, "SELF-REFERENCE"))
 
     silent: list[str] = []
     for label, mutated, expected in controls:
