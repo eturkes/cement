@@ -153,45 +153,73 @@ Measured gaps driving the arc:
     36 attack rows disposed. `main=` 82-98%, `mate=` 86% 206K/240K.
     Contract `.agent/decisions/m3u6a1-contract.md` · detail `.agent/archive/m3-units.md#m36a1`
     · tips `archive/m3u6a1-{test,rev,gate}`, `archive/m3u6a2-scout`.
-  - M3.6a2 tier=kernel tags=- depends=M3.6a1 - delete `handle`, `request_status`, `_outcome`,
-    `_fail_generation` and `_request_revision_is_current`; delete the `generation_lease_seconds`
-    constructor knob, `self._lease_us` and the clock bound named after it; delete request cancellation on
-    operation revision together with the `operation.revised` payload's `invalidated_generators` key. Two
+  - M3.6a2 OPEN tier=kernel tags=- depends=M3.6a1 - est 9 -> ? sessions (1.00, repeat of M3.6a1's
+    cadence). Delete `handle`, `request_status`, `_outcome`, `_fail_generation` and
+    `_request_revision_is_current`; delete the `generation_lease_seconds` constructor knob,
+    `self._lease_us` and the clock bound named after it; delete request cancellation on operation
+    revision together with the `operation.revised` payload's `invalidated_generators` key. Two
     event kinds vanish, `request.resolved_by_artifact` and `request.fallback_failed`. Rewrite the
-    library-API prose M3.5b D22 deferred: README 18 hit lines including the whole poll-state table,
-    `docs/architecture.md` 7, `docs/adapter-protocol.md` 8, `docs/threat-model.md` 4.
-    TRIPWIRES, named now so they become numbered obligations rather than regressions. THREE INVERT rather
-    than move: M3.3's P06 byte-span freeze on `System.handle` at `tests/test_submission.py:671` and
-    `tests/test_submission_battery.py:289` + `:330` RAISES once the method is gone, and M3.5b's D01 at
-    `tests/test_cli_removal_battery.py:617` asserts `System.handle` and `System.request_status` still ship
-    as library methods. M3.5b D15a freezes six runtime modules byte-identical. B02 is NOT a tripwire here:
-    its frozen tuple is `_command_supervisor.py` and `example_adapter.py` alone, `system.py` having never
-    been a member.
-    BURDEN RE-MEASURED AT POST-MIGRATION HEAD by `scout-m3u6a2` (`archive/m3u6a2-scout` @ `03b5da9`),
-    because M3.6a's split FORECAST this relief and nothing had rerun the harness on a migrated
-    tree. Raw / (normalised) per stage, pre -> post: stage 1 methods 296/943/48 (46) ->
-    50/979/48 (47); stage 5 request 57/601/34 (33) -> 79/659/41 (40); stage 6 imports
-    314/921/54 (52) -> 99/979/59 (58). VERDICT: CONCENTRATION COLLAPSED, THE WORK LIST DID NOT.
-    Stage 1 breaks fall ~6x while its normalised frames go 46 -> 47. This project sizes a removal
-    by FRAME COUNT and explicitly not by break count, so M3.6a1 did NOT reduce this unit's
-    governing burden - SIZE M3.6a2 AGAINST 47 NORMALISED STAGE-1 FRAMES, not against the split's
-    forecast of relief. What M3.6a1 erased is four fixture-helper cascades (`_confirm_scope` 189,
-    `_confirm` 23, `_promoted_conflict_fixture` 11, `_promoted_example_ledger` 2), leaving many
-    small independent frames in their place. The surviving 34-break concentration is NOT this
-    unit's: `PlanAdapterTests.request` (`tests/test_hospital_ocr_example.py:357`) and
-    `CommandCandidateSourceTests.request` (`tests/test_source.py:17`) are stage-5
-    `CandidateRequest.request_id` burden, owned by M3.6a3.
-    EVERY FRAME COUNT TRAVELS WITH ITS CONVENTION from here: RAW keys are `file:line in name`,
-    NORMALISED keys are `file in name`. The two differ by roughly 5-10% and comparing across them
-    manufactures a defect out of nothing - MAIN did exactly that inside S8 and withdrew it.
-    THE HARNESS ITSELF WAS DEFECTIVE and is repaired at `c3f6d83`. `m3u6a-burden.py` sized each
-    stage by grepping `Ran N` and `FAIL:`/`ERROR:` headers out of pytest text, but D28, D15 and
-    D16 replay whole suite runs as subprocess output, so nested summaries impersonated outer
-    failures. Authored at `1146421`, before `tests/test_migration_battery.py` existed, which is
-    why the PRE columns predate the battery and stay trusted. Repair = structural collection
-    through `traceback.extract_tb`, never string parsing, plus two hard aborts (`broken <= ran`;
-    no duplicate test ids). Both readings ship: corrected numbers in the graded fields, the
-    contaminated triple in `note`.
+    library-API prose M3.5b D22 deferred, all four normative documents.
+    S1 DONE - measurement + rulings, MAIN-retained, no teammate. No shipped code touched, so the
+    gate stands unrerun at its `1146421`-era 979 tests. Instruments + data committed at `cb66217`
+    (`m3u6a2-tripwires.py`, `m3u6a2-tripwires.json`, `m3u6a2-stages.json`). `main=` 85% 232K/273K
+    at a compaction cut, closing the record post-compaction.
+    GOVERNING BURDEN = 48 NORMALISED FRAMES. `m3u6a-burden.py` over throwaway worktrees at
+    `da70a56`, this unit's three stages, broken/ran/raw (normalised): 1 methods 50/979/48 (47),
+    2 lease 50/979/48 (48), 3 revise 50/979/48 (48). Stages 4-5 are M3.6a3's and were NOT
+    measured. Stage 1's 47 reproduces `archive/m3u6a2-scout` independently, so M3.6a1 did not
+    reduce this unit's burden: concentration collapsed (breaks fell ~6x once four fixture-helper
+    cascades went - `_confirm_scope` 189, `_confirm` 23, `_promoted_conflict_fixture` 11,
+    `_promoted_example_ledger` 2) while the work list did not (46 -> 47 frames).
+    STAGE 3'S FAILURE SET IS BYTE-IDENTICAL TO STAGE 2'S: deleting request cancellation on
+    operation revision plus the `invalidated_generators` key breaks nothing the methods deletion
+    had not already broken. `invalidated_generators` has ZERO pins repo-wide - only `system.py:812`
+    and `:832`, both inside the SURVIVING `revise_operation` (762..836) - so its deletion is
+    unobservable to the current gate and THIS UNIT'S BATTERY MUST SUPPLY THE PIN.
+    STAGES 1 AND 2 BOTH READ broken=50 AND THE EQUALITY IS A +1/-1 COINCIDENCE: stage 2 ADDS
+    `tests.test_authority_removal.FrozenShapeTests.test_system_constructor_shape` and LOSES one
+    subtest row, because `test_public_scalar_validation_fails_with_domain_errors` fails before its
+    subtest loop once the lease kwarg is gone. Compare the SET, size on normalised frames.
+    Every `self._lease_us` read (1099, 1110, 1235) sits inside `handle` (1059..1329, 271 lines),
+    so stage 2 leaves no dangling reference; the surviving clock bound is `_now` (704..712).
+    TRIPWIRE + PROSE CENSUS by `m3u6a2-tripwires.py` at `da70a56` (`--self-test` PASS, 6/6 controls
+    firing): PINS 15 (13 not range-scoped) · FREEZES 4 · PROSE-HIT-LINES 48, of which 47 sit in
+    the four OWNED documents (README 25, `docs/architecture.md` 13, `docs/adapter-protocol.md` 7,
+    `docs/threat-model.md` 2) and the 48th is the hospital example README's, ruled M3.6a1's. These
+    counts travel with the emitted vocabulary and are deliberately wider than M3.5b's D22 deferral
+    table (18/7/8/4) - the two are incomparable and neither corrects the other.
+    D15a IS THE SHARPEST TRIPWIRE (`tests/test_cli_removal_battery.py:1131`, assertion `:1158`):
+    it compares the WORKING TREE against `36f7890` for six runtime modules including `system.py`,
+    so it inverts the instant this unit edits one. M3.6a1 re-scoped siblings D15b (`:1199`) and
+    D22b (`:2806-2844`) to the closed range `36f7890..1146421` and never reached D15a; the repair
+    is exact and precedented in the same file.
+    FOUR P06 BYTE-SPAN FREEZES on `System.handle`, one more than the plan named -
+    `tests/test_submission.py:671`, `tests/test_submission_battery.py:289` + `:330`, and
+    `tests/test_migration_battery.py:1323` (M3.6a1's D25) - each RAISING once the method is gone.
+    M3.5b's D01 (def `:607`, assertion `:617`) asserts `System.handle` and `System.request_status`
+    still ship as library methods. B02 is NOT a tripwire: its frozen tuple is
+    `_command_supervisor.py` and `example_adapter.py` alone, `system.py` never a member.
+    WORKING-TREE PROSE PINS that break on the doc rewrite: `test_d22a` (`:2685`), `test_x20`
+    (`test_cli_channels.py:2491`), `test_b27` (`test_proposal_binding_battery.py:2176`),
+    `test_d34` (`test_submission_battery.py:1791`), `test_d23` (`test_migration_battery.py:1269`);
+    `test_d22c` (`:2875`) and `test_d25` (`:3046`) are MIXED; `test_d22b` is SAFE.
+    ALL FOUR NORMATIVE DOCUMENTS ARE THIS UNIT'S, `docs/adapter-protocol.md` INCLUDED: M3.7
+    relocates it under BYTE EQUALITY and never rewrites a claim, so leaving false `handle` prose
+    there would RELOCATE the defect rather than defer it.
+    NO PRE-OPEN SPLIT, BUDGET 9 (owner ruling). S1 measurement, S2 contract, S3 implementation,
+    S4 prose rewrite + pin repair, S5 graders, S6 dispatch + harvest + battery ruling, S7 attack
+    ruling, S8 gate catalogue, S9 sweep + closure. Every candidate seam was measured and rejected:
+    a deletion-layer split is the 46:10 imbalance M3.6a already rejected; consumer-migration relief
+    is measured ABSENT (46 -> 47); the only clean seam (prose) ships a DONE state whose README
+    documents a deleted method; two kernel units duplicate the ~6 machinery sessions that dominate
+    the cost (2x6+3 = 15 > 9). Record the overrun against 9.
+    S2 OPENS ON RULINGS, NOT MEASUREMENT: write `.agent/decisions/m3u6a2-contract.md` from the
+    burden, tripwire and ownership rulings above.
+    THE BURDEN HARNESS WAS DEFECTIVE AND IS REPAIRED AT `c3f6d83`, which M3.6a3's rerun inherits.
+    `m3u6a-burden.py` sized each stage by grepping `Ran N` and `FAIL:`/`ERROR:` headers out of
+    text, but D28, D15 and D16 replay whole suite runs as subprocess output, so nested summaries
+    impersonated outer failures. Repair = structural collection through `traceback.extract_tb`,
+    never string parsing, plus two hard aborts (`broken <= ran`; no duplicate test ids).
   - M3.6a3 tier=kernel tags=- depends=M3.6a2 - delete `Resolved`, `InProgress`, `FallbackFailed`,
     `Rejected`, `ReconciliationRequired`, the `Outcome` alias and every import and `__all__` entry naming
     them; delete `CandidateRequest.request_id`, minting the private request-row id inside
@@ -245,9 +273,12 @@ Measured gaps driving the arc:
     Re-measure the attached set whenever a unit closes and archive on the same rule.
   - A pre-open size trigger must be a STATIC source-span budget or a MEASURED burden; a trigger needing
     the completed diff (byte equality, post-factoring line counts) is unmeasurable before the unit opens.
-  - Size a removal by NORMALIZED FRAME COUNT (`<file> in <name>`) from a staged burden run, never by
-    break count: a subtest-bearing test contributes a variable number of breaks, so the count is not even
-    monotone under cumulative deletion. Compare the failure SET between stages, never the count.
+  - Size a removal by NORMALISED FRAME COUNT from a staged burden run, never by break count: a
+    subtest-bearing test contributes a variable number of breaks, so the count is not even monotone
+    under cumulative deletion. Compare the failure SET between stages, never the count. EVERY FRAME
+    COUNT TRAVELS WITH ITS CONVENTION - RAW keys are `file:line in name`, NORMALISED keys are
+    `file in name`, the two differ by roughly 5-10%, and comparing across them manufactures a defect
+    out of nothing.
 
   Evidence, all tracked and re-runnable: `.agent/decisions/m3-map-a-llm-runtime.md` (229 anchors),
   `m3-map-b-authority.md` (212), `m3-map-c-lifecycle.md` (299), `m3-research.md` (Q1-Q4, executed probes),
