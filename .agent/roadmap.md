@@ -176,33 +176,48 @@ Measured gaps driving the arc:
     had not already broken. `invalidated_generators` has ZERO pins repo-wide - only `system.py:812`
     and `:832`, both inside the SURVIVING `revise_operation` (762..836) - so its deletion is
     unobservable to the current gate and THIS UNIT'S BATTERY MUST SUPPLY THE PIN.
-    STAGES 1 AND 2 BOTH READ broken=50 AND THE EQUALITY IS A +1/-1 COINCIDENCE: stage 2 ADDS
-    `tests.test_authority_removal.FrozenShapeTests.test_system_constructor_shape` and LOSES one
-    subtest row, because `test_public_scalar_validation_fails_with_domain_errors` fails before its
-    subtest loop once the lease kwarg is gone. Compare the SET, size on normalised frames.
+    STAGES 1 AND 2 BOTH READ broken=50 AND THE EQUALITY IS A +1/-1 COINCIDENCE. Raw frames move
+    +3/-3: `test_authority_removal.py:118 test_system_constructor_shape` is genuinely NEW once the
+    lease kwarg leaves the constructor; `test_system.py test_expired_generation_poll_is_retryable_
+    and_handle_reclaims` moves `:702` -> `:686`, one frame under the RAW key and none under the
+    normalised one; and `test_system.py:732 test_public_scalar_validation_fails_with_domain_errors`
+    replaces its own two `<lambda>` subtest rows at `:735` + `:736`, because it now fails before
+    the subtest loop. Net breaks -2+1+1 = 0. Normalised 47 -> 48, since the two lambdas collapsed
+    to one frame at stage 1 and there are none at stage 2. Compare the SET, size on normalised
+    frames. Union over the three stages = 51 raw frames.
     Every `self._lease_us` read (1099, 1110, 1235) sits inside `handle` (1059..1329, 271 lines),
     so stage 2 leaves no dangling reference; the surviving clock bound is `_now` (704..712).
     TRIPWIRE + PROSE CENSUS by `m3u6a2-tripwires.py` at `da70a56` (`--self-test` PASS, 6/6 controls
-    firing): PINS 15 (13 not range-scoped) · FREEZES 4 · PROSE-HIT-LINES 48, of which 47 sit in
+    firing): PINS 15 (13 not GIT-RANGE-scoped) · FREEZES 4 · PROSE-HIT-LINES 48, of which 47 sit in
     the four OWNED documents (README 25, `docs/architecture.md` 13, `docs/adapter-protocol.md` 7,
     `docs/threat-model.md` 2) and the 48th is the hospital example README's, ruled M3.6a1's. These
     counts travel with the emitted vocabulary and are deliberately wider than M3.5b's D22 deferral
     table (18/7/8/4) - the two are incomparable and neither corrects the other.
-    D15a IS THE SHARPEST TRIPWIRE (`tests/test_cli_removal_battery.py:1131`, assertion `:1158`):
-    it compares the WORKING TREE against `36f7890` for six runtime modules including `system.py`,
-    so it inverts the instant this unit edits one. M3.6a1 re-scoped siblings D15b (`:1199`) and
-    D22b (`:2806-2844`) to the closed range `36f7890..1146421` and never reached D15a; the repair
-    is exact and precedented in the same file.
-    FOUR P06 BYTE-SPAN FREEZES on `System.handle`, one more than the plan named -
-    `tests/test_submission.py:671`, `tests/test_submission_battery.py:289` + `:330`, and
-    `tests/test_migration_battery.py:1323` (M3.6a1's D25) - each RAISING once the method is gone.
+    THE TWO INSTRUMENTS MEASURE DISJOINT SURFACES, which is why both exist and how each is read.
+    The burden stages measure the CODE DELETION and already contain D15a plus all four P06 span
+    freezes; NOT ONE of the census's 15 prose pins appears in any stage's frame set, because no
+    burden stage rewrites a document. Burden = what the deletion breaks; census = what the prose
+    rewrite breaks. Full pin inventory with scopes lives in `m3u6a2-contract.md` section 5.
+    D15a IS THE SHARPEST TRIPWIRE (def `tests/test_cli_removal_battery.py:1131`, assertion `:1158`,
+    scope MIXED, red in all three stages): it compares the WORKING TREE against `36f7890` for six
+    runtime modules including `system.py`, so it inverts the instant this unit edits one. M3.6a1
+    re-scoped siblings D15b (`:1160`) and D22b (`:2766`) to the closed range `36f7890..1146421`
+    and never reached D15a; the repair is exact and precedented in the same file.
+    FOUR P06 BYTE-SPAN FREEZES on `System.handle`, one more than the plan named, each RAISING once
+    the method is gone and each already inside the burden: `tests/test_submission.py:670`
+    (assertion `:692`), `tests/test_submission_battery.py:289` (`:307`) and `:329` (`:337`),
+    `tests/test_migration_battery.py:1322` (`:1338`, M3.6a1's D25).
+    THAT SET IS DISJOINT FROM THE CENSUS'S `FREEZES 4`, WHICH SHARES ONLY THE COUNT: the census
+    freezes are D15a, D15b, D22b and D22c, all in `test_cli_removal_battery.py`. The census cannot
+    see the P06 family at all - `_freezes()` requires the literal `cement_runtime/system.py` or
+    `System.handle` AND one of `read_bytes()`/`getsource`/`_git_bytes(`, while the four P06 frames
+    reach the same source through `cement_runtime.system.__file__`, `inspect.getsourcefile(System)`
+    and a `_source(ROOT, path)` helper, and the 6/6 self-test covers none of that negative space.
+    The measured burden is what makes them visible. S2 either widens the detector behind a control
+    that fires on a P06 frame, or records the exclusion with grounds.
     M3.5b's D01 (def `:607`, assertion `:617`) asserts `System.handle` and `System.request_status`
     still ship as library methods. B02 is NOT a tripwire: its frozen tuple is
     `_command_supervisor.py` and `example_adapter.py` alone, `system.py` never a member.
-    WORKING-TREE PROSE PINS that break on the doc rewrite: `test_d22a` (`:2685`), `test_x20`
-    (`test_cli_channels.py:2491`), `test_b27` (`test_proposal_binding_battery.py:2176`),
-    `test_d34` (`test_submission_battery.py:1791`), `test_d23` (`test_migration_battery.py:1269`);
-    `test_d22c` (`:2875`) and `test_d25` (`:3046`) are MIXED; `test_d22b` is SAFE.
     ALL FOUR NORMATIVE DOCUMENTS ARE THIS UNIT'S, `docs/adapter-protocol.md` INCLUDED: M3.7
     relocates it under BYTE EQUALITY and never rewrites a claim, so leaving false `handle` prose
     there would RELOCATE the defect rather than defer it.
