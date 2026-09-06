@@ -793,3 +793,47 @@ author could encode them. The budget of 9 absorbs the shift with no session left
   control (an explicit none naming no file still fires). Per C07 this VOIDS gate 2's prior runs and
   the next closure claim reruns the full numbered list; no closure claim cites one, because gate 2
   is legitimately red until the battery is filled.
+
+- **C16** — binds L12, L18 and SECTION 7. Section 7's baseline-green list is written per OBLIGATION
+  and three of its members are MIXED, so a diff-blind author reading it literally would have made
+  post-state predicates green at `da70a56`. The classification is SUBPROPERTY-level: legitimately
+  green at baseline are L14, L15, L16, L17, L12's preservation half (`models.py` byte-identity, the
+  ordered `__all__`, export-binding identity) and L18's non-callable-`clock_us` half
+  (`ValidationError`, message `clock_us must be callable`). Red at baseline are L12's
+  `(models, __all__, package, system)` post-state vector — `system.py` still imports all seven names
+  there — and both of L18's remaining halves, since L06 replaces the `StateError` text and the
+  caller set falls 15 -> 12. MAIN's measured credential over the delivered battery: 59 tests, 48 red
+  methods at HEAD pre-implementation (55 failure records, 0 errors, rc 1) and 50 red at `da70a56`,
+  where four rows ERROR on a `FileNotFoundError` for `m3u6a2-tripwires.py` because the pinned
+  baseline predates this unit's own instruments.
+
+- **C17** — binds L23. Its ANTI-WEAKENING clause freezes each of the 14 working-tree pin bodies
+  byte-identical to `da70a56` unless section 8 permits the delta, and section 8 enumerated NO
+  permitted delta — which makes L23 and L19-L22 jointly unsatisfiable, because correct prose removal
+  necessarily inverts pins that assert the removed prose POSITIVELY. Three are measured and
+  PERMITTED-AND-REQUIRED to invert, each to the new post-state rather than to a weaker predicate:
+  `test_b27_no_public_surface_retains_the_unqualified`
+  (`tests/test_proposal_binding_battery.py:2176`) requires README to contain
+  `` The older `System.request_status` and `System.handle` lifecycle values still report `resolved` ``,
+  which L19 deletes; `test_d23_there_is_no_idempotency_two_byte_identical_submissions_ret`
+  (`tests/test_cli_channels_battery.py:2488`) carries the positive control
+  ``call `System.handle` again with `retry_failed=True``, whose ROLE — keeping D23's scoped absence
+  assertion non-vacuous — must be re-based onto a surviving retry-advice locus, never deleted (A08);
+  `test_d34_readme_and_the_three_normative_docs` (`tests/test_submission_battery.py:1791`) requires
+  `` steps 1 to 3 describe `handle`, the request lifecycle `` and `` through `handle` ``, which L20
+  and L21 delete. The enumeration is a FLOOR that the prose session extends by MEASUREMENT under the same
+  standard: a permitted delta names the pin, the deleted claim that forces it, and the post-state the
+  inverted body asserts. `test_d22a_direction_cli_route_every_cli_route_locus_was_rewritte` is
+  UNMEASURED — its docstring locus table is not its assertion body — and takes no permission until
+  the rewrite shows one is needed. D22c's scope is section 7's `MIXED`, not the census row's
+  `GIT-RANGE`: it reads live `README.md` beside a git blob, so its live half gets rows in gate 8.
+
+- **C18** — binds L24. Its grounds catalogue admits a generic `request` hit only as private-table
+  prose or a non-generation-lease statement, and a third class is required by pins L23 freezes:
+  NEGATIVE REQUEST-IDENTITY CLAIMS. `README.md:332` reads `It carries four fields and no request
+  identity`, asserted by `tests/test_proposal_binding_battery.py:2104`, and `:2121` asserts
+  `expose no request identifier`. Both are claims that the surviving proposal API exposes NO request
+  identifier — the opposite of a claim about a deleted surface — so deleting them to reach a lower
+  generic count would break a standing pin to satisfy a census. The catalogue is private-table or
+  storage prose, a non-generation-lease statement, or a negative request-identity claim. The
+  ambiguity-quarantine subset stays at ZERO and takes no grounds.
