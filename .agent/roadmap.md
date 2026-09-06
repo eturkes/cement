@@ -243,8 +243,26 @@ Measured gaps driving the arc:
     L11 the exact thirteen surviving event kinds. SEVEN MODELS SURVIVE UNPRODUCED (L12) and belong
     to M3.6a3. Corrected in-session by C01: the first session table put implementation before the
     battery, which cannot be authored diff-blind once the diff exists.
+    GATE 2 AND ITS SEED SHIPPED IN THE SAME SESSION, before dispatch, because the seed is the whole
+    variable: `m3u6a2-seed-battery.py` derives `tests/test_lifecycle_removal_battery.py` from the
+    contract's obligation list (30 stubs, names + docstrings DERIVED so a renamed obligation renames
+    its stub, rerun prints NO-OP, and it REFUSES to overwrite authored tests), and
+    `m3u6a2-battery-validate.py` grades it on five independent checks. Graded BOTH WAYS at seed:
+    all-stub exits 1 on `STUB: 30`, filled exits 0; `--self-test` 5/5 firing. Gate 1 GREEN at 1009
+    tests, 30 skipped, 343 s.
+    A THIRD TRIPWIRE CLASS EXISTS AND NEITHER INSTRUMENT COULD SEE IT: what breaks when this unit
+    ADDS a file. Committing the seed tripped M3.6a1's D16, which read `6fb4d92..HEAD` over `tests`
+    and `examples` and so asserted that M3.6a1's surgery script reproduces every LATER unit's edits
+    too - impossible for a script pinned to an earlier baseline, and it inverts on ANY added file,
+    which makes it stricter than D15a. L30 closes both of its halves to `6fb4d92..dc4ab5e`
+    (M3.6a1's baseline and DONE tip); its per-path half compared against the WORKING TREE and now
+    compares against the tip's blobs. The seed's stub body SKIPS rather than fails, because M3.6a1's
+    D28 asserts gate 1 green at EVERY commit in its range and history keeps a red revision after the
+    unit that made it green closes. Contract corrections C01-C03 carry all three rulings.
     S3 OPENS ON WAVE 2: dispatch `test-m3u6a2` phase 1 against contract section 3 and
-    `attack-m3u6a2` against the contract, in one block, contract copied into each worktree.
+    `attack-m3u6a2` against the contract, in one block, contract copied into each worktree (`cp` +
+    `cmp`), each brief naming `m3u6a2-battery-validate.py` as the command its output must pass and
+    reporting INLINE with its marker as the final line.
     THE BURDEN HARNESS WAS DEFECTIVE AND IS REPAIRED AT `c3f6d83`, which M3.6a3's rerun inherits.
     `m3u6a-burden.py` sized each stage by grepping `Ran N` and `FAIL:`/`ERROR:` headers out of
     text, but D28, D15 and D16 replay whole suite runs as subprocess output, so nested summaries
