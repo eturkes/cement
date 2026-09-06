@@ -37,6 +37,7 @@ from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 BASELINE = "6fb4d92"
+M3U6A1_TIP = "dc4ab5e"  # M3.6a1's DONE commit — the closed endpoint every D16 claim reads against
 SURGERY = ROOT / ".agent" / "decisions" / "m3u6a1-surgery.py"
 LIFECYCLE = frozenset({"handle", "request_status"})
 
@@ -996,6 +997,12 @@ class MigrationBatteryTests(unittest.TestCase):
         recorded as a named exception in section 10.
 
         CORRECTED-BY C05
+
+        Re-scoped by M3.6a2 L30 to the CLOSED range `6fb4d92..dc4ab5e`, M3.6a1's own baseline and
+        tip. Read against `HEAD` it asserted that M3.6a1's surgery script reproduces every later
+        unit's `tests/` and `examples/` edits too, which no script pinned to an earlier baseline can
+        do: the first file M3.6a2 added entered `expected` and the clause inverted. Same family as
+        D15b and D22b, which M3.6a1 re-scoped for the same reason, and as D15a, which it missed.
         """
         self.assertTrue(SURGERY.is_file())
         expected_result = _run(
@@ -1003,7 +1010,7 @@ class MigrationBatteryTests(unittest.TestCase):
                 "git",
                 "diff",
                 "--name-only",
-                f"{BASELINE}..HEAD",
+                f"{BASELINE}..{M3U6A1_TIP}",
                 "--",
                 "tests",
                 "examples",
@@ -1031,7 +1038,13 @@ class MigrationBatteryTests(unittest.TestCase):
             self.assertEqual(changed, expected)
             for path in sorted(expected):
                 with self.subTest(path=path):
-                    self.assertEqual((replay / path).read_bytes(), (ROOT / path).read_bytes())
+                    # Against the TIP's blob, not the working tree: a later unit editing one of
+                    # these files must not redden a claim about what M3.6a1's script produced.
+                    shipped = _run(["git", "show", f"{M3U6A1_TIP}:{path}"])
+                    self.assertEqual(shipped.returncode, 0, _result(shipped))
+                    self.assertEqual(
+                        (replay / path).read_text(encoding="utf-8"), shipped.stdout
+                    )
 
     def test_d17_multi_line_anchors_wherever_a_fragment_repeats_a_count_1(self) -> None:
         """D17 — Multi-line anchors wherever a fragment repeats. A `count == 1` assertion is

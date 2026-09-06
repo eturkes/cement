@@ -262,6 +262,14 @@ Each obligation is a testable predicate. `L<n>` is the id; the battery test is `
   self-test covered none of that negative space. If widening proves to over-report, record the
   exclusion with grounds instead; what is not acceptable is leaving a detector whose name promises
   the family it cannot see.
+- **L30** M3.6a1's D16 (`tests/test_migration_battery.py:993`) is re-scoped to the CLOSED range
+  `6fb4d92..dc4ab5e` — M3.6a1's baseline and its own DONE tip — on BOTH halves: the expected path
+  set and the per-path byte comparison, which read `HEAD` and the working tree respectively. Read
+  against `HEAD`, D16 asserted that M3.6a1's surgery script reproduces every LATER unit's `tests/`
+  and `examples/` edits, which no script pinned to an earlier baseline can do. It is the same family
+  as D15a (L25), and it is stricter: D15a inverts when this unit EDITS a runtime module, while D16
+  inverts when this unit ADDS ANY FILE under `tests/` or `examples/` — the battery seed alone
+  tripped it. Its repair therefore lands BEFORE every other edit rather than beside them.
 
 ## 4. What this unit does NOT do
 
@@ -329,6 +337,21 @@ others read the working tree and are L23's work list.
 The census's own `FREEZES: 4` field names D15a, D15b, D22b and D22c — a set DISJOINT from the four
 P06 freezes above, sharing only the count. L29 is the repair.
 
+### 5.3 Addition tripwires — what breaks when this unit ADDS a file
+
+Neither instrument covers this class. The burden stages only delete and the census only reads
+documents, so the first file this unit committed is what found the class. Added by C03.
+
+| pin | locus | trips on | repair |
+|---|---|---|---|
+| M3.6a1 D16 | `tests/test_migration_battery.py:993` | ANY new or edited path under `tests/` or `examples/` | L30 — close both halves to `6fb4d92..dc4ab5e` |
+| M3.6a1 D28 | `tests/test_migration_battery.py` | any commit where gate 1 is red | none — the seed SKIPS instead of failing |
+
+D16 is stricter than D15a: D15a inverts when a runtime module is EDITED, D16 when any test or
+example file is ADDED. Its repair lands before every other edit rather than beside them. D28 needs
+no repair, but it makes a deliberately-red commit permanently costly, because history keeps the red
+revision after the unit that made it green closes.
+
 ## 6. Gates — the numbered list every closure claim reruns from committed state
 
 A gate added mid-unit invalidates these pins instead of strengthening them. Adding one is a
@@ -336,8 +359,9 @@ correction in section 8, and every closure claim after it reruns the whole list.
 
 1. `uv run python -m unittest discover -s tests -t .` — green, with the post-state test count
    recorded beside the claim.
-2. `uv run python .agent/decisions/m3u6a2-battery-validate.py` — the battery covers every `L<n>` in
-   section 3 exactly once, ids are contiguous, and no obligation is uncovered.
+2. `uv run python .agent/decisions/m3u6a2-battery-validate.py` — every `L<n>` in section 3 is
+   covered by AT LEAST one battery test, ids are contiguous, no test names an id the contract does
+   not define, and no test is still a seed stub. Coverage is a FLOOR, corrected by C02.
 3. `uv run python .agent/decisions/m3u6a2-tripwires.py --check` — the census reruns against the
    post-state tree and matches the committed expectation, including the L29 detector repair and its
    self-test controls.
@@ -385,6 +409,19 @@ stay out of any text a binder parses.
   starts, and the battery is authored DIFF-BLIND against this contract, which is impossible once the
   diff exists. The corrected table below dispatches wave 2 at S3 and implements at S4. No predicate
   moved, so no closure claim built on section 6 is affected.
+- **C02** — binds GATE 2 in section 6, no obligation. Gate 2 first read "covers every `L<n>` exactly
+  once". An identity makes coverage a ceiling as well as a floor, so a second test for one
+  obligation fails the gate and extension needs permission. M3.6a1 measured the cost of the same
+  shape from the other side: its 29-row seed grew to 92 rows over the same 29 clauses once the
+  catalogue was filled per SUBPROPERTY, and the one-row-per-clause reading was blind to three dead
+  conjuncts. Coverage is a FLOOR of one; ORPHAN and STUB are the identities.
+- **C03** — ADDS L30 and adds a THIRD tripwire class to section 5. The two instruments measured what
+  the DELETION breaks and what the PROSE REWRITE breaks; neither could see what an ADDITION breaks,
+  and committing the battery seed is an addition. It tripped M3.6a1's D16 immediately. Section 6's
+  gate list is unchanged, so no closure claim is affected; gate 2's contiguity check absorbs the new
+  id. The seed's stub body also SKIPS rather than fails, because M3.6a1's D28 asserts gate 1 is
+  green at EVERY commit in its range and history keeps a red revision after the unit that made it
+  green closes.
 
 ## 9. Session boundaries
 
