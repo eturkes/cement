@@ -292,6 +292,34 @@ Measured gaps driving the arc:
     loci over L01-L29) and `m3u6a2-attack.json` (24 seeded lenses over obligations, gates and
     sections). Row SUBJECTS are seeded, not just row ids - that is the difference measured at 0/96
     against 96/96 - and `X`/`Y` extension ids are declared a floor rather than a cap.
+    S3 DONE - HARVEST 96 ROWS, EXTENSIONS OUTNUMBERING SEEDS 42:54 AND CARRYING THE SHARPEST
+    FINDINGS, which is the seeded-floor rule paying out again. `m3u6a2-verdicts.json` 66 rows
+    (30 seeded + 36 `X`) / 43 DIVERGENT; `m3u6a2-attack.json` 30 rows (24 seeded + 6 `Y`) /
+    11 blocking + 15 material + 4 cleared, validator PASS. Tips `archive/m3u6a2-{test,attack}`,
+    tables sha256-proven byte-identical to their worktree blobs before the branches went.
+    THE ATTACK BROKE C05, THE CORRECTION MAIN HAD LANDED THAT SAME SESSION: Y01 measures 19 static
+    `_event` calls where C05's text says 20. The event-kind SET is unaffected - it was derived per
+    call site, not from the total - but a structural count inside a correction written to fix
+    structural counts is exactly the shape that keeps closing units on MAIN's own claim defects.
+    Other blocking rows to rule at S4: A13 (L15's `lineno..end_lineno` slice excludes decorators, so
+    a decorator added to a frozen span is invisible), A15 (L18 is self-contradictory - surviving
+    `revise_operation` calls `_now` and MUST change under L07), A17 + A18 (L23 is satisfiable by
+    weakening the pins, L24 is unsatisfiable under its literal census reading), A22 + Y05 + Y06
+    (gate 3 has no independent post-state oracle, never validates `totals`, never authenticates
+    provenance - `--emit` blesses whatever the tree says), Y02 + Y03 (gate 2 detects only the
+    literal `SEED STUB`, so `pass` bodies or a non-TestCase function grade clean), A06 (L08 pins the
+    key set alone, so every value may be wrong), A23 (G8 names no fixed subproperty catalogue).
+    A24 IS THE GOVERNANCE ROW AND MAIN RULES IT FIRST: did C06 change gate 3's ACCEPTANCE PREDICATE
+    after S2 was DONE, which section 6 forbids, or repair its instrument, which it permits.
+    S3 DID NOT BUY THE BATCH RULING the corrected session table assigned it. The window went to the
+    pre-dispatch verification - which is what found C04-C06 and a red gate 3 no S2 claim had seen -
+    plus the wave itself. `main=` 79% 215K/273K, `mate=` 78% 213K/273K (`test`, stopped saturated at
+    66 rows after one bounding directive it did not take; `attack` finished clean at 71% 193K).
+    S4 OPENS ON THE BATCH RULING: 43 divergent verdict rows and 30 attack rows into contract
+    sections 3 and 8 through an idempotent `m3u6a2-rule-attack.py` (`--check`, asserting the id set,
+    the `m3u5b-rule-attack.py` pattern), A24 ruled first because it decides whether gate 3's
+    expectation still stands. Phase 2 then re-dispatches `test-m3u6a2-2` from `archive/m3u6a2-test`
+    with the ruled table, and implementation follows at S5. The budget of 9 absorbs the shift.
     THE BURDEN HARNESS WAS DEFECTIVE AND IS REPAIRED AT `c3f6d83`, which M3.6a3's rerun inherits.
     `m3u6a-burden.py` sized each stage by grepping `Ran N` and `FAIL:`/`ERROR:` headers out of
     text, but D28, D15 and D16 replay whole suite runs as subprocess output, so nested summaries
