@@ -315,11 +315,91 @@ Measured gaps driving the arc:
     pre-dispatch verification - which is what found C04-C06 and a red gate 3 no S2 claim had seen -
     plus the wave itself. `main=` 79% 215K/273K, `mate=` 78% 213K/273K (`test`, stopped saturated at
     66 rows after one bounding directive it did not take; `attack` finished clean at 71% 193K).
-    S4 OPENS ON THE BATCH RULING: 43 divergent verdict rows and 30 attack rows into contract
-    sections 3 and 8 through an idempotent `m3u6a2-rule-attack.py` (`--check`, asserting the id set,
-    the `m3u5b-rule-attack.py` pattern), A24 ruled first because it decides whether gate 3's
-    expectation still stands. Phase 2 then re-dispatches `test-m3u6a2-2` from `archive/m3u6a2-test`
-    with the ruled table, and implementation follows at S5. The budget of 9 absorbs the shift.
+    S4 DONE - THE 96-ROW RULING, THE PHASE-2 WAVE AND THE WHOLE CODE IMPLEMENTATION, because a
+    compaction handed the session a second full window and the work was already staged for it.
+    `m3u6a2-rule-attack.py` rules BOTH tables (gate 6 names one command): attack 30 rows = 22
+    accept / 4 accept-in-part / 4 cleared; verdicts 66 = 35 accept / 8 accept-amend / 23
+    ratified-nondivergent. Idempotent - applied, `no-op`, `--check` in-sync. The 23 non-divergent
+    rows are ruled as a CLASS with their ids in a frozenset, so a row changing class fails loudly;
+    V04/V19/X07 were spot-checked first rather than asserting the class blind.
+    A24 RULED FIRST AND THE ANSWER IS NO, WITH THE SUBSTANCE KEPT (C07). C06 added no numbered
+    entry, so section 6's pins stand - and nothing could have been unbuilt anyway, since S2 claimed
+    gate 1 alone while gate 3 was red. But a gate's identity is (COMMAND, ACCEPTED LANGUAGE), so an
+    INSTRUMENT change is now a numbered correction voiding that gate's prior runs and forcing a
+    full-list rerun at the next closure claim.
+    FOUR MORE OF THE CONTRACT'S OWN NUMBERS WERE WRONG, each reachable only by running the count
+    (C08-C11). C05's `20` `_event` calls is 19 static (16 Constant / 2 IfExp / 1 JoinedStr), 14
+    post-state - the textual count matches the DEFINITION line; the 16-kind SET is unaffected,
+    having been derived per call site. L09's `zero occurrences` for `request_status` is
+    FALSE-BY-CONSTRUCTION against L15: 8 identifiers at base, SEVEN survive as proposal plumbing and
+    one sits inside byte-frozen `get_proposal`. C04's own repair called all three surviving
+    `requests` owners module-level FUNCTIONS - `_persist_proposal` is a `System` METHOD, so a
+    class-body scan sees ONE site. Section 1's `seven exported models` is SIX: `Outcome` was never
+    in `__all__`, and M3.6a3 inherits 7 definitions / 6 exports / 0 `system.py` imports.
+    L24 WAS UNSATISFIABLE AND MAIN REPRODUCED WHY: M3.5b's D25 needs >=2 shipped paragraphs saying
+    `request row stays internal`, measurement finds exactly 2 (README + architecture), and the
+    census `\brequests?\b` matches both - a green D25 and a zero `requests` count cannot hold
+    together. L24 now binds a NAMED token subset plus grounds per surviving generic hit, and that
+    prose is also gate 3's independent oracle (A22), which `--emit` cannot rewrite. L18 was
+    self-contradictory (`revise_operation` is both a surviving `_now` caller and an L07 edit target)
+    and is replaced by the exact 12-method call-site set. NEW OBLIGATION L31: ambiguity quarantine
+    is a removed BEHAVIOUR with its own pin, not merely a vocabulary spelling. L19-L22 split
+    MECHANICAL / SEMANTIC (C12) because the committed vocabulary scores `vocab-hit False` on
+    `Never call propose or review; use the legacy lifecycle dispatcher`. Section 7 gains gate 8's
+    FIXED exclusion catalogue; D22c is MIXED and keeps live rows.
+    THREE INSTRUMENTS WERE DEFECTIVE AND NONE OF THEM HAD BEEN RUN. The verdicts table had never
+    passed its own validator: `CONCRETE` required a TWO-digit number, so 14 rows whose observable is
+    a single-digit count, a boolean, `[]` or an exception class graded FAIL, and S3's `validator
+    PASS` covered the attack table alone (C13; widened, re-graded both ways, 66/66 concrete PASS and
+    a seeded vague row still rc 1). Gate 3's command named `--check`, which the instrument rejects -
+    the bare invocation IS check mode, so the gate as written could never have run (C14). Gate 2's
+    CORRECTION-BIND check had no form for a correction repairing an instrument OUTSIDE the numbered
+    list, so C13 itself graded UNBOUND; the fourth accepted form requires the explicit none AND the
+    repaired file's name, so the escape carries its own evidence (C15, self-test 6/6).
+    THE ADDITION-TRIPWIRE CLASS FIRED A THIRD TIME, from the contract's own wording: L23 said
+    section 8 `authorizes` a delta, the seed quotes obligation text into docstrings, and M3.1's
+    residue classifier scans `tests/` for `authoriz*` - gate 1 red on
+    `test_every_surviving_authorization_mention_is_classified`. Reworded to `permits`, which weakens
+    no predicate, rather than editing a standing gate. Gate 1 then GREEN twice: 1010 tests, 31
+    skipped, 498 s and 516 s.
+    PHASE 2 DISPATCHED, HARVESTED AND CREDENTIALED IN THE SAME SESSION. `test-m3u6a2-2` ran from a
+    worktree based at MAIN's own HEAD, not at `archive/m3u6a2-test`: the tag's base renders main's
+    later commits as DELETIONS, and basing at HEAD leaks nothing because no implementation existed
+    yet while `src/` was still byte-identical to `da70a56`. It delivered 59 tests over 31
+    obligations in 11 batches, gate 2 PASS (STUB 31 -> 0), zero `self.fail()` and zero `skipTest()`.
+    Harvest by file checkout, sha256-proven, tagged `archive/m3u6a2-test-2` before the branch went.
+    MAIN's own credentials, both runs its own: 48 red methods at HEAD (55 failure records, rc 1,
+    reproducing the author's figure exactly) and 50 red at `da70a56` in a detached worktree with the
+    import path proven - four of those ERROR on a missing `m3u6a2-tripwires.py`, because the pinned
+    baseline predates this unit's own instruments.
+    THE AUTHOR GRADED FOUR OBLIGATIONS `contract-defect` AND THREE ARE REAL (C16-C18). Section 7's
+    baseline-green list is per OBLIGATION where three members are MIXED, so a literal reading makes
+    post-state predicates green at baseline - the classification is now SUBPROPERTY-level. L23's
+    anti-weakening clause froze 14 pin bodies with section 8 enumerating NO permitted delta, which
+    made L23 and L19-L22 jointly unsatisfiable; three inversions are measured and permitted (B27,
+    D23's positive control re-based not deleted, D34), D22a stays unmeasured and unpermitted. L24's
+    grounds catalogue omitted NEGATIVE request-identity claims, so satisfying the census would have
+    deleted `four fields and no request identity` out from under a standing pin. L30's
+    `green-at-baseline` is not a defect: it is red at `da70a56` and green at HEAD because `7cfc748`
+    performed the repair inside this unit.
+    THE CODE HALF IS IMPLEMENTED AND GREEN, staged exactly as `m3u6a-burden.py` measured it: five
+    methods deleted (`handle` 271 lines, `_outcome` 116, `_fail_generation` 32, `request_status` 14,
+    `_request_revision_is_current` 12) with the routing section header, 67 methods -> 62; `__init__`
+    loses the lease parameter and `_lease_us`; `_now`'s bound becomes bare `_MAX_SQLITE_INTEGER`
+    with the `lease-safe` wording gone; `revise_operation` loses the `UPDATE requests` write and the
+    `invalidated_generators` key; the `.models` import goes 35 -> 28 names, each proven to hold
+    exactly ONE NAME token first. Battery 48 red methods -> 19, every one of L01-L18 and L31's
+    `src/` half GREEN.
+    IT LIVES ON `impl/m3u6a2`, NOT ON MAIN, BECAUSE D28 REPLAYS GATE 1 AT EVERY REVISION TOUCHING
+    `tests/` OR `examples/`. A red battery committed to main fails forever after this unit closes,
+    so the branch carries the red-to-green work and squashes into main as ONE green commit at
+    closure. `main` keeps the seed battery and stays green throughout.
+    `main=` 83% 226K/273K to the compaction hook + 75% 205K/273K after it; `mate=` 89% 243K/273K
+    (`test-m3u6a2-2`, which shipped its report under a flush directive at 236K and finished clean).
+    S5 OPENS ON THE PROSE REWRITE against the 19 surviving red methods: L19-L22 over the four owned
+    documents, L23's three permitted inversions plus any the rewrite measures, L24's grounded
+    census, then the tripwire repairs L25-L29 and L31's test inversion. Work on `impl/m3u6a2`,
+    rerun the battery to zero red, then the full numbered gate list, then squash to main.
     THE BURDEN HARNESS WAS DEFECTIVE AND IS REPAIRED AT `c3f6d83`, which M3.6a3's rerun inherits.
     `m3u6a-burden.py` sized each stage by grepping `Ran N` and `FAIL:`/`ERROR:` headers out of
     text, but D28, D15 and D16 replay whole suite runs as subprocess output, so nested summaries

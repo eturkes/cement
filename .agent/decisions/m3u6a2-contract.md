@@ -701,6 +701,13 @@ it, so the ruling took S4 whole and every later session shifts by one. The attac
 at S7 landed at S4 instead, which is where its blocking rows had to be answered before a diff-blind
 author could encode them. The budget of 9 absorbs the shift with no session left over.
 
+S4 then bought back the shift. A compaction gave it a second full window, so one session carried the
+96-row ruling, the phase-2 dispatch and harvest, both baseline credentials, and the whole code
+implementation — S5's cell as the table wrote it. The remaining work is the prose rewrite (L19-L24),
+the tripwire repairs (L25-L29) and L31's test-inversion half, which is S6 and S7 unchanged. Sessions
+are counted by what they buy, never by the number in the table, and the overrun still records
+against 9.
+
 ## 10. Interpretive grounds
 
 - SIZE BY NORMALISED FRAMES, NEVER BY BREAK COUNT. The count is not monotone under cumulative
