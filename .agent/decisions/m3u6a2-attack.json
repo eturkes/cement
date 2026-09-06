@@ -10,8 +10,8 @@
       "attack": "L01 has no structural subtraction pin. Renaming the entire 271-line method to `lifecycle_dispatch` satisfies both stated halves while preserving its body byte-for-AST-node; neither L01 nor its named predicate proves the lifecycle implementation was deleted. Pin the post-state `System` method-name set against the base set minus all five deleted methods, or compare surviving/deleted AST bodies explicitly.",
       "evidence": "Ran an in-memory mutation of the real `system.py`: exactly one `def handle` was renamed. AST evaluation returned `L01-source-half True`, `L01-attribute-half True`, `renamed-body-present True`, and `body-preserved True span 271`.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept",
+      "main_note": "L01 amended: post-state `System` method-name set == the `da70a56` set minus exactly the five deleted names. A text predicate grades spelling; the set subtraction grades subtraction. Same family as the project's token-absence rule."
     },
     {
       "id": "A02",
@@ -20,8 +20,8 @@
       "attack": "no defensible alternative: L04 binds both an exact inspected parameter vector and a live legacy-keyword rejection. A `**kwargs` tail necessarily adds a `VAR_KEYWORD` parameter and permits the named legacy call, so it violates both halves rather than slipping between them.",
       "evidence": "Ran a synthetic constructor with the four intended parameters plus `**kwargs`: `inspect.signature` returned a fifth `kwargs/VAR_KEYWORD`, `exact-names False`, `has-var-keyword True`, and `legacy-call-raises False`.",
       "severity": "cleared",
-      "disposition": null,
-      "main_note": null
+      "disposition": "cleared",
+      "main_note": "L04's two halves already reject a `**kwargs` tail; no amendment."
     },
     {
       "id": "A03",
@@ -30,8 +30,8 @@
       "attack": "L05 proves only deletion of one spelling. A tree that renames all five `_lease_us` references to `_clock_window_us` has zero forbidden occurrences while retaining the assignment, stored state, clock-bound subtraction and all three deadline additions. A structural delta or AST/data-flow predicate is required if L05 is meant to prove removal rather than vocabulary cleanup.",
       "evidence": "Applied the rename in memory to the real source. Baseline `_lease_us` count was 5; mutant count was 0; the mutant parsed and contained 5 `_clock_window_us` attribute nodes, preserving the complete reference topology.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept",
+      "main_note": "L05 amended with an AST SHAPE pin, which is what a rename cannot satisfy: `_now`'s comparator is exactly `now > _MAX_SQLITE_INTEGER` with no BinOp, and `__init__` binds no attribute derived from a lease parameter. Measured baseline: `now > _MAX_SQLITE_INTEGER - self._lease_us`."
     },
     {
       "id": "A04",
@@ -40,8 +40,8 @@
       "attack": "no defensible alternative: after excluding the five deleted methods, every `_now` result is persisted or rendered directly; no surviving consumer adds an interval or derives a deadline. The widened `_MAX_SQLITE_INTEGER` boundary therefore matches the surviving data flow.",
       "evidence": "AST traced 16 `self._now()` calls: 4 belong to deleted `handle`, `_fail_generation`, or `request_status`; the 12 surviving owners only pass the value as `now_us`, `promoted_at_us`, or `str(now)`. A source arithmetic scan found additions/subtractions only at deleted lines 1099, 1110, 1235, and 1463.",
       "severity": "cleared",
-      "disposition": null,
-      "main_note": null
+      "disposition": "cleared",
+      "main_note": "Audit confirms no surviving `_now` consumer derives a deadline; 2.1 stands."
     },
     {
       "id": "A05",
@@ -50,8 +50,8 @@
       "attack": "L07 omits a necessary fixture ruling. After the deletion no supported runtime path can create a `generating` row, so the probe must seed one through the store as legacy persisted state. That is legitimate because schema version 2 survives, but the contract neither labels the row as fabricated/legacy nor requires the test to prove its precondition before revision; a vacuous missing-row probe can therefore satisfy a careless implementation.",
       "evidence": "AST enumerated every `requests` write. The only generating producer is inside deleted `handle`; surviving `_persist_proposal` inserts `pending`, while `_write_proposal_request_status` transitions it to `resolved` or `rejected`. After removing L07's own cancellation update, supported generating inserts = 0.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept",
+      "main_note": "L07 amended: the `generating` row is FABRICATED legacy state, labelled as such, and the probe asserts it exists at `status='generating'` BEFORE `revise_operation`. A zero-row UPDATE raises nothing, so an unguarded preservation probe is green-and-empty."
     },
     {
       "id": "A06",
@@ -60,8 +60,8 @@
       "attack": "L08 specifies only the key set, so the sole new payload pin may accept `previous_revision=-999`, `policy_hash='wrong'`, and `revised_by='wrong'`. It must bind each value to the operation's pre-revision, canonical policy digest, and supplied actor, and it must read the persisted `events.payload_json`; `revise_operation` returns only the new revision and cannot evidence the payload.",
       "evidence": "Constructed an all-wrong mapping with the exact required keys: key-set equality returned True and wrong-value count returned 3. AST/source inspection found `_event` canonicalizes and inserts `payload_json`; searches found no pre-existing executable test of `previous_revision` or the `operation.revised` payload outside this seed.",
       "severity": "blocking",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept",
+      "main_note": "L08 amended to bind VALUES read from persisted `events.payload_json`: `previous_revision` == the pre-revision integer, `policy_hash` == the canonical policy digest, `revised_by` == the supplied actor. A key-set assertion passes with all three values wrong."
     },
     {
       "id": "A07",
@@ -70,8 +70,8 @@
       "attack": "L09's six raw occurrence counts are not a closure proof. `getattr(self, '_out' + 'come')()` contains none of the forbidden tokens yet dynamically targets the deleted helper and becomes a dangling call. Gate 4 must reject computed-string dispatch, registries, aliases, and unsupported call shapes, or explicitly constrain the package to direct attribute/name references and prove that constraint.",
       "evidence": "Parsed a concrete survivor containing `getattr(self, '_out' + 'come')()`: all six L09 occurrence counts were 0, while AST reconstruction returned computed target `_outcome` and `would-dangle True`. The promised `m3u6a2-closure.py` is absent at this base, so no stronger detector currently closes the gap.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept-in-part",
+      "main_note": "The general dynamic-reach problem is undecidable; the bounded pin is exact and MAIN measured it: `src/` contains ZERO getattr/setattr/hasattr/delattr calls whose name argument is not a string Constant. Gate 4 pins that count at 0, which rejects `getattr(self, '_out' + 'come')` by construction. L09 amended."
     },
     {
       "id": "A08",
@@ -80,8 +80,8 @@
       "attack": "The parsed `system.py` import delta can and should catch both additions and removals, so that half survives. The contract does not protect package-root bindings: L12 freezes only `__all__`, allowing `from .models import Resolved as _Resolved` while `__all__` still advertises `Resolved`. Freeze the relevant `ImportFrom` aliases or assert each exported name resolves to the baseline model object.",
       "evidence": "Mutated real `__init__.py` in memory by aliasing `Resolved` to `_Resolved`. The `__all__` AST remained byte-for-AST equal and `system.py` stayed untouched, but the imported binding set changed from `Resolved=True` to `Resolved=False`. Thus L10 plus L12's stated `__all__` comparison both miss it.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept",
+      "main_note": "L12 amended: each package export resolves in `cement_runtime` to the SAME object as in `cement_runtime.models` (identity, not `__all__` text), which an aliasing re-export breaks. See also X06/X34 — the export count is SIX, not seven."
     },
     {
       "id": "A09",
@@ -90,8 +90,8 @@
       "attack": "L11 requires support for today's three AST value forms but never requires total accounting of every `_event` call. A fourth form such as `kind=event_kind` can be silently skipped while the recognized set still equals the expected sixteen and a new runtime kind ships. Require an exact call-site census and fail closed on every unsupported `kind` AST node before comparing the expanded set.",
       "evidence": "Ran a three-form extractor over real `system.py`, then appended an in-memory `_event(..., kind=event_kind)` emitting `artifact.invented`. Calls rose 19->20, unsupported nodes 0->1, but the recognized 19-kind baseline set was unchanged; an ignore-unknown implementation would pass its set comparison.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept",
+      "main_note": "L11 amended to TOTAL accounting: every `_event` call's `kind` must be one of the three ruled AST forms and must expand non-empty; an unsupported form FAILS rather than being skipped. Set equality alone stays green while a fourth form ships a new kind."
     },
     {
       "id": "A10",
@@ -100,8 +100,8 @@
       "attack": "The contract now calls ambiguity quarantine a removed behaviour, yet L11 pins only disappearance of its event-kind spelling. It never asserts that duplicate promoted artifacts are no longer suspended with reason `ambiguous active scope`. A renamed/private lifecycle path could retain the storage mutation and emit an allowed kind while satisfying the vocabulary set. Add a semantic non-mutation probe or narrow the claim to event-producer removal.",
       "evidence": "Source has one `artifact.ambiguity_quarantined` emission and one adjacent suspension mutation/reason. Parsing all obligation blocks found `ambigu*` only in L11, whose predicate is the kind set; no obligation names the artifact-state mutation. Section 2.1 nevertheless labels the clock widening `The one behaviour change`.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept",
+      "main_note": "New obligation L31. C05 made ambiguity quarantine a REMOVED BEHAVIOUR and section 2.1 gave the clock widening its own obligation; the behaviour removal must have one too, or the only pin is a vocabulary spelling. L31 pins the artifact-state non-mutation."
     },
     {
       "id": "A11",
@@ -110,8 +110,8 @@
       "attack": "no defensible alternative: L12 is explicitly a unit-boundary pin, not a claim that unproduced models are desirable runtime behavior. It protects M3.6a3's measured starting population and prevents this unit from silently absorbing the next deletion. The contract states that purpose and gives deletion here a concrete cost.",
       "evidence": "Read L12 and section 4 together: both require the model layer to survive until M3.6a3, while L12 freezes `models.py` to blob `da70a56` and only the `__all__` vector in `__init__.py`. The preservation predicate is mechanically separable from any claim of active producers.",
       "severity": "cleared",
-      "disposition": null,
-      "main_note": null
+      "disposition": "cleared",
+      "main_note": "L12 is a unit-boundary pin protecting M3.6a3's measured start; grounds stated."
     },
     {
       "id": "A12",
@@ -120,8 +120,8 @@
       "attack": "L13 does not define `owner`. A scanner that walks each expected function recursively attributes a `requests` site inside a newly nested helper to the expected outer function and preserves both the count and owner-name vector. Bind ownership to the nearest lexical `FunctionDef`/`AsyncFunctionDef`, reject nested helper boundaries, and compare the exact multiset `{owner: count}`.",
       "evidence": "Parsed a counterexample with `_proposal_bindings` containing nested helper `moved`, which owns one `SELECT ... requests`. An outer-function `ast.walk` reported owner `_proposal_bindings`; a parent-chain nearest-owner calculation reported `moved`; the two differed while the site count remained one.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept",
+      "main_note": "L13 amended: ownership binds to the NEAREST lexical FunctionDef and the pin compares the exact multiset {owner: count} plus owner KIND. Carries V17's repair of C04's own error."
     },
     {
       "id": "A13",
@@ -130,8 +130,8 @@
       "attack": "L15's `lineno..end_lineno` slice excludes decorators because `FunctionDef.lineno` points at `def`. Adding `@staticmethod`, `@classmethod`, or a behavior-changing custom decorator leaves every compared method byte identical while changing runtime binding. The pin must include `min(decorator.lineno, function.lineno)..end_lineno` and assert the baseline decorator vector.",
       "evidence": "Inserted `@staticmethod` immediately above real `System.resolve` in memory. Its extracted whole-line span remained equal at 1,683 B, while decorators changed `[] -> ['staticmethod']` and the `def` line shifted 3802->3803. The altered descriptor would no longer bind `self` on instance calls.",
       "severity": "blocking",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept",
+      "main_note": "L15 amended: the span is `min(decorator lineno, def lineno)..end_lineno` and the baseline decorator vector (empty for all five) is asserted. `FunctionDef.lineno` points at `def`, so `@staticmethod` changes runtime binding while every compared byte is identical."
     },
     {
       "id": "A14",
@@ -140,8 +140,8 @@
       "attack": "L16 exercises only `_write_proposal_request_status(..., status='resolved')`. The helper's `status='rejected'` branch can be deleted or write the wrong row while the accept round trip remains green, so the sentence `this is the probe that proves it` is false. Add a reject round trip with private-row assertions or narrow the claim to the resolved branch.",
       "evidence": "AST found helper call sites in `review` at lines 1732 (`rejected`) and 1868 (`resolved`); the helper has a dedicated rejection branch beginning at line 640. L16 mandates `review-accept`, so its only reachable status is `resolved` and the rejection SQL is unobserved by that predicate.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept",
+      "main_note": "L16 amended with the reject round trip. `_write_proposal_request_status` has a dedicated rejection branch that the accept-only probe never executes, so the contract's sentence `this is the probe that proves it` was false for half the helper."
     },
     {
       "id": "A15",
@@ -150,8 +150,8 @@
       "attack": "L18 is contradictory if `caller` means the containing function: surviving `revise_operation` calls `_now` and must change under L07-L08. If `caller` means only the call expression, the contract overstates the protected surface and gives no extraction/base convention. Replace this with an exact set of surviving call sites whose call AST is unchanged against `da70a56`, excluding the intentionally edited containing body.",
       "evidence": "Applied the contract's stage-3 edits in memory. `revise_operation` survived with its `_now` call, but its AST source fell from 3,035 B/75 lines to 2,478 B/64 lines and equality was False. Thus full-caller identity cannot coexist with the required cancellation/payload deletion.",
       "severity": "blocking",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept",
+      "main_note": "L18 was self-contradictory: `revise_operation` is both a surviving `_now` caller and an L07 edit target. Replaced by an exact CALL-SITE predicate — 12 surviving caller methods, each with exactly one `self._now()` call. MAIN measured 15 callers at base, minus `handle`, `_fail_generation`, `request_status`."
     },
     {
       "id": "A16",
@@ -160,8 +160,8 @@
       "attack": "L19-L21 have mechanical halves: exact deleted-name absence, known heading/table removal, required surviving API tokens, and a closed vocabulary scan. Their semantic halves require a recorded ruling: the README proposal-route description, architecture steps 1-3, and whether paraphrases describe a deleted surface. L22's replacement claims are wholly semantic. Gate 1 can pin selected wording, but it cannot certify that replacement prose describes surviving behavior.",
       "evidence": "Ran the committed census vocabulary against two false rewrites. `Steps 1-3: Never call propose or review; use the legacy lifecycle dispatcher...` contained both required API names yet produced `vocab-hit False`; `Use the proposal identifier as an idempotency key...` also produced no hit. Mechanical token predicates accept semantically false prose.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept-in-part",
+      "main_note": "L19-L22 gain an explicit MECHANICAL/RULED split: the mechanical half is asserted by the battery, the semantic half is MAIN's recorded ruling at closure. A token predicate accepts `Never call propose or review; use the legacy lifecycle dispatcher`, so claiming a test decides replacement prose would be a guarantee-vs-claim gap."
     },
     {
       "id": "A17",
@@ -170,8 +170,8 @@
       "attack": "Nothing mechanical prevents weakening any of the fourteen working-tree prose pins. `_pins()` records only that a test function's source names a document and vocabulary; it does not freeze assertions or prove the document read is reachable. A test can become tautological, remain in the sixteen-row census, and keep gate 1 green. Freeze each pin body except contract-authorized deltas, or execute pre/post mutants proving each repaired pin still rejects its forbidden prose.",
       "evidence": "Constructed a test with an unreachable `ROOT / 'README.md'` read and tautology `assertIn('handle','handle')`. The real scanner reported `reads-doc True`, `vocab True`, `scope WORKING-TREE`, and `scanner-would-include True`; the function compiles and its only assertion passes without reading prose.",
       "severity": "blocking",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept",
+      "main_note": "L23 amended: each of the 14 working-tree pins keeps its assertion body byte-identical to its `da70a56` blob unless section 8 authorizes the delta, and every authorized delta is enumerated. Otherwise 'all pins green' is satisfiable by weakening the pins."
     },
     {
       "id": "A18",
@@ -180,8 +180,8 @@
       "attack": "L24 is unsatisfiable under its literal census reading. Standing D25 requires at least two shipped paragraphs containing `request row stays internal`, while gate 3's vocabulary matches `request`/`requests`; those legitimate schema-v2 claims must survive this unit. L24 must bind only unambiguous deleted tokens (`handle`, `request_status`, `retry_failed`, `invalidated_generators`, `resolved_by_artifact`, lease/status vocabulary, and ambiguity claims) or classify each generic request hit by meaning.",
       "evidence": "Ran `SubmissionBatteryTests.test_d25_shipped_prose_says_schema_v2_retains`: PASS. Its predicate requires >=2 paragraphs with exact phrase `request row stays internal`; measurement found 2 in README/architecture, and the committed `\\brequests?\\b` regex matched both. Therefore generic-request owned hits cannot reach zero while D25 stays green.",
       "severity": "blocking",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept",
+      "main_note": "L24 was UNSATISFIABLE under its literal reading and MAIN reproduced the collision: D25 requires >=2 shipped paragraphs containing `request row stays internal` and measurement finds exactly 2 (README + architecture), both matched by the census `\\brequests?\\b`. L24 now binds a NAMED token subset and requires grounds per surviving generic hit."
     },
     {
       "id": "A19",
@@ -190,8 +190,8 @@
       "attack": "L26 requires the figures to be recorded, not recomputed. After all four P06 tests retire, a copied typo in the three size/hash pairs can satisfy a text-presence assertion while disagreeing with history. L15 protects surviving methods only. Make L26 derive all three historical spans from the pinned git blob and compare them to the retirement record, or concede that the figures are human-checkable but gate-unchecked.",
       "evidence": "Searched the current gate-2 validator, census instrument, and seeded L26 test: the three hashes occur in the L26 docstring but no validator recomputes them. Their live recomputations currently reside in the four P06 frames that L26 explicitly retires, so the only executable recheckers are removed by the obligation itself.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept",
+      "main_note": "L26 amended: the three figures are DERIVED from git object `3b7769b` every run, not recorded as prose. A retirement that turns a computation into a transcribed literal leaves the claim gate-unchecked, and the only recomputers are the frames being retired."
     },
     {
       "id": "A20",
@@ -200,8 +200,8 @@
       "attack": "no defensible alternative: two of D01's four assertions overlap L01-L02 after inversion, but D01 also pins the exact surviving CLI leaf set and disjoint removed-leaf set. Retaining and reversing the standing M3.5b obligation preserves its lineage and adds independently implemented redundancy; deleting it would discard two non-overlapping CLI subproperties.",
       "evidence": "AST counted four assertions in current D01: two `System.handle`/`request_status` callability checks and two CLI-shape checks (`leaves == SURVIVING_LEAVES`, `REMOVED_LEAVES.isdisjoint(leaves)`). Only the first pair becomes duplicate after inversion.",
       "severity": "cleared",
-      "disposition": null,
-      "main_note": null
+      "disposition": "cleared",
+      "main_note": "Inverted D01 keeps two non-overlapping CLI subproperties; retention justified."
     },
     {
       "id": "A21",
@@ -210,8 +210,8 @@
       "attack": "L29 needs an immutable synthetic P06 fixture, because L26 removes every live positive from the post-state. The control must feed each previously missed source shape into the detector and require inclusion, plus one near-miss exclusion. Mutating only an emitted table cannot prove source recognition; after retirement both a working detector and one returning no P06 rows produce the same live result.",
       "evidence": "Ran current `--self-test`: `CONTROLS: 7/7 firing`, exit 0. The committed live freeze list contained D15a/D15b/D22b/D22c and `p06-live-overlap 0`; none of seven controls passes P06 source through `_freezes()`. Thus today's credential already passes while the named family is invisible.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept",
+      "main_note": "L29 amended (merges X14): the control needs an IMMUTABLE synthetic P06 source fixture as the positive plus a same-origin preserved-method near-miss as the negative, because L26 empties the live positive set in the same unit. A detector returning no P06 rows and a working one are otherwise indistinguishable post-retirement."
     },
     {
       "id": "A22",
@@ -220,8 +220,8 @@
       "attack": "Gate 3 has no independent post-state oracle. `--check` compares live output to JSON generated by the same `emit()` function; validation enforces drift, ownership text, and nonzero populations, not the required rewritten content. Re-emitting after a bad rewrite blesses it. Pin immutable expected loci/count policy in the contract or make `--emit` a separate audited patch whose allowed delta is checked.",
       "evidence": "Ran gate 3 unchanged on the pre-deletion baseline whose four owned documents still contain all 49/50 deleted-surface work-list lines: it exited 0 and printed `PINS: 16`, `FREEZES: 4`, `PROSE-HIT-LINES: 50`, `RESULT: PASS`. The same script exposes `--emit` to overwrite its expectation.",
       "severity": "blocking",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept-in-part",
+      "main_note": "Gate 3's COMMAND is unchanged — amending it would invalidate section 6's pins. The independent oracle moves into the CONTRACT instead: L24 states the owned-hit expectation in prose MAIN authored, so `--emit` can no longer bless a bad post-state without contradicting a number the contract carries. `--emit` is additionally forbidden after S3's re-emission except through a numbered correction (C07). Y05 and Y06 harden the validator's own totals and provenance."
     },
     {
       "id": "A23",
@@ -230,8 +230,8 @@
       "attack": "G8 names no fixed subproperty catalogue, so exclusions can hide omissions. Actual history-only subjects include L23's D22b range pin, L25's six per-module comparisons after D15a becomes closed-range, L26's three historical span figures, and L30's closed expected-path set plus every per-path blob comparison. These cannot die from a production/prose working-tree reversion; enumerate each grounded exclusion while giving the mutable repair text/endpoints separate live rows. D22c is MIXED, not an exclusion, despite the census label.",
       "evidence": "Endpoint audit found only D22b truly git-only among L23's pins; D22c reads live README plus a git blob. Read repaired D16: expected paths and each shipped byte comparison use `6fb4d92..dc4ab5e`. Current D15a has six individual live module comparisons that L25 closes to history, and L26 names three historical slice figures.",
       "severity": "blocking",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept",
+      "main_note": "Section 7 gains the fixed grounded-exclusion catalogue: L23's D22b (git-only), L25's post-repair D15a, L26's three historical figures, and BOTH halves of L30's D16. D22c is MIXED and gets live rows despite the census label. Every exclusion prints on the control line; cost never grounds one, insensitivity does."
     },
     {
       "id": "A24",
@@ -240,8 +240,8 @@
       "attack": "C06 did not add a ninth command, but it changed gate 3's acceptance predicate after S2 was marked DONE. Gate identity cannot be only a pathname: adding vocabulary, excluding a file class, adding a failure mode, and changing expected rows materially widens/narrows what passes. Treat a semantic instrument change as a gate correction that invalidates prior gate pins and requires the full numbered list to rerun.",
       "evidence": "Diffed S2-DONE `0e18fde` to S3 correction `190b6b5`: tripwire code gained 37 lines, expectation changed +34/-8, `ambigu` entered VOCAB, the battery became excluded, and `SELF-REFERENCE` became a new failure/control. The command string stayed identical while its accepted language changed.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept-in-part",
+      "main_note": "RULED FIRST because it decides whether gate 3's expectation stands. NOT an added gate: section 6's pin is the numbered LIST and C06 added no entry, so no closure claim is unbuilt — and none existed, since S2 claimed gate 1 alone while gate 3 was in fact RED. The substance holds: a gate's identity is (command, accepted language), so C07 records that an INSTRUMENT change voids prior runs of THAT gate and requires the full numbered list to rerun at the next closure claim. Gate 3's post-C06 expectation stands."
     },
     {
       "id": "Y01",
@@ -250,8 +250,8 @@
       "attack": "L11's derivation still carries a wrong structural count. The base has 19 static `_event` calls, not 20; deleting four calls in `handle` and one in `_fail_generation` leaves 14 post-state calls. A battery that treats the stated 20 as a completeness control rejects the real base and correct deletion, while omitting a call-count control leaves A09's unsupported-form gap open.",
       "evidence": "AST-counted source byte-identical to `da70a56`: 19 `_event` calls = 16 Constant, 2 IfExp, 1 JoinedStr. Expanding branches/f-string gives 22 semantic kind sites and 19 unique baseline kinds. Five static calls lie in deleted methods, so the correct post-state static count is 14.",
       "severity": "blocking",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept",
+      "main_note": "MAIN re-measured: 19 static `_event` calls (16 Constant, 2 IfExp, 1 JoinedStr); the textual `_event(` count is 20 because the DEFINITION line matches. Post-state static count is 14. C05 was a correction written to fix structural counts and carried one — corrected by C08. The 16-kind SET is unaffected: it was derived per call site."
     },
     {
       "id": "Y02",
@@ -260,8 +260,8 @@
       "attack": "Gate 2 proves only removal of the literal `SEED STUB`. Replacing every body with `pass`, or keeping every `self.skipTest` while changing its message, yields full coverage with zero executable predicates. Gate 1 also remains green. Require discovered test identities, zero skip decorators/calls, and at least one non-tautological assertion or expected exception per obligation; mutation liveness later cannot rescue a closure claim already made at gate 2.",
       "evidence": "Ran `report()` on two in-memory 30-test batteries. Thirty `pass` bodies produced `UNCOVERED: 0`, `STUB: 0`, failures=0. Thirty alternate-message `self.skipTest` bodies produced the same PASS. The validator's own clean-side self-test deliberately replaces every stub with `pass`.",
       "severity": "blocking",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept",
+      "main_note": "Gate 2's instrument is repaired (command unchanged): coverage binds to test ids DISCOVERED by `unittest.defaultTestLoader`, skip decorators/calls must be zero at closure, and each obligation needs >=1 non-tautological assertion or expected exception. The literal `SEED STUB` predicate graded 30 `pass` bodies clean."
     },
     {
       "id": "Y03",
@@ -270,8 +270,8 @@
       "attack": "`battery_tests()` walks all function definitions without requiring a `unittest.TestCase` method or module-level discoverable test. An obligation can be removed from the suite and replaced by a nested `test_lNN_*` ghost; gate 2 reports coverage while gate 1 runs one fewer test. Bind coverage to the exact discovered test IDs from `unittest.defaultTestLoader`, then map those callable methods back to AST bodies.",
       "evidence": "Renamed the real L01 method and inserted nested `test_l01_ghost` in memory. Gate 2 reported L01 covered, `UNCOVERED: 0`, failures=0; `unittest.defaultTestLoader.loadTestsFromModule` discovered only 29 cases. Validator evidence named the undiscoverable nested function as L01's sole row.",
       "severity": "blocking",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept",
+      "main_note": "Same repair as Y02: a nested `test_l01_ghost` unittest never discovers cannot count as coverage. Bind coverage to discovered ids, then map back to AST bodies."
     },
     {
       "id": "Y04",
@@ -280,8 +280,8 @@
       "attack": "`CORRECTION-BIND` does not require the correction's declared subject to resolve. Any incidental `L99` mention bypasses the unbound check because `CITES` matches syntax alone. Require `binds LNN`/`binds GATE N`/`binds SECTION N` grammar and validate the target against the contract's actual obligation, gate, or section set.",
       "evidence": "Inserted synthetic `C99 — this note merely mentions illustrative L99` into the real contract and graded a filled battery. The parser captured C99, yet printed `CORRECTION-BIND: 0 unbound` and returned failures=0 although L99 does not exist and no binding verb appears.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept",
+      "main_note": "`CORRECTION-BIND` requires explicit `binds L<nn>` / `binds GATE <n>` / `binds SECTION <n>` grammar validated against the contract's real id sets. M3.6a1 already paid for the opposite failure — illustrative ids parsed as bindings."
     },
     {
       "id": "Y05",
@@ -290,8 +290,8 @@
       "attack": "Gate 3 compares `pins`, `freezes`, and `prose` rows but never validates the `totals` object. The headline counts supporting C06 and closure can be arbitrary nonzero values while `RESULT: PASS`. Compare the complete emitted document or independently derive every total from the validated row arrays before printing and returning success.",
       "evidence": "Held all live rows fixed, replaced totals with pins=999, pins_working_tree=1, prose_hit_lines=999, prose_documents_owned=999, and ran the real validator against a stubbed identical live emission. It printed all four false totals plus `RESULT: PASS`; return code was 0.",
       "severity": "blocking",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept",
+      "main_note": "Gate 3's validator derives every `totals` field from the validated row arrays instead of printing the committed numbers. Four false totals printed beside `RESULT: PASS`."
     },
     {
       "id": "Y06",
@@ -300,8 +300,22 @@
       "attack": "Gate 3 does not authenticate its provenance metadata. A table can claim the wrong unit and git head, omit the self-exclusion disclosure, and redefine the count convention while grading PASS. Validate all top-level fields against fresh emission; otherwise the printed credential is not bound to the unit, state, or declared measurement semantics.",
       "evidence": "Mutated the real table in memory to `unit=WRONG`, head=40 zeroes, excluded=[], and `convention=counts bananas`, while retaining rows and totals. The real validator printed `EXCLUDED: none`, `RESULT: PASS`, and returned 0.",
       "severity": "material",
-      "disposition": null,
-      "main_note": null
+      "disposition": "accept",
+      "main_note": "Gate 3's validator authenticates `unit`, `head`, `excluded` and the counting convention against fresh emission. A credential not bound to unit and state is not a credential."
     }
-  ]
+  ],
+  "ruling": {
+    "session": "S4",
+    "rows": 30,
+    "by_disposition": {
+      "accept": 22,
+      "accept-in-part": 4,
+      "cleared": 4
+    },
+    "by_severity": {
+      "blocking": 11,
+      "cleared": 4,
+      "material": 15
+    }
+  }
 }

@@ -12,8 +12,8 @@
       "baseline": "At 190b6b5: hasattr=True, dir=True, getmembers=True, getattr returns System.handle; System and metaclass define no __getattr__; AST defs=[('FunctionDef',1059)] and raw 'def handle' count=1.",
       "expected": "The probe prints hasattr=False, dir=False, getmembers=False, class_getattr=False, metaclass_getattr=False, defs=[]; getattr prints exactly AttributeError with no returned object.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "Strongest public-surface reading adopted; L01 also gains A01's set subtraction."
     },
     {
       "id": "V02",
@@ -24,8 +24,8 @@
       "baseline": "At 190b6b5 all three attrs are True; each has one FunctionDef at lines 1364, 1331 and 1482 respectively; AST Name/Attribute binding counts are 6, 3 and 3.",
       "expected": "The contractual L03 observable is attrs={'_outcome': False, '_fail_generation': False, '_request_revision_is_current': False}; under the stronger alternative defs={} and all three binding counts=0 as well.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept-amend",
+      "action": "L03 binds ATTRIBUTES and DEFINITIONS: zero FunctionDef named any of the three at any scope. Binding counts follow from L09."
     },
     {
       "id": "V03",
@@ -36,8 +36,8 @@
       "baseline": "At 190b6b5 the call prints exactly ACCEPTED because generation_lease_seconds is a keyword-only parameter with default 120.",
       "expected": "The probe prints TypeError; on CPython 3.13 it also prints exactly \"System.__init__() got an unexpected keyword argument 'generation_lease_seconds'\".",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "L04 binds the class only. CPython's message is recorded diagnostically, never pinned — a paraphrased interpreter string is the project's recorded defect shape."
     },
     {
       "id": "V04",
@@ -48,8 +48,8 @@
       "baseline": "At 190b6b5 the tuples are self/POSITIONAL_OR_KEYWORD/REQUIRED, database/POSITIONAL_OR_KEYWORD/REQUIRED, candidate_source/KEYWORD_ONLY/None, clock_us/KEYWORD_ONLY/None, generation_lease_seconds/KEYWORD_ONLY/120.",
       "expected": "The probe prints exactly four rows: self POSITIONAL_OR_KEYWORD REQUIRED; database POSITIONAL_OR_KEYWORD REQUIRED; candidate_source KEYWORD_ONLY None; clock_us KEYWORD_ONLY None.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ratified-nondivergent",
+      "action": "Reading matches the contract; row becomes conformance corpus for the phase-2 suite."
     },
     {
       "id": "V05",
@@ -60,8 +60,8 @@
       "baseline": "At 190b6b5 raw tracked-byte count=5, all in src/cement_runtime/system.py at lines 702, 709, 1099, 1110 and 1235; no other tracked src file contains the substring.",
       "expected": "The probe prints exactly 0 [] for the raw `_lease_us` byte substring across the tracked src/ file set.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "Raw bytes over git-tracked `src/`; git-tracked scope excludes `__pycache__`."
     },
     {
       "id": "V06",
@@ -72,8 +72,8 @@
       "baseline": "At 190b6b5 register_operation raises StateError with message 'clock must return a lease-safe signed 64-bit microsecond timestamp'; no operations row is written.",
       "expected": "The probe prints exactly `1 (1, 9223372036854775807, 9223372036854775807)`, proving revision 1 and both stored timestamps equal `_MAX_SQLITE_INTEGER`.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ratified-nondivergent",
+      "action": "Reading matches the contract; row becomes conformance corpus for the phase-2 suite."
     },
     {
       "id": "V07",
@@ -84,8 +84,8 @@
       "baseline": "At 190b6b5 the probe prints StateError 'clock must return a lease-safe signed 64-bit microsecond timestamp'.",
       "expected": "The probe prints StateError and its quoted message contains zero `lease-safe` substrings; the likely exact post-edit text is 'clock must return a signed 64-bit microsecond timestamp'.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept-amend",
+      "action": "L06 additionally pins the POSITIVE replacement text `clock must return a signed 64-bit microsecond timestamp`. MAIN authors it, so it is not a diff-blind paraphrase, and a forbidden-substring predicate alone cannot see a silent re-wording."
     },
     {
       "id": "V08",
@@ -96,8 +96,8 @@
       "baseline": "At 190b6b5 old-edge=9223372036734775807 prints ACCEPTED 1 with that stored timestamp; widened=9223372036734775808 prints StateError with the lease-safe message.",
       "expected": "Both rows print ACCEPTED 1; stored timestamps are exactly 9223372036734775807 and 9223372036734775808 respectively.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ratified-nondivergent",
+      "action": "Reading matches the contract; row becomes conformance corpus for the phase-2 suite."
     },
     {
       "id": "V09",
@@ -108,8 +108,8 @@
       "baseline": "At 190b6b5 the directly seeded tuple ('generating', None, 'owner-a', 999) becomes exactly ('failed', 'operation_revised', None, None) after revise_operation.",
       "expected": "After revise_operation the probe prints exactly ('generating', None, 'owner-a', 999), proving all four selected fields remain unchanged.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "Fabricated legacy row through `Store.transaction`, labelled, with A05's precondition control."
     },
     {
       "id": "V10",
@@ -120,8 +120,8 @@
       "baseline": "At 190b6b5 the normalized static-SQL scan prints 1 ['UPDATE requests']; the statement is one multiline constant in revise_operation.",
       "expected": "The probe prints exactly 0 [], rejecting UPDATE/update with any whitespace, multiline split, `requests`, \"requests\", [requests], main.requests or temp.requests spellings.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "Semantic multi-spelling static-SQL scan; runtime-composed SQL stays a stated blind spot closed by X19's authorizer observation."
     },
     {
       "id": "V11",
@@ -132,8 +132,8 @@
       "baseline": "At 190b6b5 revision=2 and kind='operation.revised'; payload keys are invalidated_generators, policy_hash, previous_revision, revised_by. Values are 0, 'a56c9d4e7ea190b27140155e42d500adc1f320e79852201ae91bb313ff898965', 1 and 'alice' with int/str/int/str types.",
       "expected": "The probe prints revision 2, kind 'operation.revised', and exactly keys ['policy_hash','previous_revision','revised_by']; payload values are policy_hash='a56c9d4e7ea190b27140155e42d500adc1f320e79852201ae91bb313ff898965', previous_revision=1, revised_by='alice' with types str,int,str.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ratified-nondivergent",
+      "action": "Reading matches the contract; row becomes conformance corpus for the phase-2 suite."
     },
     {
       "id": "V12",
@@ -144,8 +144,8 @@
       "baseline": "At 190b6b5 the word-occurrence count is 1 with locus [('src/cement_runtime/system.py',1059)]; the sole src occurrence is the method definition, so line and occurrence counts happen to agree.",
       "expected": "The probe prints exactly 0 [], meaning zero standalone `handle` word occurrences on zero lines across tracked textual src/ files.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "Word occurrences over tracked textual `src/`; `handler`/`unhandled` excluded. MAIN measured baseline 1."
     },
     {
       "id": "V13",
@@ -156,8 +156,8 @@
       "baseline": "At 190b6b5 base and current parsed lists are the same 35 ordered pairs, including all seven forbidden pairs with asname=None; current==expected is False and expected length is 28.",
       "expected": "The probe prints base count 35, current count 28, current==expected True; the ordered current list is exactly the da70a56 list minus FallbackFailed, InProgress, Outcome, ReconciliationRequired, Rejected, Resolved and ReviewRequired.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ratified-nondivergent",
+      "action": "Reading matches the contract; row becomes conformance corpus for the phase-2 suite."
     },
     {
       "id": "V14",
@@ -168,8 +168,8 @@
       "baseline": "At 190b6b5 the AST prints 19 calls: 16 Constant, 2 IfExp and 1 JoinedStr. Expansion yields 19 kinds: the required 16 plus artifact.ambiguity_quarantined, request.fallback_failed and request.resolved_by_artifact. The contract's stated 20 calls counts the `_event` definition or is otherwise off by one.",
       "expected": "The probe prints exactly 16 calls/forms-total and the exact 16-kind sorted set named by L11; no member starts with `request.`. If call sites need not be one-per-kind, only `len(kinds)=16` and the exact set bind, while the measured call count must be reported separately.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept-amend",
+      "action": "The 16-kind SET stands. The CALL count is 19 at base and 14 post-state, reported separately and never as a completeness control at 20 (Y01/C08)."
     },
     {
       "id": "V15",
@@ -180,8 +180,8 @@
       "baseline": "At 190b6b5 the targeted test runs 1 with 0 failures and 0 errors; test_system.py contains one event-kind literal and two `ambiguity_events` occurrences. The tail calls handle, expects both artifacts suspended, and expects event count 1.",
       "expected": "The targeted test reports 1 run, 0 failures, 0 errors; its post-challenge query asserts artifact statuses exactly {'promoted'}, non-null promotion receipts, and ambiguity event count exactly 0. The four owned prose documents contain zero promises of ambiguity quarantine.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "Invert the `test_system.py` tail: both artifacts stay `promoted`, ambiguity event count 0. Feeds new L31."
     },
     {
       "id": "V16",
@@ -192,8 +192,8 @@
       "baseline": "At 190b6b5 models.py equals da70a56 byte-for-byte at SHA-256 6dd45cfb6b078636dcdd8ae2d89b35603b727f53cc8ca32a3574647db0838289; parsed __all__ equals the base ordered list of 57 names. Entire __init__.py also happens to match at SHA-256 dccd5a5a56418fa926fe57856771fedbe5b658013720328f3aa1062fca0bf6ca.",
       "expected": "The probe prints exactly True, models SHA-256 6dd45cfb6b078636dcdd8ae2d89b35603b727f53cc8ca32a3574647db0838289, True, and export count 57.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "Base object `da70a56`; `__all__` compared as the parsed ordered list. Note `Outcome` is absent from it (X06)."
     },
     {
       "id": "V17",
@@ -204,8 +204,8 @@
       "baseline": "At 190b6b5 there are 20 lines. The seven future survivors are 534/547/574/591 in _proposal_bindings (<module>), 643/653 in _write_proposal_request_status (<module>), and 893 in _persist_proposal (System). The other 13 belong to revise_operation, handle, _fail_generation and request_status.",
       "expected": "The probe prints exactly 7 rows with owner counts {'_proposal_bindings':4,'_write_proposal_request_status':2,'_persist_proposal':1} and owner kinds {'_proposal_bindings':'<module>','_write_proposal_request_status':'<module>','_persist_proposal':'System'}; a System-class-only scan returns exactly 1 site.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "CORRECTS C04's own text. Measured: `_proposal_bindings` and `_write_proposal_request_status` are module-level, `_persist_proposal` is a `System` method. A class-body-only scan sees ONE surviving site, not zero."
     },
     {
       "id": "V18",
@@ -216,8 +216,8 @@
       "baseline": "At 190b6b5 AST SCHEMA_VERSION=2, imported store.SCHEMA_VERSION=2, and store.py is byte-identical to da70a56: 27,951 bytes, SHA-256 2b2650144d4b384af4d8bfe67e1f9de0e186b609f3bb2632e2f81b53536770f7.",
       "expected": "The probe prints exactly `2 2 True 27951 2b2650144d4b384af4d8bfe67e1f9de0e186b609f3bb2632e2f81b53536770f7`.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ratified-nondivergent",
+      "action": "Reading matches the contract; row becomes conformance corpus for the phase-2 suite."
     },
     {
       "id": "V19",
@@ -228,8 +228,8 @@
       "baseline": "At 190b6b5 all five spans equal da70a56. Byte lengths/SHA-256 are propose 3110/009b5638840082533aca264fae58da84a6d3f35abaa9b32311ee5c1312fda902; submit_proposal 1866/1bb7c728335b8ced4cafd0fd2d5d07abbc90a2e963d61dd7e7ccb153a0871dc9; get_proposal 1421/f1518b2f5dd2203a67a5cd5ff09a696c262e5695c56c3254dae3acb2b174b5a0; review 9591/bf12f645aa7f13fdbdc118ca1e424c54eb285de5c3fccc443a232e7e63b2d90a; resolve 1683/981fcf42de09ff22e0299536198f6bae0afbda52be2b06a4731eb2d711c8721b.",
       "expected": "The probe prints current==base True and exactly the same five (byte length, SHA-256) pairs, regardless of their post-deletion line numbers.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ratified-nondivergent",
+      "action": "Reading matches the contract; row becomes conformance corpus for the phase-2 suite."
     },
     {
       "id": "V20",
@@ -240,8 +240,8 @@
       "baseline": "At 190b6b5 the normalized probe prints resolved, '{\"echo\":{\"x\":1}}', True, True, 35. One measured generated id was ex_9433610e94c8453ea4877850b4f9daec.",
       "expected": "The probe prints exactly `resolved {\"echo\":{\"x\":1}} True True 35`; stored example_id equals the returned ReviewResult.example_id and is a 35-character `ex_` identifier.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ratified-nondivergent",
+      "action": "Reading matches the contract; row becomes conformance corpus for the phase-2 suite."
     },
     {
       "id": "V21",
@@ -252,8 +252,8 @@
       "baseline": "At 190b6b5 the probe prints revision 2 and [('a0','retired','operation revised',None), ('a1','retired','operation revised',None), ('a2','retired','operation revised',None)] for draft, verified and promoted inputs respectively.",
       "expected": "The probe prints exactly `2 [('a0', 'retired', 'operation revised', None), ('a1', 'retired', 'operation revised', None), ('a2', 'retired', 'operation revised', None)]`.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ratified-nondivergent",
+      "action": "Reading matches the contract; row becomes conformance corpus for the phase-2 suite."
     },
     {
       "id": "V22",
@@ -264,8 +264,8 @@
       "baseline": "At 190b6b5 str, bool and negative each raise StateError 'clock must return a lease-safe signed 64-bit microsecond timestamp'; noncallable raises ValidationError 'clock_us must be callable'.",
       "expected": "str, bool and negative each print StateError with a message containing zero `lease-safe` substrings; noncallable prints exactly ValidationError 'clock_us must be callable'. The likely shared StateError text is 'clock must return a signed 64-bit microsecond timestamp'.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept-amend",
+      "action": "Same positive text pin as V07; the non-callable path keeps `ValidationError('clock_us must be callable')`."
     },
     {
       "id": "V23",
@@ -276,8 +276,8 @@
       "baseline": "At 190b6b5 README has 8 standalone handle words, 4 request_status substrings, and one poll-state table beginning at line 355 with all six frozen states resolved, review_required, in_progress, fallback_failed, rejected and reconciliation_required.",
       "expected": "The probe prints exactly `0 0 []`: zero handle words, zero request_status substrings, and zero Markdown tables containing any frozen lifecycle poll-state value.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "Poll-state table defined semantically (Status-headed table carrying >=1 frozen lifecycle state). Token bans cover code fences: all of it is shipped human-facing prose."
     },
     {
       "id": "V24",
@@ -288,8 +288,8 @@
       "baseline": "At 190b6b5 the Contract list has 11 items. Combined items 1-3 contain propose=0, review=0, handle=0 and request=1. Exactly one paragraph matches candidate-generation plus lease: it says a lease recovers a crashed generator and blocks a stale generator.",
       "expected": "The probe prints Contract item count 11, first-three counts with `propose` >=1 and `review` >=1, `handle`=0, and matching obsolete lease paragraphs=0.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept-amend",
+      "action": "MAIN rules the implicit question YES: items 1-3 must contain `propose` >=1 AND `review` >=1. Steps identified structurally under the Contract H2."
     },
     {
       "id": "V25",
@@ -300,8 +300,8 @@
       "baseline": "At 190b6b5 the probe finds 7 hit lines: 35 handle; 36 fallback_failed/request; 37 request; 52 request; 53 request; 56 handle/request; 57 lease. No other deletion identifier occurs.",
       "expected": "The probe prints exactly `0 []` for the explicit deleted-surface token set across all prose, code fences and examples in docs/adapter-protocol.md.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept-amend",
+      "action": "Token set adopted with one carve-out: `request_id` SURVIVES (X16). `\\brequests?\\b` already excludes it, since `_` is a word character."
     },
     {
       "id": "V26",
@@ -312,8 +312,8 @@
       "baseline": "At 190b6b5 deleted matches are line 78 (`handle` request ID as idempotency key) and line 90 (model calls repeat after timeout or lease recovery). Counts are application-owned-idempotency=0, System.propose=0, pending-proposals=1.",
       "expected": "The probe prints deleted=[]; the replacement contains exactly one `application-owned idempotency` phrase, at least one `System.propose`, and at least one `pending proposals`, all describing the surviving non-idempotent recovery route.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "The three-part replacement is adopted: application-owned idempotency key, at-most-once source invocation per call, enumerate-pending recovery rather than retry."
     },
     {
       "id": "V27",
@@ -324,8 +324,8 @@
       "baseline": "At 190b6b5 the four owned documents contain 49 hit lines: README 26, architecture 13, adapter protocol 7, threat model 3. Their token set is {ambiguity, fallback_failed, handle, in_progress, lease, reconciliation_required, request, request_status, requests, retry_failed}.",
       "expected": "Semantic deleted-surface offenders={} and exact lifecycle-token counts are 0 for {handle,request_status,retry_failed,invalidated_generators,resolved_by_artifact,in_progress,fallback_failed,reconciliation_required}. Any surviving raw hits have key set no wider than {'request','requests','lease'} and each carries explicit grounds as private-table prose or a non-generation-lease statement; under the alternate raw-zero reading the owned hit-line number is exactly 0.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "Contextual-zero adopted; L24 now names the token subset and requires grounds per surviving generic hit (A18)."
     },
     {
       "id": "V28",
@@ -336,8 +336,8 @@
       "baseline": "At 190b6b5 D15a still contains the working-tree read, contains 36f7890, and omits 1146421. Independently measured endpoint pairs are True for all six paths, with equal 12-hex hashes system 04a9256605a2, store 2b2650144d4b, models 6dd45cfb6b07, source bad3eb6e3014, supervisor 57e6b97a18ac, adapter cd8b0f39df29.",
       "expected": "The probe prints working-tree-read=False, 36f7890=True, 1146421=True, and exactly six endpoint pair equalities=True with the measured per-path hashes; changing either git-object operand would make at least one equality False or command exit nonzero.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ratified-nondivergent",
+      "action": "Reading matches the contract; row becomes conformance corpus for the phase-2 suite."
     },
     {
       "id": "V29",
@@ -348,8 +348,8 @@
       "baseline": "At 190b6b5 commit 3b7769b derives [(12866,'1182130a2b3a'),(12867,'cd60036faf5c'),(12862,'c27e71b0b4c7')]. Runtime prints cement_runtime.system, propose callable=True, handle=True, request_status=True. All four current P06 frames plus D01 pass (5 tests, 0 failures).",
       "expected": "Historical tuple remains exactly [(12866,'1182130a2b3a'),(12867,'cd60036faf5c'),(12862,'c27e71b0b4c7')]; runtime prints `cement_runtime.system True False False`. No retired frame reads the working-tree System.handle span.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "Retire = stop reading the deleted working-tree span, keep a LIVE historical check against `3b7769b` (A19). D01 inversion pairs absence with identity/positive controls."
     },
     {
       "id": "V30",
@@ -360,8 +360,8 @@
       "baseline": "At 190b6b5 all four P06 frames evade the current conjunction: detector results are False,False,False,False for the submission, two submission-battery and migration-battery frames. Live `_freezes()` reports 4 disjoint D15/D22 frames. Existing self-test prints CONTROLS: 7/7 firing, RESULT: PASS, rc=0.",
       "expected": "The historical/synthetic P06 fixture returns detector=True; live `_freezes()` remains exactly 4 after retirements; `--self-test` prints exactly `CONTROLS: 8/8 firing` and `RESULT: PASS` with exit code 0.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept-amend",
+      "action": "Adopt the `_is_freeze(segment)` seam; the fixture is the immutable synthetic P06 source of A21/X14, not a live frame. Live `_freezes()` stays 4; self-test goes 8/8."
     },
     {
       "id": "X01",
@@ -372,8 +372,8 @@
       "baseline": "At 190b6b5 hasattr, dir and getmembers are True; getattr returns System.request_status; one FunctionDef exists at line 1546; neither System nor its metaclass defines __getattr__.",
       "expected": "The probe prints False False False, method defs=[], class/metaclass __getattr__ False/False, and getattr raises exactly AttributeError; proposal-binding identifiers are not part of this observable.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "L02 binds the `System` attribute; `_ProposalBinding.request_status` is a different subject and survives under L15."
     },
     {
       "id": "X02",
@@ -384,8 +384,8 @@
       "baseline": "At 190b6b5 exact NAME-token count=8 at lines [458,503,1529,1532,1535,1542,1546,1579]. Raw substring count=17 because helper and SQL alias names also contain request_status.",
       "expected": "A correct deletion prints exact identifier count 7 at the seven surviving proposal-plumbing loci, while System method definitions named request_status=0 and System.request_status attribute=False. Literal L09 expected 0 cannot coexist with L15 current==da70a56 True.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "L09's literal `zero occurrences` for `request_status` is FALSE-BY-CONSTRUCTION against L15. MAIN measured 8 NAME tokens at base; deleting the method removes line 1546 alone, leaving SEVEN proposal-plumbing identifiers. L09 corrected by C09."
     },
     {
       "id": "X03",
@@ -396,8 +396,8 @@
       "baseline": "At 190b6b5 raw tracked-source count=5, all in system.py: signature line 686, identifier and validation argument lines 688-690, and assignment use line 702.",
       "expected": "The probe prints exactly `0 []` for the raw `generation_lease_seconds` byte substring across every tracked src/ file.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "Raw closure on `generation_lease_seconds` = 0 across tracked `src/`; `inspect.signature` cannot see a dead literal."
     },
     {
       "id": "X04",
@@ -408,8 +408,8 @@
       "baseline": "At 190b6b5 raw count=3 in system.py: one assignment occurrence at line 812 and both the payload key string and value identifier on line 832. This corrects any reading of the contract's two lines as two occurrences.",
       "expected": "The probe prints exactly `0 []` for the raw `invalidated_generators` byte substring across tracked src/ files.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "Raw closure on `invalidated_generators` = 0. MAIN measured raw 3 against 2 NAME tokens — the contract's `2` was the token count, and the third occurrence is the payload key STRING."
     },
     {
       "id": "X05",
@@ -420,8 +420,8 @@
       "baseline": "At 190b6b5 the probe prints 19 calls, forms Constant=16/IfExp=2/JoinedStr=1, unresolved=0. Those calls expand to 19 kinds.",
       "expected": "The probe prints exactly 16 calls, forms Constant=13/IfExp=2/JoinedStr=1, unresolved=0; independent expansion returns the exact 16-kind L11 set.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "Fail closed on any unsupported `kind` form (A09), so an unrecognized call cannot be silently skipped into a correct-looking set."
     },
     {
       "id": "X06",
@@ -432,8 +432,8 @@
       "baseline": "At 190b6b5 six concrete names report (__all__=True, package=True, models=True, system=True). Outcome reports (False,False,True,True). Thus Outcome is a models-only alias already, not a package export.",
       "expected": "Post deletion: six concrete names report (True,True,True,False); Outcome reports (False,False,True,False). The set of these names imported into system.py is exactly empty, while models.py remains byte-identical.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "Section 1 corrected by C10: SIX package exports, SEVEN definitions. `Outcome` is a models-only alias and was never in `__all__`."
     },
     {
       "id": "X07",
@@ -444,8 +444,8 @@
       "baseline": "At 190b6b5 all six controls remain unchanged: a0 building, a1 suspended, a2 retired, and a3/a4/a5 draft; every status_reason remains 'sentinel'.",
       "expected": "The probe prints exactly `[('a0','building','sentinel'),('a1','suspended','sentinel'),('a2','retired','sentinel'),('a3','draft','sentinel'),('a4','draft','sentinel'),('a5','draft','sentinel')]`.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ratified-nondivergent",
+      "action": "Reading matches the contract; row becomes conformance corpus for the phase-2 suite."
     },
     {
       "id": "X08",
@@ -456,8 +456,8 @@
       "baseline": "At 190b6b5 there are 15 caller methods and each has one exact `self._now()` call: register_operation, revise_operation, _persist_proposal, handle, _fail_generation, request_status, review, compile, verify_drafts, verify, promote_function, promote, challenge, revoke_example, suspend_artifact.",
       "expected": "The probe prints exactly 12 callers, removing only {handle,_fail_generation,request_status}; every remaining value is the singleton list ['self._now()']. Whole-method equality is not expected for revise_operation.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "See A15; L18 replaced by the exact surviving call-site set."
     },
     {
       "id": "X09",
@@ -468,8 +468,8 @@
       "baseline": "At 190b6b5 there is one `## Request outcomes` heading. The preceding Library API block counts submit_proposal=1, propose=1, review=1, proposal_id=4, handle=2 and request_status=2.",
       "expected": "The probe prints Request-outcomes heading count 0; Library API counts submit_proposal>=1, propose>=1, review>=1, proposal_id>=1, handle=0 and request_status=0.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "L19 is conjunctive: the Library API region must still teach both proposal routes, review and `proposal_id`. Deleting the lifecycle section is necessary, never sufficient."
     },
     {
       "id": "X10",
@@ -480,8 +480,8 @@
       "baseline": "At 190b6b5 the probe prints 16 rows, cardinalities [1 x16], 16 tests run, 0 failures, 0 errors, 0 skipped.",
       "expected": "The probe prints exactly `16 [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1] 16 0 0 0` after rewritten/rescoped pins land.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ratified-nondivergent",
+      "action": "Reading matches the contract; row becomes conformance corpus for the phase-2 suite."
     },
     {
       "id": "X11",
@@ -492,8 +492,8 @@
       "baseline": "At 190b6b5 `_freezes()` returns four rows: D15a MIXED, while D15b, D22b and D22c are GIT-RANGE.",
       "expected": "The probe prints exactly 4 rows at the same four loci, each with scope `GIT-RANGE`; the set of non-GIT-RANGE scopes is empty.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ratified-nondivergent",
+      "action": "Reading matches the contract; row becomes conformance corpus for the phase-2 suite."
     },
     {
       "id": "X12",
@@ -504,8 +504,8 @@
       "baseline": "At 190b6b5 D01 runs 1/0 failures/0 errors; System module is cement_runtime.system, propose is callable, and handle/request_status are both True.",
       "expected": "The probe prints exactly `1 0 0 cement_runtime.system True False False`; D01's existing parser leaf-set complement remains green in the same test.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "D01 inversion pairs with `System.__module__` and callable `propose`, and retains its parser leaf-set complement, so an empty dummy class cannot satisfy the negatives."
     },
     {
       "id": "X13",
@@ -516,8 +516,8 @@
       "baseline": "At 190b6b5 the target runs 1/0 failures/0 errors and reports five parameters: self required positional-or-keyword, database required positional-or-keyword, candidate_source keyword-only None, clock_us keyword-only None, generation_lease_seconds keyword-only 120.",
       "expected": "The probe prints 1 test, 0 failures, 0 errors, and exactly four tuples: self/POSITIONAL_OR_KEYWORD/REQUIRED, database/POSITIONAL_OR_KEYWORD/REQUIRED, candidate_source/KEYWORD_ONLY/None, clock_us/KEYWORD_ONLY/None.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ratified-nondivergent",
+      "action": "Reading matches the contract; row becomes conformance corpus for the phase-2 suite."
     },
     {
       "id": "X14",
@@ -528,8 +528,8 @@
       "baseline": "At 190b6b5 `_is_freeze` is absent, all four real P06 frames evade `_freezes`, and self-test prints CONTROLS: 7/7 firing, RESULT: PASS, rc=0.",
       "expected": "The probe prints helper-present=True, P06-positive=True, preserved-method-negative=False, `CONTROLS: 8/8 firing`, `RESULT: PASS`, and exit code 0; live freeze census remains 4.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "Merged into L29 as the negative half of A21's control: a same-origin preserved-method near-miss must stay OUT, or over-reporting satisfies the positive."
     },
     {
       "id": "X15",
@@ -540,8 +540,8 @@
       "baseline": "At 190b6b5 the already-landed L30 repair contains two M3U6A1_TIP references, zero executable `HEAD` string constants, and the target runs 1 with 0 failures, 0 errors, 0 skips.",
       "expected": "The probe remains exactly `2 0 1 0 0 0`; either endpoint substitution or replay-byte mismatch makes the target fail.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ratified-nondivergent",
+      "action": "Reading matches the contract; row becomes conformance corpus for the phase-2 suite."
     },
     {
       "id": "X16",
@@ -552,8 +552,8 @@
       "baseline": "At 190b6b5 adapter-protocol has one JSON `\"request_id\"` key, one inline-code `request_id`, and one `(partition, request_id)` tuple claim.",
       "expected": "The probe prints JSON-key count exactly 1. Inline/tuple counts may change with the no-retry rewrite, but the document must still state that System.propose sends CandidateRequest.request_id once per source invocation.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "L21 gains a RETENTION clause: the `\"request_id\"` JSON wire key stays, described as an opaque per-call tracing identifier. `CandidateRequest.request_id` is M3.6a3's, and byte-frozen `propose` still constructs it."
     },
     {
       "id": "X17",
@@ -564,8 +564,8 @@
       "baseline": "At 190b6b5 threat-model contains counterexample=1, revocation=3, ambiguity=1, integrity failure=1; the quarantine bullet itself names all four once.",
       "expected": "The quarantine bullet's normalized cause key set is exactly {'counterexample','revocation','integrity failure'} and contains ambiguity count 0; document-wide ambiguity count is 0.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ratified-nondivergent",
+      "action": "Reading matches the contract; row becomes conformance corpus for the phase-2 suite."
     },
     {
       "id": "X18",
@@ -576,8 +576,8 @@
       "baseline": "At 190b6b5 the human-facing tracked set has exactly 5 paths—README, three docs, hospital README—and equals DOCS; unscanned=[] .",
       "expected": "The probe prints tracked count 5, equality=True and unscanned=[]; if scope legitimately adds a human-facing Markdown file, both count and DOCS must expand together while unscanned stays empty.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "L24's scanner coverage is itself pinned: the `DOCS` tuple must equal the tracked human-facing Markdown set (README + docs/ + examples/), so a new document cannot become an unscanned home for a deleted claim."
     },
     {
       "id": "X19",
@@ -588,8 +588,8 @@
       "baseline": "At 190b6b5 the authorizer reports five SQLITE_UPDATE actions on requests columns status, error_code, lease_owner, lease_until_us and updated_at_us.",
       "expected": "The probe prints exactly `[]`: zero SQLITE_INSERT, SQLITE_UPDATE or SQLITE_DELETE authorization actions whose table is `requests` during revise_operation.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ratified-nondivergent",
+      "action": "Reading matches the contract; row becomes conformance corpus for the phase-2 suite."
     },
     {
       "id": "X20",
@@ -600,8 +600,8 @@
       "baseline": "At 190b6b5 hit-line count=20 and word-occurrence count=20; every listed line contains exactly one standalone requests token.",
       "expected": "The probe prints exactly 7 hit lines, 7 word occurrences, and per-line multiplicity 1 at the four _proposal_bindings, two _write_proposal_request_status and one System._persist_proposal loci.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "L13 pins word occurrences beside hit lines with per-line multiplicity 1; line equality alone permits packing a second reference onto an existing line."
     },
     {
       "id": "X21",
@@ -612,8 +612,8 @@
       "baseline": "At 190b6b5 all four named working-tree freezes run: 4 tests, 0 failures, 0 errors, 0 skips.",
       "expected": "The four post-retirement historical checks print exactly `4 0 0 0`; each computes at least one of the frozen figures from git object 3b7769b and none reads the current system.py bytes.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "All four P06 test identities stay DISCOVERABLE post-retirement; one aggregate replacement erases three independent tripwire records."
     },
     {
       "id": "X22",
@@ -624,8 +624,8 @@
       "baseline": "At 190b6b5 live counts are pins=16, freezes=4, leaked loci=[], and committed excluded=['tests/test_lifecycle_removal_battery.py'].",
       "expected": "The probe prints pins=16, freezes=4, leaked loci exactly [], and excluded exactly ['tests/test_lifecycle_removal_battery.py'] after phase-2 content lands.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ratified-nondivergent",
+      "action": "Reading matches the contract; row becomes conformance corpus for the phase-2 suite."
     },
     {
       "id": "X23",
@@ -636,8 +636,8 @@
       "baseline": "At 190b6b5 the closed range yields 8 paths: hospital README, hospital run_demo.py, test_cli.py, test_cli_removal_battery.py, test_hospital_ocr_example.py, test_proposal_binding_battery.py, test_resolve_battery.py, test_system.py.",
       "expected": "The probe prints count 8 and exactly that eight-member ordered path list; D16's replay changed set equals the same set.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ratified-nondivergent",
+      "action": "Reading matches the contract; row becomes conformance corpus for the phase-2 suite."
     },
     {
       "id": "X24",
@@ -648,8 +648,8 @@
       "baseline": "At 190b6b5 exact source identifier counts are handle=1, request_status=8, _outcome=7, _fail_generation=4, _request_revision_is_current=4, _lease_us=5.",
       "expected": "The probe prints exactly {'handle':0,'request_status':7,'_outcome':0,'_fail_generation':0,'_request_revision_is_current':0,'_lease_us':0}; System.request_status definition/attribute is independently absent.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "Tokenize NAME equality, expected vector {handle:0, request_status:7, _outcome:0, _fail_generation:0, _request_revision_is_current:0, _lease_us:0}. MAIN re-measured every base count."
     },
     {
       "id": "X25",
@@ -660,8 +660,8 @@
       "baseline": "At 190b6b5 generation/request lease matches occur at lines 52, 362 and 363; truthful snapshot-not-a-lease controls occur at lines 70 and 145.",
       "expected": "The probe prints generation/request lease lines exactly [] and snapshot-not-a-lease match count exactly 2 (line numbers may move).",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "L19's lease ban is context-classed: generation/request lease claims go, and the two truthful `snapshot is not a lease` statements stay. A global word ban would delete correct prose to reach zero."
     },
     {
       "id": "X26",
@@ -672,8 +672,8 @@
       "baseline": "At 190b6b5 whitespace-normalized counts are System.propose=2, CandidateSourceError=1, fallback_failed=1, and `writes no request row, no proposal, and no event`=1.",
       "expected": "Document counts are fallback_failed=0, System.propose>=1 and CandidateSourceError>=1; one surviving failure paragraph names a concrete no-write observable covering proposal count 0 and event count 0.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "L21 preserves `System.propose`'s failure contract (`CandidateSourceError` + a concrete no-write observable) while `fallback_failed` reaches 0."
     },
     {
       "id": "X27",
@@ -684,8 +684,8 @@
       "baseline": "At 190b6b5 `lease-safe` occurs exactly once in src/cement_runtime/system.py, inside _now's StateError message.",
       "expected": "The probe prints exactly `0 []` for raw `lease-safe` bytes under tracked src/.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ratified-nondivergent",
+      "action": "Reading matches the contract; row becomes conformance corpus for the phase-2 suite."
     },
     {
       "id": "X28",
@@ -696,8 +696,8 @@
       "baseline": "At 190b6b5 the reopened row changes from ('generating',None,'old-process',999) to ('failed','operation_revised',None,None).",
       "expected": "The probe prints exactly `('generating', None, 'old-process', 999)` after reopen and revision.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ratified-nondivergent",
+      "action": "Reading matches the contract; row becomes conformance corpus for the phase-2 suite."
     },
     {
       "id": "X29",
@@ -708,8 +708,8 @@
       "baseline": "At 190b6b5 the probe prints review, kind line 1878, proposal_status, one dominating definition, and values ['accepted','corrected']; the annotation is at line 1770.",
       "expected": "The probe continues to print review/proposal_status, definition count 1, and exact Literal values ['accepted','corrected']; line numbers may shift.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ratified-nondivergent",
+      "action": "Reading matches the contract; row becomes conformance corpus for the phase-2 suite."
     },
     {
       "id": "X30",
@@ -720,8 +720,8 @@
       "baseline": "At 190b6b5 there are 20 SQL constants: _proposal_bindings SELECT x4, _write_proposal_request_status UPDATE x2, revise_operation UPDATE x1, _persist_proposal INSERT x1, handle nine mixed statements, _fail_generation SELECT+UPDATE, request_status SELECT; every token multiplicity is 1.",
       "expected": "The probe prints exactly 7 rows: ('_proposal_bindings','SELECT',1) x4, ('_write_proposal_request_status','UPDATE',1) x2, and ('_persist_proposal','INSERT',1) x1.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "SQL-constant derivation joins line and word counts as L13's third instrument: verbs plus owners, excluding comments and docstrings."
     },
     {
       "id": "X31",
@@ -732,8 +732,8 @@
       "baseline": "At 190b6b5 AST counts are 16 direct `_bounded_int` calls and one definition; exactly one call is generation_lease_seconds validation at line 688.",
       "expected": "The probe prints exactly `15 1`: fifteen direct calls and one `_bounded_int` definition.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "`_bounded_int` survives with 15 calls and 1 definition — MAIN measured 16 calls at base, exactly one of them the lease validation. Inlining the helper would widen the unit past its deletion set."
     },
     {
       "id": "X32",
@@ -744,8 +744,8 @@
       "baseline": "At 190b6b5 the probe finds exactly one call each: artifact.ambiguity_quarantined at call line 1140, request.resolved_by_artifact at 1205, request.fallback_failed at 1353.",
       "expected": "The probe prints exactly `[]`; producer counts are 0 for each of the three target strings.",
       "divergent": "no",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "ratified-nondivergent",
+      "action": "Reading matches the contract; row becomes conformance corpus for the phase-2 suite."
     },
     {
       "id": "X33",
@@ -756,8 +756,8 @@
       "baseline": "At 190b6b5 repair=7cfc748, seed=7cfc748, equal=True, ancestor rc=0. The commit changed both tests/test_migration_battery.py and added tests/test_lifecycle_removal_battery.py.",
       "expected": "Literal reading requires repair!=seed and ancestor rc=0; practical no-later-than reading accepts the measured `7cfc748 7cfc748 True 0`. Current history cannot satisfy literal BEFORE without rewriting published local ancestry.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept-amend",
+      "action": "Contract wording corrected by C11, history NOT rewritten: `before every other edit` becomes `no later than the first commit that adds a file under tests/ or examples/`. Git has no intra-commit ordering, and `7cfc748` satisfies the practical reading."
     },
     {
       "id": "X34",
@@ -768,8 +768,8 @@
       "baseline": "At 190b6b5 six concrete names report (models=True,__all__=True,package=True,system=True); Outcome reports (True,False,False,True).",
       "expected": "Six concrete names report (True,True,True,False); Outcome reports (True,False,False,False). Exactly seven definitions remain in models.py.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "Seven definitions survive in `models.py`; six are package exports; all seven leave `system.py`. This is the executable state M3.6a3 inherits."
     },
     {
       "id": "X35",
@@ -780,8 +780,8 @@
       "baseline": "At 190b6b5 the normalized probe prints `confirmed None True True`.",
       "expected": "The probe prints exactly `confirmed None True True` after deletion.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "L16 binds the CONFIRMED variant: `source_kind='confirmed'`, `artifact_id` NULL, `proposal_id` bound to the reviewed proposal, `example_id` bound to the ReviewResult."
     },
     {
       "id": "X36",
@@ -792,8 +792,18 @@
       "baseline": "At 190b6b5 each of propose, submit_proposal, get_proposal, review and resolve has definition count exactly 1.",
       "expected": "The probe prints exactly {'propose':1,'submit_proposal':1,'get_proposal':1,'review':1,'resolve':1}; all five sole spans then match V19's hashes.",
       "divergent": "yes",
-      "main_verdict": null,
-      "action": null
+      "main_verdict": "accept",
+      "action": "L15 asserts definition CARDINALITY 1 per preserved name BEFORE hashing; a name-keyed span map silently drops a duplicate definition and compares the wrong one."
     }
-  ]
+  ],
+  "ruling": {
+    "session": "S4",
+    "rows": 66,
+    "by_verdict": {
+      "accept": 35,
+      "accept-amend": 8,
+      "ratified-nondivergent": 23
+    },
+    "divergent": 43
+  }
 }

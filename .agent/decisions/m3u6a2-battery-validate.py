@@ -13,7 +13,8 @@ Checks, each reported on its own line and each failing independently:
   UNCOVERED        obligations with no battery test                       must be 0
   ORPHAN           battery tests naming an id the contract does not define must be 0
   STUB             battery tests still carrying the seed marker            must be 0
-  CORRECTION-BIND  a correction cites an obligation or says it binds a section, never neither
+  CORRECTION-BIND  a correction states its subject: an obligation id, a section, a gate, or an
+                   explicit none naming the instrument it repairs — never nothing at all
 
 `--self-test` seeds each failure and requires it to fire, then requires a clean copy to pass. Run
 that after every scale-up: a both-ways credential earned at seed size is not a credential at fill
@@ -38,6 +39,12 @@ OBLIGATION = re.compile(r"^- \*\*(L\d\d)\*\* ", re.M)
 CORRECTION = re.compile(r"^- \*\*(C\d\d)\*\* (.*?)(?=^- \*\*|^#)", re.M | re.S)
 BINDS = re.compile(r"binds (?:SECTION \d+|GATE \d+|L\d\d)")
 CITES = re.compile(r"\bL\d\d\b")
+# An instrument OUTSIDE section 6 is repaired by a correction that binds no numbered clause (C13),
+# and the check failed closed on it. The escape is granted only to a correction that BOTH declares
+# the none AND names the file it repairs: a bare `binds NO obligation` would be a free bypass for
+# every later correction, which is the failure this check exists to prevent.
+DECLARES_NONE = re.compile(r"binds NO obligation")
+NAMES_INSTRUMENT = re.compile(r"`[\w./-]+\.py`")
 TEST_ID = re.compile(r"^test_(l\d\d)_")
 
 
@@ -81,6 +88,7 @@ def report(contract: str, battery: str) -> tuple[list[str], int]:
     unbound = [
         cid for cid, text in CORRECTION.findall(contract)
         if not CITES.search(text) and not BINDS.search(text)
+        and not (DECLARES_NONE.search(text) and NAMES_INSTRUMENT.search(text))
     ]
     lines.append(f"CORRECTION-BIND: {len(unbound)} unbound" + (f" {unbound}" if unbound else ""))
     failures += 1 if unbound else 0
@@ -108,6 +116,11 @@ def self_test() -> int:
         ("unbound correction", contract.replace(
             "\n## 9. Session boundaries",
             "\n- **C99** a correction naming nothing.\n\n## 9. Session boundaries", 1),
+         battery, "CORRECTION-BIND"),
+        ("explicit none naming no instrument", contract.replace(
+            "\n## 9. Session boundaries",
+            "\n- **C97** binds NO obligation and no gate, and names no file either.\n"
+            "\n## 9. Session boundaries", 1),
          battery, "CORRECTION-BIND"),
     ]
     fired = 0

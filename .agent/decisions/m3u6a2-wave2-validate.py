@@ -95,7 +95,14 @@ ATTACK_SEED: tuple[tuple[str, str, str], ...] = (
 )
 
 CITATION = re.compile(r"^(L\d{2}|G\d|C\d{2}|S\d{1,2})$")
-CONCRETE = re.compile(r"(exit \d|\"[^\"]{2,}\"|'[^']{2,}'|\{[^}]*\}|\b\d{2,}\b|`[^`]+`)")
+# `\d{2,}` rejected 14 rows whose observable is a single-digit count (`prints exactly 7 hit
+# lines`), a boolean, an empty collection or an exception class — all checkable. A grader whose
+# strict branch is guarded by recognition fails on exactly the members nobody enumerated, so the
+# admitted vocabulary is widened and the vague-prose seed in --self-test holds the floor.
+CONCRETE = re.compile(
+    r"(exit \d|\"[^\"]{2,}\"|'[^']{2,}'|\{[^}]*\}|\b\d+\b|`[^`]+`|\b(?:True|False|None)\b"
+    r"|\[\]|\b[A-Z][A-Za-z]*(?:Error|Exception)\b)"
+)
 SEVERITY = ("blocking", "material", "minor", "cleared")
 ROW_ID = {"verdicts": re.compile(r"^(V\d{2}|X\d{2})$"), "attack": re.compile(r"^(A\d{2}|Y\d{2})$")}
 FIELDS = {
