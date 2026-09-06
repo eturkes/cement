@@ -1668,9 +1668,10 @@ Measured gaps driving the arc:
     ALL NINE GATES GREEN from committed state, gate 1 last on an idle box: `Ran 979 tests in
     352.354s, OK` (floor 949); gate 7 UNCHANGED at 28 leaves / 35 nodes, `parser_shape` 151 /
     `ebd2ac811bd9776d`; gate 9 as above. Contract section 14 is the sweep record and names the
-    four retained tips - `wt/test-m3u6a1-1` @ `5e604b7`, `wt/rev-m3u6a1-1` @ `82e1a2e`,
-    `wt/gate-m3u6a1-1` @ `96d155d`, `wt/scout-m3u6a2` @ `03b5da9` - with every ground restated as
-    a measured fact, since no ruling may rest on a local-only ref.
+    four archived tips - `archive/m3u6a1-test` @ `5e604b7`, `archive/m3u6a1-rev` @ `82e1a2e`,
+    `archive/m3u6a1-gate` @ `96d155d`, `archive/m3u6a2-scout` @ `03b5da9`, tagged from the `wt/`
+    branches the Close order then removed - with every ground restated as a measured fact, since
+    no ruling may rest on a local-only ref.
     `main=` 82% 198K/240K at close, one compaction boundary crossed. `mate=` 86% 206K/240K
     (`gate-m3u6a1-1`, stopped at its 22-commit tip), 73% (`scout-m3u6a2`, complete).
   - M3.6a2 tier=kernel tags=- depends=M3.6a1 - delete `handle`, `request_status`, `_outcome`,
@@ -1687,7 +1688,7 @@ Measured gaps driving the arc:
     as library methods. M3.5b D15a freezes six runtime modules byte-identical. B02 is NOT a tripwire here:
     its frozen tuple is `_command_supervisor.py` and `example_adapter.py` alone, `system.py` having never
     been a member.
-    BURDEN RE-MEASURED AT POST-MIGRATION HEAD by `scout-m3u6a2` (`wt/scout-m3u6a2` @ `03b5da9`),
+    BURDEN RE-MEASURED AT POST-MIGRATION HEAD by `scout-m3u6a2` (`archive/m3u6a2-scout` @ `03b5da9`),
     because M3.6a's split FORECAST this relief and nothing had rerun the harness on a migrated
     tree. Raw / (normalised) per stage, pre -> post: stage 1 methods 296/943/48 (46) ->
     50/979/48 (47); stage 5 request 57/601/34 (33) -> 79/659/41 (40); stage 6 imports

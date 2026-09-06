@@ -952,14 +952,14 @@ in `.agent/polish.md` rather than asserted here.
 | `m3u6a1-verdicts.json` + `m3u6a1-battery-validate.py` | section 12's battery verdict table |
 | `m3u6a1-attack.json` + `m3u6a1-rule-attack.py` | section 13's 36 ruled attack rows, `--check` in sync |
 
-**Retained `wt/` branch tips — MILESTONE-REVIEW dispatches from these.** Their
-worktrees are removed; the branches stay because they are the only refs keeping
-these SHAs resolvable, and no ruling rests on them — every ground is restated
-above as a measured fact.
+**Archived tips — MILESTONE-REVIEW dispatches from these.** Worktrees and `wt/`
+branches are removed; the `archive/` tags are the refs keeping these SHAs
+resolvable, and no ruling rests on them — every ground is restated above as a
+measured fact.
 
-| branch | tip | based at | what it carries |
+| tag (was branch) | tip | based at | what it carries |
 | --- | --- | --- | --- |
-| `wt/test-m3u6a1-1` | `5e604b7` | `6fb4d92` | the diff-blind battery as authored, before MAIN's V01-V08 reconciliation |
-| `wt/rev-m3u6a1-1` | `82e1a2e` | `6fb4d92` | the 36-row attack table as filled, before MAIN's dispositions |
-| `wt/gate-m3u6a1-1` | `96d155d` | `915c91e` | the 92-row catalogue as filled, plus its 22 fill commits |
-| `wt/scout-m3u6a2` | `03b5da9` | `915c91e` | M3.6a2's re-measured deletion burden and the repaired `m3u6a-burden.py` |
+| `archive/m3u6a1-test` (`wt/test-m3u6a1-1`) | `5e604b7` | `6fb4d92` | the diff-blind battery as authored, before MAIN's V01-V08 reconciliation |
+| `archive/m3u6a1-rev` (`wt/rev-m3u6a1-1`) | `82e1a2e` | `6fb4d92` | the 36-row attack table as filled, before MAIN's dispositions |
+| `archive/m3u6a1-gate` (`wt/gate-m3u6a1-1`) | `96d155d` | `915c91e` | the 92-row catalogue as filled, plus its 22 fill commits |
+| `archive/m3u6a2-scout` (`wt/scout-m3u6a2`) | `03b5da9` | `915c91e` | M3.6a2's re-measured deletion burden and the repaired `m3u6a-burden.py` |
