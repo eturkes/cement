@@ -375,9 +375,16 @@ Clause discipline, carried from M3.6a1's sweep:
 
 ## 8. Corrections to this contract
 
-None yet. Each correction states the obligation it binds explicitly in its own text; a correction
-whose subject is a section rather than a numbered clause legitimately binds none, and illustrative
-ids stay out of any text a binder parses.
+Each correction states the obligation it binds explicitly in its own text; a correction whose
+subject is a section rather than a numbered clause legitimately binds none, and illustrative ids
+stay out of any text a binder parses.
+
+- **C01** — binds SECTION 9 ALONE, no obligation, and leaves section 6's gate list untouched. The
+  session table as first written put implementation at S3 and the battery at S5, which inverts the
+  project's own order: the red suite sits in the primary tree and runs RED before implementation
+  starts, and the battery is authored DIFF-BLIND against this contract, which is impossible once the
+  diff exists. The corrected table below dispatches wave 2 at S3 and implements at S4. No predicate
+  moved, so no closure claim built on section 6 is affected.
 
 ## 9. Session boundaries
 
@@ -387,14 +394,16 @@ is the 46:10 imbalance M3.6a already rejected; consumer-migration relief was mea
 deleted method; and two kernel units duplicate the ~6 machinery sessions that dominate the cost
 (2x6+3 = 15 > 9). The overrun records against 9.
 
+Corrected by C01.
+
 | session | buys |
 |---|---|
 | S1 | burden + tripwire measurement, sizing and ownership rulings — DONE |
-| S2 | this contract |
-| S3 | implementation: the deletions, the two edits, the import shrink |
-| S4 | prose rewrite over four documents plus the tripwire repairs L25-L29 |
-| S5 | battery authored against section 3, red at `da70a56` |
-| S6 | teammate dispatch, harvest, battery verdict ruling |
+| S2 | this contract — DONE |
+| S3 | wave 2 in one block: `test-m3u6a2` phase 1 against section 3, `attack-m3u6a2` against this contract; MAIN batch-rules the phase-1 table |
+| S4 | harvest the phase-2 red suite, credential it red at `da70a56`, implement the deletions, the two edits and the import shrink against it |
+| S5 | prose rewrite over the four owned documents plus the tripwire repairs L25-L29 |
+| S6 | battery verdict ruling and `m3u6a2-closure.py` (gate 4) |
 | S7 | attack ruling into section 8 through the `--check` patcher |
 | S8 | mutation catalogue and gate 7 |
 | S9 | reversion sweep, gate list rerun, DONE commit |

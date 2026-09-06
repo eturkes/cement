@@ -221,15 +221,30 @@ Measured gaps driving the arc:
     ALL FOUR NORMATIVE DOCUMENTS ARE THIS UNIT'S, `docs/adapter-protocol.md` INCLUDED: M3.7
     relocates it under BYTE EQUALITY and never rewrites a claim, so leaving false `handle` prose
     there would RELOCATE the defect rather than defer it.
-    NO PRE-OPEN SPLIT, BUDGET 9 (owner ruling). S1 measurement, S2 contract, S3 implementation,
-    S4 prose rewrite + pin repair, S5 graders, S6 dispatch + harvest + battery ruling, S7 attack
-    ruling, S8 gate catalogue, S9 sweep + closure. Every candidate seam was measured and rejected:
+    NO PRE-OPEN SPLIT, BUDGET 9 (owner ruling). S1 measurement, S2 contract, S3 wave-2 dispatch +
+    phase-1 ruling, S4 red-suite harvest + implementation, S5 prose rewrite + pin repairs, S6
+    battery verdicts + closure gate, S7 attack ruling, S8 mutation catalogue, S9 sweep + closure.
+    Every candidate seam was measured and rejected:
     a deletion-layer split is the 46:10 imbalance M3.6a already rejected; consumer-migration relief
     is measured ABSENT (46 -> 47); the only clean seam (prose) ships a DONE state whose README
     documents a deleted method; two kernel units duplicate the ~6 machinery sessions that dominate
     the cost (2x6+3 = 15 > 9). Record the overrun against 9.
-    S2 OPENS ON RULINGS, NOT MEASUREMENT: write `.agent/decisions/m3u6a2-contract.md` from the
-    burden, tripwire and ownership rulings above.
+    S2 DONE - `.agent/decisions/m3u6a2-contract.md` at `ee731aa`, 26 KB, base `da70a56`, 29
+    obligations `L01..L29` (a letter no other contract uses; `d`/`b`/`x`/`v`/`p` are all live in
+    `tests/`) over 8 numbered gates. Deleted spans total 444 lines; three methods are EDITED, not
+    deleted (`__init__` 680..702, `_now` 704..712, `revise_operation` 762..836). CLOSURE IS
+    PROVABLE BY COUNTING - the five deleted methods form a closed call-graph component entered only
+    through the two public methods being deleted, so `_lease_us`, `_outcome`, `_fail_generation` and
+    `_request_revision_is_current` all reach zero occurrences with no dangling reference. The
+    `requests` table has 20 lines over 7 methods; this unit removes 13 and leaves seven in M3.4's
+    private plumbing. ONE RULED BEHAVIOUR CHANGE: dropping the lease term from `_now`'s bound widens
+    the accepted clock range, so L06 probes both sides of the new boundary. TWO OBLIGATIONS EXIST
+    BECAUSE THE GATE IS BLIND THERE: L08 pins the `operation.revised` payload's exact three-key set,
+    L11 the exact thirteen surviving event kinds. SEVEN MODELS SURVIVE UNPRODUCED (L12) and belong
+    to M3.6a3. Corrected in-session by C01: the first session table put implementation before the
+    battery, which cannot be authored diff-blind once the diff exists.
+    S3 OPENS ON WAVE 2: dispatch `test-m3u6a2` phase 1 against contract section 3 and
+    `attack-m3u6a2` against the contract, in one block, contract copied into each worktree.
     THE BURDEN HARNESS WAS DEFECTIVE AND IS REPAIRED AT `c3f6d83`, which M3.6a3's rerun inherits.
     `m3u6a-burden.py` sized each stage by grepping `Ran N` and `FAIL:`/`ERROR:` headers out of
     text, but D28, D15 and D16 replay whole suite runs as subprocess output, so nested summaries
