@@ -1,0 +1,306 @@
+"""Enumerate M3.6a2's tripwires and its shipped-prose work list, then grade both.
+
+A removal unit's tripwires are cheaper to measure than to map, and a burden staged over
+SOURCE deletions cannot see a frame that pins shipped PROSE: `m3u6a-burden.py` deletes
+definitions and never touches a document, so every doc-pinning frame stays green there and
+re-emerges mid-implementation as a regression. This is that separate scan, plus the freeze
+census the source stage does reach.
+
+Two measured populations, one file:
+
+  PINS   - every `tests/` function that reads a shipped document or a frozen git object AND
+           names vocabulary this unit deletes. Each carries its SCOPE, derived from the
+           function's own source: GIT-RANGE (both endpoints are git objects, so the pin
+           asserts a closed historical diff and survives this unit) or WORKING-TREE (one
+           endpoint is the live tree, so the pin inverts the moment this unit edits it).
+           A scope pin read against the working tree expires; only a range-scoped assertion
+           survives the next unit.
+
+  PROSE  - every hit line in the shipped human-facing documents, with its owning unit ruled
+           by MAIN. The mechanical half is enumeration and vocabulary attribution; ownership
+           is judgment and is recorded with grounds, never derived.
+
+Counts travel with their convention. VOCAB below IS the convention for every number this
+file emits, and it is deliberately wider than M3.5b's D22 deferral table - that table
+counted `handle` loci, this one counts every line naming a surface M3.6a2 removes, so the
+two numbers are not comparable and neither corrects the other.
+
+Usage:
+    uv run python .agent/decisions/m3u6a2-tripwires.py --emit    # write the table
+    uv run python .agent/decisions/m3u6a2-tripwires.py           # grade it
+    uv run python .agent/decisions/m3u6a2-tripwires.py --self-test
+"""
+
+from __future__ import annotations
+
+import argparse
+import ast
+import json
+import pathlib
+import re
+import subprocess
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+TABLE = pathlib.Path(__file__).resolve().with_name("m3u6a2-tripwires.json")
+
+DOCS: tuple[str, ...] = (
+    "README.md",
+    "docs/architecture.md",
+    "docs/adapter-protocol.md",
+    "docs/threat-model.md",
+    "examples/hospital_ocr/README.md",
+)
+
+# The convention. Every count in the emitted table is taken under exactly this pattern.
+VOCAB = re.compile(
+    r"\bhandle\b|request_status|retry_failed|invalidated_generators|resolved_by_artifact"
+    r"|\brequests?\b|\blease\b|in_progress|fallback_failed|reconciliation_required"
+)
+
+# A frame qualifies as a PIN when it reads one of these AND matches VOCAB.
+READS_DOC = re.compile(r"README\.md|architecture\.md|threat-model\.md|adapter-protocol\.md")
+READS_TREE = re.compile(r"ROOT\s*/\s*\w|\(ROOT / relative\)|ROOT\.joinpath")
+GIT_OBJECT = re.compile(r"_git_bytes\(|git_bytes\(|\"[0-9a-f]{7,40}\"|'[0-9a-f]{7,40}'")
+
+# MAIN's ownership ruling per document, with grounds. Keyed by document; a document whose
+# every hit belongs to one unit needs no per-line ruling, which is why this is not a line map.
+OWNERS: dict[str, tuple[str, str]] = {
+    "README.md": (
+        "M3.6a2",
+        "the poll-state table, both lifecycle method names and the request-route section all "
+        "describe surfaces this unit deletes; no line names a result model by class name",
+    ),
+    "docs/architecture.md": (
+        "M3.6a2",
+        "steps 1-3 describe `handle`; the lease paragraph describes the knob this unit deletes",
+    ),
+    "docs/adapter-protocol.md": (
+        "M3.6a2",
+        "M3.7 relocates this document with BYTE EQUALITY, so it never rewrites a claim - "
+        "leaving false `handle` prose here would relocate the defect instead of fixing it",
+    ),
+    "docs/threat-model.md": (
+        "M3.6a2",
+        "`handle` request ID as an idempotency key, and lease recovery, both cease to exist",
+    ),
+    "examples/hospital_ocr/README.md": (
+        "M3.6a1",
+        "already rewritten by M3.6a1's D22-D23 transcript regeneration; the surviving hit is "
+        "the demo's own prose and names no deleted surface",
+    ),
+}
+
+
+def _frame_scope(segment: str) -> str:
+    """Classify a pin by which endpoints it reads."""
+    tree = bool(READS_TREE.search(segment))
+    git = bool(GIT_OBJECT.search(segment))
+    if git and not tree:
+        return "GIT-RANGE"
+    if tree and git:
+        return "MIXED"
+    return "WORKING-TREE"
+
+
+def _pins() -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for path in sorted((ROOT / "tests").glob("*.py")):
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.FunctionDef):
+                continue
+            segment = ast.get_source_segment(source, node) or ""
+            if not (READS_DOC.search(segment) and VOCAB.search(segment)):
+                continue
+            rows.append(
+                {
+                    "locus": f"tests/{path.name}:{node.lineno}",
+                    "test": node.name,
+                    "scope": _frame_scope(segment),
+                    "vocabulary": sorted(set(VOCAB.findall(segment))),
+                    "lines": len(segment.splitlines()),
+                }
+            )
+    return rows
+
+
+def _freezes() -> list[dict[str, object]]:
+    """Frames freezing a runtime module or method span this unit edits, by construction."""
+    rows: list[dict[str, object]] = []
+    for path in sorted((ROOT / "tests").glob("*.py")):
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.FunctionDef):
+                continue
+            segment = ast.get_source_segment(source, node) or ""
+            touches_system = "cement_runtime/system.py" in segment or "System.handle" in segment
+            frozen = "read_bytes()" in segment or "getsource" in segment or "_git_bytes(" in segment
+            if not (touches_system and frozen):
+                continue
+            rows.append(
+                {
+                    "locus": f"tests/{path.name}:{node.lineno}",
+                    "test": node.name,
+                    "scope": _frame_scope(segment),
+                    "lines": len(segment.splitlines()),
+                }
+            )
+    return rows
+
+
+def _prose() -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for relative in DOCS:
+        text = (ROOT / relative).read_text(encoding="utf-8")
+        hits = [
+            {"line": index, "tokens": sorted(set(VOCAB.findall(line)))}
+            for index, line in enumerate(text.splitlines(), start=1)
+            if VOCAB.search(line)
+        ]
+        owner, grounds = OWNERS[relative]
+        rows.append(
+            {
+                "document": relative,
+                "total_lines": len(text.splitlines()),
+                "hit_lines": len(hits),
+                "owner": owner,
+                "grounds": grounds,
+                "hits": hits,
+            }
+        )
+    return rows
+
+
+def emit() -> dict[str, object]:
+    head = subprocess.check_output(("git", "-C", str(ROOT), "rev-parse", "HEAD"), text=True).strip()
+    pins = _pins()
+    prose = _prose()
+    return {
+        "unit": "M3.6a2",
+        "head": head,
+        "vocabulary": VOCAB.pattern,
+        "convention": (
+            "hit_lines counts DOCUMENT LINES matching `vocabulary`, not `handle` loci; "
+            "M3.5b's D22 deferral table counted the latter, so the two are incomparable"
+        ),
+        "pins": pins,
+        "freezes": _freezes(),
+        "prose": prose,
+        "totals": {
+            "pins": len(pins),
+            "pins_working_tree": sum(1 for row in pins if row["scope"] != "GIT-RANGE"),
+            "prose_hit_lines": sum(int(row["hit_lines"]) for row in prose),
+            "prose_documents_owned": sum(1 for row in prose if row["owner"] == "M3.6a2"),
+        },
+    }
+
+
+def validate(table: dict[str, object]) -> int:
+    failures: list[str] = []
+    live = emit()
+    for key in ("pins", "freezes", "prose"):
+        if json.dumps(table[key], sort_keys=True) != json.dumps(live[key], sort_keys=True):
+            failures.append(f"DRIFT: committed `{key}` disagrees with a fresh measurement")
+    if table["vocabulary"] != VOCAB.pattern:
+        failures.append("VOCAB-DRIFT: the table was emitted under a different convention")
+    unowned = [row["document"] for row in table["prose"] if row["owner"] == "unknown"]
+    if unowned:
+        failures.append(f"UNRULED: {unowned}")
+    ungrounded = [row["document"] for row in table["prose"] if not str(row["grounds"]).strip()]
+    if ungrounded:
+        failures.append(f"UNGROUNDED: {ungrounded}")
+    # A pin asserting a closed historical range survives this unit; a working-tree pin does not.
+    # The unit is UNSTARTED while every working-tree pin is still green, so this is the red-at-
+    # baseline credential: at least one must exist, or the census found nothing to protect.
+    if int(table["totals"]["pins_working_tree"]) == 0:
+        failures.append("NO-TRIPWIRE: no working-tree pin found; the scan is not discriminating")
+    for label in ("pins", "prose_hit_lines"):
+        if int(table["totals"][label]) == 0:
+            failures.append(f"EMPTY: `{label}` measured zero")
+    for line in failures:
+        print(line)
+    print(f"PINS: {table['totals']['pins']}")
+    print(f"PINS-WORKING-TREE: {table['totals']['pins_working_tree']}")
+    print(f"FREEZES: {len(table['freezes'])}")
+    print(f"PROSE-HIT-LINES: {table['totals']['prose_hit_lines']}")
+    print(f"PROSE-DOCUMENTS-OWNED: {table['totals']['prose_documents_owned']}")
+    print(f"RESULT: {'FAIL' if failures else 'PASS'}")
+    return 1 if failures else 0
+
+
+def self_test() -> int:
+    """Grade the grader both ways: every control must fire."""
+    base = emit()
+    controls: list[tuple[str, dict[str, object], str]] = []
+
+    dropped = json.loads(json.dumps(base))
+    dropped["pins"] = dropped["pins"][1:]
+    controls.append(("dropped pin row", dropped, "DRIFT"))
+
+    unruled = json.loads(json.dumps(base))
+    unruled["prose"][0]["owner"] = "unknown"
+    controls.append(("unruled document", unruled, "UNRULED"))
+
+    ungrounded = json.loads(json.dumps(base))
+    ungrounded["prose"][0]["grounds"] = "   "
+    controls.append(("blank grounds", ungrounded, "UNGROUNDED"))
+
+    vocab = json.loads(json.dumps(base))
+    vocab["vocabulary"] = r"\bhandle\b"
+    controls.append(("foreign vocabulary", vocab, "VOCAB-DRIFT"))
+
+    rescoped = json.loads(json.dumps(base))
+    for row in rescoped["pins"]:
+        row["scope"] = "GIT-RANGE"
+    rescoped["totals"]["pins_working_tree"] = 0
+    controls.append(("every pin range-scoped", rescoped, "NO-TRIPWIRE"))
+
+    empty = json.loads(json.dumps(base))
+    empty["prose"] = [dict(row, hits=[], hit_lines=0) for row in empty["prose"]]
+    empty["totals"]["prose_hit_lines"] = 0
+    controls.append(("no prose hits", empty, "EMPTY"))
+
+    silent: list[str] = []
+    for label, mutated, expected in controls:
+        import io
+        import contextlib
+
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            validate(mutated)
+        if expected not in buffer.getvalue():
+            silent.append(f"{label} -> expected {expected}")
+    buffer = __import__("io").StringIO()
+    with __import__("contextlib").redirect_stdout(buffer):
+        clean = validate(base)
+    if clean != 0:
+        silent.append("filled table does not grade PASS")
+    for line in silent:
+        print(f"SILENT: {line}")
+    print(f"CONTROLS: {len(controls) - len(silent)}/{len(controls)} firing")
+    print(f"RESULT: {'FAIL' if silent else 'PASS'}")
+    return 1 if silent else 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Enumerate and grade M3.6a2's tripwires.")
+    parser.add_argument("--emit", action="store_true", help="write the table")
+    parser.add_argument("--self-test", action="store_true", help="grade the grader both ways")
+    args = parser.parse_args(argv)
+    if args.self_test:
+        return self_test()
+    if args.emit:
+        TABLE.write_text(json.dumps(emit(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        print(f"WROTE: {TABLE.relative_to(ROOT)}")
+        return 0
+    if not TABLE.is_file():
+        print(f"MISSING: {TABLE.relative_to(ROOT)}; run --emit first")
+        return 1
+    return validate(json.loads(TABLE.read_text(encoding="utf-8")))
+
+
+if __name__ == "__main__":
+    sys.exit(main())

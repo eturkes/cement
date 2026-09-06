@@ -1,0 +1,551 @@
+{
+  "convention": "hit_lines counts DOCUMENT LINES matching `vocabulary`, not `handle` loci; M3.5b's D22 deferral table counted the latter, so the two are incomparable",
+  "freezes": [
+    {
+      "lines": 28,
+      "locus": "tests/test_cli_removal_battery.py:1131",
+      "scope": "MIXED",
+      "test": "test_d15a_the_six_runtime_modules_stay_byte_identical_to_their_3"
+    },
+    {
+      "lines": 41,
+      "locus": "tests/test_cli_removal_battery.py:1160",
+      "scope": "GIT-RANGE",
+      "test": "test_d15b_the_twelve_examples_files_stay_byte_identical_to_their"
+    },
+    {
+      "lines": 108,
+      "locus": "tests/test_cli_removal_battery.py:2766",
+      "scope": "GIT-RANGE",
+      "test": "test_d22b_direction_library_route_every_library_api_locus_is_byt"
+    },
+    {
+      "lines": 52,
+      "locus": "tests/test_cli_removal_battery.py:2875",
+      "scope": "GIT-RANGE",
+      "test": "test_d22c_the_opening_text_handle_request_fence_is_protected_and"
+    }
+  ],
+  "head": "da70a56b35c7a15093ef5d7ff8359629bad9bee4",
+  "pins": [
+    {
+      "lines": 76,
+      "locus": "tests/test_cli_channels.py:2491",
+      "scope": "WORKING-TREE",
+      "test": "test_x20_new_command_help_and_publication_prohibit_retry_advice_and",
+      "vocabulary": [
+        "handle",
+        "request"
+      ]
+    },
+    {
+      "lines": 81,
+      "locus": "tests/test_cli_channels.py:2990",
+      "scope": "WORKING-TREE",
+      "test": "test_x30_every_placeholder_in_each_shipped_shell_block_is_produced",
+      "vocabulary": [
+        "request"
+      ]
+    },
+    {
+      "lines": 101,
+      "locus": "tests/test_cli_channels_battery.py:2488",
+      "scope": "WORKING-TREE",
+      "test": "test_d23_there_is_no_idempotency_two_byte_identical_submissions_ret",
+      "vocabulary": [
+        "handle",
+        "requests",
+        "retry_failed"
+      ]
+    },
+    {
+      "lines": 80,
+      "locus": "tests/test_cli_removal_battery.py:2685",
+      "scope": "WORKING-TREE",
+      "test": "test_d22a_direction_cli_route_every_cli_route_locus_was_rewritte",
+      "vocabulary": [
+        "fallback_failed",
+        "handle",
+        "in_progress",
+        "reconciliation_required",
+        "request",
+        "request_status"
+      ]
+    },
+    {
+      "lines": 108,
+      "locus": "tests/test_cli_removal_battery.py:2766",
+      "scope": "GIT-RANGE",
+      "test": "test_d22b_direction_library_route_every_library_api_locus_is_byt",
+      "vocabulary": [
+        "fallback_failed",
+        "handle",
+        "in_progress",
+        "reconciliation_required",
+        "request",
+        "request_status",
+        "retry_failed"
+      ]
+    },
+    {
+      "lines": 52,
+      "locus": "tests/test_cli_removal_battery.py:2875",
+      "scope": "GIT-RANGE",
+      "test": "test_d22c_the_opening_text_handle_request_fence_is_protected_and",
+      "vocabulary": [
+        "fallback_failed",
+        "handle",
+        "in_progress",
+        "reconciliation_required",
+        "request",
+        "request_status"
+      ]
+    },
+    {
+      "lines": 160,
+      "locus": "tests/test_cli_removal_battery.py:3046",
+      "scope": "MIXED",
+      "test": "test_d25_rewritten_human_facing_prose_holds_the_project_registe",
+      "vocabulary": [
+        "request"
+      ]
+    },
+    {
+      "lines": 22,
+      "locus": "tests/test_migration_battery.py:1269",
+      "scope": "WORKING-TREE",
+      "test": "test_d23_examples_hospital_ocr_readme_md_208_and_216_name_the",
+      "vocabulary": [
+        "request",
+        "resolved_by_artifact"
+      ]
+    },
+    {
+      "lines": 34,
+      "locus": "tests/test_proposal_binding_battery.py:2088",
+      "scope": "WORKING-TREE",
+      "test": "test_b25_prose_alone_teaches_reviewresult_and_the",
+      "vocabulary": [
+        "request"
+      ]
+    },
+    {
+      "lines": 52,
+      "locus": "tests/test_proposal_binding_battery.py:2123",
+      "scope": "WORKING-TREE",
+      "test": "test_b26_a15_prose_outside_code_fences_names",
+      "vocabulary": [
+        "request"
+      ]
+    },
+    {
+      "lines": 31,
+      "locus": "tests/test_proposal_binding_battery.py:2176",
+      "scope": "WORKING-TREE",
+      "test": "test_b27_no_public_surface_retains_the_unqualified",
+      "vocabulary": [
+        "handle",
+        "request",
+        "request_status"
+      ]
+    },
+    {
+      "lines": 22,
+      "locus": "tests/test_submission_battery.py:1541",
+      "scope": "WORKING-TREE",
+      "test": "test_d25_shipped_prose_says_schema_v2_retains",
+      "vocabulary": [
+        "request"
+      ]
+    },
+    {
+      "lines": 16,
+      "locus": "tests/test_submission_battery.py:1774",
+      "scope": "WORKING-TREE",
+      "test": "test_d33_no_shipped_surface_calls_submission_cheap",
+      "vocabulary": [
+        "request"
+      ]
+    },
+    {
+      "lines": 30,
+      "locus": "tests/test_submission_battery.py:1791",
+      "scope": "WORKING-TREE",
+      "test": "test_d34_readme_and_the_three_normative_docs",
+      "vocabulary": [
+        "handle",
+        "request"
+      ]
+    },
+    {
+      "lines": 28,
+      "locus": "tests/test_submission_battery.py:2223",
+      "scope": "WORKING-TREE",
+      "test": "test_d41_readme_and_the_normative_docs_name",
+      "vocabulary": [
+        "request"
+      ]
+    }
+  ],
+  "prose": [
+    {
+      "document": "README.md",
+      "grounds": "the poll-state table, both lifecycle method names and the request-route section all describe surfaces this unit deletes; no line names a result model by class name",
+      "hit_lines": 25,
+      "hits": [
+        {
+          "line": 14,
+          "tokens": [
+            "handle",
+            "request"
+          ]
+        },
+        {
+          "line": 52,
+          "tokens": [
+            "lease"
+          ]
+        },
+        {
+          "line": 70,
+          "tokens": [
+            "lease"
+          ]
+        },
+        {
+          "line": 145,
+          "tokens": [
+            "lease"
+          ]
+        },
+        {
+          "line": 256,
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "line": 266,
+          "tokens": [
+            "handle"
+          ]
+        },
+        {
+          "line": 281,
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "line": 303,
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "line": 325,
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "line": 327,
+          "tokens": [
+            "handle",
+            "request",
+            "request_status"
+          ]
+        },
+        {
+          "line": 332,
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "line": 345,
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "line": 346,
+          "tokens": [
+            "request_status"
+          ]
+        },
+        {
+          "line": 347,
+          "tokens": [
+            "handle"
+          ]
+        },
+        {
+          "line": 351,
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "line": 355,
+          "tokens": [
+            "handle",
+            "request_status"
+          ]
+        },
+        {
+          "line": 356,
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "line": 362,
+          "tokens": [
+            "in_progress",
+            "lease",
+            "request_status"
+          ]
+        },
+        {
+          "line": 363,
+          "tokens": [
+            "fallback_failed",
+            "handle",
+            "lease",
+            "request",
+            "retry_failed"
+          ]
+        },
+        {
+          "line": 364,
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "line": 365,
+          "tokens": [
+            "reconciliation_required",
+            "request"
+          ]
+        },
+        {
+          "line": 367,
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "line": 368,
+          "tokens": [
+            "reconciliation_required",
+            "request"
+          ]
+        },
+        {
+          "line": 370,
+          "tokens": [
+            "requests"
+          ]
+        },
+        {
+          "line": 444,
+          "tokens": [
+            "handle"
+          ]
+        }
+      ],
+      "owner": "M3.6a2",
+      "total_lines": 449
+    },
+    {
+      "document": "docs/architecture.md",
+      "grounds": "steps 1-3 describe `handle`; the lease paragraph describes the knob this unit deletes",
+      "hit_lines": 13,
+      "hits": [
+        {
+          "line": 11,
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "line": 16,
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "line": 17,
+          "tokens": [
+            "handle",
+            "request"
+          ]
+        },
+        {
+          "line": 18,
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "line": 61,
+          "tokens": [
+            "handle",
+            "request"
+          ]
+        },
+        {
+          "line": 65,
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "line": 67,
+          "tokens": [
+            "lease",
+            "request"
+          ]
+        },
+        {
+          "line": 68,
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "line": 97,
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "line": 99,
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "line": 124,
+          "tokens": [
+            "lease"
+          ]
+        },
+        {
+          "line": 148,
+          "tokens": [
+            "lease"
+          ]
+        },
+        {
+          "line": 149,
+          "tokens": [
+            "lease"
+          ]
+        }
+      ],
+      "owner": "M3.6a2",
+      "total_lines": 211
+    },
+    {
+      "document": "docs/adapter-protocol.md",
+      "grounds": "M3.7 relocates this document with BYTE EQUALITY, so it never rewrites a claim - leaving false `handle` prose here would relocate the defect instead of fixing it",
+      "hit_lines": 7,
+      "hits": [
+        {
+          "line": 35,
+          "tokens": [
+            "handle"
+          ]
+        },
+        {
+          "line": 36,
+          "tokens": [
+            "fallback_failed",
+            "request"
+          ]
+        },
+        {
+          "line": 37,
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "line": 52,
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "line": 53,
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "line": 56,
+          "tokens": [
+            "handle",
+            "request"
+          ]
+        },
+        {
+          "line": 57,
+          "tokens": [
+            "lease"
+          ]
+        }
+      ],
+      "owner": "M3.6a2",
+      "total_lines": 61
+    },
+    {
+      "document": "docs/threat-model.md",
+      "grounds": "`handle` request ID as an idempotency key, and lease recovery, both cease to exist",
+      "hit_lines": 2,
+      "hits": [
+        {
+          "line": 78,
+          "tokens": [
+            "handle",
+            "request"
+          ]
+        },
+        {
+          "line": 90,
+          "tokens": [
+            "lease"
+          ]
+        }
+      ],
+      "owner": "M3.6a2",
+      "total_lines": 114
+    },
+    {
+      "document": "examples/hospital_ocr/README.md",
+      "grounds": "already rewritten by M3.6a1's D22-D23 transcript regeneration; the surviving hit is the demo's own prose and names no deleted surface",
+      "hit_lines": 1,
+      "hits": [
+        {
+          "line": 245,
+          "tokens": [
+            "request"
+          ]
+        }
+      ],
+      "owner": "M3.6a1",
+      "total_lines": 247
+    }
+  ],
+  "totals": {
+    "pins": 15,
+    "pins_working_tree": 13,
+    "prose_documents_owned": 4,
+    "prose_hit_lines": 48
+  },
+  "unit": "M3.6a2",
+  "vocabulary": "\\bhandle\\b|request_status|retry_failed|invalidated_generators|resolved_by_artifact|\\brequests?\\b|\\blease\\b|in_progress|fallback_failed|reconciliation_required"
+}
