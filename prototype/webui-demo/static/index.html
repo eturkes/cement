@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cement - supervised answers become deterministic behavior</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <span class="mark" aria-hidden="true"></span>
+    <span class="wordmark">cement</span>
+  </div>
+  <div class="deployment">
+    <span class="chip" id="chip-partition">mercy-general</span>
+    <span class="chip" id="chip-operation">document.extraction_plan</span>
+    <span class="note">The provider is simulated. Every artifact, digest, check and
+      timing comes from the shipped <code>cement_runtime</code>.</span>
+  </div>
+  <div class="controls">
+    <button id="play" class="button primary">Run the story</button>
+    <button id="reset" class="button">Reset</button>
+  </div>
+</header>
+
+<main class="grid">
+
+  <section class="pane" id="pane-chat">
+    <div class="pane-head">
+      <h2>Intake assistant</h2>
+      <span class="pane-sub">chat deployment</span>
+    </div>
+    <div class="pane-body">
+      <div id="chat" class="chat"></div>
+    </div>
+    <div class="tray">
+      <div class="label-row"><span class="label">Send a scanned document</span></div>
+      <div id="tray" class="tray-cards"></div>
+    </div>
+  </section>
+
+  <section class="pane" id="pane-plane">
+    <div class="pane-head">
+      <h2>Control plane</h2>
+      <span class="pane-sub">background supervision</span>
+    </div>
+    <div class="pane-body">
+      <div class="block" id="block-categories">
+        <div class="label-row"><span class="label">Categories seen</span>
+          <span class="label-note" id="policy-note"></span></div>
+        <div id="categories"></div>
+      </div>
+      <div class="block" id="block-review">
+        <div class="label-row"><span class="label">Review surface</span>
+          <span class="label-note">the only surface that shows a candidate</span></div>
+        <div id="review"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="pane" id="pane-function">
+    <div class="pane-head">
+      <h2>Function</h2>
+      <span class="pane-sub">compile, verify, promote, route</span>
+    </div>
+    <div class="pane-body">
+      <div class="block" id="block-lifecycle">
+        <div class="label-row"><span class="label">Lifecycle</span>
+          <span class="label-note">each gate is separate and explicit</span></div>
+        <div class="lifecycle-buttons">
+          <button class="button" data-action="compile">compile</button>
+          <button class="button" data-action="verify">verify-drafts</button>
+          <button class="button" data-action="promote">promote</button>
+        </div>
+        <div id="lifecycle"></div>
+      </div>
+      <div class="block" id="block-function">
+        <div class="label-row"><span class="label">Promoted set</span>
+          <span class="label-note">one function per operation</span></div>
+        <div id="function"></div>
+      </div>
+      <div class="block" id="block-routing">
+        <div class="label-row"><span class="label">Operator routing</span></div>
+        <div id="routing"></div>
+      </div>
+      <div class="block" id="block-metrics">
+        <div class="label-row"><span class="label">Efficiency and predictability</span></div>
+        <div id="metrics"></div>
+      </div>
+      <div class="block" id="block-log">
+        <div class="label-row"><span class="label">Control-plane log</span>
+          <a class="label-note link" href="/api/transcript.txt" target="_blank">transcript</a></div>
+        <div id="log" class="log"></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

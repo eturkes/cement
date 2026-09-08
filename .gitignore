@@ -17,3 +17,6 @@ dist/
 .claude/settings.local.json
 .claude/.headroom_wrap_marker.json
 .scratch/
+
+# Personal project notes (not shared)
+CLAUDE.local.md
