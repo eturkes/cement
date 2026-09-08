@@ -1,0 +1,40 @@
+Cement web UI demo - control-plane transcript
+partition mercy-general · operation document.extraction_plan · seed 20260908
+policy 2 confirmations, 1 reviewer, no minimum span (production default: 3 confirmations, 2 reviewers, a 7-day span)
+
+[   0.00s] ledger    temporary ledger created; operation document.extraction_plan registered in partition mercy-general
+                      policy: 2 confirmations, 1 reviewer, no minimum span
+[   0.09s] category  layout A signature seen for the first time
+                      input_hash 047eff96a213… · 8 structural keys, no patient values
+[   1.75s] proposal  A01: provider candidate stored as prop_3be1291db37942b18f861ab61a409a35
+                      acme-vision/plan-extractor-4 1660 ms simulated · the candidate stays hidden until review
+[   2.23s] review    A01: records-supervisor corrected prop_3be1291db37942b18f861ab61a409a35
+                      confirmed example ex_a197ab007f994827b92840e750ee54c4 binds the layout signature to this exact plan
+[   4.59s] proposal  A02: provider candidate stored as prop_5fcd03506b4a45d79d2f812d6aeadd9a
+                      acme-vision/plan-extractor-4 1910 ms simulated · the candidate stays hidden until review
+[   5.03s] review    A02: records-supervisor accepted prop_5fcd03506b4a45d79d2f812d6aeadd9a
+                      confirmed example ex_e1e9f40e4ec64f30938f198f4ec644ba binds the layout signature to this exact plan
+[   5.46s] compile   compile created 1 draft(s), 0 scope(s) blocked
+                      grouped active examples by exact scope; no model runs here
+[   5.91s] verify    verify-drafts replayed 8 sealed test(s) over 1 draft(s)
+                      every active example in the exact scope, plus partition, operation, revision and input boundary probes
+[   6.34s] promote   informatics-lead promoted 1 artifact(s) against the verified scope hash
+                      art_7f5cd4b210994a308bd39ab0c1ee39ca
+[   6.35s] function  set promotion sealed 1 entry(ies) under receipt fpr_d682c1108fda40ce8d4e4e59d5f29916
+                      function_hash 828ce78358efb8fa… · 6 ordered checks passed
+[   6.79s] routing   operator routing enabled for document.extraction_plan
+                      matching requests resolve from the promoted set; every other input keeps the supervised provider path
+[   7.24s] resolve   A03: answered from the promoted set in 6.1 ms
+                      six checks passed over 1 entries · no provider call
+[   7.67s] category  layout C signature seen for the first time
+                      input_hash c192ddc3cf29… · 6 structural keys, no patient values
+[   7.67s] resolve   C01: no promoted entry for this layout (5.4 ms)
+                      the request falls back to the supervised provider path
+[   9.85s] proposal  C01: provider candidate stored as prop_2193b9dfcb0842678f7119d83f3f6c8d
+                      acme-vision/plan-extractor-4 2174 ms simulated · the candidate stays hidden until review
+[  10.32s] review    C01: records-supervisor accepted prop_2193b9dfcb0842678f7119d83f3f6c8d
+                      confirmed example ex_4fcbb271e6ec48c588ac738e26452ad7 binds the layout signature to this exact plan
+[  10.78s] compile   compile created 0 draft(s), 1 scope(s) blocked
+                      layout C: support 1 is below required 2
+[  11.24s] bundle    A03: the exported bundle returned the confirmed plan
+                      1786 bytes parsed against the operator's own hash; no ledger read

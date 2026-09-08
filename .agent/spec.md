@@ -9,7 +9,7 @@ Production artifact = a library + CLI control plane that an interface like Open 
 ## Artifacts
 
 Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
-- Prototype web UI demo — `prototype/<name>/`, PENDING: the PROTOTYPE run creates it + its run command + `proof/`.
+- Prototype web UI demo — `uv run python prototype/webui-demo/app.py` → <http://127.0.0.1:8765/>; proof = `prototype/webui-demo/proof/` (7 scene PNGs + `story-full-page.png` + `transcript.txt`).
 - Library `src/cement_runtime/` (`from cement_runtime import System`) + CLI `uv run cement --help` (README quick start = the lifecycle: `operation register` → `proposal submit/review` → `compile` → `function verify-drafts/inspect/promote/verify/export/eval`, `resolve`).
 - Hospital OCR example — `uv run python examples/hospital_ocr/run_demo.py` (`All checks passed.`; README transcript pinned).
 - Gate — `uv run python -m unittest discover -s tests -t .` (1010 tests, ~500 s) + `uv build`. Instruments per unit = `.agent/decisions/m<m>u<u>-*`.
@@ -22,7 +22,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 - `resolve` pays full P1-P6 verification per call (35.5 s / 986 MiB at the 50,000-entry cap; 616 ms at 1,000; 4 ms at 1), no cache; prose cites the numbers, never "fast". Ambiguity quarantine leaves with `handle`.
 - Exit classes: 2 usage/validation, 3 absent, 4 conflict (the one class where retry is the recovery), 5 integrity, 6 negative verdict with the channel chosen per leaf; root `verify` exit 0 = frozen precedent, not a model. `allow_abbrev=False` only on `resolve` + `proposal submit`.
 - Assurance: tier default `kernel`; `oracle` only where an independent implementation can diverge. A removal closes on a battery that fails when one obligation is undone or one preserved invariant disappears — never on a green suite. Each contract pins a NUMBERED gate list rerun from committed state; a gate added mid-unit voids the pins ⇒ linters/type checkers land at a unit boundary. Rulings enter tables through idempotent `--check` patchers; dispatch tips tagged `archive/m<m>u<u>-<role>`.
-- Prototype (user): a web UI demo under `prototype/`, disposable stack; the shipped `cement_runtime` stays the IMPLEMENT base and M3/M4 rulings bind; no `handle`-based consumer is built.
+- Prototype (user): a web UI demo under `prototype/`, disposable stack; the shipped `cement_runtime` stays the IMPLEMENT base and M3/M4 rulings bind; no `handle`-based consumer is built. Built as `prototype/webui-demo`: chat + control-plane split, stdlib `http.server` + vanilla JS + vendored woff2, `examples/hospital_ocr` corpus + `pipeline.py`, `?scene=N` autoplay. The provider alone is simulated (sampled plan variant + 1.1–3.4 s, labelled on screen); lifecycle, digests + resolve timings are the runtime's.
 - Human-facing prose (README, `docs/`, example README, CLI help) = ASD-STE100 register, graded by D25; everything else agent-optimized.
 
 ## Deferred
@@ -33,6 +33,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 - M3.6b schema cut v2→v3 (direct proposal columns, `requests` + index gone, refusal fixtures, 0.2.0); owns p50 p51 p04. Accept: fingerprint + `SCHEMA_VERSION` move together, suite green with the reset documented.
 - M3.7 command-runtime relocation under byte equality + blocked reverse imports (wheel already carries no `examples/`/`tests/`); owns p54. M3.8 demo + transcript regeneration via idempotent updater (`data`). M3.9a/b docs claim ledger rewrite + independent replay (`docs`).
 - M4 projection inside the boundary: projection artifact kind replayed against confirmed raw inputs + boundary probes, fail-closed on unrecognized input; open: verification without a domain oracle. Seeds: typed schemas + verifier plugin ABI; decision tables / constrained expression IR.
+- `System.examples()` returns values, no digests ⇒ every scope-grouping consumer recomputes the canonical sha256 (`run_demo.py`, prototype `demo.py`). Accept: rows carry `input_hash` + `output_hash`, a test pins them to the compiler's values, both consumers drop the local helper.
 - Tooling p01: ruff + a type checker with explicit rule selection; one gate command rc 0; `RUF100` zero; a seeded violation reds it.
 - Committed dev tools for scratch instruments p02 p05 p06 p19 (mutation replay, anchor validators, seam battery) + p12 p40 port the human-facing register audit to committed state. Accept: each reruns from a clean checkout; the audit flags a seeded 30-word instruction and a seeded `simply`, zero over-cap sentences on the four surfaces.
 - CLI p13 p14 p16 p18 p25 p26 p27 p49 p53 · library p03 p09 p24 p38 p43 p44 p45 p48 · test depth p07 p08 p15 p17 p20 p21 p22 p23 p28 p29 p30 p31 p39 p41 p42 p52 p56 p57 p58 p59 p60 p61 · refactors p32 p33 p46 · records p10 p11 p47 p55. Accept: per row.
@@ -41,4 +42,4 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 
 ## Phase
 
-PROTOTYPE. Next = the PROTOTYPE `/goal` run: web UI demo under `prototype/<name>/` with proof, `Phase: ITERATE`. IMPLEMENT resumes at M3.6a2 S5 on `impl/m3u6a2`.
+ITERATE. Next = interactive sessions: run `prototype/webui-demo`, refresh proof, work owner feedback into `prototype/` + `Decisions` until the owner says go. IMPLEMENT resumes at M3.6a2 S5 on `impl/m3u6a2`.
