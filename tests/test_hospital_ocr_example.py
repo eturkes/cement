@@ -355,7 +355,7 @@ class PlanAdapterTests(unittest.TestCase):
         request_id: str = "hospital-ocr-test",
     ) -> CandidateRequest:
         return CandidateRequest(
-            partition="mercy-general",
+            partition="example-hospital",
             operation="document.extraction_plan",
             operation_revision=1,
             request_id=request_id,

@@ -153,7 +153,7 @@ def _self_check() -> None:
     signature = pipeline.layout_signature(pipeline.ocr(document))
     known = proposer.propose(
         CandidateRequest(
-            partition="mercy-general",
+            partition="example-hospital",
             operation="document.extraction_plan",
             operation_revision=1,
             request_id="self-check-known-layout",
@@ -167,7 +167,7 @@ def _self_check() -> None:
 
     unknown = proposer.propose(
         CandidateRequest(
-            partition="mercy-general",
+            partition="example-hospital",
             operation="document.extraction_plan",
             operation_revision=1,
             request_id="self-check-unknown-layout",

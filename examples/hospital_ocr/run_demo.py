@@ -35,7 +35,7 @@ import pipeline
 from plan_adapter import PlanProposer
 
 
-PARTITION = "mercy-general"
+PARTITION = "example-hospital"
 OPERATION = "document.extraction_plan"
 DOCUMENTS = Path(__file__).with_name("documents")
 DEMO_POLICY = CompilePolicy(

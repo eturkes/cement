@@ -52,7 +52,7 @@ if str(EXAMPLE_DIR) not in sys.path:
     sys.path.insert(0, str(EXAMPLE_DIR))
 import pipeline  # noqa: E402
 
-PARTITION = "mercy-general"
+PARTITION = "example-hospital"
 OPERATION = "document.extraction_plan"
 REVIEWER = "records-supervisor"
 PROMOTER = "informatics-lead"

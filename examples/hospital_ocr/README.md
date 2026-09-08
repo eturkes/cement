@@ -39,7 +39,7 @@ exported bundle + ocr_text -> resolve_offline(...) -> confirmed plan or miss
 
 ### Scope and policy
 
-- Partition: `mercy-general` - learning remains isolated to this hospital.
+- Partition: `example-hospital` - learning remains isolated to this hospital.
 - Operation: `document.extraction_plan` - all layouts use one operation; each distinct signature is a separate canonical input and exact scope.
 - Demo compile policy: `CompilePolicy(min_confirmations=2, min_reviewers=1, min_span_seconds=0)`.
 - Reviewer: `records-supervisor`.
@@ -196,7 +196,7 @@ Gate reasons: support 1 is below required 2
 === Act 5: the verified set exports as portable bytes ===
 Exported set: 2 verified entries, promoted before Acts 2 and 3 resolved against them.
 Verified function hash: <function-hash>
-Exported bundle: 3341 bytes carrying no ledger.
+Exported bundle: 3344 bytes carrying no ledger.
 
 === Audit event trace ===
 01. operation.registered
@@ -234,7 +234,7 @@ All checks passed.
 - Canonicalize before learning. The exact recurring input is an ordered layout structure with no patient values. Structural position determines the signature, not the presence of a filled field. Distinct patients can therefore share one scope safely.
 - Keep decimal quantities as strings. `cement-json-v1` rejects decimal and exponent numbers. Layout C marks `potassium` and `creatinine` as `decimal_string` and extracts values such as `"4.2"` and `"0.9"`.
 - Treat layout drift as an explicit edge case. A changed layout is a new canonical input, enters supervised fallback, and solidifies through the same lifecycle. Act 4 exposes the recurrence gate as `support 1 is below required 2` rather than applying an old template silently.
-- Isolate learning by partition. `mercy-general` scopes this evidence and its promoted artifacts to one hospital.
+- Isolate learning by partition. `example-hospital` scopes this evidence and its promoted artifacts to one hospital.
 - Keep demonstration policy visibly relaxed. Production defaults require more confirmations, more reviewers, and a real observation span.
 - Export the verified function to leave the ledger behind. Act 5 exports the promoted set as one self-verifying bundle. Act 6 resolves a document from that bundle with no database, adapter, or LLM. The bundle carries a new hash on every run, because each entry seals its own run-specific evidence.
 

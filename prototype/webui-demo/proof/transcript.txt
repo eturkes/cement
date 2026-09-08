@@ -1,40 +1,40 @@
 Cement web UI demo - control-plane transcript
-partition mercy-general · operation document.extraction_plan · seed 20260908
+partition example-hospital · operation document.extraction_plan · seed 20260908
 policy 2 confirmations, 1 reviewer, no minimum span (production default: 3 confirmations, 2 reviewers, a 7-day span)
 
-[   0.00s] ledger    temporary ledger created; operation document.extraction_plan registered in partition mercy-general
+[   0.00s] ledger    temporary ledger created; operation document.extraction_plan registered in partition example-hospital
                       policy: 2 confirmations, 1 reviewer, no minimum span
 [   0.09s] category  layout A signature seen for the first time
                       input_hash 047eff96a213… · 8 structural keys, no patient values
-[   1.75s] proposal  A01: provider candidate stored as prop_0d9c1d451ba34bdf921a1694df9c7e61
+[   1.75s] proposal  A01: provider candidate stored as prop_73d00fd5f195477cbecdfbbb4a3f2c76
                       acme-vision/plan-extractor-4 1660 ms simulated · the candidate stays hidden until review
-[   2.23s] review    A01: records-supervisor corrected prop_0d9c1d451ba34bdf921a1694df9c7e61
-                      confirmed example ex_bb04141cb8be4f4f92956f704dd28cfc binds the layout signature to this exact plan
-[   4.60s] proposal  A02: provider candidate stored as prop_5c8b465bc5b24006b220fa6a2e00475c
+[   2.24s] review    A01: records-supervisor corrected prop_73d00fd5f195477cbecdfbbb4a3f2c76
+                      confirmed example ex_21be46359e7b469db6d8c6c112f0d19e binds the layout signature to this exact plan
+[   4.59s] proposal  A02: provider candidate stored as prop_0d6acee325614ebe91ed9db9ba434f53
                       acme-vision/plan-extractor-4 1910 ms simulated · the candidate stays hidden until review
-[   5.04s] review    A02: records-supervisor accepted prop_5c8b465bc5b24006b220fa6a2e00475c
-                      confirmed example ex_e48497054c60455daa28cd4499ebedcd binds the layout signature to this exact plan
-[   5.48s] compile   compile created 1 draft(s), 0 scope(s) blocked
+[   5.03s] review    A02: records-supervisor accepted prop_0d6acee325614ebe91ed9db9ba434f53
+                      confirmed example ex_ff4ca84f38ad48bebb74b8022b340145 binds the layout signature to this exact plan
+[   5.50s] compile   compile created 1 draft(s), 0 scope(s) blocked
                       grouped active examples by exact scope; no model runs here
-[   5.93s] verify    verify-drafts replayed 8 sealed test(s) over 1 draft(s)
+[   5.94s] verify    verify-drafts replayed 8 sealed test(s) over 1 draft(s)
                       every active example in the exact scope, plus partition, operation, revision and input boundary probes
 [   6.38s] promote   informatics-lead promoted 1 artifact(s) against the verified scope hash
-                      art_0c241b3141ff4031872f371000d9e89b
-[   6.39s] function  set promotion sealed 1 entry(ies) under receipt fpr_696e99ca6892454ea1bf47ad1f824f2c
-                      function_hash 8be7d8df4e716f55… · 6 ordered checks passed
-[   6.83s] routing   operator routing enabled for document.extraction_plan
+                      art_ced305284e7c41c181dcc9335b10fc3b
+[   6.40s] function  set promotion sealed 1 entry(ies) under receipt fpr_83b13c1845ab4ac089395918db51c585
+                      function_hash dcb43d01ce408ca3… · 6 ordered checks passed
+[   6.84s] routing   operator routing enabled for document.extraction_plan
                       matching requests resolve from the promoted set; every other input keeps the supervised provider path
-[   7.28s] resolve   A03: answered from the promoted set in 7.7 ms
+[   7.27s] resolve   A03: answered from the promoted set in 3.9 ms
                       six checks passed over 1 entries · no provider call
-[   7.72s] category  layout C signature seen for the first time
+[   7.71s] category  layout C signature seen for the first time
                       input_hash c192ddc3cf29… · 6 structural keys, no patient values
-[   7.73s] resolve   C01: no promoted entry for this layout (17.2 ms)
+[   7.72s] resolve   C01: no promoted entry for this layout (4.8 ms)
                       the request falls back to the supervised provider path
-[   9.91s] proposal  C01: provider candidate stored as prop_05ae89d35ee244a8b92eb12c407ceeea
+[   9.90s] proposal  C01: provider candidate stored as prop_7239cf7089be4a00984432ad17cdfd12
                       acme-vision/plan-extractor-4 2174 ms simulated · the candidate stays hidden until review
-[  10.36s] review    C01: records-supervisor accepted prop_05ae89d35ee244a8b92eb12c407ceeea
-                      confirmed example ex_3b9c9fb52cad462caaa544579c34f655 binds the layout signature to this exact plan
+[  10.34s] review    C01: records-supervisor accepted prop_7239cf7089be4a00984432ad17cdfd12
+                      confirmed example ex_2d972f3767214431bac798ce7329c77c binds the layout signature to this exact plan
 [  10.80s] compile   compile created 0 draft(s), 1 scope(s) blocked
                       layout C: support 1 is below required 2
-[  11.23s] bundle    A03: the exported bundle returned the confirmed plan
-                      1786 bytes parsed against the operator's own hash; no ledger read
+[  11.26s] bundle    A03: the exported bundle returned the confirmed plan
+                      1789 bytes parsed against the operator's own hash; no ledger read
