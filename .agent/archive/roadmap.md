@@ -1,5 +1,7 @@
 # Roadmap
 
+> Historical record: the roadmap flow's milestone ledger, frozen at M3.6a2 S4. Live state = `.agent/spec.md`; per-unit detail = `m3-units.md`; contracts + instruments = `.agent/decisions/`.
+
 ## Scope source
 
 README paragraph 1 is authoritative: aggregate repeated work into a regular, if large, function covering

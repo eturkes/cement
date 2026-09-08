@@ -3200,9 +3200,12 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         self.assertEqual(sentence_violations, [])
         self.assertEqual(instruction_violations, [])
 
-        polish = (ROOT / ".agent/polish.md").read_text()
-        self.assertIn("port the human-facing register audit to committed state", polish)
-        self.assertIn("flags a seeded 30-word instruction and a seeded `simply`", polish)
+        # The deferral this obligation binds moved with the register it lived in: live
+        # state is `.agent/spec.md` `Deferred`, and a pin reading the frozen archive would
+        # hold even after the deferral was dropped.
+        deferred = (ROOT / ".agent/spec.md").read_text()
+        self.assertIn("port the human-facing register audit to committed state", deferred)
+        self.assertIn("flags a seeded 30-word instruction and a seeded `simply`", deferred)
 
     def test_d26_root_help_describes_deterministic_resolution_plus_expl(self) -> None:
         """D26 obligation

@@ -1,5 +1,7 @@
 # Polish register
 
+> Historical record: the roadmap flow's polish register, frozen with 61 open rows. `.agent/spec.md` `Deferred` cites rows by the `p<nn>` id each row now carries; the row here holds the full text, evidence pointer, acceptance check + `pri`.
+
 Deferred-perfection items, off the milestone spine. `/session-polish` = sole consumer; protocol lives
 there. Rows are born at deferral with the acceptance check and the priority already written.
 
@@ -7,7 +9,7 @@ Gate for every row unless it says otherwise: `uv run python -m unittest discover
 `uv build`. Scope sources, assurance tiers and the unit set stay fixed — a row needing any of those
 changed is spine work, not polish.
 
-- `pri=2` `size=L` — NO deterministic checker is configured, against the standing rule that deterministic
+- `p01` `pri=2` `size=L` — NO deterministic checker is configured, against the standing rule that deterministic
   checks own every rule a tool can decide and that proven checkers are configured before a judgment pass
   spends attention on what they would have caught. The sole gate is the unittest suite; `ruff` sits on the
   machine and is run by hand (M3.5b ran it over one battery and three instruments), no repo config exists,
@@ -28,7 +30,7 @@ changed is spine work, not polish.
   inline and carries its reason, `RUF100` reports zero, and one seeded violation per tool turns that gate
   red while the suite gate stays green.
 
-- `pri=1` `size=M` — port the mutant replay driver to committed state. `.scratch/main-replay/replay.py`
+- `p02` `pri=1` `size=M` — port the mutant replay driver to committed state. `.scratch/main-replay/replay.py`
   produced u4b's recorded mutation verdicts and is gitignored, so a gate backing a durable roadmap claim
   cannot rerun from a clean checkout. It survives on this workstation together with u4b's catalogue
   (`.scratch/agents/rev2b-m2u4b-mutants.jsonl`) and the wave's result sets
@@ -43,7 +45,7 @@ changed is spine work, not polish.
   reports as killed; where u4b's catalogue was recovered, replaying it reproduces 58 killed / 1 superseded
   / 2 surviving, those 2 being the reviewer's proved-equivalent pair.
 
-- `pri=4` `size=M` — stored-scalar conversions in `system.py` are unguarded at several sites, third
+- `p03` `pri=4` `size=M` — stored-scalar conversions in `system.py` are unguarded at several sites, third
   recorded instance of one class, and NONE of them is reachable through any supported route. Scope
   correction from the M2 review, which retired the escalating severity three earlier rows had assigned it:
   the storage layer already enforces what the missing guards would. All 13 user tables are `STRICT`
@@ -68,7 +70,7 @@ changed is spine work, not polish.
   `IntegrityError`; any probe needing a schema rewrite or a fabricated row is labelled as such and is
   never cited as a real-ledger repro; suite green.
 
-- `pri=2` `size=M` — `function_receipts` has no index carrying `(partition, operation, sequence)`, so
+- `p04` `pri=2` `size=M` — `function_receipts` has no index carrying `(partition, operation, sequence)`, so
   receipt pagination costs O(all receipts in the partition) per page. `EXPLAIN QUERY PLAN` shows
   `USE TEMP B-TREE FOR ORDER BY` on the default all-revision query: measured 1,001 of 1,001 rows visited
   for `limit=3`, and 899 of 899 on the cursor path, against 3 when a revision filter applies. Receipt
@@ -83,7 +85,7 @@ changed is spine work, not polish.
   small constant of the page size on both paths, `SCHEMA_VERSION` and the fingerprint move together, and
   the suite is green with the reset documented.
 
-- `pri=3` `size=S` — the report anchor validator runs from no gate. `map` briefs make each report's
+- `p05` `pri=3` `size=S` — the report anchor validator runs from no gate. `map` briefs make each report's
   `path:line` claims machine-checkable, and the M3 planning wave's validator is now tracked at
   `.agent/decisions/m3-report-validate.py` (pipe-table shapes anchor/claim/qa/unit; anchor path plus line
   must resolve and the backticked symbol must be a substring of that source line; repo root by upward
@@ -94,7 +96,7 @@ changed is spine work, not polish.
   `.agent/decisions/*.md` carrying a recognized table shape, a committed fixture report carrying one
   resolving anchor and one stale anchor makes the gate fail, and briefs cite the tracked path.
 
-- `pri=2` `size=M` — port the seam mutation battery to a committed dev tool. u4c1's 9-mutant battery over
+- `p06` `pri=2` `size=M` — port the seam mutation battery to a committed dev tool. u4c1's 9-mutant battery over
   `_Outcome`, `main`'s channel branch, the parser slot and limit forwarding killed 9/9, but it ran from
   `.scratch/mutants.sh` and died with the wave, so the claim outlives its driver (same defect as the u4b
   replay driver already tracked here). Acceptance: a tracked script takes a catalogue of
@@ -114,7 +116,7 @@ changed is spine work, not polish.
   an anchor matching 2 times is reported as ANCHOR-MISS, not silently applied — `"checks": [asdict(check)
   for check in verification.checks],` occurs in both the `verify` and `export` leaves.
 
-- `pri=2` `size=M` — bounded projections have no cursor, and two families page in opaque-id order.
+- `p07` `pri=2` `size=M` — bounded projections have no cursor, and two families page in opaque-id order.
   `function_report` clamps six detail lists with one `projection_limit`, but the only way to see a
   truncated remainder is to raise the limit toward 10,000; there is no offset, cursor or stable sort key
   exposed. Members project by `ordinal` and artifacts by `sequence DESC`, both canonical, while
@@ -128,7 +130,7 @@ changed is spine work, not polish.
   seeds three rows in each family and asserts the projected prefix at limits 1 and 2 is the canonical
   prefix of the limit-3 projection, and the report's docstring states the ordering guarantee per family.
 
-- `pri=3` `size=S` — `stale_revision_anomalies` is unreachable through supported flows, so its projection
+- `p08` `pri=3` `size=S` — `stale_revision_anomalies` is unreachable through supported flows, so its projection
   path ships behaviorally untested except through out-of-band state. `operation revise`
   (`src/cement_runtime/system.py:509`) retires every artifact it strands, and no other command leaves a
   draft/verified/promoted artifact on a superseded revision; the CLI test reaches the family only by
@@ -138,7 +140,7 @@ changed is spine work, not polish.
   model documents the family as a corruption detector, and the CLI's own probe cites that documentation
   instead of asserting the state is otherwise reachable.
 
-- `pri=3` `size=S` — `Candidate.provenance` contract unenforced at its sole consumer, `system.py:784` in
+- `p09` `pri=3` `size=S` — `Candidate.provenance` contract unenforced at its sole consumer, `system.py:784` in
   `System.handle`. `Candidate` is a frozen dataclass typing `provenance: Mapping[str, object]` with no
   runtime check, and `canonicalize(dict(candidate.provenance), max_bytes=65_536)` is the only site that
   reads it. Probed: `[]` becomes `{}` and is stored as empty provenance; `'text'` escapes as a raw
@@ -148,7 +150,7 @@ changed is spine work, not polish.
   probe per shape (`[]`, `'text'`, `5`, `None`) raises `ValidationError` out of `handle`, with `[]`
   failing rather than silently becoming `{}`.
 
-- `pri=4` `size=S` — `.agent/decisions/` input pointers read as live references but resolve nowhere except
+- `p10` `pri=4` `size=S` — `.agent/decisions/` input pointers read as live references but resolve nowhere except
   this workstation. Seven records open with `Inputs:` lines citing `.scratch/agents/*.md`, plus
   `.scratch/main-verify/tree`, `.scratch/main-verify/f1probe.py` and `.scratch/m2u3b1.patch`; `.scratch/`
   is gitignored, so all 14 resolve to nothing in any clone. Here 11 still resolve and 3 are gone outright
@@ -156,13 +158,13 @@ changed is spine work, not polish.
   rescue before the window closes. Acceptance: each record's inputs either carry the substance inline or
   are marked expired, and no tracked file cites a `.scratch/` path as though it were retrievable.
 
-- `pri=5` `size=M` — 166 Pyright `reportAttributeAccessIssue` errors across `tests/test_system.py` lines
+- `p11` `pri=5` `size=M` — 166 Pyright `reportAttributeAccessIssue` errors across `tests/test_system.py` lines
   221-1192, pre-existing at `d0b7e93`: unnarrowed union member access in baseline outcome assertions.
   Type noise only, no behavior at stake, and Pyright is not a configured gate. Acceptance: that region
   narrows its unions explicitly, an ad-hoc `uvx pyright tests/test_system.py` reports zero
   `reportAttributeAccessIssue`, and the suite stays green.
 
-- `pri=3` `size=S` — port the human-facing register audit to committed state. `.scratch/register/audit.py`
+- `p12` `pri=3` `size=S` — port the human-facing register audit to committed state. `.scratch/register/audit.py`
   measured the ASD-STE100 pass over `README.md`, `docs/*.md` and `examples/hospital_ocr/README.md`, so the
   conformance numbers that pass recorded cannot rerun from a clean checkout; its spec sits in
   `.agent/memory.md`. Two known false positives survive: a possessive `'s` counts as a contraction, and a
@@ -173,13 +175,13 @@ changed is spine work, not polish.
 
 ## M2.u4c6 deferrals
 
-- pri=2 `size=S` — `_input` does not translate an `OSError` raised by `sys.stdin.read` /
+- `p13` pri=2 `size=S` — `_input` does not translate an `OSError` raised by `sys.stdin.read` /
   `sys.stdin.buffer.read` (`cli.py:237,247`), so a read failure on `--input -` escapes `main` as a raw
   traceback on EVERY leaf that accepts the flag, not just `function eval`. u4c6 inherited the limit rather
   than adding a leaf-local message, because the fix belongs to the shared helper. Acceptance: the two
   stream reads translate to the leaf's existing exit 2 `invalid` vocabulary, one committed test injects an
   `OSError` at each of the two stdin hosts, and no existing `--input -` message changes.
-- pri=3 `size=S` — `_emit` performs no explicit flush, so payload-and-status guarantees on every leaf
+- `p14` pri=3 `size=S` — `_emit` performs no explicit flush, so payload-and-status guarantees on every leaf
   assume a healthy stdout: a buffered embedding stream may retain data after `main` returns, and a
   `BrokenPipeError` or an exit-time flush failure can replace the intended status with a raw exception or
   Python's exit 120. Same cross-resource class as u4c5b's file receipt, now restated for stdout by u4c6's
@@ -189,7 +191,7 @@ changed is spine work, not polish.
 
 ## M2.u4c5a deferrals
 
-- pri=3 `size=S` — merge-or-drop decision on the diff-blind teammate's export suite. 28 tests written from
+- `p15` pri=3 `size=S` — merge-or-drop decision on the diff-blind teammate's export suite. 28 tests written from
   the contract alone, preserved byte-identically at `.scratch/agents/test-m2u4c5a-suite.py` (its worktree
   is gone); 36 failures + 2 errors at baseline, 28/28 green against the shipped implementation, and MAIN's
   own 21 tests carry every contract pin, so nothing merged. The question is whether any of its 28 probes
@@ -199,7 +201,7 @@ changed is spine work, not polish.
   merged into `tests/test_cli.py` under the existing naming, the file is then deleted rather than left
   dangling, and the suite is green with the merged count recorded.
 
-- pri=3 `size=S` — exit 6 now names FOUR objects across four leaves (`verify-drafts` failed drafts,
+- `p16` pri=3 `size=S` — exit 6 now names FOUR objects across four leaves (`verify-drafts` failed drafts,
   `verify` a failed committed set, `export` a refused export, `eval` an input outside the domain) with one
   meaning and four payload shapes, distinguished by command and channel alone. Nothing is wrong; the
   surface is simply at the point where a reader of `$?` cannot tell them apart. The decision-record part is
@@ -210,7 +212,7 @@ changed is spine work, not polish.
 
 ## M2.u4c4 deferrals
 
-- pri=2 `size=S` — the locked-recheck race is pinned only by injection, though it is real behavior. A
+- `p17` pri=2 `size=S` — the locked-recheck race is pinned only by injection, though it is real behavior. A
   default-constructed `System` re-reads the locked prospective function inside `promote_function` and
   raises `StateError` when it moved between `inspect` and `promote`; the CLI maps that to exit 4 with
   `error: "conflict"`, and u4c4 drives it through `main`'s exit map with a patched `System.promote_function`
@@ -225,7 +227,7 @@ changed is spine work, not polish.
   exit 4 with `function promotion candidates changed during authorization` and no patching, and asserts
   the rejected call adds no receipt and no status transition; the stale-hash message keeps its own
   separate pre-invocation probe.
-- pri=3 `size=S` — `--actor` grammar is nearly unpinned on the promote leaf. The merged suite carries a
+- `p18` pri=3 `size=S` — `--actor` grammar is nearly unpinned on the promote leaf. The merged suite carries a
   single occurrence exercising the value's validation, so the accept/reject PAIR the memory rule requires
   at every bound is absent here: an empty actor, an over-long actor and one carrying illegal characters
   all ride on the library's `_name` behavior with no CLI-side pin, and `--actor` is what the promotion
@@ -235,7 +237,7 @@ changed is spine work, not polish.
 
 ## M2.u4c3 deferrals
 
-- pri=2 `size=S` — port the agent-report anchor validator to a committed dev tool. u4c3 gated every
+- `p19` pri=2 `size=S` — port the agent-report anchor validator to a committed dev tool. u4c3 gated every
   Wave-1 and Wave-2 report on `.scratch/validate-anchors.py`, which parses fenced ```anchors blocks of
   TAB-separated `path<TAB>line<TAB>fragment` rows, resolves each against a `--root`, and exits nonzero on
   any bad anchor or leftover `TODO-FILL` sentinel. It caught a surface map whose own claims were 12/25
@@ -243,7 +245,7 @@ changed is spine work, not polish.
   reruns it — third instance of this class alongside the replay driver and the seam battery. Acceptance:
   a tracked dev tool validates a report from a clean checkout, a seeded bad anchor exits nonzero with the
   offending line printed, a seeded `TODO-FILL` exits nonzero, and a clean report exits 0.
-- pri=3 `size=S` — `verify_drafts` reruns are not idempotent on a failing draft. A failed row hits none
+- `p20` pri=3 `size=S` — `verify_drafts` reruns are not idempotent on a failing draft. A failed row hits none
   of the status transitions at `src/cement_runtime/system.py:3582-3600`, so it stays `draft`, stays
   eligible, and every rerun commits a fresh report plus `artifact.verification_failed` event with a
   distinct report ID. Harmless today because the negative branch needs out-of-band corruption, but exit 6
@@ -253,7 +255,7 @@ changed is spine work, not polish.
 
 ## M2.u4c2 deferrals
 
-- pri=2 `function receipts` / historical `show`: merge the diff-blind teammate's 13 contract-derived
+- `p21` pri=2 `function receipts` / historical `show`: merge the diff-blind teammate's 13 contract-derived
   tests. They passed 35/35 against the landed implementation but were never merged, and the worktree
   died with the wave. Acceptance: re-derive from `.agent/decisions/m2u4c2-contract.md` Decision 8/9 and
   keep only probes MAIN's 17 do not already reach — repeated-flag last-wins, Unicode decimal digits
@@ -261,7 +263,7 @@ changed is spine work, not polish.
   are the named non-overlapping ones. Gate: suite green, no existing test weakened.
 ## M2.u5a deferrals
 
-- pri=2 Bundle-identity determinism is pinned by observation, not by mechanism.
+- `p22` pri=2 Bundle-identity determinism is pinned by observation, not by mechanism.
   `test_bundle_identity_is_per_run_while_its_length_is_stable` runs two clean lifecycles under default
   entropy and asserts unequal hashes; the review proved that holding the ID stream and clock fixed makes
   two independent ledgers byte-identical, so the test observes provenance entropy rather than the
@@ -269,7 +271,7 @@ changed is spine work, not polish.
   byte-for-byte, then varies exactly one evidence or verification-example ID and proves the root
   `function_hash` moves while the length holds at 3,341. Retire the two-run observation test once the
   mechanism test lands, and keep the example README's per-run sentence bound to whichever test survives.
-- pri=3 The example's offline phase proves ledger-freedom through `System.__init__` +
+- `p23` pri=3 The example's offline phase proves ledger-freedom through `System.__init__` +
   `sqlite3.connect` patches in-process only. The three CLI subprocesses prove the operator route and
   invocation shape, never that the child process opened nothing — `eval` dispatches ahead of the `--db`
   gate, so absent `CEMENT_DB`/`CEMENT_PARTITION` rules out configuration alone. Acceptance: a
@@ -279,7 +281,7 @@ changed is spine work, not polish.
 
 ## M2 review deferrals
 
-- `pri=4` `size=S` — `_verify_row`'s `except (IntegrityError, ValidationError)`
+- `p24` `pri=4` `size=S` — `_verify_row`'s `except (IntegrityError, ValidationError)`
   (`src/cement_runtime/system.py:3522`) has an unreachable second arm, so no honest probe pins it.
   Removing `ValidationError` from the catch leaves the whole suite green. Reachability was traced and the
   arm is defensive breadth, not a gap in coverage of live behavior: `_validate_promoted` raises
@@ -294,7 +296,7 @@ changed is spine work, not polish.
   immutability trigger and is labelled a fabricated-corruption probe that is never cited as a real-ledger
   repro; suite green either way.
 
-- `pri=3` `size=S` — `main` does not handle `KeyboardInterrupt`, so operator cancellation leaks a
+- `p25` `pri=3` `size=S` — `main` does not handle `KeyboardInterrupt`, so operator cancellation leaks a
   traceback. A console probe held an exclusive SQLite lock, ran `cement ... function show`, and sent
   SIGINT during the wait: the process returned `-2` with a Python traceback on stderr ending in
   `KeyboardInterrupt`. That contradicts the JSON-first, traceback-free CLI posture everywhere else, and no
@@ -302,7 +304,7 @@ changed is spine work, not polish.
   terminates with a chosen interrupt status and no traceback, one committed probe pins it, and if JSON is
   deliberately omitted for interrupts the exception is documented once in `README.md`/`docs/`.
 
-- `pri=3` `size=S` — `verify_drafts`'s `verified_by` bound is unpinned at the CLI. The library validates
+- `p26` `pri=3` `size=S` — `verify_drafts`'s `verified_by` bound is unpinned at the CLI. The library validates
   it with `_text(..., maximum=256)` (`src/cement_runtime/system.py:155-166,3645-3648`), but the scoped CLI
   suite (`tests/test_cli.py:1574-1588`) pins only required/nonempty behavior, so weakening the leaf to
   accept oversized or control-bearing provenance leaves the suite green. This is the accept/reject PAIR
@@ -311,13 +313,13 @@ changed is spine work, not polish.
   exit 0 against invalid/2 with exact empty stdout on rejection, and the accepted boundary value read back
   out of the verification report.
 
-- `pri=3` `size=S` — `--out` writes no parent-directory `fsync`, so the atomic rename is durable against
+- `p27` `pri=3` `size=S` — `--out` writes no parent-directory `fsync`, so the atomic rename is durable against
   process death but not against power loss. Source-derived only; the review ran no power-loss simulation.
   Same cross-resource class as the `_emit` stdout-flush row. Acceptance: either the export path fsyncs the
   parent directory after `os.replace` and one probe pins the call, or a decision record states the
   durability bound once and `README.md`/`docs/` repeat it wherever export durability is claimed.
 
-- `pri=2` `size=M` — nine integrity checks across the function ABI and the P5 verifier are each
+- `p28` `pri=2` `size=M` — nine integrity checks across the function ABI and the P5 verifier are each
   individually deletable with the whole suite still green, so the committed tests do not pin them. In
   `src/cement_runtime/function.py:153-182`, deleting any ONE of four digest-syntax checks keeps all 23
   `FunctionTests` green: `evidence_snapshot_hash`, `output_hash`, `entry_seal` and `report.test_set_hash`.
@@ -334,7 +336,7 @@ changed is spine work, not polish.
   `function-hash-matches-snapshot` fails with its field-specific detail; all nine deletion mutants then
   fail, proven by a rerun of the catalogue that produced them.
 
-- `pri=3` `size=S` — two real-scale boundary pairs are asserted only against patched-down limits. The 1M
+- `p29` `pri=3` `size=S` — two real-scale boundary pairs are asserted only against patched-down limits. The 1M
   item ceiling (`tests/test_function.py:598-623`) is exercised by patching `FUNCTION_MAX_ITEMS` to a small
   fixture value, so nothing committed drives the declared number. The M2 review ran the real-scale probes
   and they pass: exactly 1,000,000 accepted and 1,000,001 rejected, and likewise for the byte gate, depth
@@ -342,21 +344,21 @@ changed is spine work, not polish.
   for items, with the slow cases marked so the default gate stays usable, and keep the patched-down
   fixtures for the fast path.
 
-- `pri=4` `size=S` — the single-snapshot race test (`tests/test_system.py:4007-4101`) infers transaction
+- `p30` `pri=4` `size=S` — the single-snapshot race test (`tests/test_system.py:4007-4101`) infers transaction
   lifetime from writer blocking plus a coherent result, so no committed assertion inspects
   `connection.in_transaction` at an inner verification call. The proof is therefore load- and
   timing-dependent rather than local, and a refactor could weaken it without failing. Acceptance: a
   targeted test wraps `_promoted_function_rows`, asserts `connection.in_transaction is True` before
   delegating, and verifies one successful result.
 
-- `pri=3` `size=S` — two test fixtures create temporary directories inside the repository root:
+- `p31` `pri=3` `size=S` — two test fixtures create temporary directories inside the repository root:
   `tempfile.TemporaryDirectory(dir=".")` at `tests/test_cli.py:165` and `tests/test_system.py:183`. An
   interrupted run leaves `tmp*/cli.db` directories behind in the working tree, which the M2 review had to
   clean before it could read a trustworthy `git status`. Acceptance: both fixtures allocate outside the
   repository, or the suite removes them on teardown even when the run is interrupted, and a deliberately
   interrupted run leaves `git status` clean.
 
-- `pri=3` `size=L` — the function layer outgrew one class. `System` (`src/cement_runtime/system.py:403`)
+- `p32` `pri=3` `size=L` — the function layer outgrew one class. `System` (`src/cement_runtime/system.py:403`)
   spans 4,920 lines and 62 methods, and four judgment-bearing methods are individually oversized:
   `verify_function` 452 lines / cyclomatic complexity 67, `function_report` 356 / 36,
   `_function_promotion_plan` 227 / 31, `promote_function` 272 / 26. Transaction ownership is genuinely
@@ -368,7 +370,7 @@ changed is spine work, not polish.
   depth stays explicit; no E/F-rated function-layer method remains; the full suite, `uv build`, the
   healthy lifecycle and the degraded and recovery matrices are unchanged.
 
-- `pri=3` `size=M` — three validation contracts are assembled independently at five sites
+- `p33` `pri=3` `size=M` — three validation contracts are assembled independently at five sites
   (`src/cement_runtime/system.py:1995,2311,2929,3893,3940`). Operation-policy scalar and canonical
   validation is built separately by verify, report and promotion planning; receipt-member
   artifact/report/binding checks are built separately by reconstruction, report projection and
@@ -385,13 +387,13 @@ changed is spine work, not polish.
 Off-spine at M3 planning. Each row carries the close check written while the evidence was fresh; the
 substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-plan-review.md` L6.
 
-- `pri=4` `size=L` — separately installable command-source distribution. M3.7 ships the runner as a
+- `p34` `pri=4` `size=L` — separately installable command-source distribution. M3.7 ships the runner as a
   source/sdist example, which is sufficient. Acceptance: a second versioned wheel installs beside a
   wheel-only `cement-runtime`; core metadata declares no provider or runtime dependency; importing core
   loads no optional module; the second wheel exposes one documented runner command; the root configured
   gate plus a clean two-wheel smoke pass; release and version ownership is explicit.
 
-- `pri=3` `size=M` — resolver cache or pooled read connection. M3.2b deliberately pays full P1-P6 per
+- `p35` `pri=3` `size=M` — resolver cache or pooled read connection. M3.2b deliberately pays full P1-P6 per
   call. Acceptance: cache identity binds database identity, current operation revision, latest receipt
   sequence and hash, and every state change that can fail a check; first/middle/last corruption never
   returns a cached hit; a concurrent-writer test proves invalidation; 1/1,000/50,000 benchmarks show a
@@ -402,19 +404,19 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   4.118654 ms. Time scales `N^1.037`, resident memory `N^1.000`, and warm reuse buys nothing at cap
   scale, so this row's `pri` rises with the largest promoted set any caller actually ships.
 
-- `pri=3` `size=M` — explicit quarantine/repair command after a resolver failure. Pure `resolve` only
+- `p36` `pri=3` `size=M` — explicit quarantine/repair command after a resolver failure. Pure `resolve` only
   reports, so ambiguity and integrity failure no longer quarantine. Acceptance: a separately named
   mutator consumes a displayed failure identity, rechecks under one write lock, changes only
   still-affected artifacts, emits one bounded event, is idempotent on rerun, and leaves an ordinary
   domain miss untouched; a race that moves the state returns conflict with no write.
 
-- `pri=4` `size=M` — caller-lifecycle helper and outbox example. Core owns no request lifecycle after M3.
+- `p37` `pri=4` `size=M` — caller-lifecycle helper and outbox example. Core owns no request lifecycle after M3.
   Acceptance: an optional example durably binds a caller logical-operation ID to partition, operation
   revision, canonical input, candidate content and source revision; same-ID/different-content fails; an
   at-least-once relay probe demonstrates duplicate proposals after the acknowledgement crash window; the
   docs call this lost-intent protection and never exactly-once submission.
 
-- `pri=4` `size=S` — rename the generic `_request_id` validator and repair entity labels. It reports the
+- `p38` `pri=4` `size=S` — rename the generic `_request_id` validator and repair entity labels. It reports the
   label `request_id` for `proposal_id` (`system.py:1087,1128,1229`), `artifact_id`
   (`3704,4466,4829,4968`), `example_id` (`4761`), `report_id` (`5006`) and the receipt id. Pre-existing;
   u4c2 pinned it as-is because fixing it meant editing `system.py` outside that unit's CLI write set.
@@ -426,26 +428,26 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
 
 ## M3.1 deferrals
 
-- `pri=3` `size=S` — every map S3 claim needs an explicit KEEP/REWRITE/DELETE row, and the source
+- `p39` `pri=3` `size=S` — every map S3 claim needs an explicit KEEP/REWRITE/DELETE row, and the source
   docstrings need falsifiers. M3.1's D8 table covered the human-facing docs it changed and rewrote the
   two source docstrings (`System` class contract, `promote_function`), but S3-001/004/005 KEEP claims and
   map rows S1-009/010/138 carry no per-row disposition, so a neighbouring edit can delete a governing
   supervision claim while the D8 table still reads satisfied. Acceptance: each S3 row carries a
   disposition plus its falsifier, source-docstring rows included, and one check rejects obsolete callback
   ATTRIBUTION rather than merely unclassified tokens.
-- `pri=3` `size=S` — the human-facing register audit still runs from no gate, now with a concrete
+- `p40` `pri=3` `size=S` — the human-facing register audit still runs from no gate, now with a concrete
   consumer. M3.1 ran `.scratch/register/audit.py` by hand over the three changed surfaces (README 161
   sentences >25w=0; threat-model 92 >25w=0; architecture 141 >25w=1, pre-existing), so no clone can
   reproduce the conformance claim. Merges with the existing register-audit port row. Acceptance: the
   tracked tool runs from the configured gate over every changed human-facing surface and reports zero new
   over-length sentences.
-- `pri=3` `size=S` — clock and ID allocation now run under `BEGIN IMMEDIATE` in `verify_drafts` and
+- `p41` `pri=3` `size=S` — clock and ID allocation now run under `BEGIN IMMEDIATE` in `verify_drafts` and
   `promote_function`, so a caller-supplied `clock_us` that blocks, or that re-enters the same ledger,
   holds the write lock while it runs. Accepted at M3.1 as the price of correct timestamp ordering, but
   pinned by nothing. Acceptance: one probe drives a blocking clock with a second default writer and one
   drives a re-entrant clock through another `System`, each asserting the chosen outcome, and the lock
   duration is recorded beside the ruling.
-- `pri=3` `size=M` — preserved invariants P6-P10 rest on the pre-existing grade of the rewritten
+- `p42` `pri=3` `size=M` — preserved invariants P6-P10 rest on the pre-existing grade of the rewritten
   `test_system.py` / `test_cli.py` cases, which the M3.1 diff-blind table (V15/V16/V21-V24, contract
   Part 8) shows is coarser than the invariants claim. P8 in particular was closed by MAIN comparing
   `store.py` bytes to `3a53389` by hand, so no clone reproduces it. Acceptance: a frozen
@@ -456,7 +458,7 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
 
 ## M3.2a deferrals
 
-- `pri=3` `size=S` — `VACUUM` inside either capability reports `StateError("database is busy or
+- `p43` `pri=3` `size=S` — `VACUUM` inside either capability reports `StateError("database is busy or
   unavailable")` -> exit 4, the ONE class where retry is the intended recovery, for a condition retry can
   never clear. Measured identical on both paths: SQLite refuses `VACUUM` inside the open transaction
   before the authorizer is consulted, so this is the transaction's refusal, not the read capability's, and
@@ -467,7 +469,7 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   path asserting the class and message, no classification input other than `sqlite_errorcode` plus
   statement provenance the Store already owns, and the parity assertion updated rather than deleted.
 
-- `pri=4` `size=S` — two `_connect` setup operations are same-value redundant, so only a call spy can
+- `p44` `pri=4` `size=S` — two `_connect` setup operations are same-value redundant, so only a call spy can
   detect their deletion: `PRAGMA busy_timeout = 10000` duplicates `sqlite3.connect(timeout=10.0)`, and
   `setconfig(SQLITE_DBCONFIG_TRUSTED_SCHEMA, False)` duplicates the preceding `PRAGMA trusted_schema =
   OFF` (`rev-m3u2a` C04, both ablations measured with zero corpus mismatches). M3.2a keeps both and pins
@@ -476,7 +478,7 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   the `hasattr(connection, "setconfig")` guard is re-examined against the declared `requires-python`, and
   the suite is green with B6 updated to match.
 
-- `pri=5` `size=S` — `system.py` re-implements its own 64-hex validator at three sites. `_digest(value,
+- `p45` `pri=5` `size=S` — `system.py` re-implements its own 64-hex validator at three sites. `_digest(value,
   label)` (`system.py:221-225`) raises `f"{label} must be a SHA-256 hex digest"` on exactly the
   `type(value) is not str or re.fullmatch(r"[0-9a-f]{64}", value) is None` predicate, and three later
   sites spell that predicate out again: `verify_function`'s `expected_function_hash` guard
@@ -489,7 +491,7 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   src/cement_runtime/system.py` reports 1, every replaced site keeps its exact current message and
   raise-versus-verdict behaviour, and the full suite is green.
 
-- `pri=4` `size=M` — every wave ships a fresh copy of the same structural validator. `m3u2a-matrix-validate.py`,
+- `p46` `pri=4` `size=M` — every wave ships a fresh copy of the same structural validator. `m3u2a-matrix-validate.py`,
   `m3u2b-wave2-validate.py` (286 lines) and `m3u3-wave1-validate.py` share one engine - `_rows` id-set
   enforcement, per-field `unknown` counting with a MAIN-owned exemption, an anchor regex, a prose-length
   floor, enum checks, `KIND`/`UNKNOWN-CELLS` output, and rc 1 while any cell is unfilled - and differ only
@@ -503,7 +505,7 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
 
 ## M3.4 deferrals
 
-- `pri=4` `size=S` — every spike/wave evidence pointer this milestone cites is a LOCAL-ONLY tag.
+- `p47` `pri=4` `size=S` — every spike/wave evidence pointer this milestone cites is a LOCAL-ONLY tag.
   `m3u4-alt-binding` (`aa77d9f`), `m3u4-alt-projection` (`cb0ef3e`), `m3u4-map`,
   `m3u4-verdicts-wave2` and `m3u4-attack-wave2` name commits that are unreachable from `main`, and
   `git ls-remote --tags origin` returns nothing, so every clone resolves none of them and a
@@ -516,7 +518,7 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   is marked expired and the two spike diffs a later unit might want are captured as tracked patch
   files under `.agent/archive/`.
 
-- `pri=3` `size=S` — `_ProposalIds` carries plural machinery no production caller reaches. It rejects a
+- `p48` `pri=3` `size=S` — `_ProposalIds` carries plural machinery no production caller reaches. It rejects a
   duplicate identifier set, returns early on an empty selection without touching SQL, and builds dynamic
   `?` placeholders, yet its only constructor is the singleton inside `_proposal_binding`
   (`src/cement_runtime/system.py`), so every shipped call passes exactly one id. Ruled KEEP at M3.4 S3:
@@ -540,7 +542,7 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
 
 ## M3.5a deferrals
 
-- `pri=3` `size=S` — argparse option abbreviation is live on EVERY parser node, not only the root. Measured at `4783eed`
+- `p49` `pri=3` `size=S` — argparse option abbreviation is live on EVERY parser node, not only the root. Measured at `4783eed`
   by `.agent/decisions/m3u5a-s2-probe.py`: root `--part` resolves to `--partition` and nested
   `function eval --bun`/`--in` resolve to `--bundle`/`--input`, while abbreviated LEAF names
   (`function ev`, `proposal sho`) are rejected. M3.5a scopes `allow_abbrev=False` to its two new
@@ -556,7 +558,7 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   parser node constructed in `_parser()` sets `allow_abbrev=False`, one census-derived test walking
   `_parser()` asserts `--part`, `--bun` and `--in` each return exit 2 with `unrecognized arguments`,
   and the break is stated in `README.md` where the grammar is described.
-- `pri=2` `size=M` — no public existing-only or read-only `System` construction exists. `Store.__init__` opens an absent
+- `p50` `pri=2` `size=M` — no public existing-only or read-only `System` construction exists. `Store.__init__` opens an absent
   path with `O_CREAT|O_EXCL` and `_initialize` then opens a WRITABLE connection, begins IMMEDIATE and
   commits even for an existing ledger (`m3u5a-map.json` `X02`); a probe measured ordinary
   construction turning an absent path into a 208,896-byte v2 ledger. M3.5a's D13 answers the operator
@@ -567,7 +569,7 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   creates nothing and answers 5, asserted without the `mock.patch.object` pattern that
   `tests/test_read_capability_battery.py:425` uses, which constructs `System` first and therefore
   cannot see this defect. Owner: M3.6b, which reworks construction.
-- `pri=2` `size=M` — every WRITE leaf still creates a ledger on a typo'd `--db`. Both M3.5a spikes measured it
+- `p51` `pri=2` `size=M` — every WRITE leaf still creates a ledger on a typo'd `--db`. Both M3.5a spikes measured it
   independently (`Z15` in `m3u5a-spike-flags.json` and `m3u5a-spike-envelope.json`): a misspelled
   path exits 3 for an unregistered operation while leaving a fresh v2 database behind, so the
   diagnosis names the operation when the real defect is the path. D13 fixes the read verb only,
@@ -580,7 +582,7 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   `System.__init__` 1, `sqlite3.connect` >= 1 and a ~208 KiB ledger left behind, with
   `Store.transaction` 0 and `System.submit_proposal` 0. Fold this case into the same ruling; the
   acceptance test per leaf must use a malformed argument value as well as a misspelled path.
-- `pri=4` `size=S` — 49 of `m3u5a-map.json`'s 55 rows are attention-directing only. MAIN re-derived six findings in
+- `p52` `pri=4` `size=S` — 49 of `m3u5a-map.json`'s 55 rows are attention-directing only. MAIN re-derived six findings in
   `m3u5a-s2-probe.py` and consumed the rest as pointers; a validator grade proves each anchor
   resolves and each cell is filled, never that a finding is true. Acceptance: any row promoted to a
   durable claim in a contract, doc or roadmap line is re-derived against HEAD first, and the
@@ -588,7 +590,7 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
 
 ## M3.5b deferrals
 
-- `pri=2` `size=S` — gate 4's `parser_shape` digest instruments only part of what B02's retired
+- `p53` `pri=2` `size=S` — gate 4's `parser_shape` digest instruments only part of what B02's retired
   `cli.py` pin used to carry, and three facets have NO instrument anywhere in the repo. It digests each
   action's dest, option strings, default, required flag, nargs and class, plus each node's
   `allow_abbrev`. It digests no help text, no `choices` and no `type`. Measured: M3.5b rewrote the root
@@ -601,7 +603,7 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   `choices`, and `type=int` to `type=str` — each move it while the leaf/node census and every existing
   D24, D25 and D26 assertion stay green.
 
-- `pri=4` `size=S` — no shipped prose names `cement_runtime.example_adapter`. Its only mention was the
+- `p54` `pri=4` `size=S` — no shipped prose names `cement_runtime.example_adapter`. Its only mention was the
   README quick start's `--source-command '["python3","-m","cement_runtime.example_adapter"]'`, which
   left with the CLI candidate-source route at M3.5b D22. The module still ships and is still reachable
   from the library route through `CommandCandidateSource`, which `docs/adapter-protocol.md` documents
@@ -613,7 +615,7 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
 
 ## M3.6a1 deferrals
 
-- `pri=2` `size=S` — the battery's `_detached_worktree` leaks a git worktree REGISTRATION and an
+- `p55` `pri=2` `size=S` — the battery's `_detached_worktree` leaks a git worktree REGISTRATION and an
   11 MB temp tree whenever the process dies before its `finally`. Measured at M3.6a1 S6: 25 orphaned
   `/tmp/cement-m3u6a1-*/tree` registrations, ~275 MB, survivors of one 600 s `TimeoutExpired` and
   several killed runs. `git worktree prune` does not reclaim them because the DIRECTORIES still
@@ -625,7 +627,7 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   mid-checkout with `SIGKILL`, then require the next battery run to report zero orphans and
   `git worktree list` to name the primary tree alone.
 
-- `pri=3` `size=M` — no mutation oracle exists for assertion STRENGTH in the migrated bodies
+- `p56` `pri=3` `size=M` — no mutation oracle exists for assertion STRENGTH in the migrated bodies
   (attack Y01, instantiated by Y09 on D24's two payload pins and by A11 on the demo's verdicts). The
   wave-2 battery is a real independent oracle — diff-blind, 23 red of 29 at `6fb4d92`, green at HEAD —
   but it pins the assertions it was told about, not the ones a later author might weaken. Measured
@@ -636,7 +638,7 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   `assertEqual(payload, {"request_id": rid})` weakened to `assertIn("request_id", payload)`, and
   `assert source.calls == before` weakened to `>=`.
 
-- `pri=2` `size=S` — D17's migrated-definition loop is VACUOUS at HEAD and dead precisely because
+- `p57` `pri=2` `size=S` — D17's migrated-definition loop is VACUOUS at HEAD and dead precisely because
   gate 2 passes. `tests/test_migration_battery.py:1036` walks `_census()["definitions"]` and
   `continue`s on every verdict outside `{MIGRATE, MIGRATE-RESOLVE}`; the committed
   `m3u6a1-census.json` holds 23 rows, all `RETAIN`, so the body never executes. Gate 2's acceptance
@@ -646,7 +648,7 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   a non-empty subject at HEAD, and a seeded control confirms it — delete one `SITES` rule from
   `m3u6a1-surgery.py` and require D17 to go red, which it does not today.
 
-- `pri=2` `size=XS` — D20 asserts a string that never existed at either end.
+- `p58` `pri=2` `size=XS` — D20 asserts a string that never existed at either end.
   `tests/test_migration_battery.py:1152` runs `assertNotIn("becomes one exportable function", ...)`
   while the baseline heading at `6fb4d92:examples/hospital_ocr/run_demo.py:348` reads "both promoted
   layouts **become** one exportable function" — one character apart, so the conjunct held vacuously
@@ -654,7 +656,7 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   from the baseline blob rather than retyped, and a seeded control confirms sensitivity — restore the
   baseline act-5 heading in a detached worktree and require D20 to go red.
 
-- `pri=3` `size=S` — D15 reports on two different artifacts under one clause.
+- `p59` `pri=3` `size=S` — D15 reports on two different artifacts under one clause.
   `tests/test_migration_battery.py:950` runs its idempotence half against
   `repaired / SURGERY.relative_to(ROOT)`, the script COMMITTED inside the detached worktree, while
   its cardinality half runs `_copy_surgery()`, which copies the WORKING-TREE script. An edit to the
@@ -665,7 +667,7 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   confirms it: mutate the working-tree `m3u6a1-surgery.py` so its second run prints `applied:`
   instead of `no-op` and require D15 to go red, which it does not today.
 
-- `pri=3` `size=S` — no check grades this contract's own gate text against what its instruments
+- `p60` `pri=3` `size=S` — no check grades this contract's own gate text against what its instruments
   measured, which is why closure sessions keep finding claim defects in MAIN's text by hand (C11,
   C12, C14, C17, C20, C21, C22, C23 — eight of twenty-four corrections are the contract restating a
   number or a shape its own artifact contradicts). Acceptance: a committed checker reads every
@@ -673,7 +675,7 @@ substance behind each sits in `.agent/decisions/m3-plan-draft.md` S5 and `m3-pla
   artifact, and exits nonzero on divergence; seeded both ways — restate one count wrong and require
   a nonzero exit, run it on the shipped contract and require zero.
 
-- `pri=3` `size=S` — the pre-battery baseline sweep M3.6a1 S8 ordered was never run, so no
+- `p61` `pri=3` `size=S` — the pre-battery baseline sweep M3.6a1 S8 ordered was never run, so no
   measurement supports the claim that `tests/test_migration_battery.py` is each reversion's SOLE
   killer. The decisive sweep proves the battery kills all 92 rows; it cannot separate a reversion
   the pre-existing suite already catches from one only the battery catches. Run
