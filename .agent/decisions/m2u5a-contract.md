@@ -96,7 +96,7 @@ cannot produce; substitution order is therefore irrelevant for these token shape
 value and equality together, so the transcript test additionally pins the occurrence count of each
 pattern at exactly 1. The README block shows the masked form and states both masks.
 
-Byte length of the bundle is stable across runs while its hash is not, so `3341` is printed literally and
+Byte length of the bundle is stable across runs while its hash is not, so `3344` is printed literally and
 pinned; the hash is masked. Both properties are measured, not assumed.
 
 ## Decision 5 — CLI round-trip scope
