@@ -22,13 +22,13 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 - `resolve` pays full P1-P6 verification per call (35.5 s / 986 MiB at the 50,000-entry cap; 616 ms at 1,000; 4 ms at 1), no cache; prose cites the numbers, never "fast". Ambiguity quarantine leaves with `handle`.
 - Exit classes: 2 usage/validation, 3 absent, 4 conflict (the one class where retry is the recovery), 5 integrity, 6 negative verdict with the channel chosen per leaf; root `verify` exit 0 = frozen precedent, not a model. `allow_abbrev=False` only on `resolve` + `proposal submit`.
 - Assurance: tier default `kernel`; `oracle` only where an independent implementation can diverge. A removal closes on a battery that fails when one obligation is undone or one preserved invariant disappears — never on a green suite. Each contract pins a NUMBERED gate list rerun from committed state; a gate added mid-unit voids the pins ⇒ linters/type checkers land at a unit boundary. Rulings enter tables through idempotent `--check` patchers; dispatch tips tagged `archive/m<m>u<u>-<role>`.
-- Prototype (user): a web UI demo under `prototype/`, disposable stack; the shipped `cement_runtime` stays the IMPLEMENT base and M3/M4 rulings bind; no `handle`-based consumer is built. `prototype/webui-demo`: chat + control-plane split, stdlib `http.server` + vanilla JS + vendored woff2, `examples/hospital_ocr` corpus + `pipeline.py`, `?scene=N` autoplay, light theme only (user ruling), accents ≥4.5:1 on white. The provider alone is simulated (sampled plan variant + 1.1–3.4 s, labelled on screen); lifecycle, digests + resolve timings are the runtime's.
+- Prototype (user): `prototype/webui-demo` = behavioral reference (UX, outputs, aesthetics) for IMPLEMENT, never its code base; retires at phase close. Chat + control-plane split, light theme (user ruling), accents ≥4.5:1 on white, `?scene=N` autoplay; the provider alone is simulated and labelled on screen, while lifecycle, digests + resolve timings are the runtime's.
 - Human-facing prose (README, `docs/`, example README, CLI help) = ASD-STE100 register, graded by D25; everything else agent-optimized.
 
 ## Deferred
 
 `p<nn>` = the archived polish register under `.agent/archive/` (full text, evidence, `pri`, acceptance).
-- M3.6a2 S5–S9: code half green on `archive/m3u6a2-impl` (= `impl/m3u6a2`); 19 red battery methods = L19–L24 prose rewrite of the four owned docs, L25–L29 tripwire repairs, L31 quarantine pin. Accept: `tests/test_lifecycle_removal_battery.py` 0 red; contract §6 gates 1–8 green; ONE green squash commit onto main.
+- M3.6a2 S6–S9: code half = `archive/m3u6a2-impl` (`63444f7`, only `system.py` + the battery; main touched neither since `683be58`) cherry-picked onto `impl/m3u6a2b` off main; 19 red battery methods = L19–L24 prose rewrite of the four owned docs, L25–L29 tripwire repairs, L31 quarantine pin. Accept: `tests/test_lifecycle_removal_battery.py` 0 red; contract §6 gates 1–8 green; ONE green squash commit onto main.
 - M3.6a3 delete `Resolved`/`InProgress`/`FallbackFailed`/`Rejected`/`ReconciliationRequired`/`Outcome` + `CandidateRequest.request_id`; rule `ReviewRequired` first. Accept: burden re-measured on its own deletion set; battery per contract.
 - M3.6b schema cut v2→v3 (direct proposal columns, `requests` + index gone, refusal fixtures, 0.2.0); owns p50 p51 p04. Accept: fingerprint + `SCHEMA_VERSION` move together, suite green with the reset documented.
 - M3.7 command-runtime relocation under byte equality + blocked reverse imports (wheel already carries no `examples/`/`tests/`); owns p54. M3.8 demo + transcript regeneration via idempotent updater (`data`). M3.9a/b docs claim ledger rewrite + independent replay (`docs`).
@@ -42,4 +42,4 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 
 ## Phase
 
-ITERATE. Next = interactive sessions: run `prototype/webui-demo`, refresh proof, work owner feedback into `prototype/` + `Decisions` until the owner says go. IMPLEMENT resumes at M3.6a2 S5 on `impl/m3u6a2`.
+IMPLEMENT. Owner said go. Order: M3.6a2 S6–S9 → M3.6a3 → M3.6b → M3.7 → M3.8 → M3.9a/b → gate tooling + CI + scanners (p01 + the IMPLEMENT law-gap row) → `rev` lenses adjudicated in `.agent/review.md` → README + `prototype/` retirement → MAINTAIN.
