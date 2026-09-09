@@ -10,11 +10,12 @@ paths:
 ## Recipe
 
 1. `cmp CLAUDE.md ~/Projects/agents/claude/CLAUDE.project.md` ⇒ the working tree is upstream verbatim.
-2. `git -C ~/Projects/agents diff <last-sync> HEAD -- claude/CLAUDE.project.md claude/prompts/` = the genuine upstream delta; each upstream commit body carries its rationale.
-3. `git checkout HEAD -- CLAUDE.md` restores downstream state → fold the delta on hunk by hunk, adapting each to the invariants.
-4. Record the new `<last-sync>` here in the same commit.
+2. `git -C ~/Projects/agents diff <last-sync> HEAD -- claude/CLAUDE.project.md claude/prompts/` = the genuine upstream delta; each upstream commit body carries its rationale. Its `prompts/` half reaches this repo only through a `/goal` body the owner pastes.
+3. `git diff HEAD -- CLAUDE.md` = what the overwrite took away. Divergence is zero by design, so a hunk absent from the step-2 delta is reverted downstream law → `git checkout HEAD -- CLAUDE.md`, then fold the delta on hunk by hunk.
+4. Sweep the invariants below, each retired form under a positive control naming its expected match count first.
+5. Bind every new upstream clause to the `.claude/rules/` file carrying its downstream mechanics — the template states the law, `.claude/rules/` states how this repo satisfies it — and record the new `<last-sync>` here, all in one commit.
 
-`last-sync = agents@bc2c494`.
+`last-sync = agents@7d72589`.
 
 ## Invariants a refresh must keep, else restore
 
