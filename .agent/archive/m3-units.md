@@ -1624,3 +1624,85 @@ dispatches from each unit's committed contract in `.agent/decisions/`, never fro
     no ruling may rest on a local-only ref.
     `main=` 82% 198K/240K at close, one compaction boundary crossed. `mate=` 86% 206K/240K
     (`gate-m3u6a1-1`, stopped at its 22-commit tip), 73% (`scout-m3u6a2`, complete).
+
+## M3.6a2 <a id="m36a2"></a>
+
+  - M3.6a2 DONE tier=kernel tags=`archive/m3u6a2-{scout,test,test-2,attack,impl,impl-1,impl-2,impl-3,prod-1,rev}`
+    depends=M3.6a1 - deleted the request lifecycle (`System.handle`, `System.request_status` and
+    the closed call-graph component serving them: leases, request-ID idempotency, request
+    invalidation, the `in_progress`/`retry_failed`/`fallback_failed`/`reconciliation_required`
+    vocabulary), rewrote the four normative documents describing it, and refroze the migration
+    battery onto the closed transition. Landed on main as ONE squash commit from 38
+    branch commits (`impl/m3u6a2b`, tip `archive/m3u6a2-impl-3` `5fd6f23`). Contract + rulings:
+    `.agent/decisions/m3u6a2-*`.
+    SURFACE. `src/cement_runtime/system.py` = `2 480` and the only changed file under `src/`. The
+    two additions are a PRESERVATION, not a stowaway: the lease removal deleted the path that
+    bounded `now`, so `or now > _MAX_SQLITE_INTEGER` plus its `StateError` keep the signed-64-bit
+    clock invariant, pinned structurally at `tests/test_lifecycle_removal_battery.py:363`.
+    `CandidateRequest.request_id` STAYS - live on the `cement-source-v1` envelope, leaves with
+    M3.6b's single schema cut.
+    CLOSURE. Not a green suite: 31 diff-blind obligations, five raw-source residue predicates each
+    paired with a STRUCTURAL pin, reversion sweep `ROWS: 30 SURVIVORS: 0`, mutation replay
+    `MUTANTS: 15 SURVIVORS: 0`. Gates 1-10 green from committed `278d2a8`, log
+    `.agent/decisions/m3u6a2-closure-gates.log`; discovery = 1031 tests (1000 + 30 + `test_d28`).
+    THAT LIST WAS NOT THE WHOLE GATE, and finding out cost the unit its close. Gate 1 ran
+    `discover` minus `tests/test_migration_battery.py` and gate 10a ran that module minus
+    `test_d28` - 1000 + 30 of 1031, with the one gate that grades history omitted from every
+    rerun, each split honestly labelled and both reporting `OK`. Run whole from the squash,
+    `test_d28` was RED, and MAIN reproduced the same failure at the branch's own newest in-range
+    revision `05f7ce4`, so it was structural and pre-existing rather than squash damage: D28
+    unlinks the migration battery from each checkout it grades while four frames of the lifecycle
+    battery READ that file, so any revision carrying both cannot pass. Two instruments, each
+    correct alone, mutually exclusive in composition - only the composed run can see it. Repaired
+    by AMENDING the squash (D28 grades committed trees; a fix on top leaves the red revision in
+    range forever): D28 exports `CEMENT_D28_INNER_REPLAY=1` and the four frames narrow to what the
+    checkout holds, the pairing checked BOTH ways so a real deletion still reddens. Law + seeds
+    `.claude/rules/ops.md`, reversal `.agent/review.md`.
+    THE SPLIT HID A SECOND ONE, and it was found by the same first full run: D19 errors
+    `CandidateSourceError: candidate source failed` whenever `test_hospital_ocr_example` runs
+    before it, and passes in 0.169 s alone. `MigrationBatteryTests` swaps `sys.modules` to the
+    `dc4ab5e` worktree but purged only `cement_runtime`, while the example module imports
+    `pipeline`, `plan_adapter` and `run_demo` at MODULE scope from the primary tree - they bind
+    runtime classes at their own import time, the worktree's `run_demo` reuses the cached copies,
+    and the candidate is then not an instance of the class the worktree's `propose` accepts.
+    `propose` catches `Exception` and re-raises `from None` deliberately, so the cause is erased
+    and the generic message reads like a flake - MAIN misread it as CPU contention first, on the
+    real evidence of a concurrent job, and the quiet rerun is what refuted that. `SWAPPED_ROOTS`
+    now names all four roots. TWO composition defects from one split gate: a subset that reports
+    like the whole is worth less than a slower run of the real thing.
+    THE REFREEZE (C26/D30) is the ruling that outlives the unit. The battery graded a CLOSED
+    transition against the LIVE tree, so it reddened correct work at every later unit and the tax
+    repeated per unit - 13 of 29 non-D28 frames were red at this HEAD, and one (D15) had been red
+    on main since an ITERATE rename. Repair: one class-level detached worktree at `dc4ab5e`, every
+    tree-reading helper given a `root` with NO default, D28 alone keeping the live range because
+    `gate 1 stays green at EVERY commit` is meaningless against a frozen endpoint. Pin the
+    STRUCTURAL half first - while a helper carries the tree implicitly the frame census reports
+    exactly like a converted battery.
+    A TOKEN CENSUS FORBIDS A SPELLING, NOT A CAPABILITY (C29, found by the closing `rev`). D30
+    censused `ROOT` in four places and CLAIMED `naming ROOT is the whole predicate`. False:
+    `ROOT` is built from `__file__`, so a frame navigating `__file__` reaches the live tree naming
+    `ROOT` nowhere and passes all four checks - and the idiom already lived in the module. The
+    defect was the CLAIM plus a forbidden-list census failing open on the member nobody named; no
+    live frame exploited it and no assertion was weakened. Repair enumerates the handles that
+    REACH the tree: `ROOT` + `__file__` censused at module and frame level against their own
+    allowlists, both checked in REVERSE; inherited cwd closed structurally and asserted
+    (`subprocess.run` has ONE call site, inside `_run`, whose `cwd`/`root` have no defaults). Five
+    seeds, each firing on its own assertion.
+    A CONTROL THAT CANNOT FIRE (C27) survived to closure: gate 2's `uncovered obligation` control
+    renamed one `def test_l01_` when L01 had grown from one covering test to three, so coverage
+    survived the mutation and the control reported exactly like one that fired - `4/6`, read as
+    green for the whole unit until `--self-test` was run against the committed contract. Every
+    control mutation now asserts it MOVED its input and raises otherwise. `6/6` after.
+    THE CLOSING REVIEW ran on 7 lenses fixed and committed at `5f712ea` BEFORE any reviewer read
+    the diff, which is what makes the pass terminate. 4 findings: 3 fixed (the 1031-vs-1010 count
+    and a false `~500 s` in two LIVE files; README's absolute `No public surface names it`, which
+    contradicted `__all__`, README's own quick start and `docs/adapter-protocol.md`'s required
+    `(partition, request_id)` idempotency key; C29 above), 1 OVERTURNED on MAIN's re-derivation -
+    the D25 coverage it reported lost is contracted by L26, which executes all four target ids
+    itself. Full table `.agent/review.md`. p64 + p65 born.
+    A REVIEWER DIED OF CONTEXT OVERFLOW (`Prompt is too long · automatic compaction failed`) at
+    240K reading a 6973/1670 diff whole - a dispatch defect, not a reviewer defect. The successor
+    got a per-lens READ TARGET in the seeded table plus the closed rows, and finished four lenses
+    at 48% gauge. Seed the read target, not just the row.
+    A GRADER'S SUBSTRING HEURISTIC FAILS CLOSED on rows that legitimately quote its sentinel: the
+    queue grader rejected the row filed to describe the defect, twice (p65).

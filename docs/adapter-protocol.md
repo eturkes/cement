@@ -32,10 +32,10 @@ The response must contain both fields. Additional top-level fields fail closed. 
 output. It rejects duplicate object keys, decimal/exponent and non-finite numbers, signed-64-bit
 overflow,
 invalid Unicode, and oversized or deep containers. Encode domain decimals as strings. Cement excludes
-stderr from stored errors, because stderr can contain secrets. Through `handle`, exit failure,
-timeout, malformed JSON, or an oversized result becomes an inert `fallback_failed` request. Through
-`System.propose`, the same failures raise `CandidateSourceError`. That call then writes no request
-row, no proposal, and no event.
+stderr from stored errors, because stderr can contain secrets. Exit failure, timeout, malformed JSON,
+and an oversized result are the four adapter failures Cement recognizes. Through
+`System.propose`, the same failures raise `CandidateSourceError`. That call then writes no row, no
+proposal, and no event.
 
 On Linux with `/proc`, Cement launches the adapter beneath a private child-subreaper. The supervisor
 enforces the primary timeout and the stdout/stderr limits. It terminates the adapter. It discovers and
@@ -48,14 +48,14 @@ cleanup only. Hosts without that facility terminate only the direct process. Whe
 containment matters, use Linux or an external job/container boundary. This mechanism controls
 lifecycle. It does not make an untrusted executable safe.
 
-The adapter receives no stored examples and cannot verify or promote its own proposal. Treat all
-request fields as untrusted prompt content. Keep system instructions and provider credentials outside
-the request. The command inherits the current environment by default, so it can access deliberately
-configured credentials. The Python API can instead pass an exact environment mapping.
+The adapter receives no stored examples and cannot verify or promote its own proposal. Treat every
+field of the input object as untrusted prompt content. Keep system instructions and provider
+credentials out of that object. The command inherits the current environment by default, so it can
+access deliberately configured credentials. The Python API can instead pass an exact environment
+mapping.
 
-Through `handle`, Cement can invoke the adapter again after a failed request or an expired generation
-lease. `System.propose` invokes the adapter at most one time for each call, and it never retries. A
+`System.propose` invokes the adapter at most one time for each call, and it never retries. A
 call that fails input validation or operation lookup invokes the adapter zero times. Provider
-calls must create no external effects. `request_id` is partition-local and available for provider-side
-idempotency and tracing. Adapters that use a global idempotency namespace must key on
-`(partition, request_id)`.
+calls must create no external effects. `request_id` is an opaque per-call tracing identifier. It is
+partition-local, and a provider can use it as an idempotency key. Adapters that use a global
+idempotency namespace must key on `(partition, request_id)`.

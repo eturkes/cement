@@ -294,8 +294,8 @@ EXPECTED: dict[str, dict[str, object]] = {
     "provenance_literal": {
         "exported_constant": True,
         "literal_sites": 1,
-        # 1 declaration target + the 3 former literal sites D16 rewired.
-        "reference_sites": 4,
+        # 1 declaration target + 2 surviving former literal sites; `handle` owned the third.
+        "reference_sites": 3,
     },
 }
 

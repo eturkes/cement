@@ -844,3 +844,230 @@ against 9.
   generic count would break a standing pin to satisfy a census. The catalogue is private-table or
   storage prose, a non-generation-lease statement, or a negative request-identity claim. The
   ambiguity-quarantine subset stays at ZERO and takes no grounds.
+
+- **C19** — binds L23, exercising C17's FLOOR clause. The prose rewrite showed the permission C17
+  withheld: `test_d22a_direction_cli_route_every_cli_route_locus_was_rewritte`
+  (`tests/test_cli_removal_battery.py`) closes on
+  `assertRegex(readme, r"System\.handle.{0,120}System\.request_status.{0,120}library route")`, whose
+  subject is the README sentence L19 deletes. DELETED CLAIM: the README named both lifecycle methods
+  as the library route. POST-STATE: the pin asserts the replacement claim,
+  `request row stays internal … No public surface names it`, over the whitespace-flattened README —
+  the re-scope target `System.handle` is gone, so re-basing the regex onto a surviving locus is
+  impossible and inversion onto the successor claim is the only non-weakening move. The frame keeps
+  its whole phrase-absence loop, so the row's other subproperty is untouched. `test_d22a` is a
+  REQUIRED inversion in L23's battery, not a permitted one: a body still matching the old regex
+  cannot be green against rewritten prose.
+
+- **C20** — binds L23, second FLOOR extension, and it is a PERMITTED DELTA rather than an inversion.
+  `test_d25_rewritten_human_facing_prose_holds_the_project_registe` grades the four owned documents
+  against ASD-STE100 by CENSUS: its `imperatives` and `descriptive` tuples enumerate the sentence
+  openers the shipped prose actually uses, so any rewrite of those documents moves the tuples by
+  construction. Two facts rule a `da70a56` byte pin out. FIRST, the body already differed on main
+  before this unit opened — `d9e2c90` (the owner's `mercy-general` → `example-hospital` partition
+  rename) edited the same lists — so the frozen half of L23 would have been red at the unit's own
+  baseline. SECOND, L19-L22 introduce proposal-route openers that no earlier body could name.
+  POST-STATE, asserted rather than permitted: the current body contains `"propose"`, `"resolve"`,
+  `"submitproposal"`, `"verifydrafts"` and `"reviewresult"`, each absent at `da70a56`, and differs
+  from the baseline. That keeps the row an obligation — a blanket permission would license deleting
+  the census instead of extending it.
+
+- **C21** — binds L19 and section 7's D22c ruling, no new gate.
+  `test_d22c_the_opening_text_handle_request_fence_is_protected_and` froze README's opening
+  `text` fence byte-identical between `36f7890` and the working tree. L24 requires ZERO `handle` tokens in README, and that fence drew
+  the request route as `handle(request)`, so the freeze and the census cannot both hold on the live
+  half. The freeze INVERTS on the live half and KEEPS the historical half load-bearing:
+  `handle(request)` is asserted present in the `36f7890` blob, the two halves are asserted DIFFERENT,
+  and the current fence is asserted to match zero `handle` words, to draw
+  `propose / submit_proposal` and `resolve, against the ledger`, and to contain no bare `cement `
+  command word. The baseline assertion is what stops the inversion from degenerating into an
+  unconditional pass: a fence that never carried the old drawing would fail it.
+
+- **C22** — names gate 8's COMMAND. Section 6 stated gate 8 only as accepted language, and a gate's
+  identity is (COMMAND, ACCEPTED LANGUAGE) per C07, so gate 8 was unrunnable as written. The command
+  is `uv run python .agent/decisions/m3u6a2-sweep.py --sweep`. The instrument carries 30 rows
+  S01–S30 over three operation kinds — `patch` (anchored edit, `count == 1` asserted),
+  `revert_file`, and `revert_frame` (splices a named function's `da70a56` span into the current
+  file) — covering the five deleted `System` methods (S01–S05), the lease knob and its raw
+  occurrences (S06–S09), `invalidated_generators` (S10), the seven `.models` imports (S11), a
+  `request.` event kind (S12), the four owned documents (S13–S16), the four required inversions plus
+  D25's permitted delta (S17–S21), D15a (S22), the four P06 frames (S23–S26), D01 (S27), the
+  constructor shape (S28), the L29 tripwire detector (S29) and the L31 duplicate-gate frame (S30).
+  `EXCLUSIONS` holds the four clauses section 7 fixed — D22b, D15a after its repair, L26's three
+  historical figures, and L30's D16 halves — each printed with its grounds on every control line,
+  because a clause whose subject is committed history is insensitive to every working-tree mutation.
+  Naming the command does not add a gate; the numbered pins survive and gate 8 reruns at closure.
+
+- **C23** — binds GATE 9, no obligation. It ADDS gate 9, so every claim after it reruns the whole
+  numbered list. Gate 8 proves the BATTERY's clauses die when their subjects are reverted. Nothing
+  proved the same for the 32 SUITE frames the deletion broke, and that is the exact place a removal
+  loses coverage silently: deleting a frame together with the behaviour it pinned leaves the gate
+  green and the tree smaller. Gate 9 is `uv run python
+  .agent/decisions/m3u6a2-dispositions-validate.py`. Accepted language: every row in
+  `m3u6a2-dispositions.json` carries a disposition in {`delete`, `rebase`, `remeasure`} with
+  grounds of at least 60 characters; the row-set equals the seed committed at `27658c4`; a `delete`
+  row's test is absent from the tree and its `covering_test` either resolves to a real test under
+  `tests/` or is the deletion-set sentinel; a `rebase` or `remeasure` row's test is present and its
+  span DIFFERS from the `27658c4` baseline. `--self-test` grades the grader both ways and must
+  print `CONTROLS: 6/6 firing` with the all-`unknown` seed grading nonzero.
+
+- **C24** — binds GATE 9, no obligation. It REPAIRS gate 9's instrument (command unchanged, so the
+  numbered pins survive; prior runs of gate 9 alone are void, and it had none at a closure claim).
+  C23's language grades the TEAMMATE's half: a `delete` row's test is gone, a surviving row's span
+  differs. Both stay green for the failure this unit actually risks — a rebase that keeps the frame
+  and drops the check, because the span DID differ. Gate 9 now additionally holds MAIN's ruling and
+  a derived census: every row carries `main_verdict` in {`affirmed`, `affirmed-cover-verified`,
+  `affirmed-drop-ruled`} with a `main_note` of at least 60 characters; an `affirmed-cover-verified`
+  note must NAME a test that resolves under `tests/`; and for every surviving row the assertion
+  count — assertion-method calls plus bare `assert` statements inside the frame — is compared
+  against `27658c4`. A count that FELL must be ruled `affirmed-drop-ruled`, and a row so ruled
+  whose count did not fall fails as a phantom. The census is a coarse proxy by construction: it
+  cannot separate a real check from type-narrowing scaffolding, which is exactly why a fall must be
+  RULED rather than merely reported. MAIN's ruling is written by the idempotent patcher `uv run
+  python .agent/decisions/m3u6a2-rule-dispositions.py`, `--check` for the gate. MAIN's audit at
+  ruling time: 8 `delete` rows, of which R06 and R17 claimed an unnamed surviving cover and both
+  were located by name; 24 surviving rows, of which SIX fell — R02 5->4, R04 5->4, R12 13->8, R15
+  9->7, R16 5->4, R18 6->5 — every drop being an `assertIsInstance` or bare `assert isinstance`
+  narrowing pair for a deleted outcome class, a guard on the deleted `generation_lease_seconds`
+  keyword, or a self-derived comparand replaced by a literal. Four of the six gained strength in
+  the same edit: R04's literal `{}`, R12's cross-partition `requests` pair, R15's revision binding,
+  R18's second `NotFoundError`.
+
+- **C25** — binds GATE 9, no obligation. It SUPERSEDES C23's `CONTROLS: 6/6 firing` with `CONTROLS:
+  11/11 firing`, and records what running gate 9 for the first time found. Two defects, both in the
+  instrument: (1) the `UNCHANGED` control went UNREACHABLE at fill size. It relabelled every row
+  `rebase` without touching the row's subject, so once all 32 frames were genuinely repaired no row
+  could be byte-identical to `27658c4` and the control reported exactly like a control that fired
+  (`CONTROLS: 10/11 firing` is what named it). The control now borrows a frame DERIVED as
+  byte-identical between `27658c4` and the tree, and a tree holding no such frame raises rather
+  than passing. (2) `--self-test` grades 11 mutated tables and each resolves a covering test per
+  row, so the uncached grader reparsed 47k lines of `tests/` thousands of times and exceeded 120 s.
+  Source text, per-file function-name sets, frame spans and assertion counts are cached; both entry
+  points now run in 6.5 s. Measured after the repair, on the merged tree: the patcher prints
+  `APPLIED`, then `no-op`, then `CHECK: ruling applied and byte-identical`, rc 0 each — 24
+  `affirmed`, 2 `affirmed-cover-verified`, 6 `affirmed-drop-ruled` over 32 rows. Gate 9 prints
+  `RESULT: PASS (0 findings)` rc 0 and `--self-test` prints `CONTROLS: 11/11 firing` / `RESULT:
+  PASS` rc 0.
+
+- **C26** — binds GATE 10, no obligation. It RULES the migration battery, and ADDS gate 10 (so any
+  prior run of gate 10 alone is void; it had none). `tests/test_migration_battery.py` grades what
+  M3.6a1 DID, and it reads the WORKING TREE to do it. That is a claim with an expiry: the
+  transition `6fb4d92` -> `dc4ab5e` is closed and permanently answerable from two git objects,
+  while the tree keeps moving. Measured, both directions: at `dc4ab5e` all 29 non-D28 frames pass
+  (`Ran 29 tests in 80.055s`, `OK`); at this branch's HEAD 13 fail — D01, D02, D03, D04, D05, D08,
+  D09, D10, D14a, D15, D24, D26, D29. Twelve are M3.6a2's own burden. D15 is NOT: it fails on
+  `main` too (`Ran 29 tests`, `FAILED (failures=1)`), because the ITERATE-phase `mercy-general` ->
+  `example-hospital` rename moved a `descriptive = {...}` anchor that `m3u6a1-surgery.py` replays,
+  and D28 cannot see it because every child replay unlinks this module. So the battery has been
+  quietly reddening correct work since before this unit opened.
+
+  RULING: every obligation reads the closed transition; only D28 reads the working tree, because
+  `gate 1 stays green at EVERY commit` is a standing property of the live range and is meaningless
+  against a frozen endpoint. This preserves the obligations rather than retiring them — the
+  properties were only ever true OF that transition, so asserting them of HEAD was a category
+  error, and freezing them stops the battery taxing M3.6b, M3.7, M3.8 and M3.9 with the same false
+  reds. What the frozen battery still detects: a rewritten history, and a deleted or corrupted
+  migration record.
+
+  MECHANISM: one detached worktree at `M3U6A1_TIP` per class (`setUpClass`/`tearDownClass`), and
+  every read routed through it. The module already carries the machinery — its tree helpers all
+  take `root`, and `_environment(root)` prepends `root` and `root/src` to `PYTHONPATH`, which is
+  proven to win over the editable install (`cement_runtime.__file__` resolves inside the named
+  worktree). No `uv sync` is needed in that worktree.
+
+  ACCEPTANCE, seeded red before dispatch as D30 and enumerating every unit of work by name: no
+  module-level helper references `ROOT` (today: `_census`, `_demo_module`, `_fallback`, `_run`,
+  `_run_demo`, `_test_id`), no module constant is derived from `ROOT` (today: `SURGERY`), and no
+  frame off the allowlist names `ROOT` (today: 22). The two structural halves come FIRST and are
+  what make the frame census total: while a helper defaults to `ROOT`, a frame reaches the tree
+  without naming it and the census reports exactly like a converted battery. The allowlist is
+  checked for the reverse too — a name on it must exist AND must really read the tree, so a
+  converted frame cannot be parked there — and an `assertGreaterEqual(len(frames), 30)` floor keeps
+  an empty census from reading as a clean one. Seeds: pass `ROOT` in any frame off the allowlist;
+  give any helper a `ROOT` default.
+
+- **Gate 10a** (branch) — `uv run python -m unittest tests.test_migration_battery` with `test_d28`
+  omitted: `OK`, 30 frames.
+- **Gate 10b** (main, after the squash) — the same module WITHOUT the omission: `OK`. D28 replays
+  gate 1 at every revision in `6fb4d92..HEAD` touching `tests/`, `examples/` or the surgery
+  script, so it can only pass once this branch's red-to-green intermediates collapse into one
+  commit; that collapse is the reason project law puts this work on a branch.
+
+- **C28** — binds L23, and adds no gate. C26's refreeze converts every non-D28 frame onto the
+  closed transition, and `tests/test_migration_battery.py`'s
+  `test_d23_examples_hospital_ocr_readme_md_208_and_216_name_the` is the ONE migration-battery body
+  L23 froze. L23 reads "pin bodies freeze unless the DELETED CLAIM forces inversion", and this
+  delta is forced by C26 rather than by the deletion, so L23 fired correctly on correct work — its
+  frozen set predates C26. Measured: gate 1 minus the migration battery ran 1000 tests with exactly
+  ONE failure, this subtest.
+
+  RULING: the row moves to `permitted_deltas`, never to `required_inversions` and never out of the
+  frozen set — the same shape C20 used when the L19-L22 rewrite forced D25's census to move. The
+  permitted token is `self.root`, absent at `da70a56` and present now. The delta is the
+  `ROOT` -> `self.root` conversion ALONE: the assertion logic either side is byte-identical, so
+  nothing L23 grades was weakened.
+
+  WHY A NAMED TOKEN IS TOTAL HERE: this row states only what the delta must BUY, and on its own it
+  would not prove the frame stopped reading the live tree. D30 owns that complementary half by
+  forbidding `ROOT` in any frame off its allowlist, checked in reverse so a converted frame cannot
+  be parked there. Bought plus forbidden is total; neither alone is.
+
+  Seed, run: replacing the permitted token with one the body does not hold fails L23 rc 1
+  (`FAILED (failures=1)`), and restoring the file is byte-identical. Measured after: L23 `Ran 1
+  test`, `OK`.
+
+- **C27** — binds GATE 2, no obligation. It REPAIRS gate 2's instrument
+  `m3u6a2-battery-validate.py` (command unchanged, so the numbered pins survive; prior runs of gate
+  2 alone are void). Running gate 2's `--self-test` at closure printed `SELF-TEST: 4/6 firing`
+  against the committed contract, and both silences were the same class — a control that reports
+  exactly like a control that fired.
+
+  (1) The `uncovered obligation` control renamed `def test_l01_` with `count=1`. At seed size L01
+  carried one test; it now carries three, so renaming one member left L01 covered, `UNCOVERED: 0`
+  graded clean and the control went unreachable with the instrument healthy. The control now drops
+  the whole COVERING SET.
+
+  (2) The `clean, filled battery` control was silent because the CONTRACT was genuinely failing:
+  C23, C24, C25 and C26 stated their subject in prose the binder does not parse
+  (`BINDS` reads `binds SECTION n`, `binds GATE n` or `binds L<nn>`), so `CORRECTION-BIND` reported
+  4 unbound. Section 8's own opening rule requires each correction to state what it binds, so the
+  four texts were conformed to it rather than the binder widened — a binder widened to accept the
+  prose it failed on is a bypass wearing a repair's name.
+
+  Every control mutation now asserts it MOVED its input and raises otherwise, which is what makes
+  (1) impossible to repeat silently under any future rename. Measured after the repair:
+  `SELF-TEST: 6/6 firing` rc 0, and gate 2 `CORRECTION-BIND: 0 unbound` / `GATE 2: PASS` rc 0.
+
+- **C29** — binds GATE 10, no obligation. It STRENGTHENS D30's working-tree census after the
+  closing `rev` (row L6) showed the frame's stated guarantee exceeded what it checked. D30 censused
+  the token `ROOT` in four places and its docstring concluded `naming ROOT is the whole predicate`.
+  That is false: `ROOT` is itself built from `__file__` (`tests/test_migration_battery.py:38`), so a
+  frame navigating `__file__` reaches the live tree while naming `ROOT` nowhere and passes all four
+  checks. The idiom was already resident in the module, which is what makes the hole reachable
+  rather than theoretical. No live frame exploited it and no assertion was weakened, so the defect
+  was the CLAIM plus a forbidden-list census that fails open on the member nobody named.
+
+  The repair enumerates the handles that REACH the tree instead of the spellings that name it.
+  `ROOT` and `__file__` are now censused at module level (no helper, no derived constant) and at
+  frame level, each against its own allowlist — `WORKING_TREE_READERS` and the new `SELF_READERS`
+  — and both allowlists are checked in REVERSE, so a converted frame cannot be parked on either.
+  The third handle, an inherited working directory, is closed structurally and the structure is
+  asserted: `subprocess.run` has ONE call site, it lies inside `_run`, and `_run` gives `cwd` and
+  `root` no defaults. The docstring now states the three handles and its own boundary.
+
+  Five seeds fire, each on its own assertion, tree restored `cmp`-identical after every one:
+  `__file__` in a frame off `SELF_READERS` → `['test_d29_...'] != []`; a module-level helper naming
+  `__file__` → `['_seed_helper'] != []`; a second `subprocess.run` call site → `2 != 1`; a `cwd`
+  default on `_run` → `<ast.Call ...> is not None`; a name on `SELF_READERS` the module does not
+  define → `'test_seed_absent' not found in`. D30 green either side of the seed run.
+
+- **C30** — binds GATE 3, no obligation. It RE-EMITS gate 3's committed expectation table
+  (command and instrument unchanged, so the numbered pins survive; prior runs of gate 3 alone are
+  void). C29's constant block and row L5's README repair both sit ABOVE censused loci, so the table
+  drifted positionally. The delta was RULED, not blind-refreshed: `pins` moved exactly one row
+  (`test_d23` locus `tests/test_migration_battery.py:1417` -> `:1426`, i.e. +9 = the `SELF_READERS`
+  block, with `test`, `lines` and `vocabulary` identical), `freezes` came back byte-identical, and
+  `prose` moved README `total_lines` 436 -> 438 with hit lines 330 -> 332 and 347 -> 349 carrying
+  identical tokens while lines 70, 145, 302 and 324 held still. Zero rows changed subject; zero
+  hits appeared or vanished. Measured after the re-emit: `RESULT: PASS` rc 0 and `--self-test`
+  `CONTROLS: 8/8 firing` `RESULT: PASS` rc 0. This is p63's disease seen once more — the table
+  keys on absolute `file:line`, so any edit above a censused frame costs a ruled re-emit.

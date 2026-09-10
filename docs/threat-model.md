@@ -58,7 +58,7 @@
   one prospective function hash under a write lock. The sixth check requires the latest persisted
   receipt to bind the live promoted snapshot. Individually valid artifacts therefore cannot pass as a
   set without a current checkpoint.
-- Counterexample, revocation, ambiguity, and integrity failure quarantine builds.
+- A counterexample, a revocation, or an integrity failure quarantines the affected builds.
 
 ## Deployment obligations
 
@@ -74,9 +74,11 @@
   creates a second data-classification, retention, and disclosure surface outside the ledger.
 - An exported bundle is intentionally sealed from later ledger state. If a revocation, a policy
   revision, or an evidence change must take effect, deploy a newly verified export.
-- Treat results as plans. Re-run live policy and authorization immediately before an effect. Use the
-  `handle` request ID as an idempotency key. Stop for reconciliation after uncertain effect commit
-  state. `submit_proposal` and `propose` give no idempotency. Each call writes a new proposal. Do not
+- Treat results as plans. Re-run live policy and authorization immediately before an effect. Cement
+  supplies no idempotency key, so supply one from your application and bind it to the exact input you
+  act on. Stop for reconciliation after uncertain effect commit
+  state. `submit_proposal` and `propose` give no idempotency. `propose` invokes the configured source
+  one time for each call, and it never retries. Each call writes a new proposal. Do not
   repeat those calls to recover. A `StateError` from either call does not prove that the proposal is
   absent, because a database commit can succeed and then fail. List the partition's pending proposals
   and match your input before you act. The `cement proposal submit` command inherits every sentence
@@ -87,7 +89,7 @@
   Access depends on the host identity model and the local policy, so treat the value as visible to
   any observer on the same host. An interactive shell can also record the value in its history file.
   Cement controls neither mechanism. The same applies to `cement resolve --input`.
-- Keep provider wrappers pure. Model calls can repeat after timeout or lease recovery.
+- Keep provider wrappers pure. A model call can repeat after a timeout.
 - Monitor promoted scopes. When policy or expected behavior changes, challenge them. Revise the
   operation instead of overwriting contradictory history.
 - Deploy command adapters on Linux. If crash-resilient process-tree containment is required, add an

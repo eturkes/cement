@@ -872,15 +872,15 @@ class ReadCapabilityBatteryTests(unittest.TestCase):
                         continue
                     scan(node.body, {item.optional_vars.id}, (method_name,))
 
-        # The totals are a tripwire: every new transaction site is acknowledged
-        # here by name in the commit that adds it. M3.3 added exactly two.
+        # The totals are a tripwire: every transaction-site change is acknowledged
+        # beside the named proposal sites that must survive lifecycle removal.
         self.assertEqual(
             [name for name, _ in read_sites].count("_submission_revision"), 1
         )
         self.assertEqual([name for name, _ in write_sites].count("_persist_proposal"), 1)
-        self.assertEqual(len(read_sites), 18)
-        self.assertEqual(len(write_sites), 16)
-        self.assertEqual(len(reached_helpers), 12)
+        self.assertEqual(len(read_sites), 17)
+        self.assertEqual(len(write_sites), 13)
+        self.assertEqual(len(reached_helpers), 11)
         self.assertEqual(violations, [])
 
     def test_b21_validate_ledger_succeeds_inside_enforced_block(self):

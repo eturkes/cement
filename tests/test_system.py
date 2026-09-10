@@ -271,36 +271,37 @@ class SystemTests(unittest.TestCase):
         return build.created[0], promotion
 
     def test_supervised_miss_to_exact_artifact_hit(self) -> None:
-        self.register()
-        artifact_id, _ = self.mature_and_promote()
-        calls = len(self.source.calls)
-        resolved = self.system.handle(
-            "tenant-a", "echo", {"x": 1}, request_id="artifact-hit"
+        self.register(confirmations=2, reviewers=2, span=0)
+        artifact_id, _, _ = self._promote_function_entry(
+            {"x": 1},
+            "exact-hit",
         )
-        self.assertEqual(resolved.source, "artifact")
-        self.assertEqual(resolved.artifact_id, artifact_id)
-        self.assertEqual(resolved.output, {"echo": {"x": 1}})
+        calls = len(self.source.calls)
+
+        resolved = self.system.resolve("tenant-a", "echo", {"x": 1})
+        self.assertTrue(resolved.verification.passed)
+        self.assertIsNotNone(resolved.match)
+        assert resolved.match is not None
+        self.assertTrue(resolved.match.matched)
+        self.assertEqual(resolved.match.output, {"echo": {"x": 1}})
+        self.assertEqual(
+            resolved.match.artifact_hash,
+            self.system.artifact("tenant-a", artifact_id)["artifact_hash"],
+        )
         self.assertEqual(len(self.source.calls), calls)
 
-        # Exact scope: a near miss goes back to supervision.
-        near = self.system.handle(
-            "tenant-a", "echo", {"x": 2}, request_id="near-miss"
-        )
-        self.assertIsInstance(near, ReviewRequired)
-        self.assertEqual(len(self.source.calls), calls + 1)
+        # Exact scope: a near miss stays deterministic until the caller supervises it.
+        near = self.system.resolve("tenant-a", "echo", {"x": 2})
+        self.assertTrue(near.verification.passed)
+        self.assertIsNotNone(near.match)
+        assert near.match is not None
+        self.assertFalse(near.match.matched)
+        self.assertIsNone(near.match.output)
+        self.assertEqual(len(self.source.calls), calls)
 
-    def test_dispatch_uses_sealed_promotion_receipt_without_rehashing_tests(self) -> None:
-        self.register()
-        artifact_id, _ = self.mature_and_promote()
-        with mock.patch.object(
-            System,
-            "_test_snapshot",
-            side_effect=AssertionError("dispatch rehashed sealed tests"),
-        ):
-            resolved = self.system.handle(
-                "tenant-a", "echo", {"x": 1}, request_id="sealed-fast-path"
-            )
-        self.assertEqual(resolved.artifact_id, artifact_id)
+        pending = self.system.propose("tenant-a", "echo", {"x": 2})
+        self.assertIsInstance(pending, str)
+        self.assertEqual(len(self.source.calls), calls + 1)
 
     def test_candidate_never_appears_in_consumer_outcome_and_rejection_is_not_evidence(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
@@ -410,80 +411,6 @@ class SystemTests(unittest.TestCase):
         with self.assertRaises(NotFoundError):
             self.system.get_proposal("tenant-a", "prop_absent")
 
-    def test_confirmed_request_cache_is_bound_to_immutable_example(self) -> None:
-        self.register(confirmations=2, reviewers=1, span=0)
-        for label, corrupted in (
-            ("confirmed-cache-invalid", "{"),
-            ("confirmed-cache-mismatch", '"tampered"'),
-        ):
-            with self.subTest(request_id=label):
-                confirmed = self.confirm()
-                connection = sqlite3.connect(self.database)
-                try:
-                    (request_id,) = connection.execute(
-                        "SELECT request_id FROM proposals WHERE id = ?",
-                        (confirmed.proposal_id,),
-                    ).fetchone()
-                    connection.execute(
-                        """
-                        UPDATE requests SET output_json = ?
-                        WHERE partition = ? AND id = ?
-                        """,
-                        (corrupted, "tenant-a", request_id),
-                    )
-                    connection.commit()
-                finally:
-                    connection.close()
-
-                self.assertIsInstance(
-                    self.system.request_status("tenant-a", request_id),
-                    ReconciliationRequired,
-                )
-                outcome = self.system.handle(
-                    "tenant-a", "echo", {"x": 1}, request_id=request_id
-                )
-                self.assertIsInstance(outcome, ReconciliationRequired)
-
-    def test_artifact_request_cache_is_bound_to_current_execution(self) -> None:
-        self.register(confirmations=2, reviewers=1, span=0)
-        self.confirm()
-        self.confirm()
-        artifact = self.system.compile("tenant-a", "echo").created[0]
-        report = self.system.verify("tenant-a", artifact)
-        self.system.promote(
-            "tenant-a", artifact, scope_hash=report.scope_hash, promoted_by="manager"
-        )
-        for request_id, corrupted in (
-            ("artifact-cache-invalid", "{"),
-            ("artifact-cache-mismatch", '"tampered"'),
-        ):
-            with self.subTest(request_id=request_id):
-                self.system.handle(
-                    "tenant-a", "echo", {"x": 1}, request_id=request_id
-                )
-                connection = sqlite3.connect(self.database)
-                try:
-                    connection.execute(
-                        """
-                        UPDATE requests SET output_json = ?
-                        WHERE partition = ? AND id = ?
-                        """,
-                        (corrupted, "tenant-a", request_id),
-                    )
-                    connection.commit()
-                finally:
-                    connection.close()
-                self.assertIsInstance(
-                    self.system.request_status("tenant-a", request_id),
-                    ReconciliationRequired,
-                )
-                self.assertIsInstance(
-                    self.system.handle(
-                        "tenant-a", "echo", {"x": 1}, request_id=request_id
-                    ),
-                    ReconciliationRequired,
-                )
-
     def test_correction_is_the_fixture_and_conflicts_block_compilation(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
         self.confirm(corrected={"answer": "human"})
@@ -565,26 +492,6 @@ class SystemTests(unittest.TestCase):
         self.assertEqual(quarantined, (build,))
         self.assertEqual(system.artifact("tenant-a", build)["status"], "suspended")
 
-    def test_quarantined_artifact_cannot_replay_an_old_idempotency_key(self) -> None:
-        self.register()
-        artifact, _ = self.mature_and_promote()
-        original = self.system.handle(
-            "tenant-a", "echo", {"x": 1}, request_id="served-before-quarantine"
-        )
-        self.assertEqual(original.artifact_id, artifact)
-        self.system.challenge(
-            "tenant-a",
-            "echo",
-            {"x": 1},
-            {"counterexample": True},
-            reviewer="auditor",
-        )
-        replay = self.system.handle(
-            "tenant-a", "echo", {"x": 1}, request_id="served-before-quarantine"
-        )
-        self.assertIsInstance(replay, ReconciliationRequired)
-        self.assertFalse(hasattr(replay, "output"))
-
     def test_late_review_counterexample_quarantines_promoted_scope(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
         late = self.system.propose("tenant-a", "echo", {"x": 1})
@@ -612,22 +519,20 @@ class SystemTests(unittest.TestCase):
 
     def test_request_idempotency_and_partition_isolation(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
-        first = self.system.handle("tenant-a", "echo", {"x": 1}, request_id="stable-id")
-        second = self.system.handle("tenant-a", "echo", {"x": 1}, request_id="stable-id")
-        self.assertEqual(first, second)
-        self.assertEqual(len(self.source.calls), 1)
-        with self.assertRaises(ConflictError):
-            self.system.handle("tenant-a", "echo", {"x": 2}, request_id="stable-id")
+        first = self.system.propose("tenant-a", "echo", {"x": 1})
+        second = self.system.propose("tenant-a", "echo", {"x": 1})
+        self.assertNotEqual(first, second)
+        self.assertEqual(len(self.source.calls), 2)
+
         self.system.register_operation(
             "tenant-b", "echo", policy=CompilePolicy(2, 1, 0)
         )
-        isolated = self.system.handle(
-            "tenant-b", "echo", {"x": 1}, request_id="stable-id"
-        )
-        self.assertIsInstance(isolated, ReviewRequired)
-        self.assertNotEqual(isolated.proposal_id, first.proposal_id)
+        isolated = self.system.propose("tenant-b", "echo", {"x": 1})
+        self.assertNotEqual(isolated, first)
         with self.assertRaises(NotFoundError):
-            self.system.get_proposal("tenant-b", first.proposal_id)
+            self.system.get_proposal("tenant-b", first)
+        with self.assertRaises(NotFoundError):
+            self.system.get_proposal("tenant-a", isolated)
 
     def test_monotonic_feeds_survive_transitions_and_clock_rollback(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
@@ -661,66 +566,45 @@ class SystemTests(unittest.TestCase):
         self.assertEqual([item["id"] for item in reports], [second_report.id])
         self.assertLess(reports[0]["created_at_us"], first_stored["created_at_us"])
 
-    def test_concurrent_retry_observes_generation_lease(self) -> None:
-        source = BlockingSource()
-        system = System(self.database, candidate_source=source, clock_us=self.clock)
-        system.register_operation(
-            "tenant-a", "wait", policy=CompilePolicy(2, 1, 0)
-        )
-        result = []
-
-        def invoke() -> None:
-            result.append(system.handle("tenant-a", "wait", 1, request_id="same"))
-
-        thread = threading.Thread(target=invoke)
-        thread.start()
-        self.assertTrue(source.entered.wait(timeout=1))
-        duplicate = system.handle("tenant-a", "wait", 1, request_id="same")
-        self.assertIsInstance(duplicate, InProgress)
-        source.release.set()
-        thread.join(timeout=2)
-        self.assertIsInstance(result[0], ReviewRequired)
-
-    def test_expired_generation_poll_is_retryable_and_handle_reclaims(self) -> None:
-        source = BlockingSource()
-        system = System(
-            self.database,
-            candidate_source=source,
-            clock_us=self.clock,
-            generation_lease_seconds=1,
-        )
-        system.register_operation(
-            "tenant-a", "wait", policy=CompilePolicy(2, 1, 0)
-        )
-        original = []
-        thread = threading.Thread(
-            target=lambda: original.append(
-                system.handle("tenant-a", "wait", 1, request_id="expired")
-            )
-        )
-        thread.start()
-        self.assertTrue(source.entered.wait(timeout=1))
-        self.clock.advance(2)
-        expired = system.request_status("tenant-a", "expired")
-        self.assertIsInstance(expired, FallbackFailed)
-        self.assertEqual(expired.code, "generation_lease_expired")
-
-        system.candidate_source = FakeSource(output="replacement")
-        reclaimed = system.handle("tenant-a", "wait", 1, request_id="expired")
-        self.assertIsInstance(reclaimed, ReviewRequired)
-        source.release.set()
-        thread.join(timeout=2)
-        self.assertEqual(original, [reclaimed])
-
     def test_missing_or_broken_source_is_a_stored_inert_failure(self) -> None:
-        no_source = System(self.database, clock_us=self.clock)
-        no_source.register_operation(
+        class BrokenSource:
+            def propose(self, request: object) -> Candidate:
+                del request
+                raise RuntimeError("adapter detail must not escape")
+
+        systems = (
+            (
+                System(self.database, clock_us=self.clock),
+                StateError,
+                "candidate source is not configured",
+            ),
+            (
+                System(
+                    self.database,
+                    candidate_source=BrokenSource(),
+                    clock_us=self.clock,
+                ),
+                cement_runtime.CandidateSourceError,
+                "candidate source failed",
+            ),
+        )
+        systems[0][0].register_operation(
             "tenant-a", "none", policy=CompilePolicy(2, 1, 0)
         )
-        failed = no_source.handle("tenant-a", "none", 1, request_id="failure")
-        self.assertIsInstance(failed, FallbackFailed)
-        again = no_source.handle("tenant-a", "none", 1, request_id="failure")
-        self.assertEqual(failed, again)
+        for system, error, message in systems:
+            with self.subTest(error=error.__name__):
+                with self.assertRaisesRegex(error, f"^{message}$"):
+                    system.propose("tenant-a", "none", 1)
+
+        with self.system.store.transaction(write=False) as connection:
+            self.assertEqual(
+                connection.execute("SELECT count(*) FROM requests").fetchone()[0],
+                0,
+            )
+            self.assertEqual(
+                connection.execute("SELECT count(*) FROM proposals").fetchone()[0],
+                0,
+            )
 
     def test_policy_rejects_non_integer_numeric_values_immediately(self) -> None:
         for values in ((2.0, 1, 0), (2, True, 0), (2, 1, 0.0)):
@@ -728,12 +612,8 @@ class SystemTests(unittest.TestCase):
                 CompilePolicy(*values)
 
     def test_public_scalar_validation_fails_with_domain_errors(self) -> None:
-        with self.assertRaises(ValidationError):
-            System(self.database, generation_lease_seconds=1.0000001)
         self.register(confirmations=2, reviewers=1, span=0)
         invalid_calls = (
-            lambda: self.system.handle("tenant-a", "echo", 1, request_id=""),
-            lambda: self.system.handle("tenant-a", "echo", 1, retry_failed=1),
             lambda: self.system.proposals("tenant-a", after_sequence=0.5),
             lambda: self.system.proposals("tenant-a", limit=True),
             lambda: self.system.examples("tenant-a", "echo", include_revoked=1),
@@ -877,93 +757,39 @@ class SystemTests(unittest.TestCase):
 
     def test_operation_revision_invalidates_every_old_request_path(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
-        confirmed = self.system.handle(
-            "tenant-a", "echo", {"x": 1}, request_id="old-confirmed"
-        )
-        self.system.review(
-            "tenant-a", confirmed.proposal_id, reviewer="alice", decision="accept"
-        )
-        pending = self.system.handle(
-            "tenant-a", "echo", {"x": 2}, request_id="old-pending"
-        )
-        self.system.candidate_source = None
-        failed = self.system.handle(
-            "tenant-a", "echo", {"x": 3}, request_id="old-failed"
-        )
-        self.assertIsInstance(failed, FallbackFailed)
-        self.system.candidate_source = self.source
-        calls_before_revision = len(self.source.calls)
+        pending = self.system.propose("tenant-a", "echo", {"x": 2})
+        self.assertEqual(self.source.calls[-1].operation_revision, 1)
 
-        self.system.revise_operation(
-            "tenant-a",
-            "echo",
-            policy=CompilePolicy(2, 1, 0),
-            revised_by="owner",
+        self.assertEqual(
+            self.system.revise_operation(
+                "tenant-a",
+                "echo",
+                policy=CompilePolicy(2, 1, 0),
+                revised_by="owner",
+            ),
+            2,
         )
-        for request_id, value in (
-            ("old-confirmed", {"x": 1}),
-            ("old-pending", {"x": 2}),
-            ("old-failed", {"x": 3}),
-        ):
-            with self.subTest(request_id=request_id):
-                replay = self.system.handle(
-                    "tenant-a",
-                    "echo",
-                    value,
-                    request_id=request_id,
-                    retry_failed=True,
-                )
-                self.assertIsInstance(replay, ReconciliationRequired)
-                self.assertIsInstance(
-                    self.system.request_status("tenant-a", request_id),
-                    ReconciliationRequired,
-                )
-        self.assertEqual(len(self.source.calls), calls_before_revision)
         with self.assertRaisesRegex(StateError, "obsolete operation revision"):
             self.system.review(
-                "tenant-a", pending.proposal_id, reviewer="alice", decision="accept"
+                "tenant-a", pending, reviewer="alice", decision="accept"
             )
         rejected = self.system.review(
-            "tenant-a", pending.proposal_id, reviewer="alice", decision="reject"
+            "tenant-a", pending, reviewer="alice", decision="reject"
         )
         self.assertEqual(rejected.status, "rejected")
-        self.assertEqual(
-            self.system.request_status("tenant-a", "old-pending").status,
-            "rejected",
-        )
+        with self.system.store.transaction(write=False) as connection:
+            request = connection.execute(
+                """
+                SELECT status, operation_revision, proposal_id
+                FROM requests WHERE proposal_id = ?
+                """,
+                (pending,),
+            ).fetchone()
+        self.assertEqual(tuple(request), ("rejected", 1, pending))
 
-        current = self.system.handle(
-            "tenant-a", "echo", {"x": 1}, request_id="current-request"
-        )
-        self.assertIsInstance(current, ReviewRequired)
+        current = self.system.propose("tenant-a", "echo", {"x": 1})
+        self.assertIsInstance(current, str)
         self.assertEqual(self.source.calls[-1].operation_revision, 2)
-
-    def test_revision_cancels_in_flight_old_generation(self) -> None:
-        source = BlockingSource()
-        system = System(self.database, candidate_source=source, clock_us=self.clock)
-        system.register_operation(
-            "tenant-a", "wait", policy=CompilePolicy(2, 1, 0)
-        )
-        outcomes = []
-
-        thread = threading.Thread(
-            target=lambda: outcomes.append(
-                system.handle("tenant-a", "wait", 1, request_id="in-flight")
-            )
-        )
-        thread.start()
-        self.assertTrue(source.entered.wait(timeout=1))
-        system.revise_operation(
-            "tenant-a",
-            "wait",
-            policy=CompilePolicy(2, 1, 0),
-            revised_by="owner",
-        )
-        source.release.set()
-        thread.join(timeout=2)
-        self.assertEqual(len(outcomes), 1)
-        self.assertIsInstance(outcomes[0], ReconciliationRequired)
-        self.assertEqual(system.proposals("tenant-a"), [])
 
     def test_explicit_revision_bumps_even_when_thresholds_do_not_change(self) -> None:
         policy = CompilePolicy(2, 1, 0)
@@ -1050,10 +876,17 @@ class SystemTests(unittest.TestCase):
             connection.commit()
         finally:
             connection.close()
-        fallback = self.system.handle(
-            "tenant-a", "echo", {"x": 1}, request_id="bad-promotion-receipt"
-        )
-        self.assertIsInstance(fallback, ReviewRequired)
+        with self.assertRaisesRegex(
+            StateError,
+            "challenge quarantined an integrity-invalid artifact",
+        ):
+            self.system.challenge(
+                "tenant-a",
+                "echo",
+                {"x": 1},
+                {"echo": {"x": 1}},
+                reviewer="auditor",
+            )
         self.assertEqual(self.system.artifacts("tenant-a", "echo")[-1]["status"], "suspended")
 
     def test_verification_recomputes_build_stability_metadata(self) -> None:
@@ -1162,11 +995,21 @@ class SystemTests(unittest.TestCase):
         self.system.promote(
             "tenant-a", third_build, scope_hash=final_report.scope_hash, promoted_by="manager"
         )
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        self.system.promote_function(
+            "tenant-a",
+            "echo",
+            expected_function_hash=manifest.function_hash,
+            promoted_by="manager",
+        )
+        resolution = self.system.resolve("tenant-a", "echo", {"x": 1})
+        self.assertTrue(resolution.verification.passed)
+        self.assertIsNotNone(resolution.match)
+        assert resolution.match is not None
+        self.assertTrue(resolution.match.matched)
         self.assertEqual(
-            self.system.handle(
-                "tenant-a", "echo", {"x": 1}, request_id="liveness-restored"
-            ).source,
-            "artifact",
+            resolution.match.artifact_hash,
+            self.system.artifact("tenant-a", third_build)["artifact_hash"],
         )
 
     def test_verification_records_are_database_immutable(self) -> None:
@@ -2690,10 +2533,10 @@ class SystemTests(unittest.TestCase):
                 {"echo": {"x": 1}},
                 reviewer="auditor",
             )
-        fallback = self.system.handle(
-            "tenant-a", "echo", {"x": 1}, request_id="duplicate-dispatch"
-        )
-        self.assertIsInstance(fallback, ReviewRequired)
+        # M3.6a2 L31: ambiguity quarantine left with `handle`, the one route that suspended an
+        # ambiguous pair. Detection survives — `verify_function` fails closed above and
+        # `challenge` refuses below — so the regression INVERTS onto the surviving post-state
+        # rather than being deleted with the behaviour.
         connection = sqlite3.connect(self.database)
         try:
             after = connection.execute(
@@ -2711,9 +2554,14 @@ class SystemTests(unittest.TestCase):
             ).fetchone()[0]
         finally:
             connection.close()
-        self.assertEqual({status for status, _ in after}, {"suspended"})
-        self.assertTrue(all(receipt is None for _, receipt in after))
-        self.assertEqual(ambiguity_events, 1)
+        self.assertEqual(
+            [
+                (status, promotion_hash is not None)
+                for status, promotion_hash in after
+            ],
+            [("promoted", True), ("promoted", True)],
+        )
+        self.assertEqual(ambiguity_events, 0)
 
     def test_function_verification_duplicate_detail_is_bounded_and_ordered(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
@@ -3077,20 +2925,18 @@ class SystemTests(unittest.TestCase):
         )
         self.assertEqual(result.function_hash, baseline.function_hash)
         self.assertIsNone(result.document)
-        with mock.patch.object(
-            System,
-            "_test_snapshot",
-            side_effect=AssertionError("dispatch rehashed sealed tests"),
-        ):
-            resolved = self.system.handle(
-                "tenant-a",
-                "echo",
-                input_value,
-                request_id="tampered-child-fast-path",
-            )
-        self.assertIsInstance(resolved, Resolved)
-        assert isinstance(resolved, Resolved)
-        self.assertEqual(resolved.artifact_id, artifact_id)
+        resolution = self.system.resolve("tenant-a", "echo", input_value)
+        self._assert_function_checks(
+            resolution.verification,
+            (True, True, False, True, True, False),
+        )
+        self.assertFalse(resolution.verification.passed)
+        self.assertIsNone(resolution.match)
+        resolution_checks = self._function_checks(resolution.verification)
+        self.assertIn(
+            artifact_id,
+            resolution_checks["sealed-passing-reports"].detail,
+        )
 
     def test_function_verification_rejects_later_entry_receipt(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
@@ -14857,21 +14703,34 @@ class SystemTests(unittest.TestCase):
         for partition, operation in scopes:
             self.system.register_operation(partition, operation, policy=policy)
 
-        target: list[ReviewRequired] = []
+        new_id = system_module._new_id
+
+        def propose_with_request_id(
+            partition: str,
+            operation: str,
+            value: object,
+            request_id: str,
+        ) -> str:
+            def fixed_id(prefix: str) -> str:
+                return request_id if prefix == "req" else new_id(prefix)
+
+            with mock.patch.object(system_module, "_new_id", side_effect=fixed_id):
+                return self.system.propose(partition, operation, value)
+
+        target: list[str] = []
         for request_id, value in (
             ("shared_request", {"target": 3}),
             ("target_middle", {"target": 2}),
             ("target_last", {"target": 1}),
         ):
-            pending = self.system.handle(
-                "tenant_a",
-                "echo_1",
-                value,
-                request_id=request_id,
+            target.append(
+                propose_with_request_id(
+                    "tenant_a",
+                    "echo_1",
+                    value,
+                    request_id,
+                )
             )
-            self.assertIsInstance(pending, ReviewRequired)
-            assert isinstance(pending, ReviewRequired)
-            target.append(pending)
         self.assertEqual(
             self.system.revise_operation(
                 "tenant_a",
@@ -14881,32 +14740,40 @@ class SystemTests(unittest.TestCase):
             ),
             2,
         )
-        current = self.system.handle(
-            "tenant_a",
-            "echo_1",
-            {"target": 4},
-            request_id="target_current",
+        target.append(
+            propose_with_request_id(
+                "tenant_a",
+                "echo_1",
+                {"target": 4},
+                "target_current",
+            )
         )
-        self.assertIsInstance(current, ReviewRequired)
-        assert isinstance(current, ReviewRequired)
-        target.append(current)
 
-        colliders: list[ReviewRequired] = []
+        colliders: list[str] = []
         for partition, operation, request_id in (
             ("tenantXa", "echo_1", "shared_request"),
             ("tenant_a", "echoX1", "other-operation"),
             ("tenant_a", "ECHO_1", "case-operation"),
             ("TENANT_A", "echo_1", "case-partition"),
         ):
-            pending = self.system.handle(
-                partition,
-                operation,
-                {"collider": request_id},
-                request_id=request_id,
+            colliders.append(
+                propose_with_request_id(
+                    partition,
+                    operation,
+                    {"collider": request_id},
+                    request_id,
+                )
             )
-            self.assertIsInstance(pending, ReviewRequired)
-            assert isinstance(pending, ReviewRequired)
-            colliders.append(pending)
+
+        with self.system.store.transaction(write=False) as connection:
+            shared_rows = connection.execute(
+                "SELECT partition, id FROM requests WHERE id = ?",
+                ("shared_request",),
+            ).fetchall()
+        self.assertEqual(
+            {(str(row["partition"]), str(row["id"])) for row in shared_rows},
+            {("tenant_a", "shared_request"), ("tenantXa", "shared_request")},
+        )
 
         report = self.system.function_report(
             "tenant_a",
@@ -14914,7 +14781,7 @@ class SystemTests(unittest.TestCase):
             projection_limit=10,
         )
         gaps = report.operation_now.pending_proposals
-        target_ids = tuple(sorted(item.proposal_id for item in target))
+        target_ids = tuple(sorted(target))
         self.assertEqual(report.operation_now.pending_proposal_count, 4)
         self.assertEqual(tuple(item.proposal_id for item in gaps), target_ids)
         # The gap no longer carries request identity, so the surviving projected
@@ -14928,7 +14795,7 @@ class SystemTests(unittest.TestCase):
         )
         self.assertTrue(
             {item.proposal_id for item in gaps}.isdisjoint(
-                {item.proposal_id for item in colliders}
+                set(colliders)
             )
         )
 

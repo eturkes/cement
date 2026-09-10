@@ -1,0 +1,109 @@
+# M3.6a2 closure gates — the FULL numbered list rerun from committed state 278d2a8,
+# which is what C27/C28/C29/C30 landing mid-unit require. Supersedes the 05f7ce4 run.
+# Gate 8 needs --sweep; invoked without it the instrument exits 2 (recorded below, then rerun).
+
+COMMIT: 278d2a8  TREE: 1 modified
+=== GATE 1 (discover minus test_migration_battery)
+modules: 18
+........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+----------------------------------------------------------------------
+Ran 1000 tests in 292.536s
+
+OK
+GATE1-RC: 0
+=== GATE 10a (migration module minus test_d28)
+ids: 30
+..............................
+----------------------------------------------------------------------
+Ran 30 tests in 65.566s
+
+OK
+GATE10a-RC: 0
+########## GATE 2
+ORPHAN: 0
+STUB: 0
+CORRECTION-BIND: 0 unbound
+GATE 2: PASS
+rc=0
+
+########## GATE 3
+FREEZES: 4
+PROSE-HIT-LINES: 12
+PROSE-DOCUMENTS-OWNED: 4
+RESULT: PASS
+rc=0
+
+########## GATE 4
+CHECK L12/L14/L15 byte_identity ok exports=57 findings=[]
+RESULT: PASS (0/5 checks failed)
+rc=0
+
+########## GATE 5
+CHECK   shipped_prose.surfaces ok got=5
+CHECK   shipped_prose.invocations ok want>=18 got=18
+CHECK   shipped_prose.parse_failures ok got=0
+CHECK   control.removed[handle] ok must not parse
+CHECK   control.removed[request] ok must not parse
+CHECK   control.surviving[proposal submit] ok must parse
+rc=0
+
+########## GATE 6
+m3u6a2-attack.json: in-sync {'session': 'S4', 'rows': 30, 'by_disposition': {'accept': 22, 'accept-in-part': 4, 'cleared': 4}, 'by_severity': {'blocking': 11, 'cleared': 4, 'material': 15}}
+m3u6a2-verdicts.json: in-sync {'session': 'S4', 'rows': 66, 'by_verdict': {'accept': 35, 'accept-amend': 8, 'ratified-nondivergent': 23}, 'divergent': 43}
+rc=0
+
+########## GATE 9
+AFFIRMED: 24
+AFFIRMED-COVER-VERIFIED: 2
+AFFIRMED-DROP-RULED: 6
+RESULT: PASS (0 findings)
+rc=0
+
+########## GATE 9 self-test
+CONTROLS: 11/11 firing
+SEED-GRADE: zero with 0 unruled rows
+RESULT: PASS
+rc=0
+
+########## UV BUILD
+Building source distribution...
+Building wheel from source distribution...
+Successfully built dist/cement_runtime-0.1.0.tar.gz
+Successfully built dist/cement_runtime-0.1.0-py3-none-any.whl
+rc=0
+
+########## GATE 7 (mutation replay)
+M12 L07 killed revise_operation regains a `requests` write that executes zero rows :: test_l07_revise_operation_performs_no_requests_write_the_source
+M13 L16 killed the resolved request row stops being the confirmed variant :: test_l16_the_proposal_round_trip_still_ends_with_the_private
+M14 L16 killed the rejection branch writes the accept status :: test_l16_rejected_proposal_writes_the_private_rejected_variant
+M15 L04/L05 killed the deleted lease knob returns to the constructor :: test_l04_system___init___s_signature_is_exactly_self_database test_l04_generation_lease_keyword_is_rejected test_l05_generation_lease_seconds_has_zero_raw_src_occurrences
+MUTANTS: 15 SURVIVORS: 0
+RESULT: PASS
+rc=0
+SRC AFTER 7: 0 modified
+
+########## GATE 8 (reversion sweep)
+usage: m3u6a2-sweep.py [-h] [--sweep]
+m3u6a2-sweep.py: error: pass --sweep
+rc=2
+SRC AFTER 8: 0 modified
+
+########## SRC CLEAN
+(clean)
+########## GATE 8 (reversion sweep)
+S25 L26 died the unit-baseline P06 freeze reads live source again :: test_l26_the_four_p06_span_freezes_are_retired_with_their_history
+S26 L26 died the migration battery's P06 freeze reads live source again :: test_l26_the_four_p06_span_freezes_are_retired_with_their_history
+S27 L27 died D01's inverted ships-both-methods pin reverts :: test_l27_m3_5b_s_d01_tests_test_cli_removal_battery_py_608
+S28 L28 died the frozen constructor shape reverts to four parameters :: test_l28_tests_test_authority_removal_py_118
+S29 L29 died the freeze detector loses the SPAN shape :: test_l29_m3u6a2_tripwires_py_s__freezes_detector_is_widened_to_see
+S30 L31 died the duplicate-gate regression reverts to its lifecycle spelling :: test_l31_existing_duplicate_regression_is_inverted_not_deleted
+ROWS: 30 SURVIVORS: 0
+RESULT: PASS
+rc=0
+SRC AFTER 8: 0 modified
+(clean)
+
+########## GATE 3 self-test
+CONTROLS: 8/8 firing
+RESULT: PASS
+rc=0

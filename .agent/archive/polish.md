@@ -1,6 +1,6 @@
 # Polish register
 
-> Historical record: the roadmap flow's polish register, frozen with 61 open rows. `.agent/spec.md` `Deferred` cites rows by the `p<nn>` id each row now carries; the row here holds the full text, evidence pointer, acceptance check + `pri`.
+> Historical record: the roadmap flow's polish register, frozen with 61 open rows. Live successor = `.agent/deferred.md`, which carries every one of those rows as one line + acceptance check under the same `p<nn>` id and takes every row born after the freeze; the row here holds the full text, evidence pointer, grounds, `pri` + `size`. Row headers are not uniform — 11 rows spell `pri` without backticks, 3 carry no `size` — so a parser over this file pins itself against the loose `^- \`pNN\`` count.
 
 Deferred-perfection items, off the milestone spine. `/session-polish` = sole consumer; protocol lives
 there. Rows are born at deferral with the acceptance check and the priority already written.

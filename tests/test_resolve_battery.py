@@ -218,32 +218,17 @@ class ResolveBatteryTests(unittest.TestCase):
 
     def test_b04(self) -> None:
         """
-        B04: the two live resolve vocabularies never cross-wire: resolve returns exactly
-        FunctionResolution by type identity and constructs no Resolved, and handle constructs no
-        FunctionResolution
+        B04: resolve returns exactly FunctionResolution by type identity, and the runtime
+        module exposes no legacy Resolved constructor that the route could cross-wire.
         """
+        import cement_runtime.system as system_module
 
         system, _, _, _ = self._make_system()
         self._promote_values(system, ({"n": 12},), prefix="cross-wire")
 
-        with mock.patch(
-            "cement_runtime.system.Resolved",
-            side_effect=AssertionError("resolve constructed Resolved"),
-        ):
-            resolution = system.resolve("tenant_a", "echo_1", {"n": 12})
+        self.assertFalse(hasattr(system_module, "Resolved"))
+        resolution = system.resolve("tenant_a", "echo_1", {"n": 12})
         self.assertIs(type(resolution), FunctionResolution)
-
-        with mock.patch(
-            "cement_runtime.system.FunctionResolution",
-            side_effect=AssertionError("handle constructed FunctionResolution"),
-        ):
-            outcome = system.handle(
-                "tenant_a",
-                "echo_1",
-                {"n": 12},
-                request_id="cross-wire-handle",
-            )
-        self.assertIs(type(outcome), Resolved)
 
     def test_b05(self) -> None:
         """

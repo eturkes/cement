@@ -115,15 +115,17 @@ class FrozenShapeTests(unittest.TestCase):
 
     def test_system_constructor_shape(self) -> None:  # P3
         parameters = inspect.signature(system.System.__init__).parameters
+        # M3.6a2 L28: `generation_lease_seconds` leaves with the generation lease, so the
+        # frozen shape drops to three parameters. The remaining two keep their kind and their
+        # default here, which is the half of P3 the deletion does not touch.
         self.assertEqual(
             list(parameters),
-            ["self", "database", "candidate_source", "clock_us", "generation_lease_seconds"],
+            ["self", "database", "candidate_source", "clock_us"],
         )
-        for name in ("candidate_source", "clock_us", "generation_lease_seconds"):
+        for name in ("candidate_source", "clock_us"):
             self.assertIs(parameters[name].kind, inspect.Parameter.KEYWORD_ONLY)
         self.assertIsNone(parameters["candidate_source"].default)
         self.assertIsNone(parameters["clock_us"].default)
-        self.assertEqual(parameters["generation_lease_seconds"].default, 120)
         hints = typing.get_type_hints(system.System.__init__)
         self.assertIs(hints["return"], type(None))
 

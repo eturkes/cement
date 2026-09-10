@@ -59,7 +59,6 @@ from .models import (
     CompileScope,
     DraftEntry,
     DraftVerification,
-    FallbackFailed,
     FunctionAnchorReport,
     FunctionCheck,
     FunctionMember,
@@ -72,18 +71,12 @@ from .models import (
     FunctionResolution,
     FunctionSetPromotion,
     FunctionVerification,
-    InProgress,
     OperationArtifact,
     OperationArtifactStatus,
     OperationNowReport,
-    Outcome,
     PendingProposalGap,
     Promotion,
     ProposalView,
-    ReconciliationRequired,
-    Rejected,
-    Resolved,
-    ReviewRequired,
     ReviewResult,
     StaleRevisionAnomaly,
     VerificationReport,
@@ -683,14 +676,7 @@ class System:
         *,
         candidate_source: CandidateSource | None = None,
         clock_us: Callable[[], int] | None = None,
-        generation_lease_seconds: int = 120,
     ) -> None:
-        generation_lease_seconds = _bounded_int(
-            generation_lease_seconds,
-            "generation_lease_seconds",
-            minimum=1,
-            maximum=3_600,
-        )
         # A source is classified where it is invoked, never here: reading
         # ``propose`` off a descriptor already executes caller-supplied code, so a
         # constructor pre-flight is the very hazard it looks like a guard against.
@@ -699,16 +685,15 @@ class System:
         self.store = Store(database)
         self.candidate_source = candidate_source
         self._clock_us = clock_us if clock_us is not None else (lambda: time.time_ns() // 1_000)
-        self._lease_us = generation_lease_seconds * 1_000_000
 
     def _now(self) -> int:
         now = self._clock_us()
         if (
             type(now) is not int
             or now < 0
-            or now > _MAX_SQLITE_INTEGER - self._lease_us
+            or now > _MAX_SQLITE_INTEGER
         ):
-            raise StateError("clock must return a lease-safe signed 64-bit microsecond timestamp")
+            raise StateError("clock must return a signed 64-bit microsecond timestamp")
         return now
 
     # -- operation revisions -------------------------------------------------
@@ -809,16 +794,6 @@ class System:
                 """,
                 (partition, operation, previous),
             )
-            invalidated_generators = connection.execute(
-                """
-                UPDATE requests
-                SET status = 'failed', error_code = 'operation_revised',
-                    lease_owner = NULL, lease_until_us = NULL, updated_at_us = ?
-                WHERE partition = ? AND operation = ? AND operation_revision = ?
-                  AND status = 'generating'
-                """,
-                (now, partition, operation, previous),
-            ).rowcount
             _event(
                 connection,
                 partition=partition,
@@ -829,7 +804,6 @@ class System:
                     "previous_revision": previous,
                     "policy_hash": policy_json.digest,
                     "revised_by": revised_by,
-                    "invalidated_generators": invalidated_generators,
                 },
                 now_us=now,
             )
@@ -1054,443 +1028,6 @@ class System:
             provenance=provenance,
         )
 
-    # -- routing + supervised fallback --------------------------------------
-
-    def handle(
-        self,
-        partition: str,
-        operation: str,
-        input_value: object,
-        *,
-        request_id: str | None = None,
-        retry_failed: bool = False,
-    ) -> Outcome:
-        partition = _name(partition, "partition")
-        operation = _name(operation, "operation")
-        if type(retry_failed) is not bool:
-            raise ValidationError("retry_failed must be a boolean")
-        request_id = _request_id(_new_id("req") if request_id is None else request_id)
-        input_json = canonicalize(input_value)
-        now = self._now()
-        owner = _new_id("lease")
-
-        with self.store.transaction(write=True) as connection:
-            request = connection.execute(
-                "SELECT * FROM requests WHERE partition = ? AND id = ?",
-                (partition, request_id),
-            ).fetchone()
-            if request is not None:
-                if (
-                    request["partition"] != partition
-                    or request["operation"] != operation
-                    or request["input_json"] != input_json.text
-                ):
-                    raise ConflictError("request_id is already bound to different immutable content")
-                if not self._request_revision_is_current(request, connection):
-                    return self._outcome(request, now, connection)
-                if request["status"] == "generating" and int(request["lease_until_us"] or 0) <= now:
-                    connection.execute(
-                        """
-                        UPDATE requests
-                        SET lease_owner = ?, lease_until_us = ?, attempts = attempts + 1,
-                            updated_at_us = ?
-                        WHERE partition = ? AND id = ? AND status = 'generating'
-                        """,
-                        (owner, now + self._lease_us, now, partition, request_id),
-                    )
-                    revision = int(request["operation_revision"])
-                elif request["status"] == "failed" and retry_failed:
-                    connection.execute(
-                        """
-                        UPDATE requests
-                        SET status = 'generating', error_code = NULL, lease_owner = ?,
-                            lease_until_us = ?, attempts = attempts + 1, updated_at_us = ?
-                        WHERE partition = ? AND id = ? AND status = 'failed'
-                        """,
-                        (owner, now + self._lease_us, now, partition, request_id),
-                    )
-                    revision = int(request["operation_revision"])
-                else:
-                    return self._outcome(request, now, connection)
-            else:
-                registered = connection.execute(
-                    "SELECT * FROM operations WHERE partition = ? AND name = ?",
-                    (partition, operation),
-                ).fetchone()
-                if registered is None:
-                    raise NotFoundError("operation is not registered in this partition")
-                revision = int(registered["revision"])
-                artifacts = connection.execute(
-                    """
-                    SELECT * FROM artifacts
-                    WHERE partition = ? AND operation = ? AND operation_revision = ?
-                      AND input_hash = ? AND status = 'promoted'
-                    """,
-                    (partition, operation, revision, input_json.digest),
-                ).fetchall()
-                if len(artifacts) > 1:
-                    ids = [str(row["id"]) for row in artifacts]
-                    connection.executemany(
-                        """
-                        UPDATE artifacts SET status = 'suspended', promotion_hash = NULL,
-                            status_reason = ? WHERE id = ?
-                        """,
-                        [("ambiguous active scope", artifact_id) for artifact_id in ids],
-                    )
-                    _event(
-                        connection,
-                        partition=partition,
-                        kind="artifact.ambiguity_quarantined",
-                        subject_type="operation",
-                        subject_id=f"{partition}/{operation}@{revision}",
-                        payload={"artifact_ids": ids},
-                        now_us=now,
-                    )
-                    artifacts = []
-                if artifacts:
-                    artifact_row = artifacts[0]
-                    try:
-                        artifact = self._artifact_from_row(artifact_row)
-                        self._validate_promoted(connection, artifact_row)
-                        execution = execute(
-                            artifact,
-                            partition=partition,
-                            operation=operation,
-                            operation_revision=revision,
-                            input_json=input_json,
-                        )
-                    except (IntegrityError, ValidationError):
-                        connection.execute(
-                            """
-                            UPDATE artifacts
-                            SET status = 'suspended', promotion_hash = NULL,
-                                status_reason = 'runtime integrity failure'
-                            WHERE id = ? AND status = 'promoted'
-                            """,
-                            (artifact_row["id"],),
-                        )
-                        _event(
-                            connection,
-                            partition=partition,
-                            kind="artifact.integrity_quarantined",
-                            subject_type="artifact",
-                            subject_id=str(artifact_row["id"]),
-                            payload={},
-                            now_us=now,
-                        )
-                    else:
-                        if execution.matched:
-                            output_json = canonicalize(execution.output)
-                            connection.execute(
-                                """
-                                INSERT INTO requests(
-                                    id, partition, operation, operation_revision, input_json,
-                                    input_hash, status, output_json, source_kind, artifact_id,
-                                    created_at_us, updated_at_us
-                                ) VALUES (?, ?, ?, ?, ?, ?, 'resolved', ?, 'artifact', ?, ?, ?)
-                                """,
-                                (
-                                    request_id,
-                                    partition,
-                                    operation,
-                                    revision,
-                                    input_json.text,
-                                    input_json.digest,
-                                    output_json.text,
-                                    artifact_row["id"],
-                                    now,
-                                    now,
-                                ),
-                            )
-                            _event(
-                                connection,
-                                partition=partition,
-                                kind="request.resolved_by_artifact",
-                                subject_type="request",
-                                subject_id=request_id,
-                                payload={"artifact_id": str(artifact_row["id"])},
-                                now_us=now,
-                            )
-                            return Resolved(
-                                request_id=request_id,
-                                output=output_json.value,
-                                source="artifact",
-                                artifact_id=str(artifact_row["id"]),
-                            )
-                connection.execute(
-                    """
-                    INSERT INTO requests(
-                        id, partition, operation, operation_revision, input_json, input_hash,
-                        status, lease_owner, lease_until_us, created_at_us, updated_at_us
-                    ) VALUES (?, ?, ?, ?, ?, ?, 'generating', ?, ?, ?, ?)
-                    """,
-                    (
-                        request_id,
-                        partition,
-                        operation,
-                        revision,
-                        input_json.text,
-                        input_json.digest,
-                        owner,
-                        now + self._lease_us,
-                        now,
-                        now,
-                    ),
-                )
-
-        if self.candidate_source is None:
-            return self._fail_generation(partition, request_id, owner, "candidate_source_unavailable")
-        try:
-            candidate = self.candidate_source.propose(
-                CandidateRequest(
-                    partition=partition,
-                    operation=operation,
-                    operation_revision=revision,
-                    request_id=request_id,
-                    input=input_json.value,
-                )
-            )
-            proposed = canonicalize(candidate.output)
-            provenance = canonicalize(dict(candidate.provenance), max_bytes=PROVENANCE_MAX_BYTES)
-            if type(provenance.value) is not dict:
-                raise ValidationError("candidate provenance must be a JSON object")
-        except CandidateSourceError:
-            return self._fail_generation(partition, request_id, owner, "candidate_source_error")
-        except Exception:
-            # Custom adapter failures remain inert and do not leak details into audit data.
-            return self._fail_generation(partition, request_id, owner, "candidate_source_error")
-
-        proposal_id = _new_id("prop")
-        completed = self._now()
-        with self.store.transaction(write=True) as connection:
-            request = connection.execute(
-                "SELECT * FROM requests WHERE partition = ? AND id = ?",
-                (partition, request_id),
-            ).fetchone()
-            if request is None:
-                raise IntegrityError("reserved request disappeared")
-            if request["status"] != "generating" or request["lease_owner"] != owner:
-                return self._outcome(request, completed, connection)
-            if not self._request_revision_is_current(request, connection):
-                connection.execute(
-                    """
-                    UPDATE requests
-                    SET status = 'failed', error_code = 'operation_revised',
-                        lease_owner = NULL, lease_until_us = NULL, updated_at_us = ?
-                    WHERE partition = ? AND id = ? AND status = 'generating'
-                      AND lease_owner = ?
-                    """,
-                    (completed, partition, request_id, owner),
-                )
-                refreshed = connection.execute(
-                    "SELECT * FROM requests WHERE partition = ? AND id = ?",
-                    (partition, request_id),
-                ).fetchone()
-                if refreshed is None:
-                    raise IntegrityError("invalidated request disappeared")
-                return self._outcome(refreshed, completed, connection)
-            status_sequence = _event(
-                connection,
-                partition=partition,
-                kind="proposal.created",
-                subject_type="proposal",
-                subject_id=proposal_id,
-                payload={"request_id": request_id},
-                now_us=completed,
-            )
-            connection.execute(
-                """
-                INSERT INTO proposals(
-                    id, partition, request_id, proposed_output_json, proposed_output_hash,
-                    provenance_json, provenance_hash, status, created_at_us, status_sequence
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
-                """,
-                (
-                    proposal_id,
-                    partition,
-                    request_id,
-                    proposed.text,
-                    proposed.digest,
-                    provenance.text,
-                    provenance.digest,
-                    completed,
-                    status_sequence,
-                ),
-            )
-            connection.execute(
-                """
-                UPDATE requests
-                SET status = 'pending', proposal_id = ?, lease_owner = NULL,
-                    lease_until_us = NULL, updated_at_us = ?
-                WHERE partition = ? AND id = ?
-                """,
-                (proposal_id, completed, partition, request_id),
-            )
-        return ReviewRequired(request_id=request_id, proposal_id=proposal_id)
-
-    def _fail_generation(
-        self, partition: str, request_id: str, owner: str, code: str
-    ) -> Outcome:
-        now = self._now()
-        with self.store.transaction(write=True) as connection:
-            request = connection.execute(
-                "SELECT * FROM requests WHERE partition = ? AND id = ?",
-                (partition, request_id),
-            ).fetchone()
-            if request is None:
-                raise IntegrityError("reserved request disappeared")
-            if request["status"] != "generating" or request["lease_owner"] != owner:
-                return self._outcome(request, now, connection)
-            connection.execute(
-                """
-                UPDATE requests
-                SET status = 'failed', error_code = ?, lease_owner = NULL,
-                    lease_until_us = NULL, updated_at_us = ?
-                WHERE partition = ? AND id = ?
-                """,
-                (code, now, partition, request_id),
-            )
-            _event(
-                connection,
-                partition=str(request["partition"]),
-                kind="request.fallback_failed",
-                subject_type="request",
-                subject_id=request_id,
-                payload={"code": code},
-                now_us=now,
-            )
-        return FallbackFailed(request_id=request_id, code=code)
-
-    def _outcome(
-        self,
-        request: sqlite3.Row,
-        now_us: int,
-        connection: sqlite3.Connection,
-    ) -> Outcome:
-        status = str(request["status"])
-        request_id = str(request["id"])
-        if status != "rejected" and not self._request_revision_is_current(request, connection):
-            return ReconciliationRequired(
-                request_id=request_id,
-                reason="operation revision changed; submit a new request ID",
-                artifact_id=str(request["artifact_id"]) if request["artifact_id"] else None,
-                example_id=str(request["example_id"]) if request["example_id"] else None,
-            )
-        if status == "resolved":
-            if request["output_json"] is None or request["source_kind"] is None:
-                raise IntegrityError("resolved request is incomplete")
-            stored_output = str(request["output_json"])
-            output: JSONValue = None
-            if request["source_kind"] == "artifact":
-                source_kind: Literal["artifact", "confirmed"] = "artifact"
-                artifact_id = str(request["artifact_id"] or "")
-                artifact_row = connection.execute(
-                    "SELECT * FROM artifacts WHERE id = ?", (artifact_id,)
-                ).fetchone()
-                valid = False
-                if artifact_row is not None and artifact_row["status"] == "promoted":
-                    try:
-                        artifact = self._artifact_from_row(artifact_row)
-                        self._validate_promoted(connection, artifact_row)
-                        input_json = parse_json(str(request["input_json"]))
-                        execution = execute(
-                            artifact,
-                            partition=str(request["partition"]),
-                            operation=str(request["operation"]),
-                            operation_revision=int(request["operation_revision"]),
-                            input_json=input_json,
-                        )
-                        valid = (
-                            execution.matched
-                            and canonicalize(execution.output).text == stored_output
-                        )
-                        if valid:
-                            output = execution.output
-                    except (IntegrityError, ValidationError):
-                        valid = False
-                if not valid:
-                    return ReconciliationRequired(
-                        request_id=request_id,
-                        reason="artifact is no longer active and integrity-valid",
-                        artifact_id=artifact_id or None,
-                    )
-            elif request["source_kind"] == "confirmed":
-                source_kind = "confirmed"
-                example_id = str(request["example_id"] or "")
-                example = connection.execute(
-                    """
-                    SELECT e.*, x.example_id AS revoked
-                    FROM examples AS e
-                    LEFT JOIN example_revocations AS x ON x.example_id = e.id
-                    WHERE e.id = ?
-                    """,
-                    (example_id,),
-                ).fetchone()
-                valid = False
-                if example is not None and example["revoked"] is None:
-                    assessment = self._assess_examples(
-                        [example], CompilePolicy(2, 1, 0)
-                    )
-                    valid = not assessment["integrity_failures"] and (
-                        example["partition"] == request["partition"]
-                        and example["operation"] == request["operation"]
-                        and example["operation_revision"] == request["operation_revision"]
-                        and example["input_json"] == request["input_json"]
-                        and example["output_json"] == stored_output
-                    )
-                    if valid:
-                        output = parse_json(str(example["output_json"])).value
-                if not valid:
-                    return ReconciliationRequired(
-                        request_id=request_id,
-                        reason="confirmed example is missing, revoked, or inconsistent",
-                        example_id=example_id or None,
-                    )
-            else:
-                raise IntegrityError("resolved request has an unknown source kind")
-            return Resolved(
-                request_id=request_id,
-                output=output,
-                source=source_kind,
-                artifact_id=str(request["artifact_id"]) if request["artifact_id"] else None,
-                example_id=str(request["example_id"]) if request["example_id"] else None,
-            )
-        if status == "pending":
-            if not request["proposal_id"]:
-                raise IntegrityError("pending request has no proposal")
-            return ReviewRequired(request_id=request_id, proposal_id=str(request["proposal_id"]))
-        if status == "generating":
-            remaining = max(0, int(request["lease_until_us"] or now_us) - now_us)
-            if remaining == 0:
-                return FallbackFailed(
-                    request_id=request_id,
-                    code="generation_lease_expired",
-                )
-            return InProgress(
-                request_id=request_id,
-                retry_after_seconds=max(1, (remaining + 999_999) // 1_000_000),
-            )
-        if status == "failed":
-            return FallbackFailed(request_id=request_id, code=str(request["error_code"] or "unknown"))
-        if status == "rejected":
-            if not request["proposal_id"]:
-                raise IntegrityError("rejected request has no proposal")
-            return Rejected(request_id=request_id, proposal_id=str(request["proposal_id"]))
-        raise IntegrityError(f"unknown request status: {status}")
-
-    @staticmethod
-    def _request_revision_is_current(
-        request: sqlite3.Row,
-        connection: sqlite3.Connection,
-    ) -> bool:
-        operation = connection.execute(
-            "SELECT revision FROM operations WHERE partition = ? AND name = ?",
-            (request["partition"], request["operation"]),
-        ).fetchone()
-        return operation is not None and int(operation["revision"]) == int(
-            request["operation_revision"]
-        )
-
     @staticmethod
     def _proposal_content(
         binding: _ProposalBinding,
@@ -1542,21 +1079,6 @@ class System:
             or row["bound_request_status"] != request_status
         ):
             raise IntegrityError("proposal and request states are inconsistent")
-
-    def request_status(self, partition: str, request_id: str) -> Outcome:
-        """Poll an existing request without resupplying its immutable input."""
-
-        partition = _name(partition, "partition")
-        request_id = _request_id(request_id)
-        now = self._now()
-        with self.store.transaction() as connection:
-            row = connection.execute(
-                "SELECT * FROM requests WHERE partition = ? AND id = ?",
-                (partition, request_id),
-            ).fetchone()
-            if row is None:
-                raise NotFoundError("request does not exist in this partition")
-            return self._outcome(row, now, connection)
 
     # -- supervision ---------------------------------------------------------
 

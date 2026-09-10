@@ -1814,7 +1814,7 @@ class ObligationBatteryTests(unittest.TestCase):
                 isinstance(node, ast.Name) and node.id == "PROVENANCE_MAX_BYTES"
                 for node in ast.walk(system_tree)
             ),
-            4,
+            3,
         )
         cap_assignment = next(
             node
@@ -2570,11 +2570,12 @@ class ObligationBatteryTests(unittest.TestCase):
                 if re.search(r"^\s*[-*|] ", paragraph, re.MULTILINE)
                 else [paragraph]
             )
-        submission_paragraphs = "\n".join(
+        matched_units = [
             unit
             for unit in units
             if re.search(r"\bsubmission\b|proposal submit", unit, re.IGNORECASE)
-        ).lower()
+        ]
+        submission_paragraphs = "\n".join(matched_units).lower()
         scrubbed = re.sub(
             r"\b(?:do not|never|must not)\s+(?:retry|resubmit|run again|repeat)\b",
             "",
@@ -2585,7 +2586,14 @@ class ObligationBatteryTests(unittest.TestCase):
             r"\b(?:should|must|can|may|please)\s+(?:retry|resubmit|run again|repeat)\b"
             r"|(?:^|[.!?:;]\s+)(?:retry|resubmit|run again|repeat)\b",
         )
-        self.assertIn("call `System.handle` again with `retry_failed=True`", readme)
+        # M3.6a2 L23 permitted inversion. The A11/D22 control named README's `handle` retry
+        # advice, which this unit deletes. Its role was anti-vacuity, so it is replaced in
+        # place rather than dropped: an empty corpus, or one that never says `retry`, satisfies
+        # the scoped absence assertion above for free (A08). These three bind the corpus to the
+        # README sentence asserted above and prove the scrub removes real vocabulary.
+        self.assertEqual(len(matched_units), 10)
+        self.assertIn("do not retry a failed submission", submission_paragraphs)
+        self.assertNotEqual(scrubbed, submission_paragraphs)
 
     def test_d24_zero_source_calls_zero_system_propose_calls_and_zero_sourc(
         self,
@@ -2658,27 +2666,23 @@ class ObligationBatteryTests(unittest.TestCase):
             self.assertIs(system.candidate_source, source)
             leaves = _table_counts(path)
 
-            # POSITIVE CONTROL. `handle` was the CLI witness that a configured
-            # source IS reachable, which is what stops the two zeros above from
-            # being vacuous. M3.5b removes that CLI route and keeps the LIBRARY
-            # method, so the control moves onto `System.handle` itself. A control
-            # deleted rather than relocated turns an isolation pin into a
-            # tautology.
-            handled = system.handle(PARTITION, OPERATION, 12)
-        self.assertEqual(handled.status, "fallback_failed")
-        self.assertEqual(handled.code, "candidate_source_error")
+        # POSITIVE CONTROL. Direct `System.propose` must still reach the configured
+        # source; otherwise the CLI's zero-source result is vacuous.
+        with self.assertRaisesRegex(CementError, r"^candidate source failed$") as caught:
+            system.propose(PARTITION, OPERATION, 12)
+        self.assertEqual(type(caught.exception).__name__, "CandidateSourceError")
         self.assertEqual(constructor.call_count, 2)
 
         after = _table_counts(path)
         leaf_delta = {table: leaves[table] - before[table] for table in before}
-        handle_delta = {table: after[table] - leaves[table] for table in before}
+        control_delta = {table: after[table] - leaves[table] for table in before}
         self.assertEqual(
             {table: count for table, count in leaf_delta.items() if count},
             {"events": 1, "proposals": 1, "requests": 1},
         )
         self.assertEqual(
-            {table: count for table, count in handle_delta.items() if count},
-            {"events": 1, "requests": 1},
+            {table: count for table, count in control_delta.items() if count},
+            {},
         )
 
     def test_d25_the_parser_census_moves_28_30_leaves_and_35_37_nodes_deriv(

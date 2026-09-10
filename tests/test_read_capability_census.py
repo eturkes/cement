@@ -121,7 +121,7 @@ class ReadReachabilityTests(unittest.TestCase):
         # A collapsed census would report zero offenders over zero sites.
         result = census()
         self.assertGreaterEqual(result["read_sites"], 17)
-        self.assertGreaterEqual(result["write_sites"], 15)
+        self.assertGreaterEqual(result["write_sites"], 13)
         self.assertGreaterEqual(len(result["helpers"]), 12)
 
 

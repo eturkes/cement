@@ -73,6 +73,31 @@ READS_DOC = re.compile(r"README\.md|architecture\.md|threat-model\.md|adapter-pr
 READS_TREE = re.compile(r"ROOT\s*/\s*\w|\(ROOT / relative\)|ROOT\.joinpath")
 GIT_OBJECT = re.compile(r"_git_bytes\(|git_bytes\(|\"[0-9a-f]{7,40}\"|'[0-9a-f]{7,40}'")
 
+# A FREEZE has two shapes. The MODULE shape names a runtime path and re-reads it. The SPAN
+# shape reaches `system.py` INDIRECTLY - `cement_runtime.system.__file__`,
+# `inspect.getsourcefile(System)`, a `_source(ROOT, path)` helper - and slices one deleted
+# method out of it. A literal-path scan sees only the first, so the P06 family sat in the
+# detector's negative space while its name promised the family.
+FREEZE_PATH = re.compile(r"cement_runtime/system\.py|System\.handle")
+FREEZE_READ = re.compile(r"read_bytes\(\)|getsource|_git_bytes\(")
+LIVE_SYSTEM_SOURCE = re.compile(
+    r"cement_runtime\.system\.__file__|getsourcefile\(\s*System\b|_source\(\s*ROOT\s*,"
+)
+# The discriminator. The same acquisition selecting a PRESERVED method freezes nothing this
+# unit moves, so naming the deleted method is what separates a freeze from a source read.
+DELETED_SPAN = re.compile(r"System\.handle|name\s*==\s*[\"']handle[\"']")
+
+# Control fixtures for `_is_freeze`, frozen and synthetic so no repair to a real frame can
+# quietly retire the control. The two differ in the METHOD NAME alone: a detector keying on the
+# acquisition passes the positive and fails the negative, which is the over-report this pair buys.
+P06_FIXTURE_POSITIVE = (
+    'def test_span(self):\n'
+    '    source = pathlib.Path(inspect.getsourcefile(System)).read_text(encoding="utf-8")\n'
+    '    node = next(item for item in ast.parse(source).body if item.name == "handle")\n'
+    '    self.assertEqual(len(ast.get_source_segment(source, node)), 12_866)\n'
+)
+P06_FIXTURE_NEGATIVE = P06_FIXTURE_POSITIVE.replace('"handle"', '"propose"')
+
 # MAIN's ownership ruling per document, with grounds. Keyed by document; a document whose
 # every hit belongs to one unit needs no per-line ruling, which is why this is not a line map.
 OWNERS: dict[str, tuple[str, str]] = {
@@ -121,6 +146,13 @@ def _frame_scope(segment: str) -> str:
     return "WORKING-TREE"
 
 
+def _is_freeze(segment: str) -> bool:
+    """True when a frame re-reads bytes this unit moves, by either shape above."""
+    module_shape = bool(FREEZE_PATH.search(segment)) and bool(FREEZE_READ.search(segment))
+    span_shape = bool(LIVE_SYSTEM_SOURCE.search(segment)) and bool(DELETED_SPAN.search(segment))
+    return module_shape or span_shape
+
+
 def _pins() -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for path in sorted((ROOT / "tests").glob("*.py")):
@@ -158,9 +190,7 @@ def _freezes() -> list[dict[str, object]]:
             if not isinstance(node, ast.FunctionDef):
                 continue
             segment = ast.get_source_segment(source, node) or ""
-            touches_system = "cement_runtime/system.py" in segment or "System.handle" in segment
-            frozen = "read_bytes()" in segment or "getsource" in segment or "_git_bytes(" in segment
-            if not (touches_system and frozen):
+            if not _is_freeze(segment):
                 continue
             rows.append(
                 {
@@ -301,6 +331,21 @@ def self_test() -> int:
     controls.append(("battery counted as a pin", mirror, "SELF-REFERENCE"))
 
     silent: list[str] = []
+    # The last control grades the DETECTOR rather than a table: `validate` compares two tables and
+    # is blind to a `_is_freeze` that reports nothing, so a table-only battery would credit a
+    # detector that lost the span shape entirely.
+    detector = [
+        label
+        for label, expected, segment in (
+            ("span-shape freeze unseen", True, P06_FIXTURE_POSITIVE),
+            ("preserved-method read over-reported", False, P06_FIXTURE_NEGATIVE),
+        )
+        if _is_freeze(segment) is not expected
+    ]
+    total = len(controls) + 1
+    if detector:
+        silent.append(f"`_is_freeze` fixture pair -> {', '.join(detector)}")
+
     for label, mutated, expected in controls:
         import io
         import contextlib
@@ -317,7 +362,7 @@ def self_test() -> int:
         silent.append("filled table does not grade PASS")
     for line in silent:
         print(f"SILENT: {line}")
-    print(f"CONTROLS: {len(controls) - len(silent)}/{len(controls)} firing")
+    print(f"CONTROLS: {total - len(silent)}/{total} firing")
     print(f"RESULT: {'FAIL' if silent else 'PASS'}")
     return 1 if silent else 0
 

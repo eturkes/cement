@@ -103,24 +103,39 @@ def self_test() -> int:
     # grading the committed file both ways would only ever prove the failing half.
     filled = re.sub(rf'\s*self\.(?:fail|skipTest)\("{SEED_MARKER}[^"]*"\)', "\n        pass",
                     battery)
+    def mutated(label: str, before: str, after: str) -> str:
+        # A control whose mutation silently fails to apply reports exactly like a control that
+        # fired. Measured: the UNCOVERED control renamed `test_l01_` with `count=1` and went
+        # unreachable once L01 grew to three covering tests, so it graded SILENT with the
+        # instrument healthy. Every mutation asserts it moved the text.
+        if after == before:
+            raise AssertionError(f"control {label!r} did not mutate its input")
+        return after
+
     controls: list[tuple[str, str, str, str]] = [
         ("clean, filled battery", contract, filled, ""),
-        ("dropped obligation", contract.replace(f"- **{first}** ", f"- {first} ", 1), battery,
+        ("dropped obligation",
+         mutated("dropped obligation", contract,
+                 contract.replace(f"- **{first}** ", f"- {first} ", 1)), battery,
          "OBLIGATIONS"),
+        # The whole COVERING SET goes, never one member: `count=1` leaves an obligation covered
+        # the moment a second test names it.
         ("uncovered obligation", contract,
-         re.sub(rf"def test_{first.lower()}_", "def test_l99_", battery, count=1), "UNCOVERED"),
-        ("orphan test", contract, battery.replace("class ", "class ", 1)
-         + f"\n\nclass _Orphan:\n    def test_l98_orphan(self):\n        pass\n", "ORPHAN"),
+         mutated("uncovered obligation", battery,
+                 re.sub(rf"def test_{first.lower()}_", "def test_l99_", battery)), "UNCOVERED"),
+        ("orphan test", contract,
+         battery + "\n\nclass _Orphan:\n    def test_l98_orphan(self):\n        pass\n", "ORPHAN"),
         # Seeded MID-DOCUMENT on purpose: appended at the end it would fire even under a regex
         # bounded by `\Z`, and that is the exact defect this control exists to catch.
-        ("unbound correction", contract.replace(
+        ("unbound correction", mutated("unbound correction", contract, contract.replace(
             "\n## 9. Session boundaries",
-            "\n- **C99** a correction naming nothing.\n\n## 9. Session boundaries", 1),
+            "\n- **C99** a correction naming nothing.\n\n## 9. Session boundaries", 1)),
          battery, "CORRECTION-BIND"),
-        ("explicit none naming no instrument", contract.replace(
-            "\n## 9. Session boundaries",
-            "\n- **C97** binds NO obligation and no gate, and names no file either.\n"
-            "\n## 9. Session boundaries", 1),
+        ("explicit none naming no instrument", mutated(
+            "explicit none naming no instrument", contract, contract.replace(
+                "\n## 9. Session boundaries",
+                "\n- **C97** binds NO obligation and no gate, and names no file either.\n"
+                "\n## 9. Session boundaries", 1)),
          battery, "CORRECTION-BIND"),
     ]
     fired = 0

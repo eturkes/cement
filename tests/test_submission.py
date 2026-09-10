@@ -17,6 +17,7 @@ import inspect
 import pathlib
 import re
 import sqlite3
+import subprocess
 import tempfile
 import typing
 import unittest
@@ -35,7 +36,37 @@ from cement_runtime import (
     store as store_module,
 )
 
+ROOT = pathlib.Path(__file__).resolve().parents[1]
 SECRET = "adapter-secret-42"
+
+
+def _p06_handle_spans() -> tuple[str, str, str]:
+    """P06's three span conventions for `System.handle`, recomputed from history.
+
+    M3.6a2 L26 retires the freeze: the method is deleted, so the pin moves onto the git
+    object it always described. All three figures are derived from `3b7769b` on every run,
+    because a transcribed number satisfies a text-presence assertion while disagreeing with
+    history, and the only executable recomputers were the frames being retired.
+    """
+    source = subprocess.run(
+        ["git", "show", "3b7769b:src/cement_runtime/system.py"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    system_node = next(
+        item
+        for item in ast.parse(source).body
+        if isinstance(item, ast.ClassDef) and item.name == "System"
+    )
+    node = next(
+        item
+        for item in system_node.body
+        if isinstance(item, ast.FunctionDef) and item.name == "handle"
+    )
+    kept = "".join(source.splitlines(keepends=True)[node.lineno - 1 : node.end_lineno])
+    return kept.rstrip("\r\n"), kept, ast.get_source_segment(source, node) or ""
 
 # D01's footprint quantifies over every APPLICATION table the live ledger
 # declares, derived here rather than named, because a hand-written list is a
@@ -668,39 +699,22 @@ class SubmissionTests(unittest.TestCase):
     # -- frozen shapes ------------------------------------------------------
 
     def test_handle_is_byte_identical_to_the_unit_baseline(self):
-        """P06: `handle` keeps the bytes it has carried since 3b7769b, less one constant.
+        """P06, RETIRED by M3.6a2 L26: the span is history, and the test identity records it.
 
         Convention: the whole-line span from `node.lineno` to `node.end_lineno`,
         which keeps the leading indentation, with trailing newlines stripped.
         A column-offset slice measures 4 bytes shorter and is a different claim.
 
-        M3.5a's D16 routes every provenance limit through the exported
-        `PROVENANCE_MAX_BYTES`, and one of the three literal sites sits inside
-        this method, so the freeze broke on a value-preserving identifier
-        substitution rather than on any behaviour change. The pin is re-anchored
-        with its delta asserted: substituting the literal back reproduces
-        M3.3's own numbers, so the substitution is the whole delta.
+        The method is deleted, so this frame no longer protects live bytes; L15 carries that
+        value for the methods that survive. Deleting the frame instead would erase one of
+        four independent tripwire records of what `handle` weighed.
         """
 
-        source = pathlib.Path(cement_runtime.system.__file__).read_text(encoding="utf-8")
-        lines = source.splitlines(keepends=True)
-        spans = [
-            "".join(lines[node.lineno - 1 : node.end_lineno]).rstrip("\n")
-            for node in ast.walk(ast.parse(source))
-            if isinstance(node, ast.FunctionDef) and node.name == "handle"
-        ]
-        self.assertEqual(len(spans), 1)
-        payload = spans[0].encode("utf-8")
-        self.assertEqual(len(payload), 12_880)
+        stripped, _, _ = _p06_handle_spans()
+        payload = stripped.encode("utf-8")
+        self.assertEqual(len(payload), 12_866)
         self.assertTrue(
-            hashlib.sha256(payload).hexdigest().startswith("eec7cb7c85f8")
-        )
-
-        self.assertEqual(spans[0].count("PROVENANCE_MAX_BYTES"), 1)
-        restored = spans[0].replace("PROVENANCE_MAX_BYTES", "65_536").encode("utf-8")
-        self.assertEqual(len(restored), 12_866)
-        self.assertTrue(
-            hashlib.sha256(restored).hexdigest().startswith("1182130a2b3a")
+            hashlib.sha256(payload).hexdigest().startswith("1182130a2b3a")
         )
 
     def test_submission_adds_no_exported_symbol(self):
@@ -914,12 +928,6 @@ class SubmissionTests(unittest.TestCase):
         self.assertEqual(request["status"], "resolved")
         self.assertEqual(request["source_kind"], "confirmed")
         self.assertEqual(self._counts(database)["examples"], 1)
-
-    def test_handle_still_answers_on_a_system_that_submitted_directly(self):
-        system, _, _ = self._make_system()
-        system.submit_proposal("tenant_a", "echo_1", {"k": 1}, candidate=self._candidate())
-        outcome = system.handle("tenant_a", "echo_1", {"k": 99})
-        self.assertIs(type(outcome), ReviewRequired)
 
 
 if __name__ == "__main__":

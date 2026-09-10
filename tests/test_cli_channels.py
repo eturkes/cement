@@ -2020,7 +2020,7 @@ class CliChannelTests(unittest.TestCase):
             and node.id == "PROVENANCE_MAX_BYTES"
             for node in ast.walk(system_tree)
         )
-        self.assertEqual(system_uses, 3)
+        self.assertEqual(system_uses, 2)
 
     def test_x12_top_level_non_object_submission_rejection_has_no_contract(self) -> None:
         """X12 [D17] top-level non-object submission rejection has no contract-selected exact sentence

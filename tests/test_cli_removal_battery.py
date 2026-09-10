@@ -613,9 +613,18 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         operator route. This is a ruled, temporary condition of the M3 track order, not a
         defect. State it once in the contract; do not state it in shipped prose, which
         describes what exists rather than what is scheduled.
+
+        M3.6a2 L23/L27 INVERT this pin. The ruled temporary condition ended: both methods are
+        deleted, so the obligation keeps its subject and reverses its predicate. Deleting the
+        pin instead would delete the behaviour's only record along with the behaviour. The two
+        absences travel with positive identity controls, because `System.__module__` and
+        `callable(System.propose)` are what stop both `assertFalse` calls from passing against
+        an empty class, and D01's leaf-set complement stays green beside them.
         """
-        self.assertTrue(callable(getattr(System, "handle", None)))
-        self.assertTrue(callable(getattr(System, "request_status", None)))
+        self.assertEqual(System.__module__, "cement_runtime.system")
+        self.assertTrue(callable(System.propose))
+        self.assertFalse(hasattr(System, "handle"))
+        self.assertFalse(hasattr(System, "request_status"))
         leaves, _ = _parser_census(cement_cli._parser())
         self.assertEqual(leaves, set(SURVIVING_LEAVES))
         self.assertTrue(REMOVED_LEAVES.isdisjoint(leaves))
@@ -1153,9 +1162,15 @@ class RemovalObligationBatteryTests(unittest.TestCase):
             "src/cement_runtime/example_adapter.py",
         )
         self.assertEqual(len(protected), 6)
+        # M3.6a2 L25: re-scoped to the closed range `36f7890..1146421`, the same repair
+        # M3.6a1 gave D15b and D22b. Read against the working tree, this clause inverts the
+        # moment a later unit edits a runtime module, so it asserted a scope M3.5b no longer
+        # owns rather than the historical diff it was written to freeze.
         for relative in protected:
             with self.subTest(relative=relative):
-                self.assertEqual((ROOT / relative).read_bytes(), _git_bytes("36f7890", relative))
+                self.assertEqual(
+                    _git_bytes("1146421", relative), _git_bytes("36f7890", relative)
+                )
 
     def test_d15b_the_twelve_examples_files_stay_byte_identical_to_their(self) -> None:
         """D15b obligation
@@ -1290,6 +1305,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         parser = cement_cli._parser()
         leaves, nodes = _parser_census(parser)
 
+        self.assertEqual(report["provenance_literal"]["reference_sites"], 3)
         self.assertEqual(len(check_lines), 19)
         self.assertEqual(leaves, set(SURVIVING_LEAVES))
         self.assertEqual(
@@ -1777,7 +1793,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         self.assertTrue(
             {"DEFAULT_MAX_BYTES", "PROVENANCE_MAX_BYTES", "_SUBMISSION_FRAMING"}.issubset(strings)
         )
-        self.assertIn("self.assertEqual(system_uses, 3)", code)
+        self.assertIn("self.assertEqual(system_uses, 2)", code)
 
     def test_d18h_test_cli_channels_py_2605_x21_preserve_both_new_leaves(self) -> None:
         """D18h obligation
@@ -2315,8 +2331,10 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         self.assertNotIn("_source", patch_targets)
         self.assertIn("self.assertFalse(hasattr(cement_cli, '_source'))", code)
         self.assertNotIn("self.run_cli('handle'", code)
-        self.assertIn("system.handle", code)
-        self.assertTrue({"fallback_failed", "candidate_source_error"}.issubset(strings))
+        self.assertNotIn("system.handle", code)
+        self.assertIn("system.propose(PARTITION, OPERATION, 12)", code)
+        self.assertIn("CandidateSourceError", strings)
+        self.assertIn("control_delta", code)
         self.assertIn("constructor.call_count, 2", code)
         self.assertIn("resolve.call_count, 1", code)
         self.assertIn("submit.call_count, 1", code)
@@ -2758,9 +2776,11 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         for phrase in stale_phrases:
             with self.subTest(phrase=phrase):
                 self.assertNotIn(phrase, flat_readme)
+        # M3.6a2 L23 permitted inversion. The re-scope target itself is gone: no library route
+        # carries a request identifier any more, so the pin asserts the replacement claim.
         self.assertRegex(
-            readme,
-            r"System\.handle.{0,120}System\.request_status.{0,120}library route",
+            flat_readme,
+            r"request row stays internal.{0,400}No public surface names it",
         )
 
     def test_d22b_direction_library_route_every_library_api_locus_is_byt(self) -> None:
@@ -2919,10 +2939,18 @@ class RemovalObligationBatteryTests(unittest.TestCase):
             for language, body in _fenced_blocks(_git_bytes("36f7890", "README.md").decode())
             if language == "text"
         ]
+        # M3.6a2 permitted delta (contract C21). L19 rewrites this fence, because L24 requires
+        # zero `handle` tokens in README, so byte-identity with `36f7890` is unreachable. The
+        # baseline half stays load-bearing — it proves the deleted spelling WAS here — and the
+        # freeze inverts onto the post-state, keeping the subproperty gate 5 still cannot
+        # reach: the opening fence names the surviving entry points and no CLI invocation.
         self.assertTrue(current)
         self.assertTrue(baseline)
-        self.assertEqual(current[0], baseline[0])
-        self.assertIn("handle(request)", current[0])
+        self.assertIn("handle(request)", baseline[0])
+        self.assertNotEqual(current[0], baseline[0])
+        self.assertNotRegex(current[0], r"\bhandle\b")
+        self.assertIn("propose / submit_proposal", current[0])
+        self.assertIn("resolve, against the ledger", current[0])
         self.assertNotRegex(current[0], r"\bcement\s+")
 
     def test_d23_no_shipped_human_facing_surface_instructs_an_operator(self) -> None:
@@ -3083,22 +3111,33 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         # actually uses, and an unclassified opener is a FAILURE, not a default to the looser
         # bound. Adding prose therefore forces the classification rather than skipping it.
         imperatives = {
+            "authenticate",
             "call",
             "canonicalize",
             "capture",
+            "deploy",
+            "do",
+            "encode",
+            "exclude",
             "export",
             "generate",
             "inspect",
             "isolate",
             "keep",
             "list",
+            "make",
+            "minimize",
+            "monitor",
             "pass",
             "poll",
+            "put",
             "re-run",
             "reconcile",
             "repeat",
             "review",
+            "revise",
             "run",
+            "stop",
             "submit",
             "treat",
             "use",
@@ -3110,10 +3149,22 @@ class RemovalObligationBatteryTests(unittest.TestCase):
             "4",
             "5",
             "6",
+            "7",
+            "8",
             "a",
+            # Always the noun phrase "Accept/correct creates ...", never the imperative.
+            "accept",
+            "accepted",
+            "access",
             "act",
+            "adapters",
+            "additional",
+            "an",
             "applyplan",
+            "artifacts",
+            "both",
             "caller",
+            "callers",
             "candidate",
             "cement",
             "cement-json-v1",
@@ -3124,15 +3175,25 @@ class RemovalObligationBatteryTests(unittest.TestCase):
             "corpus",
             "counterexamples",
             "current",
+            "decimal",
             # Always the noun phrase "Demo compile policy", never the imperative.
             "demo",
             "distinct",
+            "each",
+            "entry",
             "every",
+            "evidence",
             "example-hospital",
+            # Always the noun phrase "Exit failure", never the imperative.
+            "exit",
             "fallbackfailed",
             "for",
+            # Always the command name `function export`, never the imperative.
+            "function",
+            "historical",
             "hospital",
             "if",
+            "individually",
             "inprogress",
             "it",
             "its",
@@ -3141,39 +3202,62 @@ class RemovalObligationBatteryTests(unittest.TestCase):
             "linux",
             "llm",
             "meaning",
+            "neither",
             "no",
             "ocr",
+            "offline",
             "on",
             "only",
             "operation",
+            "otherwise",
             "partition",
             "patient",
+            "per-value",
             "planadapter",
             "production",
             "promoter",
             "promotion",
-            "resolveoffline",
-            "rundemo",
+            # Always the method name `propose`, never the imperative.
+            "propose",
+            "proposed",
+            "provider",
             "reconciliationrequired",
             "rejected",
             "request",
+            "requestid",
+            # Always the command name `resolve`, never the imperative.
+            "resolve",
+            "resolveoffline",
             "resolved",
             "reviewer",
             "reviewrequired",
+            "reviewresult",
+            "rundemo",
             "schema",
             # Always a noun phrase in this prose -- "Set promotion", "Set verification" --
             # never the imperative verb.
             "set",
+            "sqlite",
             "status",
+            "strict",
             "structural",
+            "submitproposal",
             "supervised",
             "system",
             "that",
             "the",
             "then",
+            "they",
             "this",
+            "through",
+            "two",
+            "unknown",
             "verification",
+            "verifydrafts",
+            # A condition opener, classified with `if` and `while`.
+            "when",
             "while",
+            "whole-set",
         }
         unclassified: list[str] = []
         units: list[str] = []
@@ -3206,12 +3290,21 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         self.assertEqual(sentence_violations, [])
         self.assertEqual(instruction_violations, [])
 
-        # The deferral this obligation binds moved with the register it lived in: live
-        # state is `.agent/spec.md` `Deferred`, and a pin reading the frozen archive would
-        # hold even after the deferral was dropped.
-        deferred = (ROOT / ".agent/spec.md").read_text()
-        self.assertIn("port the human-facing register audit to committed state", deferred)
-        self.assertIn("flags a seeded 30-word instruction and a seeded `simply`", deferred)
+        # The full register audit this test approximates is scratch-local, so the
+        # obligation holds only while its port stays deferred: live state is the queue
+        # `.agent/deferred.md`, and a pin reading the
+        # frozen `.agent/archive/polish.md` would hold even after the row was dropped.
+        # Anchors are the row's own bytes -- the previous pin retyped the archive's p12
+        # wording instead of deriving it, so it asserted literals no live file contained.
+        queue = (ROOT / ".agent/deferred.md").read_text(encoding="utf-8").splitlines()
+        rows = [line for line in queue if line.startswith("- `p12` ")]
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertIn(".scratch/register/audit.py", row)
+        self.assertIn("ASD-STE100 checker", row)
+        acceptance = row.split("Accept:", 1)[1]
+        self.assertIn("30-word instruction", acceptance)
+        self.assertIn("`simply`", acceptance)
 
     def test_d26_root_help_describes_deterministic_resolution_plus_expl(self) -> None:
         """D26 obligation

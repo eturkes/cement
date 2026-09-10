@@ -33,6 +33,35 @@ from cement_runtime.store import SCHEMA, SCHEMA_FINGERPRINT, SCHEMA_VERSION
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _p06_handle_spans() -> tuple[str, str, str]:
+    """P06's three span conventions for `System.handle`, recomputed from history.
+
+    M3.6a2 L26 retires the freeze: the method is deleted, so the pin moves onto the git
+    object it always described. All three figures are derived from `3b7769b` on every run,
+    because a transcribed number satisfies a text-presence assertion while disagreeing with
+    history, and the only executable recomputers were the frames being retired.
+    """
+    source = subprocess.run(
+        ["git", "show", "3b7769b:src/cement_runtime/system.py"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    system_node = next(
+        item
+        for item in ast.parse(source).body
+        if isinstance(item, ast.ClassDef) and item.name == "System"
+    )
+    node = next(
+        item
+        for item in system_node.body
+        if isinstance(item, ast.FunctionDef) and item.name == "handle"
+    )
+    kept = "".join(source.splitlines(keepends=True)[node.lineno - 1 : node.end_lineno])
+    return kept.rstrip("\r\n"), kept, ast.get_source_segment(source, node) or ""
 PARTITION = "tenant_10"
 OPERATION = "echo_10"
 INPUT = {"value": 10, "nested": ["x", 11]}
@@ -289,93 +318,36 @@ class SubmissionBatteryTests(unittest.TestCase):
     def test_p06_handle_is_12_866_b_1182130a2b3a(self) -> None:
         """P06. The whole-line lineno..end_lineno span with trailing newlines stripped reproduces the byte pin.
 
-        The name still states the pin this test proves. M3.5a's D16 routes every
-        provenance limit through the exported `PROVENANCE_MAX_BYTES`, and one of
-        the three literal sites sits inside `handle`, so the raw span now
-        measures 12,880 bytes. Substituting that one identifier back to its
-        literal reproduces 12,866 and `1182130a2b3a` exactly, which is a
-        STRONGER claim than either anchor alone: it proves the substitution is
-        the whole delta and every other byte of `handle` is the byte it carried
-        at `3b7769b`.
+        The name still states the pin this test proves. M3.6a2 L26 RETIRES the
+        freeze: `handle` is deleted, so the pin moves onto the git object it
+        always described, and the historical figure the name carries is the one
+        it asserts again.
         """
-        source_path = Path(inspect.getsourcefile(System) or "")
-        source = source_path.read_text(encoding="utf-8")
-        module = ast.parse(source)
-        system_node = next(
-            node for node in module.body if isinstance(node, ast.ClassDef) and node.name == "System"
-        )
-        handle_node = next(
-            node
-            for node in system_node.body
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "handle"
-        )
-        whole_line_span_trailing_newlines_stripped = "".join(
-            source.splitlines(keepends=True)[handle_node.lineno - 1 : handle_node.end_lineno]
-        ).rstrip("\r\n")
-        encoded = whole_line_span_trailing_newlines_stripped.encode("utf-8")
+        stripped, _, _ = _p06_handle_spans()
+        encoded = stripped.encode("utf-8")
 
-        self.assertEqual(len(encoded), 12_880)
-        self.assertTrue(hashlib.sha256(encoded).hexdigest().startswith("eec7cb7c85f8"))
-
-        self.assertEqual(
-            whole_line_span_trailing_newlines_stripped.count("PROVENANCE_MAX_BYTES"), 1
-        )
-        restored = whole_line_span_trailing_newlines_stripped.replace(
-            "PROVENANCE_MAX_BYTES", "65_536"
-        ).encode("utf-8")
-        self.assertEqual(len(restored), 12_866)
-        self.assertTrue(hashlib.sha256(restored).hexdigest().startswith("1182130a2b3a"))
+        self.assertEqual(len(encoded), 12_866)
+        self.assertTrue(hashlib.sha256(encoded).hexdigest().startswith("1182130a2b3a"))
 
     def test_p06_three_slicing_conventions_are_distinct(self) -> None:
         """P06. Recomputing all three AST conventions proves only newline-stripped whole lines select the normative pin."""
-        source_path = Path(inspect.getsourcefile(System) or "")
-        source = source_path.read_text(encoding="utf-8")
-        module = ast.parse(source)
-        system_node = next(
-            node for node in module.body if isinstance(node, ast.ClassDef) and node.name == "System"
-        )
-        handle_node = next(
-            node
-            for node in system_node.body
-            if isinstance(node, ast.FunctionDef) and node.name == "handle"
-        )
-        kept = "".join(
-            source.splitlines(keepends=True)[handle_node.lineno - 1 : handle_node.end_lineno]
-        )
-        stripped = kept.rstrip("\r\n")
-        source_segment = ast.get_source_segment(source, handle_node) or ""
         measured = tuple(
             (len(value.encode("utf-8")), hashlib.sha256(value.encode("utf-8")).hexdigest()[:12])
-            for value in (stripped, kept, source_segment)
+            for value in _p06_handle_spans()
         )
 
         self.assertEqual(
             measured,
-            (
-                (12_880, "eec7cb7c85f8"),
-                (12_881, "da24241f4628"),
-                (12_876, "8ce3957fc619"),
-            ),
-        )
-        # Substituting the one constant M3.5a exported back to its literal
-        # reproduces M3.3's table exactly, on all three conventions at once. The
-        # substitution is therefore the WHOLE delta, and the three conventions
-        # stay distinct across it.
-        restored = tuple(
-            (len(value.encode("utf-8")), hashlib.sha256(value.encode("utf-8")).hexdigest()[:12])
-            for value in (
-                text.replace("PROVENANCE_MAX_BYTES", "65_536")
-                for text in (stripped, kept, source_segment)
-            )
-        )
-        self.assertEqual(
-            restored,
             (
                 (12_866, "1182130a2b3a"),
                 (12_867, "cd60036faf5c"),
                 (12_862, "c27e71b0b4c7"),
             ),
         )
+        # The distinctness claim is what the name carries, so it is asserted rather than
+        # implied by three unequal rows: a widening that collapsed two conventions would
+        # still satisfy the table above if one row were dropped.
+        self.assertEqual(len(set(measured)), 3)
 
     def test_d01_success_footprint_over_declared_schema_tables(self) -> None:
         """D01. Per-table before/after counts pin exactly one request, proposal, and event on both routes."""
@@ -445,10 +417,9 @@ class SubmissionBatteryTests(unittest.TestCase):
                 self.assertEqual(row, ("pending", proposal_id, None, None, 1))
 
     def test_d03_the_event_is_proposal_created_with(self) -> None:
-        """D03. Normalizing handle's request_id leaves the exact empty payload and proposal subject on both new routes."""
+        """D03. Both proposal routes emit the exact empty payload and proposal subject."""
         source = _ReturningSource()
         system, path = self.new_system(source=source)
-        handled = system.handle(PARTITION, OPERATION, INPUT, request_id="request_public_10")
         direct_id = system.submit_proposal(PARTITION, OPERATION, INPUT, candidate=CANDIDATE)
         source_id = system.propose(PARTITION, OPERATION, INPUT)
 
@@ -458,12 +429,10 @@ class SubmissionBatteryTests(unittest.TestCase):
                 "WHERE kind = 'proposal.created' ORDER BY sequence"
             ).fetchall()
 
-        self.assertEqual(len(rows), 3)
-        handle_payload = json.loads(rows[0][3])
-        self.assertEqual(handle_payload.pop("request_id"), handled.request_id)
-        for row, proposal_id in zip(rows[1:], (direct_id, source_id), strict=True):
+        self.assertEqual(len(rows), 2)
+        for row, proposal_id in zip(rows, (direct_id, source_id), strict=True):
             self.assertEqual(row[:3], ("proposal.created", "proposal", proposal_id))
-            self.assertEqual(json.loads(row[3]), handle_payload)
+            self.assertEqual(json.loads(row[3]), {})
             self.assertNotIn("request", row[3].lower())
 
     def test_d04_no_idempotency_byte_identical_content_submitted(self) -> None:
@@ -1458,7 +1427,7 @@ class SubmissionBatteryTests(unittest.TestCase):
                 self.assertNotIn(request_id, event[2])
 
     def test_d23_the_eight_named_seams_still_expose(self) -> None:
-        """D23. One proposal ID reaches the same request ID through all eight named live high-level seams."""
+        """D23. Only CandidateRequest exposes the request ID across the six surviving seams."""
         source = _ReturningSource()
         system, _ = self.new_system(source=source)
         proposal_id = system.propose(PARTITION, OPERATION, INPUT)
@@ -1471,20 +1440,9 @@ class SubmissionBatteryTests(unittest.TestCase):
             for gap in report.operation_now.pending_proposals
             if gap.proposal_id == proposal_id
         )
-        # M3.4 split this seam census in two. The handle lifecycle still carries the
-        # caller's own request identity; the proposal, review and report seams no longer
-        # expose any. Both halves are asserted, so readmitting one member to the wrong
-        # half fails here.
-        exposed = {
-            "CandidateRequest": source_request.request_id,
-            "handle": system.handle(
-                PARTITION,
-                OPERATION,
-                INPUT,
-                request_id=request_id,
-            ).request_id,
-            "request_status": system.request_status(PARTITION, request_id).request_id,
-        }
+        # CandidateRequest still carries the adapter trace identity. The proposal,
+        # review, and report seams expose none; both sides remain explicit.
+        exposed = {"CandidateRequest": source_request.request_id}
         view = system.get_proposal(PARTITION, proposal_id)
         record = system.proposal(PARTITION, proposal_id)
         feed = system.proposals(PARTITION)[0]
@@ -1496,7 +1454,7 @@ class SubmissionBatteryTests(unittest.TestCase):
             note="rejected_23",
         )
 
-        self.assertEqual(len(exposed), 3)
+        self.assertEqual(len(exposed), 1)
         self.assertEqual(set(exposed.values()), {request_id})
         self.assertNotIn("request_id", view.__dataclass_fields__)
         self.assertNotIn("request_id", record)
@@ -1663,6 +1621,25 @@ class SubmissionBatteryTests(unittest.TestCase):
         census_source = ast.get_source_segment(source, node) or ""
         self.assertIn("_submission_revision", census_source)
         self.assertIn("_persist_proposal", census_source)
+        exact_totals = {
+            call.args[0].args[0].id: call.args[1].value
+            for call in ast.walk(node)
+            if isinstance(call, ast.Call)
+            and isinstance(call.func, ast.Attribute)
+            and call.func.attr == "assertEqual"
+            and len(call.args) >= 2
+            and isinstance(call.args[0], ast.Call)
+            and isinstance(call.args[0].func, ast.Name)
+            and call.args[0].func.id == "len"
+            and len(call.args[0].args) == 1
+            and isinstance(call.args[0].args[0], ast.Name)
+            and isinstance(call.args[1], ast.Constant)
+            and type(call.args[1].value) is int
+        }
+        self.assertEqual(
+            exact_totals,
+            {"read_sites": 17, "write_sites": 13, "reached_helpers": 11},
+        )
 
     def test_d29_every_census_site_binds_a_simple(self) -> None:
         """D29. The census AST accumulates binding defects into violations and its live execution leaves that list empty."""
@@ -1705,6 +1682,25 @@ class SubmissionBatteryTests(unittest.TestCase):
             and any(isinstance(arg, ast.Name) and arg.id == "violations" for arg in call.args)
             and any(isinstance(arg, ast.List) and not arg.elts for arg in call.args)
             for call in ast.walk(node)
+        )
+        exact_site_counts = {
+            call.args[0].args[0].id: call.args[1].value
+            for call in ast.walk(node)
+            if isinstance(call, ast.Call)
+            and isinstance(call.func, ast.Attribute)
+            and call.func.attr == "assertEqual"
+            and len(call.args) >= 2
+            and isinstance(call.args[0], ast.Call)
+            and isinstance(call.args[0].func, ast.Name)
+            and call.args[0].func.id == "len"
+            and len(call.args[0].args) == 1
+            and isinstance(call.args[0].args[0], ast.Name)
+            and isinstance(call.args[1], ast.Constant)
+            and type(call.args[1].value) is int
+        }
+        self.assertEqual(
+            exact_site_counts,
+            {"read_sites": 17, "write_sites": 13, "reached_helpers": 11},
         )
         self.assertTrue(records_violations)
         self.assertTrue(pins_empty)
@@ -1797,7 +1793,7 @@ class SubmissionBatteryTests(unittest.TestCase):
                 "`propose` invokes the configured source one time",
             ),
             ROOT / "docs/architecture.md": (
-                "steps 1 to 3 describe `handle`, the request lifecycle",
+                # M3.6a2 L23 permitted inversion: steps 1-3 no longer describe a lifecycle route.
                 "two methods enter the same pipeline at step 3 alone",
                 "schema v2 keeps it as internal storage",
             ),
@@ -1807,7 +1803,7 @@ class SubmissionBatteryTests(unittest.TestCase):
                 "do not repeat those calls to recover",
             ),
             ROOT / "docs/adapter-protocol.md": (
-                "through `handle`",
+                # M3.6a2 L23 permitted inversion: the adapter document has one route left.
                 "through `system.propose`, the same failures raise `candidatesourceerror`",
                 "`system.propose` invokes the adapter at most one time for each call",
                 "invokes the adapter zero times",

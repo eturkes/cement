@@ -573,10 +573,6 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         }
         permitted = {
             "_persist_proposal",
-            "handle",
-            "_fail_generation",
-            "request_status",
-            "revise_operation",
             "_proposal_bindings",
             "_write_proposal_request_status",
         }
@@ -584,9 +580,9 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         self.assertSetEqual(permitted, owners)
 
     def test_b03_the_permitted_owner_set_is_exactly(self) -> None:
-        """B03. the permitted owner set is exactly seven names and every freed path is absent from it
+        """B03. the permitted owner set is exactly three names and every freed path is absent from it
 
-        Reproduction: census literal request-table owners, pin all seven permitted
+        Reproduction: census literal request-table owners, pin all three surviving
         names, and separately reject every public or converter owner freed by M3.4.
         """
         import ast
@@ -619,10 +615,6 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         }
         permitted = {
             "_persist_proposal",
-            "handle",
-            "_fail_generation",
-            "request_status",
-            "revise_operation",
             "_proposal_bindings",
             "_write_proposal_request_status",
         }
@@ -637,7 +629,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
             "_proposal_binding",
         }
 
-        self.assertEqual(7, len(permitted))
+        self.assertEqual(3, len(permitted))
         self.assertTrue(permitted <= owners, permitted - owners)
         self.assertTrue(freed.isdisjoint(owners), freed & owners)
 
@@ -2199,11 +2191,13 @@ class ProposalBindingBatteryTests(unittest.TestCase):
             (root / "README.md").read_text(encoding="utf-8")
         )
         normalized = " ".join(readme.split())
+        # M3.6a2 L23 permitted inversion. One vocabulary survives, so the qualifier that kept the
+        # two apart is replaced by the claim that there is no second one.
         self.assertIn(
-            "The older `System.request_status` and `System.handle` lifecycle values still report `resolved`",
+            "`ReviewResult.status` and `proposal show` report the same word for the same decision",
             normalized,
         )
-        self.assertIn("Cement does not translate one vocabulary into the other", normalized)
+        self.assertIn("Cement publishes one review vocabulary and no second one", normalized)
 
     def test_b28_x32_a_binding_missing_beyond_the(self) -> None:
         """B28. X32 a binding missing beyond the 10000 row detail cap still raises IntegrityError
@@ -2455,21 +2449,13 @@ class ProposalBindingBatteryTests(unittest.TestCase):
             self._assert_request_identity_absent(payload)
 
     def test_b30_the_six_owned_event_payloads_are_2(self) -> None:
-        """B30. the six owned event payloads are request free and the handle route payload is unchanged
+        """B30. direct creation keeps an empty payload, proposal subject, and sequence binding
 
-        Reproduction: drive the exempt handle creation route and pin its exact
-        request-id payload, proposal subject, and status_sequence binding unchanged.
+        Reproduction: drive the surviving direct route and pin its exact empty
+        payload, proposal subject, and status_sequence binding.
         """
         system, database, _ = self._make_system()
-        request_id = "handle-route-11"
-        outcome = system.handle(
-            "tenant_a",
-            "echo_1",
-            {"index": 11},
-            request_id=request_id,
-        )
-        self.assertIsInstance(outcome, ReviewRequired)
-        proposal_id = typing.cast(ReviewRequired, outcome).proposal_id
+        proposal_id = self._submit(system, input_value={"index": 16})
         event = self._rows(
             database,
             """
@@ -2487,7 +2473,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
 
         self.assertEqual(event["subject_type"], "proposal")
         self.assertEqual(event["subject_id"], proposal_id)
-        self.assertEqual(json.loads(event["payload_json"]), {"request_id": request_id})
+        self.assertEqual(json.loads(event["payload_json"]), {})
         self.assertEqual(proposal["status_sequence"], event["sequence"])
 
     def test_b31_the_exact_cli_triples_exit_0(self) -> None:

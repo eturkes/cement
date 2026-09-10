@@ -51,7 +51,7 @@ paths:
 - Where one leaf routes the same argument to two library calls, check that EVERY branch grades it — import the library's own validator (`_name`, `_request_id`) and call it before dispatch.
 - A CLI-owned bound over an unclamped library projection makes state CLI-unreachable and buys nothing: the bound belongs to whichever layer owns the query. An unsliced payload takes no count field.
 - Linux refuses an exec argument well below 1 MiB here (~120 KB launches, ~140 KB is E2BIG) while in-process `main([...])` has no wall, so any adjacent-pair test at `DEFAULT_MAX_BYTES` travels through `--input -`.
-- Known residue, each owning a `Deferred` row: every WRITE leaf creates a ledger on a typo'd `--db` or an invalid argument value (value parsing runs after `System(...)`); `_input` does not translate an `OSError` from stdin; `_emit` performs no explicit flush; `main` does not handle `KeyboardInterrupt`; `_request_id` reports the label `request_id` for proposal, artifact, example, report and receipt ids; `system.py` re-implements the 64-hex predicate at three sites beside `_digest`.
+- Known residue, each owning a `.agent/deferred.md` row: every WRITE leaf creates a ledger on a typo'd `--db` or an invalid argument value (value parsing runs after `System(...)`); `_input` does not translate an `OSError` from stdin; `_emit` performs no explicit flush; `main` does not handle `KeyboardInterrupt`; `_request_id` reports the label `request_id` for proposal, artifact, example, report and receipt ids; `system.py` re-implements the 64-hex predicate at three sites beside `_digest`.
 
 ## Events
 

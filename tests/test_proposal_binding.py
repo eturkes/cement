@@ -36,15 +36,9 @@ PERMITTED_REQUEST_NAMERS = frozenset(
         "_persist_proposal",
         # M3.4's adapter. Its two members are the sole request access for the proposal
         # read, review and report paths, which this file's complement assertion proves.
-        # That M3.6b then rewrites these two and moves no consumer is a PREDICTION about
-        # a unit that has not run; the census establishes the coupling, never the swap.
+        # M3.6b rewrites these two; the census establishes the coupling, never the swap.
         "_proposal_bindings",
         "_write_proposal_request_status",
-        # handle-lifecycle owners. M3.5b removes the grammar; M3.6a deletes the methods.
-        "handle",
-        "_fail_generation",
-        "request_status",
-        "revise_operation",
     }
 )
 
@@ -158,6 +152,16 @@ class RequestRowConfinementTests(unittest.TestCase):
         self.source = Path(system.__file__).read_text(encoding="utf-8")
 
     def test_exactly_the_permitted_definitions_name_the_request_row(self) -> None:
+        self.assertEqual(
+            PERMITTED_REQUEST_NAMERS,
+            frozenset(
+                {
+                    "_persist_proposal",
+                    "_proposal_bindings",
+                    "_write_proposal_request_status",
+                }
+            ),
+        )
         self.assertEqual(
             _definitions_naming_table(self.source, TABLE),
             set(PERMITTED_REQUEST_NAMERS),

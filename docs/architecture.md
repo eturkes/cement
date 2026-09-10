@@ -8,14 +8,14 @@ Cement is a pure decision-plan router, a local control plane, and a portable fun
    quantities, so binary-float rounding cannot widen an exact scope.
 2. Resolve only one integrity-valid promoted artifact whose partition, operation revision, and exact
    canonical input all match.
-3. Otherwise reserve the idempotent request, call the candidate source outside the SQLite transaction,
-   and store a pending proposal.
+3. Otherwise store one pending proposal. `System.submit_proposal` takes the candidate from the
+   caller. `System.propose` calls the configured candidate source outside the SQLite transaction.
+   Both routes send the pending proposal to review.
 4. A separate review action accepts, corrects, or rejects the candidate. Accept/correct creates an
    immutable replay fixture; reject remains audit evidence only. Review returns a `ReviewResult`,
    which names the proposal, the decision, the created example, and the confirmed output. It carries
    no request identifier, and neither does any proposal read or report value. The event payload of a
-   proposal or a review action also carries no request identifier. The `handle` lifecycle keeps the
-   request identifier in its own event payload, because that audit link belongs to the request.
+   proposal or a review action also carries no request identifier.
 5. A scheduled compiler groups active fixtures by exact scope. It requires the operation's configured
    support, distinct-reviewer, time-span, and zero-conflict gates.
 6. The compiler emits `cement-exact-lookup-v1`, a capability-free JSON document with only `exact` and
@@ -58,13 +58,13 @@ promoter and the promotion time, so those values never change the `function_hash
 The function format is bounded at 64 MiB, 50,000 entries, one million items, and depth 67. Per-value
 limits of 1 MiB, 100,000 items, and depth 64 still apply, so a rich set can fail before 50,000 entries.
 
-Steps 1 to 3 describe `handle`, the request lifecycle. Two methods enter the same pipeline at step 3
+Two methods enter the same pipeline at step 3
 alone. `System.submit_proposal` stores a caller-supplied candidate. `System.propose` validates its
 inputs and reads the operation first. If those checks pass, it calls the configured candidate source
 one time, outside every transaction that the call holds, and stores the result. Both methods
 write one request row, one proposal row, and one `proposal.created` event in one transaction. They
-return the new proposal identifier. Neither method resolves an artifact, reserves an idempotent
-request, or takes a generation lease. Review at step 4 receives their proposals unchanged. The
+return the new proposal identifier. Neither method resolves an artifact, and neither one reserves
+anything before it writes. Review at step 4 receives their proposals unchanged. The
 request row stays internal to this route, and schema v2 keeps it as internal storage.
 
 Two CLI channels reach these seams directly. `cement proposal submit OPERATION --submission VALUE`
@@ -93,11 +93,9 @@ Scope identity is:
 
 `partition` is mandatory to prevent accidental cross-tenant/workflow learning. Every explicit
 operation revision retires prior builds, including a revision that keeps the same numeric thresholds.
-Request IDs are unique within a partition and bind immutable operation and input content. The same ID
-in another partition is independent. A revision invalidates every older request path. Cement
-withholds cached output and cancels generators. Failed calls cannot retry, and pending proposals
-cannot become examples. Callers reconcile prior effects and use a new request ID under the current
-revision.
+A revision retires every older build at once. Cement withholds the cached output, and a pending
+proposal from an older revision cannot become an example. Callers reconcile prior effects, then work
+under the current revision.
 
 Confirmed receipt data and artifact evidence edges are immutable. Revocation is a separate tombstone;
 it suspends every non-retired dependent build. Artifact suspension and retirement are terminal, and no
@@ -145,8 +143,7 @@ exhaustive finite coverage, or formal proof.
 
 SQLite uses foreign keys, STRICT tables, rollback journaling, `synchronous=EXTRA`, a busy timeout,
 defensive connection configuration when available, and explicit `BEGIN IMMEDIATE` write transitions.
-Candidate generation holds no lock. A lease permits recovery after a crashed generator; a stale
-generator cannot overwrite a proposal claimed by another lease owner.
+A candidate source runs outside every write transaction, so it holds no lock while it works.
 
 Initialization adopts only a schema-empty SQLite database. It creates the schema atomically and runs
 SQLite integrity and foreign-key checks. It then validates the database metadata fingerprint plus

@@ -38,8 +38,27 @@ from unittest import mock
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 BASELINE = "6fb4d92"
 M3U6A1_TIP = "dc4ab5e"  # M3.6a1's DONE commit — the closed endpoint every D16 claim reads against
-SURGERY = ROOT / ".agent" / "decisions" / "m3u6a1-surgery.py"
+SURGERY = pathlib.Path(".agent") / "decisions" / "m3u6a1-surgery.py"
 LIFECYCLE = frozenset({"handle", "request_status"})
+# Purged and restored around the worktree swap below. `cement_runtime` alone is not enough: the
+# example package modules bind its classes at THEIR import time, and `test_hospital_ocr_example.py`
+# imports all three at module scope, so in a full run they survive into this class holding the
+# PRIMARY tree's classes. The worktree's `run_demo` then reuses them, D19's demo builds a candidate
+# whose class is not the one the worktree's `System.propose` accepts, and `propose` swallows the
+# mismatch as `candidate source failed` — green when this module runs alone, red in composition.
+SWAPPED_ROOTS = ("cement_runtime", "pipeline", "plan_adapter", "run_demo")
+# D30's allowlist. Only an obligation whose SUBJECT is the live range belongs here; every
+# other frame reads the closed transition and cannot name `ROOT`.
+WORKING_TREE_READERS = frozenset({"test_d28_gate_1_stays_green_at_every_commit_never_only_at_the_last"})
+# D30's second allowlist. `__file__` is the handle `ROOT` is built from, so a frame can reach the
+# tree through it while naming `ROOT` nowhere — a `ROOT` census alone forbids a spelling, not a
+# capability. Only a frame whose subject IS this module's own text belongs here.
+SELF_READERS = frozenset(
+    {
+        "test_d28_gate_1_stays_green_at_every_commit_never_only_at_the_last",
+        "test_d30_every_obligation_reads_the_closed_transition",
+    }
+)
 
 
 def _environment(root: pathlib.Path) -> dict[str, str]:
@@ -54,8 +73,8 @@ def _environment(root: pathlib.Path) -> dict[str, str]:
 def _run(
     command: list[str],
     *,
-    cwd: pathlib.Path = ROOT,
-    root: pathlib.Path = ROOT,
+    cwd: pathlib.Path,
+    root: pathlib.Path,
     timeout: int = 600,
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
@@ -91,15 +110,19 @@ def _tree(root: pathlib.Path, path: str) -> ast.Module:
     return ast.parse(_source(root, path), filename=path)
 
 
-def _baseline_source(path: str) -> str:
-    result = _run(["git", "show", f"{BASELINE}:{path}"])
+def _baseline_source(root: pathlib.Path, path: str) -> str:
+    result = _run(
+        ["git", "show", f"{BASELINE}:{path}"],
+        cwd=root,
+        root=root,
+    )
     if result.returncode != 0:
         raise AssertionError(_result(result))
     return result.stdout
 
 
-def _baseline_tree(path: str) -> ast.Module:
-    return ast.parse(_baseline_source(path), filename=f"{BASELINE}:{path}")
+def _baseline_tree(root: pathlib.Path, path: str) -> ast.Module:
+    return ast.parse(_baseline_source(root, path), filename=f"{BASELINE}:{path}")
 
 
 def _top_definitions(tree: ast.Module) -> Iterator[ast.FunctionDef]:
@@ -186,17 +209,17 @@ def _consumer_map(root: pathlib.Path) -> dict[str, int]:
     return consumers
 
 
-def _census() -> dict[str, Any]:
+def _census(root: pathlib.Path) -> dict[str, Any]:
     return json.loads(
-        (ROOT / ".agent" / "decisions" / "m3u6a1-census.json").read_text(
+        (root / ".agent" / "decisions" / "m3u6a1-census.json").read_text(
             encoding="utf-8"
         )
     )
 
 
-def _fallback() -> dict[str, Any]:
+def _fallback(root: pathlib.Path) -> dict[str, Any]:
     return json.loads(
-        (ROOT / ".agent" / "decisions" / "m3u6a1-fallback.json").read_text(
+        (root / ".agent" / "decisions" / "m3u6a1-fallback.json").read_text(
             encoding="utf-8"
         )
     )
@@ -213,9 +236,9 @@ def _owner_at(tree: ast.Module, line: int) -> ast.FunctionDef:
     return matches[0]
 
 
-def _shape_owners(shape: str) -> list[tuple[str, str]]:
+def _shape_owners(root: pathlib.Path, shape: str) -> list[tuple[str, str]]:
     owners: list[tuple[str, str]] = []
-    sites = _fallback()["sites"]
+    sites = _fallback(root)["sites"]
     if not isinstance(sites, dict):
         raise TypeError("fallback sites must be an object")
     trees: dict[str, ast.Module] = {}
@@ -223,13 +246,13 @@ def _shape_owners(shape: str) -> list[tuple[str, str]]:
         if not isinstance(row, dict) or row.get("shape") != shape:
             continue
         path, raw_line = key.rsplit(":", 1)
-        tree = trees.setdefault(path, _baseline_tree(path))
+        tree = trees.setdefault(path, _baseline_tree(root, path))
         owners.append((path, _owner_at(tree, int(raw_line)).name))
     return owners
 
 
-def _test_id(path: str, name: str) -> str:
-    tree = _tree(ROOT, path)
+def _test_id(root: pathlib.Path, path: str, name: str) -> str:
+    tree = _tree(root, path)
     module = path.removesuffix(".py").replace("/", ".")
     matches: list[str] = []
     for node in tree.body:
@@ -245,9 +268,47 @@ def _test_id(path: str, name: str) -> str:
     return matches[0]
 
 
-def _run_test_methods(specifications: list[tuple[str, str]]) -> subprocess.CompletedProcess[str]:
-    ids = [_test_id(path, name) for path, name in specifications]
-    return _run([sys.executable, "-m", "unittest", *ids], timeout=600)
+def _p06_handle_spans(root: pathlib.Path) -> tuple[str, str, str]:
+    """P06's three span conventions for `System.handle`, recomputed from history.
+
+    M3.6a2 L26 retires the freeze: the method is deleted, so the pin moves onto the git
+    object it always described. All three figures are derived from `3b7769b` on every run,
+    because a transcribed number satisfies a text-presence assertion while disagreeing with
+    history, and the only executable recomputers were the frames being retired.
+    """
+    result = _run(
+        ["git", "show", "3b7769b:src/cement_runtime/system.py"],
+        cwd=root,
+        root=root,
+    )
+    if result.returncode != 0:
+        raise AssertionError(_result(result))
+    source = result.stdout
+    system_node = next(
+        item
+        for item in ast.parse(source).body
+        if isinstance(item, ast.ClassDef) and item.name == "System"
+    )
+    node = next(
+        item
+        for item in system_node.body
+        if isinstance(item, ast.FunctionDef) and item.name == "handle"
+    )
+    kept = "".join(source.splitlines(keepends=True)[node.lineno - 1 : node.end_lineno])
+    return kept.rstrip("\r\n"), kept, ast.get_source_segment(source, node) or ""
+
+
+def _run_test_methods(
+    root: pathlib.Path,
+    specifications: list[tuple[str, str]],
+) -> subprocess.CompletedProcess[str]:
+    ids = [_test_id(root, path, name) for path, name in specifications]
+    return _run(
+        [sys.executable, "-m", "unittest", *ids],
+        cwd=root,
+        root=root,
+        timeout=600,
+    )
 
 
 def _string_constants(node: ast.AST) -> list[str]:
@@ -406,26 +467,45 @@ def _assert_calls_fit(
 
 
 @contextlib.contextmanager
-def _detached_worktree(revision: str) -> Iterator[pathlib.Path]:
+def _detached_worktree(
+    root: pathlib.Path,
+    revision: str,
+) -> Iterator[pathlib.Path]:
     with tempfile.TemporaryDirectory(prefix="cement-m3u6a1-") as directory:
         path = pathlib.Path(directory) / "tree"
-        added = _run(["git", "worktree", "add", "--detach", str(path), revision])
+        added = _run(
+            ["git", "worktree", "add", "--detach", str(path), revision],
+            cwd=root,
+            root=root,
+        )
         if added.returncode != 0:
             raise AssertionError(_result(added))
         try:
             yield path
         finally:
-            _run(["git", "worktree", "remove", "--force", str(path)])
-            _run(["git", "worktree", "prune"])
+            removed = _run(
+                ["git", "worktree", "remove", "--force", str(path)],
+                cwd=root,
+                root=root,
+            )
+            pruned = _run(
+                ["git", "worktree", "prune"],
+                cwd=root,
+                root=root,
+            )
+            if removed.returncode != 0:
+                raise AssertionError(_result(removed))
+            if pruned.returncode != 0:
+                raise AssertionError(_result(pruned))
 
 
-def _copy_surgery(root: pathlib.Path) -> pathlib.Path:
-    target = root / ".agent" / "decisions" / SURGERY.name
-    shutil.copy2(SURGERY, target)
+def _copy_surgery(source_root: pathlib.Path, target_root: pathlib.Path) -> pathlib.Path:
+    target = target_root / SURGERY
+    shutil.copy2(source_root / SURGERY, target)
     return target
 
 
-def _run_demo(root: pathlib.Path = ROOT, *flags: str) -> subprocess.CompletedProcess[str]:
+def _run_demo(root: pathlib.Path, *flags: str) -> subprocess.CompletedProcess[str]:
     return _run(
         [sys.executable, *flags, "run_demo.py"],
         cwd=root / "examples" / "hospital_ocr",
@@ -434,8 +514,8 @@ def _run_demo(root: pathlib.Path = ROOT, *flags: str) -> subprocess.CompletedPro
 
 
 @contextlib.contextmanager
-def _demo_module() -> Iterator[Any]:
-    example = ROOT / "examples" / "hospital_ocr"
+def _demo_module(root: pathlib.Path) -> Iterator[Any]:
+    example = root / "examples" / "hospital_ocr"
     module_name = "_m3u6a1_run_demo"
     spec = importlib.util.spec_from_file_location(module_name, example / "run_demo.py")
     if spec is None or spec.loader is None:
@@ -470,6 +550,41 @@ def _text_blocks(text: str) -> list[str]:
 
 class MigrationBatteryTests(unittest.TestCase):
 
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        cls._closed_transition = _detached_worktree(ROOT, M3U6A1_TIP)
+        cls.root = cls._closed_transition.__enter__()
+        try:
+            cls._saved_path = sys.path.copy()
+            cls._saved_runtime_modules = {
+                name: module
+                for name, module in sys.modules.items()
+                if name.partition(".")[0] in SWAPPED_ROOTS
+            }
+            for name in cls._saved_runtime_modules:
+                del sys.modules[name]
+            sys.path[:0] = [str(cls.root), str(cls.root / "src")]
+            importlib.invalidate_caches()
+        except BaseException:
+            cls._closed_transition.__exit__(*sys.exc_info())
+            raise
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        try:
+            for name in list(sys.modules):
+                if name.partition(".")[0] in SWAPPED_ROOTS:
+                    del sys.modules[name]
+            sys.modules.update(cls._saved_runtime_modules)
+            sys.path[:] = cls._saved_path
+            importlib.invalidate_caches()
+        finally:
+            try:
+                cls._closed_transition.__exit__(None, None, None)
+            finally:
+                super().tearDownClass()
+
     def test_d01_m3u6a1_census_py_reports_surviving_migrate_0_with_unruled(self) -> None:
         """D01 — `m3u6a1-census.py` reports `SURVIVING-MIGRATE: 0`, with `UNRULED`, `STALE`,
         `MEASURE-DRIFT`, `UNGROUNDED-OVERRIDE` and `BAD-VERDICT` all 0.
@@ -477,7 +592,12 @@ class MigrationBatteryTests(unittest.TestCase):
         CORRECTED-BY C02, C11
         """
         result = _run(
-            [sys.executable, str(ROOT / ".agent" / "decisions" / "m3u6a1-census.py")]
+            [
+                sys.executable,
+                str(self.root / ".agent" / "decisions" / "m3u6a1-census.py"),
+            ],
+            cwd=self.root,
+            root=self.root,
         )
         self.assertEqual(result.returncode, 0, _result(result))
         for label in (
@@ -509,7 +629,7 @@ class MigrationBatteryTests(unittest.TestCase):
                 "test_function_report_pending_request_join_is_like_and_case_exact",
             ),
         ]
-        corrected_result = _run_test_methods(corrected)
+        corrected_result = _run_test_methods(self.root, corrected)
         self.assertEqual(corrected_result.returncode, 0, _result(corrected_result))
 
     def test_d02_m3u6a1_rule_census_py_check_reports_in_sync(self) -> None:
@@ -518,9 +638,11 @@ class MigrationBatteryTests(unittest.TestCase):
         result = _run(
             [
                 sys.executable,
-                str(ROOT / ".agent" / "decisions" / "m3u6a1-rule-census.py"),
+                str(self.root / ".agent" / "decisions" / "m3u6a1-rule-census.py"),
                 "--check",
-            ]
+            ],
+            cwd=self.root,
+            root=self.root,
         )
         self.assertEqual(result.returncode, 0, _result(result))
         self.assertEqual(result.stdout.strip(), "IN-SYNC")
@@ -533,13 +655,15 @@ class MigrationBatteryTests(unittest.TestCase):
         CORRECTED-BY C03
         """
         retained = [
-            row for row in _census()["definitions"] if row["verdict"] == "RETAIN"
+            row
+            for row in _census(self.root)["definitions"]
+            if row["verdict"] == "RETAIN"
         ]
         self.assertEqual(len(retained), 23)
         specifications: list[tuple[str, str]] = []
         for row in retained:
             path, name = row["site"].split("::", 1)
-            definition = _top_definition(ROOT, path, name)
+            definition = _top_definition(self.root, path, name)
             self.assertEqual(
                 _lifecycle_count(definition),
                 row["sites"],
@@ -552,7 +676,10 @@ class MigrationBatteryTests(unittest.TestCase):
                 "test_unknown_resolved_source_kind_fails_closed_at_storage",
             )
         )
-        result = _run_test_methods(list(dict.fromkeys(specifications)))
+        result = _run_test_methods(
+            self.root,
+            list(dict.fromkeys(specifications)),
+        )
         self.assertEqual(result.returncode, 0, _result(result))
 
     def test_d04_system_handle_and_system_request_status_still_ship(self) -> None:
@@ -561,7 +688,11 @@ class MigrationBatteryTests(unittest.TestCase):
 
         CORRECTED-BY C15
         """
-        unchanged = _run(["git", "diff", "--exit-code", BASELINE, "--", "src"])
+        unchanged = _run(
+            ["git", "diff", "--exit-code", BASELINE, "--", "src"],
+            cwd=self.root,
+            root=self.root,
+        )
         self.assertEqual(unchanged.returncode, 0, _result(unchanged))
 
         from cement_runtime import System
@@ -580,12 +711,12 @@ class MigrationBatteryTests(unittest.TestCase):
         """
         retained = {
             row["site"]: row["sites"]
-            for row in _census()["definitions"]
+            for row in _census(self.root)["definitions"]
             if row["verdict"] == "RETAIN"
         }
         self.assertEqual(len(retained), 23)
         self.assertEqual(sum(retained.values()), 45)
-        self.assertEqual(_consumer_map(ROOT), retained)
+        self.assertEqual(_consumer_map(self.root), retained)
         # C17: the seed totals 44 and the whole increment is this one definition,
         # 6 sites -> 7, because `self.confirm("old-confirmed")` was inlined into the
         # direct `handle` call it always was. Binding 45 to its cause is what makes
@@ -598,7 +729,7 @@ class MigrationBatteryTests(unittest.TestCase):
             7,
         )
 
-        system_tree = _tree(ROOT, "src/cement_runtime/system.py")
+        system_tree = _tree(self.root, "src/cement_runtime/system.py")
         methods = {
             node.name
             for node in _top_definitions(system_tree)
@@ -611,11 +742,11 @@ class MigrationBatteryTests(unittest.TestCase):
         `verification.passed` true and `match.matched` false, positioned BEFORE its
         `propose` call in the same test body.
         """
-        owners = _shape_owners("MISS-GUARDED")
+        owners = _shape_owners(self.root, "MISS-GUARDED")
         self.assertEqual(len(owners), 4)
         for path, name in owners:
             with self.subTest(site=f"{path}::{name}"):
-                definition = _top_definition(ROOT, path, name)
+                definition = _top_definition(self.root, path, name)
                 proposes = sorted(
                     _attribute_calls(definition, {"propose"}), key=lambda call: call.lineno
                 )
@@ -646,11 +777,11 @@ class MigrationBatteryTests(unittest.TestCase):
 
         CORRECTED-BY C16
         """
-        owners = _shape_owners("MISS-GUARDED")
+        owners = _shape_owners(self.root, "MISS-GUARDED")
         self.assertEqual(len(owners), 4)
         for path, name in owners:
             with self.subTest(site=f"{path}::{name}"):
-                definition = _top_definition(ROOT, path, name)
+                definition = _top_definition(self.root, path, name)
                 resolves = _attribute_calls(definition, {"resolve"})
                 proposes = _attribute_calls(definition, {"propose"})
                 self.assertTrue(
@@ -664,12 +795,12 @@ class MigrationBatteryTests(unittest.TestCase):
         table.
         """
         shapes: dict[tuple[str, str], list[str]] = defaultdict(list)
-        sites = _fallback()["sites"]
+        sites = _fallback(self.root)["sites"]
         self.assertIsInstance(sites, dict)
         baseline_trees: dict[str, ast.Module] = {}
         for key, row in sites.items():
             path, raw_line = key.rsplit(":", 1)
-            tree = baseline_trees.setdefault(path, _baseline_tree(path))
+            tree = baseline_trees.setdefault(path, _baseline_tree(self.root, path))
             owner = _owner_at(tree, int(raw_line)).name
             shapes[(path, owner)].append(row["shape"])
 
@@ -693,7 +824,7 @@ class MigrationBatteryTests(unittest.TestCase):
                         == name
                     ),
                 )
-                current = _top_definition(ROOT, path, name)
+                current = _top_definition(self.root, path, name)
                 expected = len(_attribute_calls(baseline, {"resolve"})) + values.count(
                     "MISS-GUARDED"
                 )
@@ -712,7 +843,12 @@ class MigrationBatteryTests(unittest.TestCase):
         CORRECTED-BY C18
         """
         result = _run(
-            [sys.executable, str(ROOT / ".agent" / "decisions" / "m3u6a1-fallback.py")],
+            [
+                sys.executable,
+                str(self.root / ".agent" / "decisions" / "m3u6a1-fallback.py"),
+            ],
+            cwd=self.root,
+            root=self.root,
             timeout=600,
         )
         self.assertEqual(result.returncode, 0, _result(result))
@@ -737,7 +873,7 @@ class MigrationBatteryTests(unittest.TestCase):
         targets = _required_match(r"(?m)^TARGETS: (\d+)$", result.stdout)
         retained_sites = sum(
             row["sites"]
-            for row in _census()["definitions"]
+            for row in _census(self.root)["definitions"]
             if row["verdict"] == "RETAIN"
         )
         self.assertEqual(int(targets.group(1)), retained_sites)
@@ -750,18 +886,18 @@ class MigrationBatteryTests(unittest.TestCase):
         CORRECTED-BY C12
         """
         path = "tests/test_system.py"
-        helper = _class_method(ROOT, path, "confirm")
+        helper = _class_method(self.root, path, "confirm")
         self.assertNotIn("request_id", _parameters(helper))
-        baseline_calls = _attribute_calls(_baseline_tree(path), {"confirm"})
-        current_calls = _attribute_calls(_tree(ROOT, path), {"confirm"})
+        baseline_calls = _attribute_calls(_baseline_tree(self.root, path), {"confirm"})
+        current_calls = _attribute_calls(_tree(self.root, path), {"confirm"})
         self.assertEqual(len(baseline_calls), 41)
         # C03's third repair re-bases `test_operation_revision_invalidates_every_old_
         # request_path` onto a direct `handle` + `review` plant, so exactly one RETAIN
         # consumer leaves the population. Pin WHICH site left, not just the arithmetic.
         self.assertEqual(len(current_calls), 40)
         self.assertEqual(
-            _confirm_call_owners(_baseline_tree(path))
-            - _confirm_call_owners(_tree(ROOT, path)),
+            _confirm_call_owners(_baseline_tree(self.root, path))
+            - _confirm_call_owners(_tree(self.root, path)),
             {"test_operation_revision_invalidates_every_old_request_path"},
         )
         _assert_calls_fit(self, helper, current_calls, bound=True)
@@ -771,10 +907,12 @@ class MigrationBatteryTests(unittest.TestCase):
         parameter. Every one of its 65 call sites drops the corresponding argument.
         """
         path = "tests/test_system.py"
-        helper = _class_method(ROOT, path, "_confirm_scope")
+        helper = _class_method(self.root, path, "_confirm_scope")
         self.assertNotIn("request_id", _parameters(helper))
-        baseline_calls = _attribute_calls(_baseline_tree(path), {"_confirm_scope"})
-        current_calls = _attribute_calls(_tree(ROOT, path), {"_confirm_scope"})
+        baseline_calls = _attribute_calls(
+            _baseline_tree(self.root, path), {"_confirm_scope"}
+        )
+        current_calls = _attribute_calls(_tree(self.root, path), {"_confirm_scope"})
         self.assertEqual(len(baseline_calls), 65)
         self.assertEqual(len(current_calls), len(baseline_calls))
         _assert_calls_fit(self, helper, current_calls, bound=True)
@@ -789,10 +927,12 @@ class MigrationBatteryTests(unittest.TestCase):
         parameter check.
         """
         path = "tests/test_system.py"
-        helper = _class_method(ROOT, path, "_promote_scope")
+        helper = _class_method(self.root, path, "_promote_scope")
         self.assertNotIn("prefix", _parameters(helper))
-        baseline_calls = _attribute_calls(_baseline_tree(path), {"_promote_scope"})
-        current_calls = _attribute_calls(_tree(ROOT, path), {"_promote_scope"})
+        baseline_calls = _attribute_calls(
+            _baseline_tree(self.root, path), {"_promote_scope"}
+        )
+        current_calls = _attribute_calls(_tree(self.root, path), {"_promote_scope"})
         self.assertEqual(len(baseline_calls), 14)
         self.assertEqual(len(current_calls), len(baseline_calls))
         _assert_calls_fit(self, helper, current_calls, bound=True)
@@ -823,15 +963,15 @@ class MigrationBatteryTests(unittest.TestCase):
         for path, name, bound, expected_calls in helpers:
             with self.subTest(helper=f"{path}::{name}"):
                 helper = (
-                    _class_method(ROOT, path, name)
+                    _class_method(self.root, path, name)
                     if bound
-                    else _module_function(ROOT, path, name)
+                    else _module_function(self.root, path, name)
                 )
                 self.assertEqual(len(_attribute_calls(helper, {"handle"})), 0)
                 self.assertGreaterEqual(len(_attribute_calls(helper, {"propose"})), 1)
                 self.assertEqual(_unused_parameters(helper), set())
-                baseline_calls = _calls(_baseline_tree(path), name)
-                current_calls = _calls(_tree(ROOT, path), name)
+                baseline_calls = _calls(_baseline_tree(self.root, path), name)
+                current_calls = _calls(_tree(self.root, path), name)
                 self.assertEqual(len(baseline_calls), expected_calls)
                 self.assertEqual(len(current_calls), len(baseline_calls))
                 _assert_calls_fit(self, helper, current_calls, bound=bound)
@@ -843,23 +983,23 @@ class MigrationBatteryTests(unittest.TestCase):
         CORRECTED-BY C13
         """
         helpers = [
-            ("tests/test_system.py", _class_method(ROOT, "tests/test_system.py", "confirm")),
+            ("tests/test_system.py", _class_method(self.root, "tests/test_system.py", "confirm")),
             (
                 "tests/test_system.py",
-                _class_method(ROOT, "tests/test_system.py", "_confirm_scope"),
+                _class_method(self.root, "tests/test_system.py", "_confirm_scope"),
             ),
             (
                 "tests/test_system.py",
-                _class_method(ROOT, "tests/test_system.py", "_promote_scope"),
+                _class_method(self.root, "tests/test_system.py", "_promote_scope"),
             ),
             (
                 "tests/test_resolve_battery.py",
-                _class_method(ROOT, "tests/test_resolve_battery.py", "_confirm"),
+                _class_method(self.root, "tests/test_resolve_battery.py", "_confirm"),
             ),
             (
                 "tests/test_proposal_binding_battery.py",
                 _class_method(
-                    ROOT,
+                    self.root,
                     "tests/test_proposal_binding_battery.py",
                     "_promoted_conflict_fixture",
                 ),
@@ -867,14 +1007,14 @@ class MigrationBatteryTests(unittest.TestCase):
             (
                 "tests/test_hospital_ocr_example.py",
                 _module_function(
-                    ROOT,
+                    self.root,
                     "tests/test_hospital_ocr_example.py",
                     "_promoted_example_ledger",
                 ),
             ),
         ]
         outer = _top_definition(
-            ROOT,
+            self.root,
             "tests/test_system.py",
             "test_function_report_reaches_every_compiler_block_reason_through_public_apis",
         )
@@ -891,7 +1031,7 @@ class MigrationBatteryTests(unittest.TestCase):
                 self.assertEqual(_unused_parameters(helper), set())
                 baseline_matches = [
                     node
-                    for node in ast.walk(_baseline_tree(path))
+                    for node in ast.walk(_baseline_tree(self.root, path))
                     if isinstance(node, ast.FunctionDef)
                     and node.name == helper.name
                     and _lifecycle_count(node)
@@ -914,16 +1054,16 @@ class MigrationBatteryTests(unittest.TestCase):
         CORRECTED-BY C06, C12
         """
         path = "tests/test_system.py"
-        tree = _tree(ROOT, path)
+        tree = _tree(self.root, path)
         definitions = [
             node
             for node in ast.walk(tree)
             if isinstance(node, ast.FunctionDef) and node.name == "confirm"
         ]
         self.assertEqual(len(definitions), 2)
-        method = _class_method(ROOT, path, "confirm")
+        method = _class_method(self.root, path, "confirm")
         outer = _top_definition(
-            ROOT,
+            self.root,
             path,
             "test_function_report_reaches_every_compiler_block_reason_through_public_apis",
         )
@@ -956,10 +1096,10 @@ class MigrationBatteryTests(unittest.TestCase):
 
         CORRECTED-BY C02, C05
         """
-        self.assertTrue(SURGERY.is_file())
-        with _detached_worktree("HEAD") as repaired:
+        self.assertTrue((self.root / SURGERY).is_file())
+        with _detached_worktree(self.root, M3U6A1_TIP) as repaired:
             result = _run(
-                [sys.executable, str(repaired / SURGERY.relative_to(ROOT))],
+                [sys.executable, str(repaired / SURGERY)],
                 cwd=repaired,
                 root=repaired,
             )
@@ -973,8 +1113,8 @@ class MigrationBatteryTests(unittest.TestCase):
             self.assertEqual(dirty.returncode, 0, _result(dirty))
             self.assertEqual(dirty.stdout, "")
 
-        with _detached_worktree(BASELINE) as repeated:
-            script = _copy_surgery(repeated)
+        with _detached_worktree(self.root, BASELINE) as repeated:
+            script = _copy_surgery(self.root, repeated)
             demo = repeated / "examples" / "hospital_ocr" / "run_demo.py"
             text = demo.read_text(encoding="utf-8")
             tree = ast.parse(text)
@@ -1004,7 +1144,7 @@ class MigrationBatteryTests(unittest.TestCase):
         do: the first file M3.6a2 added entered `expected` and the clause inverted. Same family as
         D15b and D22b, which M3.6a1 re-scoped for the same reason, and as D15a, which it missed.
         """
-        self.assertTrue(SURGERY.is_file())
+        self.assertTrue((self.root / SURGERY).is_file())
         expected_result = _run(
             [
                 "git",
@@ -1014,7 +1154,9 @@ class MigrationBatteryTests(unittest.TestCase):
                 "--",
                 "tests",
                 "examples",
-            ]
+            ],
+            cwd=self.root,
+            root=self.root,
         )
         self.assertEqual(expected_result.returncode, 0, _result(expected_result))
         expected = {
@@ -1024,8 +1166,8 @@ class MigrationBatteryTests(unittest.TestCase):
         }
         self.assertTrue(expected)
 
-        with _detached_worktree(BASELINE) as replay:
-            script = _copy_surgery(replay)
+        with _detached_worktree(self.root, BASELINE) as replay:
+            script = _copy_surgery(self.root, replay)
             result = _run([sys.executable, str(script)], cwd=replay, root=replay)
             self.assertEqual(result.returncode, 0, _result(result))
             changed_result = _run(
@@ -1040,7 +1182,11 @@ class MigrationBatteryTests(unittest.TestCase):
                 with self.subTest(path=path):
                     # Against the TIP's blob, not the working tree: a later unit editing one of
                     # these files must not redden a claim about what M3.6a1's script produced.
-                    shipped = _run(["git", "show", f"{M3U6A1_TIP}:{path}"])
+                    shipped = _run(
+                        ["git", "show", f"{M3U6A1_TIP}:{path}"],
+                        cwd=self.root,
+                        root=self.root,
+                    )
                     self.assertEqual(shipped.returncode, 0, _result(shipped))
                     self.assertEqual(
                         (replay / path).read_text(encoding="utf-8"), shipped.stdout
@@ -1052,9 +1198,9 @@ class MigrationBatteryTests(unittest.TestCase):
 
         CORRECTED-BY C06
         """
-        self.assertTrue(SURGERY.is_file())
-        with _detached_worktree(BASELINE) as shifted:
-            script = _copy_surgery(shifted)
+        self.assertTrue((self.root / SURGERY).is_file())
+        with _detached_worktree(self.root, BASELINE) as shifted:
+            script = _copy_surgery(self.root, shifted)
             system_tests = shifted / "tests" / "test_system.py"
             system_tests.write_text(
                 "\n" * 37 + system_tests.read_text(encoding="utf-8"),
@@ -1066,7 +1212,7 @@ class MigrationBatteryTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0, _result(second))
             self.assertIn("no-op", second.stdout + second.stderr)
 
-            for row in _census()["definitions"]:
+            for row in _census(self.root)["definitions"]:
                 if row["verdict"] not in {"MIGRATE", "MIGRATE-RESOLVE"}:
                     continue
                 path, name = row["site"].split("::", 1)
@@ -1099,7 +1245,9 @@ class MigrationBatteryTests(unittest.TestCase):
 
         CORRECTED-BY C07
         """
-        main = _module_function(ROOT, "examples/hospital_ocr/run_demo.py", "main")
+        main = _module_function(
+            self.root, "examples/hospital_ocr/run_demo.py", "main"
+        )
         counts = {
             name: len(_attribute_calls(main, {name}))
             for name in ("handle", "propose", "resolve")
@@ -1115,7 +1263,7 @@ class MigrationBatteryTests(unittest.TestCase):
 
         CORRECTED-BY C09
         """
-        with _demo_module() as demo:
+        with _demo_module(self.root) as demo:
             events: list[tuple[str, int | bool]] = []
             verifications: list[object] = []
             real_checkpoint = demo.checkpoint_function
@@ -1169,7 +1317,7 @@ class MigrationBatteryTests(unittest.TestCase):
         set, resolve.
         """
         path = "examples/hospital_ocr/run_demo.py"
-        main = _module_function(ROOT, path, "main")
+        main = _module_function(self.root, path, "main")
         lifecycle = sorted(
             [
                 (call.lineno, call.func.attr)
@@ -1200,7 +1348,7 @@ class MigrationBatteryTests(unittest.TestCase):
             self.assertTrue(candidates, f"demo omits lifecycle step {name!r}")
             cursor = min(candidates)
 
-        result = _run_demo()
+        result = _run_demo(self.root)
         self.assertEqual(result.returncode, 0, _result(result))
         self.assertNotIn("becomes one exportable function", result.stdout)
         act_five = result.stdout.split("=== Act 5:", 1)[1].split(
@@ -1218,17 +1366,19 @@ class MigrationBatteryTests(unittest.TestCase):
         # and `-O` strips them wherever they sit. Counting inside `main` alone reads 33
         # against the module's 35 and cannot match the shipped pin.
         current_count = sum(
-            isinstance(node, ast.Assert) for node in ast.walk(_tree(ROOT, path))
+            isinstance(node, ast.Assert)
+            for node in ast.walk(_tree(self.root, path))
         )
         baseline_count = sum(
-            isinstance(node, ast.Assert) for node in ast.walk(_baseline_tree(path))
+            isinstance(node, ast.Assert)
+            for node in ast.walk(_baseline_tree(self.root, path))
         )
         self.assertNotEqual(current_count, baseline_count)
 
         test_path = "tests/test_hospital_ocr_example.py"
-        test_source = _source(ROOT, test_path)
+        test_source = _source(self.root, test_path)
         refusal_test = _top_definition(
-            ROOT,
+            self.root,
             test_path,
             "test_demo_refuses_to_run_where_python_removes_its_assertions",
         )
@@ -1239,7 +1389,7 @@ class MigrationBatteryTests(unittest.TestCase):
 
         for flag in ("-O", "-OO"):
             with self.subTest(flag=flag):
-                result = _run_demo(ROOT, flag)
+                result = _run_demo(self.root, flag)
                 self.assertNotEqual(result.returncode, 0, _result(result))
                 self.assertNotIn("All checks passed.", result.stdout)
 
@@ -1252,7 +1402,7 @@ class MigrationBatteryTests(unittest.TestCase):
 
         CORRECTED-BY C05, C15
         """
-        result = _run_demo()
+        result = _run_demo(self.root)
         self.assertEqual(result.returncode, 0, _result(result))
         artifact_mask = re.compile(r"art_[0-9a-f]{32}")
         function_mask = re.compile(r"[0-9a-f]{64}")
@@ -1262,7 +1412,7 @@ class MigrationBatteryTests(unittest.TestCase):
             "art_<hex>", function_mask.sub("<function-hash>", result.stdout)
         )
         blocks = _text_blocks(
-            (ROOT / "examples" / "hospital_ocr" / "README.md").read_text(
+            (self.root / "examples" / "hospital_ocr" / "README.md").read_text(
                 encoding="utf-8"
             )
         )
@@ -1270,6 +1420,7 @@ class MigrationBatteryTests(unittest.TestCase):
         self.assertEqual(masked, blocks[0])
 
         frame = _run_test_methods(
+            self.root,
             [
                 (
                     "tests/test_hospital_ocr_example.py",
@@ -1287,10 +1438,13 @@ class MigrationBatteryTests(unittest.TestCase):
 
         CORRECTED-BY C07
         """
-        paths = [ROOT / "README.md", *sorted((ROOT / "docs").glob("*.md"))]
-        paths.extend(sorted((ROOT / "examples").glob("*/README.md")))
+        paths = [
+            self.root / "README.md",
+            *sorted((self.root / "docs").glob("*.md")),
+        ]
+        paths.extend(sorted((self.root / "examples").glob("*/README.md")))
         offenders = {
-            path.relative_to(ROOT).as_posix(): [
+            path.relative_to(self.root).as_posix(): [
                 line_number
                 for line_number, line in enumerate(
                     path.read_text(encoding="utf-8").splitlines(), start=1
@@ -1320,16 +1474,16 @@ class MigrationBatteryTests(unittest.TestCase):
                 "test_d03_the_event_is_proposal_created_with",
             ),
         ]
-        rows = {row["site"]: row for row in _census()["definitions"]}
+        rows = {row["site"]: row for row in _census(self.root)["definitions"]}
         for path, name in targets:
             site = f"{path}::{name}"
             with self.subTest(site=site):
                 self.assertEqual(rows[site]["verdict"], "RETAIN")
                 self.assertEqual(
-                    _lifecycle_count(_top_definition(ROOT, path, name)),
+                    _lifecycle_count(_top_definition(self.root, path, name)),
                     rows[site]["sites"],
                 )
-        result = _run_test_methods(targets)
+        result = _run_test_methods(self.root, targets)
         self.assertEqual(result.returncode, 0, _result(result))
 
     def test_d25_m3_3_s_p06_byte_span_freeze_on_system_handle_stays_green(self) -> None:
@@ -1339,95 +1493,40 @@ class MigrationBatteryTests(unittest.TestCase):
         here so a lens on the wrong row is checkable.
 
         CORRECTED-BY C10, C15
+
+        RETIRED by M3.6a2 L26: the method is deleted, so the freeze moves onto `3b7769b`.
+        The row LABELS travel with the figures, which is the subproperty this frame owns —
+        a lens reading the wrong convention names its row rather than silently disagreeing.
+        The peer-frame replay left with the retirement: `_test_id` reads the live tree, which
+        L26 forbids in this closure, and L26 already runs all four frames itself.
         """
-        path = "src/cement_runtime/system.py"
-        source = _source(ROOT, path)
-        tree = ast.parse(source)
-        system = next(
-            node
-            for node in tree.body
-            if isinstance(node, ast.ClassDef) and node.name == "System"
-        )
-        handle = next(
-            node
-            for node in system.body
-            if isinstance(node, ast.FunctionDef) and node.name == "handle"
-        )
-        kept = "".join(
-            source.splitlines(keepends=True)[handle.lineno - 1 : handle.end_lineno]
-        )
-        stripped = kept.rstrip("\r\n")
-        segment = ast.get_source_segment(source, handle)
-        if segment is None:
-            self.fail("cannot recover the shipped handle source")
-        measured = tuple(
-            (len(value.encode()), hashlib.sha256(value.encode()).hexdigest()[:12])
-            for value in (stripped, kept, segment)
-        )
-
-        baseline_source = _baseline_source(path)
-        baseline_tree = ast.parse(baseline_source)
-        baseline_system = next(
-            node
-            for node in baseline_tree.body
-            if isinstance(node, ast.ClassDef) and node.name == "System"
-        )
-        baseline_handle = next(
-            node
-            for node in baseline_system.body
-            if isinstance(node, ast.FunctionDef) and node.name == "handle"
-        )
-        baseline_kept = "".join(
-            baseline_source.splitlines(keepends=True)[
-                baseline_handle.lineno - 1 : baseline_handle.end_lineno
-            ]
-        )
-        baseline_segment = ast.get_source_segment(baseline_source, baseline_handle)
-        if baseline_segment is None:
-            self.fail("cannot recover the baseline handle source")
-        baseline_measured = tuple(
-            (len(value.encode()), hashlib.sha256(value.encode()).hexdigest()[:12])
-            for value in (
-                baseline_kept.rstrip("\r\n"),
-                baseline_kept,
-                baseline_segment,
-            )
-        )
-        self.assertEqual(measured, baseline_measured)
-
-        restored = tuple(
-            (len(value.encode()), hashlib.sha256(value.encode()).hexdigest()[:12])
-            for value in (
-                text.replace("PROVENANCE_MAX_BYTES", "65_536")
-                for text in (stripped, kept, segment)
-            )
-        )
-        self.assertEqual(
-            restored,
-            (
-                (12_866, "1182130a2b3a"),
-                (12_867, "cd60036faf5c"),
-                (12_862, "c27e71b0b4c7"),
+        stripped, kept, segment = _p06_handle_spans(self.root)
+        measured = {
+            "lineno..end_lineno, trailing newlines stripped": (
+                len(stripped.encode()),
+                hashlib.sha256(stripped.encode()).hexdigest()[:12],
             ),
+            "lineno..end_lineno, newlines kept": (
+                len(kept.encode()),
+                hashlib.sha256(kept.encode()).hexdigest()[:12],
+            ),
+            "ast.get_source_segment": (
+                len(segment.encode()),
+                hashlib.sha256(segment.encode()).hexdigest()[:12],
+            ),
+        }
+        self.assertEqual(
+            measured,
+            {
+                "lineno..end_lineno, trailing newlines stripped": (
+                    12_866,
+                    "1182130a2b3a",
+                ),
+                "lineno..end_lineno, newlines kept": (12_867, "cd60036faf5c"),
+                "ast.get_source_segment": (12_862, "c27e71b0b4c7"),
+            },
         )
-
-        frames = _run_test_methods(
-            [
-                (
-                    "tests/test_submission.py",
-                    "test_handle_is_byte_identical_to_the_unit_baseline",
-                ),
-                (
-                    "tests/test_submission_battery.py",
-                    "test_p06_handle_is_12_866_b_1182130a2b3a",
-                ),
-                (
-                    "tests/test_submission_battery.py",
-                    "test_p06_three_slicing_conventions_are_distinct",
-                ),
-            ]
-        )
-        self.assertEqual(frames.returncode, 0, _result(frames))
+        self.assertEqual(len(set(measured.values())), 3)
 
     def test_d26_m3_5b_s_d01_pin_at_tests_test_cli_removal_battery_py_617(self) -> None:
         """D26 — M3.5b's D01 pin at `tests/test_cli_removal_battery.py:617`, asserting
@@ -1441,6 +1540,7 @@ class MigrationBatteryTests(unittest.TestCase):
         self.assertTrue(callable(getattr(System, "handle", None)))
         self.assertTrue(callable(getattr(System, "request_status", None)))
         result = _run_test_methods(
+            self.root,
             [
                 (
                     "tests/test_cli_removal_battery.py",
@@ -1456,6 +1556,7 @@ class MigrationBatteryTests(unittest.TestCase):
         CORRECTED-BY C15
         """
         result = _run_test_methods(
+            self.root,
             [
                 (
                     "tests/test_cli_removal_battery.py",
@@ -1485,34 +1586,46 @@ class MigrationBatteryTests(unittest.TestCase):
                 "tests",
                 "examples",
                 ":(exclude)tests/test_migration_battery.py",
-            ]
+            ],
+            cwd=ROOT,
+            root=ROOT,
         )
         self.assertEqual(revision_result.returncode, 0, _result(revision_result))
         revisions = revision_result.stdout.splitlines()
         self.assertTrue(revisions, "no migration commit exists after the opening commit")
-        for revision in revisions:
-            with self.subTest(revision=revision), _detached_worktree(revision) as tree:
-                (tree / "tests" / pathlib.Path(__file__).name).unlink(missing_ok=True)
-                result = _run(
-                    [
-                        sys.executable,
-                        "-m",
-                        "unittest",
-                        "discover",
-                        "-s",
-                        "tests",
-                        "-t",
-                        ".",
-                    ],
-                    cwd=tree,
-                    root=tree,
-                    timeout=600,
-                )
-                self.assertEqual(result.returncode, 0, _result(result))
-                ran = _required_match(
-                    r"(?m)^Ran (\d+) tests? in ", result.stdout + result.stderr
-                )
-                self.assertGreaterEqual(int(ran.group(1)), 949)
+        # Dropping this module hides it from the four frames in
+        # `tests/test_lifecycle_removal_battery.py` that read it, which then error on a file the
+        # replay itself removed. The inner run announces itself so those frames narrow to what
+        # the checkout holds; `_environment` copies `os.environ`, so this reaches every one.
+        os.environ["CEMENT_D28_INNER_REPLAY"] = "1"
+        try:
+            for revision in revisions:
+                with self.subTest(revision=revision), _detached_worktree(
+                    ROOT, revision
+                ) as tree:
+                    (tree / "tests" / pathlib.Path(__file__).name).unlink(missing_ok=True)
+                    result = _run(
+                        [
+                            sys.executable,
+                            "-m",
+                            "unittest",
+                            "discover",
+                            "-s",
+                            "tests",
+                            "-t",
+                            ".",
+                        ],
+                        cwd=tree,
+                        root=tree,
+                        timeout=600,
+                    )
+                    self.assertEqual(result.returncode, 0, _result(result))
+                    ran = _required_match(
+                        r"(?m)^Ran (\d+) tests? in ", result.stdout + result.stderr
+                    )
+                    self.assertGreaterEqual(int(ran.group(1)), 949)
+        finally:
+            os.environ.pop("CEMENT_D28_INNER_REPLAY", None)
 
     def test_d29_m3u6a1_premise_py_grades_its_two_premises_rather_than(self) -> None:
         """D29 — `m3u6a1-premise.py` grades its two premises rather than printing them: it
@@ -1521,8 +1634,13 @@ class MigrationBatteryTests(unittest.TestCase):
 
         CORRECTED-BY C19, C21
         """
-        probe = ROOT / ".agent" / "decisions" / "m3u6a1-premise.py"
-        result = _run([sys.executable, str(probe)], timeout=600)
+        probe = self.root / ".agent" / "decisions" / "m3u6a1-premise.py"
+        result = _run(
+            [sys.executable, str(probe)],
+            cwd=self.root,
+            root=self.root,
+            timeout=600,
+        )
         self.assertEqual(result.returncode, 0, _result(result))
         self.assertIn("RESULT: PASS", result.stdout)
         self.assertIn(
@@ -1544,10 +1662,145 @@ class MigrationBatteryTests(unittest.TestCase):
                 source.replace(original, "EXPECTED_P2 = (True, True, True)"),
                 encoding="utf-8",
             )
-            mutated = _run([sys.executable, str(mutant)], timeout=600)
+            mutated = _run(
+                [sys.executable, str(mutant)],
+                cwd=self.root,
+                root=self.root,
+                timeout=600,
+            )
         self.assertEqual(mutated.returncode, 1, _result(mutated))
         self.assertIn("RESULT: FAIL", mutated.stdout)
         self.assertIn("P2-DRIFT", mutated.stdout)
+
+    def test_d30_every_obligation_reads_the_closed_transition(self) -> None:
+        """D30 — Every obligation here reads the CLOSED transition `6fb4d92` -> `dc4ab5e`, and
+        only D28 reads the working tree.
+
+        This battery grades what M3.6a1 DID. That question is settled and permanently
+        answerable from two git objects, so an obligation aimed at the working tree asserts a
+        claim with an expiry: it holds until some later unit legitimately edits the tree, then
+        reddens correct code. Measured, not argued — all 29 non-D28 frames pass at `dc4ab5e`
+        and 13 of them fail at M3.6a2's HEAD, and one (D15) was already failing on `main`
+        because the ITERATE-phase `mercy-general` -> `example-hospital` rename moved an anchor
+        the surgery script replays.
+
+        D28 is the exception by subject: `gate 1 stays green at EVERY commit` is a standing
+        property of the whole range and is meaningless read against a frozen endpoint.
+
+        The frame census is total ONLY while no helper and no module constant carries the
+        working tree implicitly, so that half is asserted first: a `root=ROOT` default or a
+        `ROOT`-derived constant lets a frame reach the tree without naming it, and the census
+        then reports exactly like a converted battery.
+
+        `ROOT` alone is NOT the whole predicate, because a token census forbids a SPELLING
+        rather than a capability. This module reaches the tree through exactly three handles
+        and each is pinned below: `ROOT`; `__file__`, which is what `ROOT` is built from and
+        which a frame can navigate without ever naming `ROOT`; and an inherited working
+        directory, closed structurally because `subprocess.run` has ONE call site, inside
+        `_run`, whose `cwd` and `root` carry no defaults. `SELF_READERS` holds the frames that
+        may touch `__file__` — D28 takes this module's NAME to drop it from each replayed
+        worktree, and D30 reads its own source because a census of the frames that will
+        actually run cannot come from a frozen copy. Both allowlists are checked in REVERSE, so
+        a converted frame cannot be parked on either.
+
+        Seeds that red this: pass `ROOT` in any frame off `WORKING_TREE_READERS`; give any
+        helper a `ROOT` default; name `__file__` in any frame off `SELF_READERS`; add a second
+        `subprocess.run` call site; give `_run` a `cwd` or `root` default; put a name on either
+        allowlist that this module does not define.
+        """
+        source = pathlib.Path(__file__).read_text(encoding="utf-8")
+        module = ast.parse(source)
+
+        def names(node: ast.AST, symbol: str) -> bool:
+            return any(
+                isinstance(item, ast.Name) and item.id == symbol for item in ast.walk(node)
+            )
+
+        # Handles 1 and 2, module level: no helper and no constant may carry a tree handle, or a
+        # frame reaches the tree without naming anything the frame census can see. `ROOT` itself
+        # is the one permitted derivation, and it is what makes `__file__` a handle at all.
+        for symbol in ("ROOT", "__file__"):
+            with self.subTest(handle=symbol):
+                implicit = sorted(
+                    node.name
+                    for node in module.body
+                    if isinstance(node, ast.FunctionDef) and names(node, symbol)
+                )
+                self.assertEqual(implicit, [])
+                derived = sorted(
+                    target.id
+                    for node in module.body
+                    if isinstance(node, ast.Assign)
+                    for target in node.targets
+                    if isinstance(target, ast.Name)
+                    and target.id != "ROOT"
+                    and names(node.value, symbol)
+                )
+                self.assertEqual(derived, [])
+        body = next(
+            node
+            for node in module.body
+            if isinstance(node, ast.ClassDef) and node.name == "MigrationBatteryTests"
+        ).body
+        frames = [
+            node
+            for node in body
+            if isinstance(node, ast.FunctionDef) and node.name.startswith("test_")
+        ]
+        # Anti-collapse floor: a census over an empty frame list reports exactly like a
+        # census over a converted one.
+        self.assertGreaterEqual(len(frames), 30)
+        by_name = {node.name: node for node in frames}
+        # Handles 1 and 2, frame level. Each handle carries its own allowlist and each allowlist
+        # is checked in REVERSE: every name on it must exist AND must really use that handle, so
+        # a converted frame cannot be parked there.
+        for symbol, allowed in (("ROOT", WORKING_TREE_READERS), ("__file__", SELF_READERS)):
+            with self.subTest(handle=symbol):
+                self.assertEqual(
+                    sorted(
+                        node.name
+                        for node in frames
+                        if node.name not in allowed and names(node, symbol)
+                    ),
+                    [],
+                )
+                for name in sorted(allowed):
+                    with self.subTest(allowed=name):
+                        self.assertIn(name, by_name)
+                        self.assertTrue(
+                            names(by_name[name], symbol),
+                            f"{name} no longer reads {symbol}; drop it from the allowlist",
+                        )
+        # Handle 3, an inherited working directory. Closed structurally rather than by census:
+        # `subprocess.run` has ONE call site, it sits inside `_run`, and `_run` gives `cwd` and
+        # `root` no defaults, so no frame can spawn a process rooted at the runner's own cwd.
+        run_sites = [
+            node
+            for node in ast.walk(module)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "run"
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "subprocess"
+        ]
+        self.assertEqual(len(run_sites), 1)
+        runner = next(
+            node
+            for node in module.body
+            if isinstance(node, ast.FunctionDef) and node.name == "_run"
+        )
+        self.assertLess(runner.lineno, run_sites[0].lineno)
+        self.assertGreaterEqual(runner.end_lineno or 0, run_sites[0].lineno)
+        defaults = dict(
+            zip(
+                (argument.arg for argument in runner.args.kwonlyargs),
+                runner.args.kw_defaults,
+            )
+        )
+        for required in ("cwd", "root"):
+            with self.subTest(parameter=required):
+                self.assertIn(required, defaults)
+                self.assertIsNone(defaults[required])
 
 
 if __name__ == "__main__":

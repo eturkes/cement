@@ -11,9 +11,7 @@ fully replayable. Repetition does not justify a broader rule, and Cement makes n
 approval proves domain correctness.
 
 ```text
-handle(request)
-  ├─ one promoted exact match → resolved JSON plan
-  └─ no safe match → LLM proposal (hidden from consumer)
+propose / submit_proposal → LLM candidate, hidden from the consumer
                        ├─ reject → audit only
                        └─ accept/correct → immutable example
                                               ↓ periodic compile
@@ -24,11 +22,13 @@ handle(request)
                                          promoted exact match
                                               ↓ set verification + set promotion
                                     one function: every promoted match
-                                              ↓ export
-                                         portable bundle
+                                         ├─ resolve, against the ledger
+                                         │    ├─ exact match → resolved JSON plan
+                                         │    └─ no exact match → verified absence
+                                         └─ export → portable bundle
                                               ↓ evaluate, with no ledger
-                                         ├─ exact match → resolved JSON plan
-                                         └─ no exact match → inert miss
+                                              ├─ exact match → resolved JSON plan
+                                              └─ no exact match → inert miss
 ```
 
 ## Guarantees
@@ -46,10 +46,10 @@ handle(request)
   those values; retirement and suspension are one-way states. Set promotion repeats one function hash,
   retires predecessors, activates candidates, and writes one immutable receipt plus ordered
   memberships in the same transaction.
-- Counterexamples, evidence revocation, ambiguity, or runtime integrity failure quarantine affected
-  artifacts before fallback.
-- Request IDs are partition-local idempotency keys bound to immutable operation and input content.
-  Candidate generation runs outside database transactions under a recoverable lease.
+- A counterexample, an evidence revocation, or a runtime integrity failure quarantines the affected
+  artifacts.
+- A configured candidate source runs outside every Cement transaction. `System.propose` invokes it
+  one time for each call, and Cement never retries it.
 
 The promoted artifacts of one operation aggregate into a single portable object:
 
@@ -250,10 +250,10 @@ shares that one review surface.
 ## Library API
 
 ```python
-from cement_runtime import Candidate, CompilePolicy, System
+from cement_runtime import Candidate, CandidateRequest, CompilePolicy, System
 
 class ProviderAdapter:
-    def propose(self, request):
+    def propose(self, candidate_request: CandidateRequest) -> Candidate:
         # Call an LLM here; provenance should identify model/prompt/tool revisions.
         return Candidate(
             output={"kind": "reply", "text": "candidate"},
@@ -263,11 +263,10 @@ class ProviderAdapter:
 system = System("cement.db", candidate_source=ProviderAdapter())
 system.register_operation("tenant-42", "support.reply", policy=CompilePolicy())
 
-outcome = system.handle(
+proposal_id = system.propose(
     "tenant-42",
     "support.reply",
     {"question": "Where is my invoice?", "locale": "en-GB", "policy_revision": 7},
-    request_id="ticket-123/attempt-1",
 )
 ```
 
@@ -278,7 +277,7 @@ safely.
 ### Explicit proposal submission
 
 `System.submit_proposal` and `System.propose` write one pending proposal directly. Use them when you
-already hold a candidate, or when you want exactly one candidate without the request lifecycle.
+already hold a candidate, or when you want exactly one candidate from the configured source.
 
 ```python
 proposal_id = system.submit_proposal(
@@ -324,8 +323,9 @@ own input.
 
 The request row stays internal to this route. The two signatures neither accept nor return its
 identifier. Schema v2 keeps the row as internal storage, and no proposal, review, or report value
-shows it. Only the `System.handle` and `System.request_status` library route still carries a request
-identifier, because the caller supplies that identifier itself.
+shows it. No public surface names it on this route, and no caller supplies it. The adapter
+interface is different. A candidate source receives `CandidateRequest`, which names `request_id`.
+Cement fills that field itself.
 
 ### Reviewing a proposal
 
@@ -342,32 +342,21 @@ Accept and correct each create exactly one confirmed example. Reject creates non
 decisions return the same four keys, so a script can test `example_id` for null instead of testing
 for a missing key.
 
-The proposal vocabulary and the request vocabulary stay separate. `ReviewResult.status` and
-`proposal show` report `accepted` or `corrected`. The older `System.request_status` and
-`System.handle` lifecycle values still report `resolved` for the same decision. Cement does not
-translate one vocabulary into the other.
+`ReviewResult.status` and `proposal show` report the same word for the same decision: `accepted`,
+`corrected`, or `rejected`. Cement publishes one review vocabulary and no second one.
 
 `System.get_proposal`, `System.proposal`, `System.proposals`, and `function_report` also expose no
 request identifier. Use `proposal_id` to name a proposal on every surface.
 
 ## Request outcomes
 
-`System.handle` and `System.request_status` return explicit states. No command reaches them. The
-request lifecycle is a library route.
+Two routes answer a caller. `resolve` reads the ledger, and `function eval` reads an exported
+bundle. Each route reports an exact match, a verified absence, or a failed verdict, and neither route
+writes. The supervised route reports its own outcome through `proposal show` and `System.review`,
+which both return `accepted`, `corrected`, or `rejected`.
 
-| Status | Meaning | Caller action |
-|---|---|---|
-| `resolved` | Current promoted artifact or still-valid confirmed fixture produced the output. | Re-run live authorization/policy. Then apply the plan idempotently. |
-| `review_required` | A hidden candidate awaits supervision. | Inspect the named proposal on the separate review surface. |
-| `in_progress` | This partition's generation lease is active. | Poll `System.request_status`. While the lease is active, the input needs no resubmission. |
-| `fallback_failed` | The candidate source failed, or its generation lease expired, and Cement stored no output. | For a stored source failure, call `System.handle` again with `retry_failed=True`, or use a new ID. For `generation_lease_expired`, resubmit the original `System.handle` input and request ID to reclaim the lease. |
-| `rejected` | A supervisor rejected the proposal. | Use a new request ID to request another candidate. |
-| `reconciliation_required` | A previously returned source lost validity through revocation, suspension, a failed integrity check, or an obsolete operation revision. Cement returns no cached output. | Reconcile any effects already attempted. Then submit a new request ID. |
-
-Replaying a request ID is content-idempotent. It does not promise to replay an unsafe old output.
-Quarantine or an explicit operation revision can move a prior request to `reconciliation_required`.
-Cement allows only rejection for pending proposals from an older revision. Another partition can
-reuse the same ID without coupling the two requests.
+A quarantined artifact stops answering. A later operation revision retires the older builds, and
+Cement then allows only rejection for a pending proposal from that older revision.
 
 `cement-json-v1` accepts null, booleans, strings, signed 64-bit integers, arrays, and string-keyed
 objects. It rejects decimal and exponent numbers. Encode domain decimals as strings with a documented
@@ -441,7 +430,7 @@ and reads the bundle path, and importing `cement_runtime` still loads `sqlite3`.
 Every library call and every CLI command assumes that your service already authorized access to the
 exact partition. That applies to operation registration and revision, proposal review, compilation,
 verification, promotion, challenge, evidence revocation, and artifact suspension. It applies equally to
-`System.handle` and to all reads. `operation revise`
+every write route and to all reads. `operation revise`
 always creates a semantic revision and retires older builds, even when threshold values stay unchanged.
 Linux is the strongest command-adapter deployment target: Cement uses a subreaper supervisor there to
 kill and reap detached descendants. This is lifecycle containment for a trusted provider wrapper, not
