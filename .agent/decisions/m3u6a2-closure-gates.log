@@ -107,3 +107,38 @@ SRC AFTER 8: 0 modified
 CONTROLS: 8/8 firing
 RESULT: PASS
 rc=0
+
+########## GATE 10b — GATE 1 WHOLE, `test_d28` INCLUDED, from committed state on `main`
+# The run every gate above deferred. Gates 1 and 10a between them ran 1000 + 30 of 1031 and
+# exercised `test_d28` in neither, so this is the first execution of the real composition.
+# It found TWO defects, both structural and both invisible to any subset:
+#   d28  — D28 unlinks `tests/test_migration_battery.py` from every checkout it grades while four
+#          frames of `test_lifecycle_removal_battery.py` read that file. Reproduced at the
+#          branch's own newest in-range revision `05f7ce4`, so pre-existing, not squash damage.
+#   D19  — `MigrationBatteryTests` purged only `cement_runtime` from its worktree module swap,
+#          leaving `pipeline`/`plan_adapter`/`run_demo` cached from the primary tree by
+#          `tests/test_hospital_ocr_example`. Green alone, red in composition.
+# Both repaired INSIDE the squash by amend: D28 grades committed trees, so a fix commit on top
+# leaves the red revision inside `6fb4d92..HEAD` permanently.
+
+RUN 1  pre-fix squash          Ran 1031 tests in  849.609s  FAILED (failures=1, errors=1)  rc 1
+RUN 2  d28 repaired            Ran 1031 tests in 1051.195s  FAILED (errors=1)              rc 1
+RUN 3  quiet box, D19 unfixed  Ran 1031 tests in 1121.795s  FAILED (errors=1)              rc 1
+RUN 4  D19 repaired            Ran 1031 tests in 1056.911s  OK                             rc 0
+
+GATE10b-RC: 0
+uv build: Successfully built dist/cement_runtime-0.1.0-py3-none-any.whl
+BUILD-RC: 0
+
+# Run 3 is the control that refuted the load reading: RUN 2 overlapped another project's gate on
+# the same box, which made D19's generic `CandidateSourceError` look like a timeout flake. A quiet
+# rerun reproduced it identically, and the two-module command reproduces it in 0.8 s.
+#
+# FIRING SEEDS for the d28 pairing, both directions, each run:
+#   CEMENT_D28_INNER_REPLAY=1 with the instrument PRESENT  -> 5 frames FAILED (failures=5),
+#     `set=True contradicts tests/test_migration_battery.py present=True`
+#   instrument ABSENT with the variable unset              -> the same 5, `set=False … present=False`
+#   announced + pruned -> OK (skipped=1)      neither -> OK, full strength
+# FIRING SEED for D19: `uv run python -m unittest tests.test_hospital_ocr_example
+#   tests.test_migration_battery.MigrationBatteryTests.test_d19_…` -> FAILED (errors=1) before,
+#   OK after; each module still green alone.

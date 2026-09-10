@@ -39,15 +39,22 @@ Queue = `.agent/deferred.md` (`p<nn>`, one line + acceptance each, unattached; p
 
 ## Phase
 
-IMPLEMENT, returning to ITERATE at M3.6a2's close. OWNER RULED (this session): finish M3.6a2 S9 to
-green and squash it onto main FIRST, then flip `Phase:` to ITERATE; the IMPLEMENT spine below is
+ITERATE. M3.6a2 closed and landed on main as `ffe9848`, green on the FULL gate with `test_d28`
+included (`Ran 1031 tests in 1056.911s` `OK`, `uv build` rc 0). The IMPLEMENT spine below is
 SUSPENDED INTACT, not retired — `Decisions` and every unfinished unit stand as written, and the
-ITERATE outcome amends them where it lands. Reason for the return = prototype feedback: the owner
-has UX/output changes for `prototype/webui-demo`. That prototype still runs — its only drift is two
-prose hits (`prototype/webui-demo/README.md:60`, `prototype/webui-demo/demo.py:9`) saying the demo
-never calls the now-deleted `handle`; the `released` matches in `static/app.js` are the demo's OWN
-message vocabulary, not the runtime's. ITERATE opens by running the artifacts + refreshing proof,
-then works the owner's feedback into `prototype/` + `Decisions`; `/goal` stays OFF for ITERATE.
+ITERATE outcome amends them where it lands. Reason for the return, owner-ruled: prototype
+feedback. The owner has UX/output changes for `prototype/webui-demo` and will give them in a LATER
+session; none were given in the session that flipped this line, so nothing is pending on disk.
+
+ITERATE opens by running the artifacts + refreshing proof, then works the owner's feedback into
+`prototype/` + `Decisions`. `/goal` stays OFF here and these are interactive sessions until the
+owner says go. Start with `uv run python prototype/webui-demo/app.py` → <http://127.0.0.1:8765/>;
+the prototype runs unchanged against the post-removal runtime. Its only drift is two PROSE hits
+(`prototype/webui-demo/README.md:60`, `prototype/webui-demo/demo.py:9`) saying the demo never calls
+the now-deleted `handle` — true statements about a method that no longer exists, so they read as
+stale rather than wrong. The `released` matches in `static/app.js` are the demo's OWN message
+vocabulary, not the runtime's, and are not drift.
+
 Resume IMPLEMENT at M3.6a3 when the owner says go.
 
 Suspended IMPLEMENT order, resuming at its head: M3.6a3 → M3.6b → M3.7 → M3.8 → M3.9a/b → gate tooling + CI + scanners (p01 + the IMPLEMENT law-gap row) → README + `prototype/` retirement → phase-close `rev` over the whole phase diff → MAINTAIN. Every unit's closing diff draws its OWN `rev` first and every pass adjudicates into `.agent/review.md`, so the phase-close pass runs LAST with nothing mutating after it, and is never the only one.
