@@ -13,6 +13,26 @@ fixed before the close it reviews; a finding outside it is born as a `.agent/def
 row with its acceptance check, never as an open row here. A fix earns ONE re-review round
 against its acceptance check alone.
 
+## `CLAUDE.md` refresh (ITERATE, ad-hoc) — target = the single commit landing the refresh
+
+The template was overwritten from `~/Projects/agents/claude/CLAUDE.project.md` at `c38a706`,
+carrying one new `Engineering` bullet (`Verification integrity`); this pass reviews that fold plus
+every downstream binding it drew. THE LENS SET BELOW WAS WRITTEN BEFORE THE REVIEWER WAS
+DISPATCHED and ships in the same commit as the reviewed content, the diff being authored before
+the pass rather than on a branch — that is the one departure from the M3.6a2 shape, and the
+guarantee it preserves is the same: no lens was added, dropped or reworded after a finding
+appeared. Verdicts land in the close commit.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| L1 | upstream fidelity — the tracked template equals upstream byte for byte, the fold adds exactly upstream's delta and reverts no downstream law, and `last-sync` names a revision whose range holds every unfolded template/prompt commit | pending | |
+| L2 | binding completeness — each clause of the new bullet reaches a `.claude/rules/` file with this repo's mechanics, or the record states why it needs none | pending | |
+| L3 | claim soundness — every fact the new prose asserts is measured at this tree: the skip census is complete, the named missing checks are absent, and each cited symbol, path, line and environment variable is spelled as shipped | pending | |
+| L4 | claim-vs-guarantee gap — no green claim, old or new, certifies more than was run, and the `Phase` record of the M3.6a2 close stays true of THAT run | pending | |
+| L5 | law conflict — the new text contradicts no standing rule in the files it lands in, and duplicates none of them across scopes (the D28 `skipTest` seed, `REPORTED never forced`, the `CLAUDE.md`-versus-rules routing split) | pending | |
+| L6 | repo-state integrity — the queue grades clean, no committed check reads an edited path in a way this diff reddens, and the retired-name sweep plus every tree census stay satisfied | pending | |
+| L7 | register conformance — agent-optimized register on machine-read law, no human-facing surface touched, Marksman-clean markdown, no provenance | pending | |
+
 ## M3.6a2 close (IMPLEMENT, unit) — target = the `main..impl/m3u6a2b` squash content
 
 Delete the lifecycle API (`handle`, `request_status` and the closed call-graph component

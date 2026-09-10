@@ -15,7 +15,7 @@ paths:
 4. Sweep the invariants below, each retired form under a positive control naming its expected match count first.
 5. Bind every new upstream clause to the `.claude/rules/` file carrying its downstream mechanics — the template states the law, `.claude/rules/` states how this repo satisfies it — and record the new `<last-sync>` here, all in one commit.
 
-`last-sync = agents@539ca8b`.
+`last-sync = agents@c38a706`.
 
 ## Invariants a refresh must keep, else restore
 
@@ -23,6 +23,7 @@ paths:
 - `Session flow` names `.agent/spec.md` (five sections: `Intent`, `Artifacts`, `Decisions`, `Deferred`, `Phase`) plus `.agent/review.md`, and binds spec size to LIVENESS — every line binds current or future work, superseded text dies in the commit that supersedes it, size emergent. A restored byte cap is a reverted upstream fix: it rewards compressing prose over deleting dead rows. `Deferred` = queue pointer + the unfinished units; the queue itself is `.agent/deferred.md`, where `Engineering` routes every off-path improvement and every scratch-validator port.
 - The `.claude/rules/` two-tier bullet (bare | `paths:`) — the sole carrier of project law and of what a teammate inherits.
 - No `## Claude Code` section and no retired-flow reference: session slash commands, the attached ledger trio, Serena, `read-guard`.
+- `Engineering` carries the `Verification integrity` bullet — red-first witness, contract-owned output tables, skip/xfail approval, `green` = run + passed. `.claude/rules/assurance.md` `## Verification integrity` and `.claude/rules/ops.md` (green reporting, Commits witness) hold this repo's mechanics for it, so dropping the bullet orphans live law downstream.
 
 ## Repo-measured law the template never carries
 

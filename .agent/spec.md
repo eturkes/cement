@@ -40,7 +40,9 @@ Queue = `.agent/deferred.md` (`p<nn>`, one line + acceptance each, unattached; p
 ## Phase
 
 ITERATE. M3.6a2 closed and landed on main as `ffe9848`, green on the FULL gate with `test_d28`
-included (`Ran 1031 tests in 1056.911s` `OK`, `uv build` rc 0). The IMPLEMENT spine below is
+included (`Ran 1031 tests in 1056.911s` `OK`, `uv build` rc 0; skipped + not-run = none, the
+plain `OK` carrying no `(skipped=N)`; missing = format, lint, type check, dependency audit +
+secret scan, all five pending the gate-tooling unit). The IMPLEMENT spine below is
 SUSPENDED INTACT, not retired — `Decisions` and every unfinished unit stand as written, and the
 ITERATE outcome amends them where it lands. Reason for the return, owner-ruled: prototype
 feedback. The owner has UX/output changes for `prototype/webui-demo` and will give them in a LATER
