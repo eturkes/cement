@@ -42,9 +42,10 @@ Queue = `.agent/deferred.md` (`p<nn>`, one line + acceptance each, unattached; p
 ITERATE. M3.6a2 closed and landed on main as `ffe9848`, green on the FULL gate with `test_d28`
 included (`Ran 1031 tests in 1056.911s` `OK`, `uv build` rc 0; outer skipped + not-run = none,
 nested D28 = L30 skipped in every inner replay by construction; missing = format, lint, type
-check, dependency audit + secret scan, all five pending the gate-tooling unit). The refresh
-commit `a8109eb` reran that gate whole: `Ran 1031 tests in 1113.706s` `OK`, `uv build` rc 0,
-same exclusions. The IMPLEMENT spine below is
+check, dependency audit + secret scan, all five pending the gate-tooling unit). The `CLAUDE.md`
+refresh landed as `a8109eb` + `81fad11` and reran that gate whole from EACH: `Ran 1031 tests` in
+1113.706s and 1015.317s, `OK` rc 0, `uv build` rc 0, same exclusions both times. The IMPLEMENT
+spine below is
 SUSPENDED INTACT, not retired — `Decisions` and every unfinished unit stand as written, and the
 ITERATE outcome amends them where it lands. Reason for the return, owner-ruled: prototype
 feedback. The owner has UX/output changes for `prototype/webui-demo` and will give them in a LATER
