@@ -64,7 +64,11 @@ body {
     linear-gradient(transparent 31px, rgba(16,32,40,.045) 31px),
     linear-gradient(90deg, transparent 31px, rgba(16,32,40,.045) 31px),
     radial-gradient(120% 90% at 50% -10%, #f7f9f9 0%, var(--bg) 60%);
+  /* The field gradient sizes to the ROOT box, so it must not tile: a page taller
+     than the viewport otherwise bands at every viewport height. */
   background-size: 32px 32px, 32px 32px, 100% 100%;
+  background-repeat: repeat, repeat, no-repeat;
+  background-color: var(--bg);
   color: var(--ink);
   font: 400 14px/1.5 "Space Grotesk", system-ui, sans-serif;
   display: flex;
@@ -545,6 +549,119 @@ details.ocr pre {
 .log-line .detail { color: var(--ink-3); }
 
 .empty { color: var(--ink-3); font-size: 12px; font-style: italic; padding: 4px 0; }
+
+/* --- function source overlay --- */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(16, 24, 28, .42);
+}
+
+/* `display: flex` outranks the UA rule for [hidden], so restate it. */
+.overlay[hidden] { display: none; }
+
+.overlay-card {
+  width: min(1080px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.overlay-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--panel-2);
+}
+
+.overlay-head h2 { margin: 0; font-size: 13.5px; font-weight: 700; letter-spacing: .02em; }
+.overlay-head .button { margin-left: auto; align-self: center; }
+.overlay-body { padding: 14px; overflow-y: auto; }
+
+body.expanded .overlay { position: static; padding: 0 12px 12px; background: none; }
+body.expanded .overlay-card { max-height: none; }
+
+pre.code {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 0;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.code .c { color: var(--ink-3); }
+.code .kw { color: var(--wet); font-weight: 500; }
+.code .fn { color: var(--set); font-weight: 500; }
+.code .k { color: var(--set); }
+.code .s { color: var(--ink); }
+.code .p { color: var(--ink-3); }
+
+.entry {
+  margin: 16px 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--line-soft);
+}
+
+.entry:hover { border-left-color: var(--set-edge); }
+
+details.exact summary {
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  list-style: none;
+}
+
+details.exact summary::-webkit-details-marker { display: none; }
+
+.hint {
+  margin-left: 10px;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--wet);
+}
+
+.hint::before { content: "▸ "; }
+details.exact[open] .hint::before { content: "▾ "; }
+
+details.origins { margin: 10px 0 0 32px; }
+details.origins summary {
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--wet);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.origin {
+  border: 1px solid var(--wet-edge);
+  border-radius: 9px;
+  padding: 11px;
+  margin-top: 9px;
+  background: var(--panel-2);
+}
+
+.origin-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.origin .note { font-size: 12px; color: var(--ink-2); margin: 7px 0 0; }
 
 .toast {
   position: fixed;

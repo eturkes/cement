@@ -5,6 +5,10 @@
 let STATE = null;
 let BUSY = false;
 let POLL = null;
+let SOURCE_OPEN = false;
+let OPEN_ALL = false;
+/* Re-rendering the source collapses every open <details>, so redraw only on change. */
+let SOURCE_KEY = "";
 
 const $ = (id) => document.getElementById(id);
 const esc = (value) =>
@@ -21,6 +25,14 @@ function jsonHtml(value) {
         ? `<span class="k">"${body}"</span>${colon}`
         : `<span class="s">"${body}"</span>`)
     .replace(/\b(true|false|null|-?\d+(?:\.\d+)?)\b/g, '<span class="p">$1</span>');
+}
+
+/* Pretty JSON whose continuation lines carry a code-block indent. */
+function jsonBlock(value, pad) {
+  return jsonHtml(value)
+    .split("\n")
+    .map((line, index) => (index ? pad + line : line))
+    .join("\n");
 }
 
 function toast(message) {
@@ -100,9 +112,14 @@ function render() {
   renderReview();
   renderLifecycle();
   renderFunction();
+  renderSource();
   renderRouting();
   renderMetrics();
   renderLog();
+  /* Capture aid: a screenshot cannot click a disclosure open. */
+  if (OPEN_ALL) {
+    for (const node of document.querySelectorAll("details")) node.open = true;
+  }
 }
 
 function renderChat() {
@@ -354,10 +371,144 @@ function renderFunction() {
     <div class="hash">${esc(fn.function_hash)}</div>
     <div class="checks">${checks}</div>
     <div class="actions">
+      <button class="button small primary" data-source="open">read the function</button>
       <button class="button small" data-offline="A03">answer A03 from the bundle</button>
       <a class="button small" href="/api/bundle.json" download="function.json">download bundle</a>
     </div>
     ${offlineResult}`;
+}
+
+/* --- function source --- */
+
+function renderSource() {
+  const overlay = $("overlay");
+  const fn = STATE.function;
+  if (!SOURCE_OPEN || !fn || !fn.source) {
+    overlay.hidden = true;
+    return;
+  }
+  const key = [fn.function_hash]
+    .concat((fn.excluded || []).map((row) => row.layout + ":" + row.confirmations))
+    .join("|");
+  if (overlay.hidden || key !== SOURCE_KEY) {
+    $("source").innerHTML = sourceHtml(fn);
+    SOURCE_KEY = key;
+  }
+  overlay.hidden = false;
+}
+
+function sourceHtml(fn) {
+  const src = fn.source;
+  const count = src.entries.length;
+  const passed = fn.checks.filter((check) => check.passed).length;
+  const head = [
+    `# cement · ${src.partition} · ${src.operation} @ revision ${src.revision}`,
+    `# function_hash ${fn.function_hash}`,
+    `# ${count} entr${count === 1 ? "y" : "ies"} · ${passed}/${fn.checks.length} ` +
+      `checks passed · receipt ${fn.receipt_id} · ${fn.bundle_bytes} bytes`,
+    "# a reading of the exported cement-function-v2 bundle; Cement seals exact " +
+      "entries, and it emits no code",
+  ]
+    .map((line) => `<span class="c">${esc(line)}</span>`)
+    .join("\n");
+  const tail = [
+    `    <span class="kw">raise</span> <span class="fn">NoMatch</span>   ` +
+      `<span class="c">${esc("# outside the verified boundary → the supervised path")}</span>`,
+  ];
+  for (const row of fn.excluded || []) {
+    if (tail.length === 1) tail.push("", `<span class="c">${esc("# not in this function:")}</span>`);
+    tail.push(`<span class="c">${esc(
+      `#   layout ${row.layout} · ${row.document_type} · ` +
+      `${row.confirmations}/${row.required} confirmations · still supervised`)}</span>`);
+  }
+  const name = String(src.operation).replace(/[^A-Za-z0-9]+/g, "_");
+  return `<pre class="code">${head}\n\n<span class="kw">def</span> ` +
+    `<span class="fn">${esc(name)}</span>(input):</pre>` +
+    src.entries.map((entry) => entryHtml(entry, count)).join("") +
+    `<pre class="code">${tail.join("\n")}</pre>`;
+}
+
+/* One-line stand-in for a value: scalars verbatim, containers by size. */
+function elide(value) {
+  if (Array.isArray(value)) {
+    return `[<span class="p">${value.length} item${value.length === 1 ? "" : "s"}</span>]`;
+  }
+  if (value && typeof value === "object") {
+    const size = Object.keys(value).length;
+    return `{<span class="p">${size} key${size === 1 ? "" : "s"}</span>}`;
+  }
+  return jsonHtml(value);
+}
+
+function elideTop(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return elide(value);
+  return "{" + Object.keys(value)
+    .map((key) => `<span class="k">${esc(JSON.stringify(key))}</span>: ${elide(value[key])}`)
+    .join(", ") + "}";
+}
+
+function entryHtml(entry, total) {
+  const meta =
+    `    # entry ${entry.index}/${total} · layout ${entry.layout} · ` +
+    `artifact ${String(entry.artifact_hash).slice(0, 12)}… · ` +
+    `${entry.confirmations} confirmation${entry.confirmations === 1 ? "" : "s"}` +
+    (entry.reviewers.length ? ` · ${entry.reviewers.join(", ")}` : "");
+  /* The signature is bulky and the plan is the point, so the guard opens elided. The
+     exact bytes stay one click away: they are what the entry actually matches on. */
+  const guard =
+    `<details class="exact"><summary>    <span class="kw">if</span> input == ` +
+    `${elideTop(entry.input)}:<span class="hint">exact input</span></summary>` +
+    `<pre class="code">        <span class="c">${esc(
+      "# the exact canonical JSON this entry matches, byte for byte")}</span>\n` +
+    `        ${jsonBlock(entry.input, "        ")}</pre></details>`;
+  const origins = entry.originals.length
+    ? `<details class="origins"><summary>the ${entry.originals.length} supervised
+         request${entry.originals.length === 1 ? "" : "s"} behind this entry</summary>
+       ${entry.originals.map(originHtml).join("")}</details>`
+    : `<div class="tiny dim" style="margin:10px 0 0 32px">This session holds no request
+         record for this entry.</div>`;
+  return `<div class="entry">
+    <pre class="code"><span class="c">${esc(meta)}</span></pre>
+    ${guard}
+    <pre class="code">        <span class="kw">return</span> ` +
+    `${jsonBlock(entry.output, "        ")}</pre>
+    ${origins}
+  </div>`;
+}
+
+function originHtml(row) {
+  const verdict = row.diff.length
+    ? `<span class="badge set">corrected</span>`
+    : `<span class="badge pass">accepted unchanged</span>`;
+  const change = row.diff.length
+    ? `<div class="label-row" style="margin-top:10px">
+         <span class="label">What the supervisor changed</span></div>
+       <div class="diff">${row.diff
+         .map(
+           (line) => `<div class="diff-row ${esc(line.kind)}">
+             <span class="tag">${esc(line.kind)}</span>
+             <span>${esc(line.field)}</span>
+             <span class="dim">${esc(line.detail)}</span></div>`)
+         .join("")}</div>`
+    : `<div class="tiny dim" style="margin-top:10px">The entry holds this plan byte for
+         byte.</div>`;
+  return `<div class="origin">
+    <div class="origin-head">
+      <span class="badge llm">request ${esc(row.document_id)}</span>
+      ${verdict}
+      <span class="tiny dim">${esc(row.provider)} · ${esc(row.provider_ms)} ms
+        simulated · variant ${esc(row.variant)}</span>
+    </div>
+    <div class="note">The provider ${esc(row.note)}.</div>
+    <div class="label-row" style="margin-top:10px">
+      <span class="label">The plan the provider wrote for this request</span></div>
+    <pre class="json">${jsonHtml(row.provider_plan)}</pre>
+    ${change}
+    <div class="answer-meta">
+      <span>proposal ${esc(row.proposal_id)}</span>
+      <span>example ${esc(row.example_id)}</span>
+      <span>${esc(row.status)} by ${esc(row.reviewer)}</span></div>
+  </div>`;
 }
 
 function renderRouting() {
@@ -475,13 +626,28 @@ async function runStory(upTo) {
 /* --- wiring --- */
 
 document.addEventListener("click", (event) => {
-  const target = event.target.closest("[data-send],[data-review],[data-action],[data-offline],[data-revoke]");
+  const target = event.target.closest(
+    "[data-send],[data-review],[data-action],[data-offline],[data-revoke],[data-source]");
   if (!target || BUSY) return;
   if (target.dataset.send) send(target.dataset.send);
   else if (target.dataset.review) review(target.dataset.proposal, target.dataset.review);
   else if (target.dataset.action) lifecycle(target.dataset.action);
   else if (target.dataset.offline) offline(target.dataset.offline);
   else if (target.dataset.revoke) revoke(target.dataset.revoke);
+  else if (target.dataset.source) setSource(true);
+});
+
+function setSource(open) {
+  SOURCE_OPEN = open;
+  render();
+}
+
+$("overlay-close").addEventListener("click", () => setSource(false));
+$("overlay").addEventListener("click", (event) => {
+  if (event.target === $("overlay")) setSource(false);
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && SOURCE_OPEN) setSource(false);
 });
 
 $("play").addEventListener("click", () => runStory(SCENES.length - 1));
@@ -494,6 +660,8 @@ $("reset").addEventListener("click", async () => {
 (async function start() {
   const parameters = new URLSearchParams(location.search);
   if (parameters.has("expand")) document.body.classList.add("expanded");
+  if (parameters.has("source")) SOURCE_OPEN = true;
+  if (parameters.has("open")) OPEN_ALL = true;
   if (parameters.has("reset")) await call("/api/reset", {});
   STATE = await (await fetch("/api/state")).json();
   render();

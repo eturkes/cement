@@ -5,8 +5,7 @@ Only the provider is simulated: ``StubProvider`` samples a plan variant and a la
 instead of calling a model, so every artifact, digest, check, receipt and resolve
 timing the page shows comes from the real system.
 
-The demo enters the pipeline at ``submit_proposal``, the surviving explicit-candidate
-seam. It never calls ``handle``.
+The demo enters the pipeline at ``submit_proposal``, the explicit-candidate seam.
 """
 
 from __future__ import annotations
@@ -278,6 +277,9 @@ class Session:
         self.log: list[dict[str, JSONValue]] = []
         self.categories: dict[str, dict[str, JSONValue]] = {}
         self.pending: dict[str, dict[str, JSONValue]] = {}
+        # Keyed by scope. An entry's value is unreadable without the per-request plans
+        # that produced it, and `pending` drops a proposal the moment it is reviewed.
+        self.lineage: dict[str, list[dict[str, JSONValue]]] = {}
         self.drafts: dict[str, dict[str, JSONValue]] = {}
         self.function: dict[str, JSONValue] | None = None
         self.bundle_text: str | None = None
@@ -534,6 +536,23 @@ class Session:
                 return
 
             extracted, error = self._preview(result.output, document["text"])
+            self.lineage.setdefault(str(record["input_hash"]), []).append(
+                {
+                    "document_id": document["id"],
+                    "proposal_id": proposal_id,
+                    "layout": record["layout"],
+                    "provider": PROVIDER_NAME,
+                    "provider_ms": record["provider_ms"],
+                    "variant": record["variant"],
+                    "note": record["note"],
+                    "provider_plan": record["plan"],
+                    "confirmed_plan": result.output,
+                    "diff": plan_diff(record["plan"], result.output),
+                    "status": result.status,
+                    "reviewer": REVIEWER,
+                    "example_id": result.example_id,
+                }
+            )
             self._say(
                 "assistant",
                 "released",
@@ -682,6 +701,9 @@ class Session:
             "bundle_bytes": len(self.bundle_text.encode("utf-8"))
             if self.bundle_text
             else 0,
+            "source": self._source_view(str(verification.function_hash))
+            if self.bundle_text is not None
+            else None,
         }
         self.offline = None
         self._note(
@@ -691,6 +713,43 @@ class Session:
             f"function_hash {str(verification.function_hash)[:16]}… · "
             f"{len(verification.checks)} ordered checks passed",
         )
+
+    def _source_view(self, function_hash: str) -> dict[str, JSONValue]:
+        """Project the exported bundle into the entries a reader can read.
+
+        Parsed back out of the bundle rather than rebuilt from the ledger: the reader
+        must see the artifact that travels, not a second rendering of the same rows.
+        """
+
+        document = parse_function(
+            str(self.bundle_text), expected_function_hash=function_hash
+        )
+        scope: JSONValue = document.value["scope"]
+        sealed: JSONValue = document.value["entries"]
+        entries: list[dict[str, JSONValue]] = []
+        for index, entry in enumerate(sealed, start=1):
+            input_hash = str(entry["input_hash"])
+            originals = self.lineage.get(input_hash, [])
+            entries.append(
+                {
+                    "index": index,
+                    "layout": self._layout_of(input_hash),
+                    "input": entry["input"],
+                    "output": entry["output"],
+                    "input_hash": input_hash,
+                    "artifact_hash": entry["artifact_hash"],
+                    "entry_seal": entry["entry_seal"],
+                    "confirmations": len(originals),
+                    "reviewers": sorted({str(row["reviewer"]) for row in originals}),
+                    "originals": originals,
+                }
+            )
+        return {
+            "partition": scope["partition"],
+            "operation": scope["operation"],
+            "revision": scope["operation_revision"],
+            "entries": entries,
+        }
 
     def route(self, enabled: bool) -> None:
         with self._lock:
@@ -784,6 +843,23 @@ class Session:
                     }
                 )
             resolve_ms = list(self.stats["resolve_ms"])
+            function = self.function
+            if function is not None:
+                # Read time, not promotion time: a category can miss the floor after
+                # the promotion that sealed the function.
+                function = {
+                    **function,
+                    "excluded": [
+                        {
+                            "layout": category["layout"],
+                            "document_type": category["document_type"],
+                            "confirmations": len(evidence.get(key, [])),
+                            "required": POLICY_VIEW["min_confirmations"],
+                        }
+                        for key, category in self.categories.items()
+                        if not category["promoted"]
+                    ],
+                }
             return {
                 "partition": PARTITION,
                 "operation": OPERATION,
@@ -805,7 +881,7 @@ class Session:
                 "pending": list(self.pending.values()),
                 "drafts": list(self.drafts.values()),
                 "blocked": getattr(self, "blocked", []),
-                "function": self.function,
+                "function": function,
                 "offline": self.offline,
                 "routed": self.routed,
                 "thinking": self.thinking,

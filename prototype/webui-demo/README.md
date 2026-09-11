@@ -38,6 +38,10 @@ process.
    is not enough to compile, and the lifecycle panel shows the gate.
 7. **The function travels.** Download the bundle, or answer A03 from the bundle bytes
    alone. The bundle carries no ledger.
+8. **The function is readable.** Select **read the function**. The overlay shows the
+   promoted set as one function: one guarded branch per entry, and a no-match tail. Each
+   branch opens to the supervised requests that produced it. Compare the plan that the
+   provider wrote for one request against the entry that now answers it.
 
 ## Real and simulated
 
@@ -54,10 +58,12 @@ Everything else is the shipped `cement_runtime`:
 - The resolve time is measured around `System.resolve`. Each call runs the full six-check
   verification and caches nothing.
 - The exported bundle is the real `cement-function-v2` document.
+- The function source overlay parses that bundle back and reads its entries. The `def`
+  and `if` lines are a rendering for the reader. Cement seals exact entries, and it emits
+  no code.
 
 The demo reads the OCR corpus and the signature and extraction functions from
-`examples/hospital_ocr/`. It enters the pipeline at `submit_proposal`. It never calls
-`handle`.
+`examples/hospital_ocr/`. It enters the pipeline at `submit_proposal`.
 
 ## Proof
 
@@ -72,6 +78,7 @@ The `proof/` directory holds the evidence from one recorded run:
 | `05-routed.png` | A03 answered from the function with no provider call. |
 | `06-boundary.png` | The miss on layout C and the compile gate. |
 | `07-bundle.png` | The answer from the exported bundle. |
+| `08-source.png` | The promoted set read as one function, with one request behind it. |
 | `story-full-page.png` | The whole page at the end of the story. |
 | `transcript.txt` | The control-plane log of the same run. |
 
@@ -85,3 +92,15 @@ the guarantees, and [docs/architecture.md](../../docs/architecture.md) for the s
 
 Query parameters help with capture. `?reset=1` starts a new ledger. `?scene=N` plays the
 story to scene N. `?expand=1` removes the internal scrollbars for a full-page screenshot.
+`?source=1` opens the function source overlay. `?open=1` opens every disclosure, because
+a screenshot cannot select one.
+
+Regenerate the proof with a headless browser against a running server. Each capture plays
+its own story into a new ledger:
+
+```bash
+uv run python prototype/webui-demo/app.py &
+base='http://127.0.0.1:8765/?reset=1&expand=1'
+webcap "$base&scene=3" --png prototype/webui-demo/proof/04-cemented.png \
+  --full-page --width 1500 --wait 32000 --timeout 90000
+```
