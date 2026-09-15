@@ -31,6 +31,25 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   seals exact entries and emits no code. Per-request history retains ONLY proposals that became
   confirmed examples; each entry drills down to the requests behind it, showing the plan the
   provider wrote and what the supervisor changed.
+  Demo framing (owner-ruled): the prototype explains a concept and must never read as a
+  production control plane. Layout = TWO HALVES, `what the user sees` | `none of this is
+  visible in production`. The chat is a PLAIN chat — no badge, id, model name, digest or
+  timing — so the supervised answer and the cemented answer render IDENTICALLY; that identity
+  is the demonstration. A `held` answer renders as the typing indicator until its review lands,
+  and a `miss` renders NOTHING: the user waits while the request returns to the model. Every
+  detail stripped from a bubble moves to a per-message `what happened under this` disclosure.
+  The right half runs the operator lifecycle as REAL `cement` subprocesses against the demo
+  ledger (`_cli`), printing the command, its rc and a condensed reading of the bytes it
+  returned, with verbatim stdout + exact argv one click away; an argument over 80 chars prints
+  as its shell variable (`--output "$OUTPUT"`), which keeps a 64-char digest visible because
+  repeating it IS `function promote`. Chat-side submit + resolve stay IN-PROCESS and say so:
+  measured subprocess 106-109 ms vs `System.resolve` 0.9-3.5 ms, so routing the chat through a
+  shell would report interpreter startup as the function's cost. Per-entry drill-down = the
+  FOUR REAL HOPS p67 names (`function inspect` → `artifact show` → `events` → `proposal show`),
+  each a recorded invocation, with `originals` derived from `proposal show`'s own
+  `proposed_output`/`final_output` rather than from session memory; `events` carries no example
+  filter, so the join is done by hand and shown. Metrics keep the numbers and lose the stat
+  tiles. Free interaction stays.
 - Human-facing prose (README, `docs/`, example README, CLI help) = ASD-STE100 register, graded by D25; everything else agent-optimized.
 - Gate tooling (owner-ruled; lands at a unit boundary): mypy 2.3.1 `strict` over `src/cement_runtime` alone; ruff 0.16.6 format + check, `extend-exclude = ["tests", ".agent", "prototype"]`; scanners = `uv audit` (native, OSV/SARIF) + gitleaks Action + ruff `S`; `license = "Apache-2.0"`. Grounds, config + firing seeds → `.claude/rules/ops.md`; checker + CI measurements → `.agent/decisions/m3u10-*`. `github.com/eturkes/cement` is PUBLIC ⇒ `push`/`pull_request` carry the gate, a cron alone is disabled after 60 idle days.
 
@@ -65,10 +84,22 @@ A prototype-only turn owes no gate run (`.claude/rules/ops.md`, census bullet); 
 `capture-proof.sh` rerun, since every proof PNG that shows the Function pane goes stale with the
 UI.
 
-Feedback landed so far: the demo showed the CEREMONY around the function and never the function —
-the per-request plan was visible only while its proposal was pending, and the promoted set showed
-a count plus a hash. The function source view answers both ends (`Decisions`). Owner picked
-source-style dispatch over an entry table, and entry-feeding requests only over every attempt.
+Feedback landed so far, both worked into `prototype/` + `Decisions`:
+1. The demo showed the CEREMONY around the function and never the function — the per-request plan
+   was visible only while its proposal was pending, and the promoted set showed a count plus a
+   hash. Answered by the function source view; owner picked source-style dispatch over an entry
+   table, and entry-feeding requests only over every attempt.
+2. The intake assistant was busier than a real chat, and the page as a whole read as a production
+   control plane rather than an explanation. Answered by the two-halves framing, the plain chat,
+   the per-message peel-back, and the real-CLI right half (`Decisions`, demo-framing bullet).
+
+Shipped for (2): `demo.py` `_cli`/`_display`/`_hops`, rewritten `index.html`/`app.js`/`app.css`.
+Verified by running the story through the API on a live server — 9 real commands recorded rc 0,
+5 hops per entry, `blocked: layout C - support 1 is below required 2` read off the real `compile`,
+offline bundle match on A03, empty server log. STILL OPEN for this turn: `prototype/webui-demo/
+README.md` still describes the three-pane page, and `proof/` (9 PNGs + `transcript.txt`) is stale
+against the new UI ⇒ rerun `prototype/webui-demo/capture-proof.sh`, whose `08-source.png` height
+may need raising now that the hops sit inside the overlay.
 
 Resume IMPLEMENT at M3.6a3 when the owner says go.
 

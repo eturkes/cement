@@ -6,15 +6,24 @@ instead of calling a model, so every artifact, digest, check, receipt and resolv
 timing the page shows comes from the real system.
 
 The demo enters the pipeline at ``submit_proposal``, the explicit-candidate seam.
+
+Two seams, deliberately split. The operator's lifecycle runs as REAL ``cement``
+subprocesses against this ledger, because the shipped control plane is a CLI and the
+page must not read as a web console. Chat-side submit and resolve stay in-process:
+a subprocess costs a flat ~105 ms of interpreter startup against a 0.9-4 ms resolve,
+so routing the chat through it would report startup cost as the function's cost.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import copy
 import hashlib
 import json
 from pathlib import Path
 import random
+import shlex
+import subprocess
 import sys
 import tempfile
 import threading
@@ -64,6 +73,38 @@ POLICY_VIEW = {
 }
 PROVIDER_NAME = "acme-vision/plan-extractor-4"
 LATENCY_RANGE = (1.1, 3.4)
+
+def _display(arguments: tuple[str, ...]) -> str:
+    """The short form the page prints, runnable as spelled after the preamble.
+
+    A JSON payload passed to `--output` or `--input` runs to hundreds of characters
+    and buries the command it belongs to, so it prints as the shell variable a person
+    would use. The expansion beside it carries the exact argv that ran. The bound
+    clears a 64-character digest, because repeating that digest IS the point of
+    `function promote`.
+    """
+
+    parts: list[str] = []
+    previous = ""
+    for argument in arguments:
+        if len(argument) > 80 and previous.startswith("--"):
+            parts.append('"$' + previous.lstrip("-").upper().replace("-", "_") + '"')
+        else:
+            parts.append(shlex.quote(argument))
+        previous = argument
+    return "cement " + " ".join(parts)
+
+
+def _cement_entry_point() -> Path:
+    """The console script beside the running interpreter, so subprocesses run this
+    checkout. ``sys.executable`` stays unresolved on purpose: `.venv/bin/python` is a
+    symlink into the uv-managed toolchain, and resolving it leaves the venv."""
+
+    beside = Path(sys.executable).parent / "cement"
+    return beside if beside.is_file() else ROOT / ".venv" / "bin" / "cement"
+
+
+CEMENT = _cement_entry_point()
 
 JSONValue = Any
 
@@ -275,6 +316,8 @@ class Session:
         self.provider = StubProvider(seed)
         self.chat: list[dict[str, JSONValue]] = []
         self.log: list[dict[str, JSONValue]] = []
+        # Every real `cement` invocation, in order, with its exact argv and stdout.
+        self.terminal: list[dict[str, JSONValue]] = []
         self.categories: dict[str, dict[str, JSONValue]] = {}
         self.pending: dict[str, dict[str, JSONValue]] = {}
         # Keyed by scope. An entry's value is unreadable without the per-request plans
@@ -329,6 +372,69 @@ class Session:
         self.chat.append(message)
         return message
 
+    def _cli(
+        self,
+        *arguments: str,
+        stdin: str | None = None,
+        reading: Callable[[JSONValue], list[list[str]]] | None = None,
+        check: bool = True,
+        sink: list[dict[str, JSONValue]] | None = None,
+    ) -> JSONValue:
+        """Run one real ``cement`` command against this ledger and record it.
+
+        The page shows the command, its exit code and a short reading of the bytes
+        this call actually returned; the verbatim stdout stays attached for the
+        reader who opens it. Nothing here is rendered from anywhere else.
+        """
+
+        argv = [str(CEMENT), "--db", self.database, "--partition", PARTITION]
+        argv.extend(arguments)
+        started = time.perf_counter()
+        completed = subprocess.run(  # noqa: S603
+            argv, input=stdin, capture_output=True, text=True
+        )
+        elapsed = round((time.perf_counter() - started) * 1000)
+        stdout = completed.stdout or completed.stderr
+        value: JSONValue = None
+        if stdout.strip():
+            try:
+                value = json.loads(stdout)
+            except json.JSONDecodeError:
+                value = None
+        rows: list[list[str]] = []
+        if reading is not None and completed.returncode == 0:
+            rows = reading(value)
+        elif completed.returncode != 0:
+            message = value.get("message") if isinstance(value, dict) else None
+            rows = [["error", str(message or f"exit {completed.returncode}")]]
+        rows_sink = self.terminal if sink is None else sink
+        rows_sink.append(
+            {
+                "seq": self._next(),
+                "at": round(time.time() - self.started, 2),
+                "display": _display(arguments),
+                "argv": argv,
+                "rc": completed.returncode,
+                "ms": elapsed,
+                "stdout": stdout,
+                "bytes": len(stdout.encode("utf-8")),
+                "reading": rows,
+            }
+        )
+        if check and completed.returncode != 0:
+            # Recorded first: a failing command belongs on the terminal the page reads.
+            raise RuntimeError(rows[0][1] if rows else f"exit {completed.returncode}")
+        return value
+
+    def _ledger_preamble(self) -> list[str]:
+        """The two lines that make every printed command runnable as spelled."""
+
+        return [
+            f"export CEMENT_DB={shlex.quote(self.database)}",
+            "alias cement='cement --db \"$CEMENT_DB\" "
+            f"--partition {shlex.quote(PARTITION)}'",
+        ]
+
     def _document(self, document_id: str) -> dict[str, JSONValue]:
         for document in self.documents:
             if document["id"] == document_id:
@@ -374,6 +480,25 @@ class Session:
                 layout=document["layout"],
                 text=document["text"],
                 ask="Extract the record fields as JSON.",
+                under={
+                    "summary": "what Cement keys this request on",
+                    "rows": [
+                        ["layout", str(document["layout"])],
+                        ["input digest", str(document["input_hash"])],
+                        [
+                            "structural keys",
+                            str(len(document["signature"]["structure"])),
+                        ],
+                    ],
+                    "blocks": [
+                        {
+                            "label": "the signature, holding no patient values",
+                            "json": document["signature"],
+                        },
+                    ],
+                    "note": "Documents for different patients share this signature. "
+                    "That is what makes them one category.",
+                },
             )
             if self.routed and self.function is not None:
                 if self._answer_from_function(document):
@@ -466,6 +591,35 @@ class Session:
                 entries=verification.entries,
                 resolve_ms=elapsed,
                 checks=[check.key for check in verification.checks],
+                under={
+                    "summary": "no model ran; the promoted function answered",
+                    "rows": [
+                        ["resolve", f"{elapsed} ms, measured"],
+                        ["matched entry", str(match.artifact_hash)],
+                        ["function", str(verification.function_hash)],
+                        [
+                            "checks",
+                            f"{len(verification.checks)} passed over "
+                            f"{verification.entries} entry(ies), on this call",
+                        ],
+                    ],
+                    "blocks": [
+                        {
+                            "label": "the sealed plan this entry returns",
+                            "json": match.output,
+                        },
+                    ],
+                    "commands": [
+                        f"cement resolve {OPERATION} --input "
+                        + shlex.quote(json.dumps(document["signature"])),
+                    ],
+                    "commands_ran": False,
+                    "commands_label": "the deployment calls System.resolve in "
+                    "process, and this command makes the same call from a shell",
+                    "note": "Every resolve runs the full six-check verification and "
+                    "caches nothing. A shell adds about 105 ms of interpreter "
+                    "startup, which is why the page calls the library here.",
+                },
             )
             self._note(
                 "resolve",
@@ -505,28 +659,55 @@ class Session:
             if record is None:
                 raise KeyError(f"no pending proposal {proposal_id!r}")
             document = self._document(str(record["document_id"]))
+            arguments = [
+                "proposal",
+                "review",
+                proposal_id,
+                "--reviewer",
+                REVIEWER,
+                "--decision",
+                decision,
+            ]
             if decision == "correct":
-                result = self.system.review(
-                    PARTITION,
-                    proposal_id,
-                    reviewer=REVIEWER,
-                    decision="correct",
-                    corrected_output=record["correction"],
-                    note="corrected to the confirmed layout plan",
-                )
-            else:
-                result = self.system.review(
-                    PARTITION, proposal_id, reviewer=REVIEWER, decision=decision
-                )
+                arguments += [
+                    "--output",
+                    json.dumps(record["correction"], separators=(",", ":")),
+                    "--note",
+                    "corrected to the confirmed layout plan",
+                ]
+            result = self._cli(
+                *arguments,
+                reading=lambda value: [
+                    ["status", str(value["status"])],
+                    ["example", str(value["example_id"] or "none created")],
+                ],
+            )
             del self.pending[proposal_id]
             self.stats["reviews"] += 1
 
-            if result.status == "rejected":
+            if result["status"] == "rejected":
                 self._say(
                     "assistant",
                     "rejected",
                     document_id=document["id"],
                     proposal_id=proposal_id,
+                    under={
+                        "summary": "a person refused the model's answer",
+                        "rows": [
+                            ["answered by", f"{PROVIDER_NAME} (simulated)"],
+                            ["held as", str(proposal_id)],
+                            ["reviewer", f"{REVIEWER} rejected it"],
+                            ["confirmed example", "none created"],
+                        ],
+                        "blocks": [
+                            {
+                                "label": "the plan the model wrote, released to nobody",
+                                "json": record["plan"],
+                            },
+                        ],
+                        "commands": [self.terminal[-1]["display"]],
+                        "commands_label": "the command the review surface ran",
+                    },
                 )
                 self._note(
                     "review",
@@ -535,7 +716,8 @@ class Session:
                 )
                 return
 
-            extracted, error = self._preview(result.output, document["text"])
+            extracted, error = self._preview(result["output"], document["text"])
+            diff = plan_diff(record["plan"], result["output"])
             self.lineage.setdefault(str(record["input_hash"]), []).append(
                 {
                     "document_id": document["id"],
@@ -546,11 +728,11 @@ class Session:
                     "variant": record["variant"],
                     "note": record["note"],
                     "provider_plan": record["plan"],
-                    "confirmed_plan": result.output,
-                    "diff": plan_diff(record["plan"], result.output),
-                    "status": result.status,
+                    "confirmed_plan": result["output"],
+                    "diff": diff,
+                    "status": result["status"],
                     "reviewer": REVIEWER,
-                    "example_id": result.example_id,
+                    "example_id": result["example_id"],
                 }
             )
             self._say(
@@ -558,27 +740,55 @@ class Session:
                 "released",
                 document_id=document["id"],
                 proposal_id=proposal_id,
-                status=result.status,
+                status=result["status"],
                 reviewer=REVIEWER,
                 output=extracted,
                 error=error,
-                plan=result.output,
-                example_id=result.example_id,
+                plan=result["output"],
+                example_id=result["example_id"],
+                under={
+                    "summary": "a model answered, and a person confirmed it",
+                    "rows": [
+                        ["answered by", f"{PROVIDER_NAME} (simulated)"],
+                        ["model took", f"{record['provider_ms']} ms (simulated)"],
+                        ["held as", str(proposal_id)],
+                        ["reviewer", f"{REVIEWER} {result['status']} it"],
+                        ["confirmed example", str(result["example_id"])],
+                    ],
+                    "blocks": [
+                        {"label": "the plan the model wrote", "json": record["plan"]},
+                    ],
+                    "diff": diff,
+                    "diff_label": "what the supervisor changed",
+                    "diff_empty": "The supervisor kept the model's plan byte for byte.",
+                    "commands": [self.terminal[-1]["display"]],
+                    "commands_label": "the command the review surface ran",
+                },
             )
             self._note(
                 "review",
-                f"{document['id']}: {REVIEWER} {result.status} {proposal_id}",
-                f"confirmed example {result.example_id} binds the layout signature "
+                f"{document['id']}: {REVIEWER} {result['status']} {proposal_id}",
+                f"confirmed example {result['example_id']} binds the layout signature "
                 "to this exact plan",
             )
 
     def revoke(self, example_id: str) -> None:
         with self._lock:
-            self.system.revoke_example(
-                PARTITION,
+            self._cli(
+                "example",
+                "revoke",
                 example_id,
-                revoked_by=REVIEWER,
-                reason="withdrawn in the demo",
+                "--actor",
+                REVIEWER,
+                "--reason",
+                "withdrawn in the demo",
+                reading=lambda value: [
+                    ["revoked", str(value["example_id"])],
+                    [
+                        "suspended artifacts",
+                        str(len(value["suspended_artifact_ids"])),
+                    ],
+                ],
             )
             self._note(
                 "evidence",
@@ -590,8 +800,22 @@ class Session:
 
     def compile(self) -> None:
         with self._lock:
-            result = self.system.compile(PARTITION, OPERATION)
-            for artifact_id in result.created:
+            result = self._cli(
+                "compile",
+                OPERATION,
+                reading=lambda value: [
+                    ["created", str(len(value["created"])) + " draft(s)"],
+                ]
+                + [
+                    [
+                        "blocked",
+                        f"layout {self._layout_of(str(row['input_hash']))} - "
+                        + "; ".join(str(reason) for reason in row["reasons"]),
+                    ]
+                    for row in value["blocked"]
+                ],
+            )
+            for artifact_id in result["created"]:
                 summary = self.system.artifact(PARTITION, artifact_id)
                 self.drafts[artifact_id] = {
                     "artifact_id": artifact_id,
@@ -609,12 +833,12 @@ class Session:
                     "support": row.get("support"),
                     "reasons": row.get("reasons"),
                 }
-                for row in result.blocked
+                for row in result["blocked"]
             ]
             self._note(
                 "compile",
-                f"compile created {len(result.created)} draft(s), "
-                f"{len(result.blocked)} scope(s) blocked",
+                f"compile created {len(result['created'])} draft(s), "
+                f"{len(result['blocked'])} scope(s) blocked",
                 "; ".join(
                     f"layout {row['layout']}: "
                     + ", ".join(str(reason) for reason in (row["reasons"] or []))
@@ -626,21 +850,37 @@ class Session:
 
     def verify(self) -> None:
         with self._lock:
-            verification = self.system.verify_drafts(
-                PARTITION, OPERATION, verified_by=PROMOTER
+            verification = self._cli(
+                "function",
+                "verify-drafts",
+                OPERATION,
+                "--actor",
+                PROMOTER,
+                reading=lambda value: [
+                    [
+                        "verdict",
+                        "passed" if value["passed"] else "failed",
+                    ],
+                    [
+                        "replayed",
+                        f"{sum(row['report']['tests'] for row in value['entries'])} "
+                        f"sealed test(s) over {len(value['entries'])} draft(s)",
+                    ],
+                ],
             )
-            for entry in verification.entries:
-                draft = self.drafts.get(entry.artifact_id)
+            for entry in verification["entries"]:
+                draft = self.drafts.get(entry["artifact_id"])
                 if draft is None:
                     continue
-                draft["status"] = "verified" if entry.report.passed else "failed"
-                draft["tests"] = entry.report.tests
-                draft["scope_hash"] = entry.report.scope_hash
-            tests = sum(entry.report.tests for entry in verification.entries)
+                report = entry["report"]
+                draft["status"] = "verified" if report["passed"] else "failed"
+                draft["tests"] = report["tests"]
+                draft["scope_hash"] = report["scope_hash"]
+            tests = sum(row["report"]["tests"] for row in verification["entries"])
             self._note(
                 "verify",
                 f"verify-drafts replayed {tests} sealed test(s) "
-                f"over {len(verification.entries)} draft(s)",
+                f"over {len(verification['entries'])} draft(s)",
                 "every active example in the exact scope, plus partition, operation, "
                 "revision and input boundary probes",
             )
@@ -651,11 +891,17 @@ class Session:
             for draft in self.drafts.values():
                 if draft["status"] != "verified":
                     continue
-                self.system.promote(
-                    PARTITION,
+                self._cli(
+                    "promote",
                     str(draft["artifact_id"]),
-                    scope_hash=str(draft["scope_hash"]),
-                    promoted_by=PROMOTER,
+                    "--scope-hash",
+                    str(draft["scope_hash"]),
+                    "--actor",
+                    PROMOTER,
+                    reading=lambda value: [
+                        ["promoted", str(value["artifact_id"])],
+                        ["replaced", str(len(value["replaced_artifact_ids"]))],
+                    ],
                 )
                 draft["status"] = "promoted"
                 promoted.append(str(draft["artifact_id"]))
@@ -673,46 +919,165 @@ class Session:
             self._checkpoint()
 
     def _checkpoint(self) -> None:
-        manifest = self.system.inspect_function_promotion(PARTITION, OPERATION)
-        if not manifest.entries:
+        manifest = self._cli(
+            "function",
+            "inspect",
+            OPERATION,
+            reading=lambda value: [
+                ["verified entries", str(len(value["entries"]))],
+                ["prospective hash", str(value["function_hash"])],
+            ],
+        )
+        if not manifest["entries"]:
             self._note("function", "no verified entries to seal into a function", "")
             return
-        promotion = self.system.promote_function(
-            PARTITION,
+        function_hash = str(manifest["function_hash"])
+        # `function promote` refuses unless the operator repeats the digest `inspect`
+        # reported, so the demo passes the value it just read rather than a flag.
+        promotion = self._cli(
+            "function",
+            "promote",
             OPERATION,
-            expected_function_hash=manifest.function_hash,
-            promoted_by=PROMOTER,
-        )
-        verification = self.system.verify_function(
-            PARTITION, OPERATION, expected_function_hash=manifest.function_hash
-        )
-        document = verification.document
-        self.bundle_text = document.text if document is not None else None
-        self.function = {
-            "function_hash": verification.function_hash,
-            "entries": verification.entries,
-            "passed": verification.passed,
-            "checks": [
-                {"key": check.key, "passed": check.passed, "detail": check.detail}
-                for check in verification.checks
+            "--expected-function-hash",
+            function_hash,
+            "--actor",
+            PROMOTER,
+            reading=lambda value: [
+                ["receipt", str(value["receipt_id"])],
+                ["members", f"{len(value['member_artifact_ids'])} artifact(s)"],
             ],
-            "receipt_id": promotion.receipt_id,
-            "members": list(promotion.member_artifact_ids),
-            "bundle_bytes": len(self.bundle_text.encode("utf-8"))
-            if self.bundle_text
-            else 0,
-            "source": self._source_view(str(verification.function_hash))
-            if self.bundle_text is not None
-            else None,
+        )
+        verification = self._cli(
+            "function",
+            "verify",
+            OPERATION,
+            "--expected-function-hash",
+            function_hash,
+            reading=lambda value: [
+                ["verdict", "passed" if value["passed"] else "failed"],
+                [
+                    "checks",
+                    f"{sum(1 for check in value['checks'] if check['passed'])}/"
+                    f"{len(value['checks'])} over {value['entries']} entry(ies)",
+                ],
+            ],
+        )
+        self._cli(
+            "function",
+            "export",
+            OPERATION,
+            reading=lambda value: [
+                ["abi", str(value["abi"])],
+                ["sealed entries", str(len(value["entries"]))],
+            ],
+        )
+        self.bundle_text = str(self.terminal[-1]["stdout"])
+        self.function = {
+            "function_hash": verification["function_hash"],
+            "entries": verification["entries"],
+            "passed": verification["passed"],
+            "checks": verification["checks"],
+            "receipt_id": promotion["receipt_id"],
+            "members": list(promotion["member_artifact_ids"]),
+            "bundle_bytes": len(self.bundle_text.encode("utf-8")),
+            "source": self._source_view(function_hash),
         }
         self.offline = None
         self._note(
             "function",
-            f"set promotion sealed {verification.entries} entry(ies) "
-            f"under receipt {promotion.receipt_id}",
-            f"function_hash {str(verification.function_hash)[:16]}… · "
-            f"{len(verification.checks)} ordered checks passed",
+            f"set promotion sealed {verification['entries']} entry(ies) "
+            f"under receipt {promotion['receipt_id']}",
+            f"function_hash {function_hash[:16]}… · "
+            f"{len(verification['checks'])} ordered checks passed",
         )
+
+    def _hops(
+        self, artifact_id: str, shared: list[dict[str, JSONValue]]
+    ) -> tuple[list[dict[str, JSONValue]], list[dict[str, JSONValue]]]:
+        """Walk one promoted entry back to the requests behind it, through the CLI.
+
+        Four leaves and a join the caller performs by hand: no command prints an
+        entry beside its originals, and `events` carries no example filter, so this
+        scans the whole stream and matches `payload.example_id` itself. The cost is
+        the point, and every row here is a command that ran.
+        """
+
+        rows = list(shared)
+        artifact = self._cli(
+            "artifact",
+            "show",
+            artifact_id,
+            reading=lambda value: [
+                ["evidence", ", ".join(value["evidence_ids"])],
+                [
+                    "support",
+                    f"{value['support']} example(s), "
+                    f"{value['reviewer_count']} reviewer(s)",
+                ],
+            ],
+            sink=rows,
+        )
+        wanted = set(artifact["evidence_ids"])
+
+        def matched(stream: JSONValue) -> list[tuple[str, str]]:
+            return [
+                (str(row["subject_id"]), str(row["payload"]["example_id"]))
+                for row in stream
+                if row["subject_type"] == "proposal"
+                and isinstance(row.get("payload"), dict)
+                and row["payload"].get("example_id") in wanted
+            ]
+
+        events = self._cli(
+            "events",
+            "--limit",
+            "200",
+            reading=lambda value: [
+                ["scanned", f"{len(value)} event(s); no example filter exists"],
+                [
+                    "matched",
+                    ", ".join(pair[0] for pair in matched(value)) or "none",
+                ],
+            ],
+            sink=rows,
+        )
+        by_proposal = {
+            str(row["proposal_id"]): row
+            for group in self.lineage.values()
+            for row in group
+        }
+        originals: list[dict[str, JSONValue]] = []
+        for proposal_id, example_id in matched(events):
+            shown = self._cli(
+                "proposal",
+                "show",
+                proposal_id,
+                reading=lambda value: [
+                    ["status", f"{value['status']} by {value['reviewer']}"],
+                    ["proposed_output", "what the model wrote"],
+                    ["final_output", "what the supervisor kept"],
+                ],
+                sink=rows,
+            )
+            session_row = by_proposal.get(proposal_id, {})
+            provenance = shown.get("provenance") or {}
+            originals.append(
+                {
+                    "proposal_id": proposal_id,
+                    "example_id": example_id,
+                    "document_id": session_row.get("document_id", "-"),
+                    "provider": provenance.get("model", PROVIDER_NAME),
+                    "provider_ms": session_row.get("provider_ms"),
+                    "variant": provenance.get("variant", "-"),
+                    "note": session_row.get("note", ""),
+                    "provider_plan": shown["proposed_output"],
+                    "confirmed_plan": shown["final_output"],
+                    "diff": plan_diff(shown["proposed_output"], shown["final_output"]),
+                    "status": shown["status"],
+                    "reviewer": shown["reviewer"],
+                }
+            )
+        return rows, originals
 
     def _source_view(self, function_hash: str) -> dict[str, JSONValue]:
         """Project the exported bundle into the entries a reader can read.
@@ -726,10 +1091,31 @@ class Session:
         )
         scope: JSONValue = document.value["scope"]
         sealed: JSONValue = document.value["entries"]
+        # Hop 1 answers every entry at once, so it runs here and prefixes each walk.
+        shared: list[dict[str, JSONValue]] = []
+        manifest = self._cli(
+            "function",
+            "inspect",
+            OPERATION,
+            reading=lambda value: [
+                [
+                    "entries",
+                    ", ".join(str(row["artifact_id"]) for row in value["entries"]),
+                ],
+            ],
+            sink=shared,
+        )
+        by_artifact_hash = {
+            str(row["artifact_hash"]): str(row["artifact_id"])
+            for row in manifest["entries"]
+        }
         entries: list[dict[str, JSONValue]] = []
         for index, entry in enumerate(sealed, start=1):
             input_hash = str(entry["input_hash"])
-            originals = self.lineage.get(input_hash, [])
+            artifact_id = by_artifact_hash.get(str(entry["artifact_hash"]), "")
+            hops, originals = (
+                self._hops(artifact_id, shared) if artifact_id else ([], [])
+            )
             entries.append(
                 {
                     "index": index,
@@ -738,10 +1124,12 @@ class Session:
                     "output": entry["output"],
                     "input_hash": input_hash,
                     "artifact_hash": entry["artifact_hash"],
+                    "artifact_id": artifact_id,
                     "entry_seal": entry["entry_seal"],
                     "confirmations": len(originals),
                     "reviewers": sorted({str(row["reviewer"]) for row in originals}),
                     "originals": originals,
+                    "hops": hops,
                 }
             )
         return {
@@ -877,6 +1265,11 @@ class Session:
                 ],
                 "chat": self.chat,
                 "log": self.log,
+                "terminal": self.terminal,
+                "ledger": {
+                    "path": self.database,
+                    "preamble": self._ledger_preamble(),
+                },
                 "categories": sorted(categories, key=lambda row: str(row["layout"])),
                 "pending": list(self.pending.values()),
                 "drafts": list(self.drafts.values()),

@@ -13,24 +13,21 @@
     <span class="mark" aria-hidden="true"></span>
     <span class="wordmark">cement</span>
   </div>
-  <div class="deployment">
-    <span class="chip" id="chip-partition">example-hospital</span>
-    <span class="chip" id="chip-operation">document.extraction_plan</span>
-    <span class="note">The provider is simulated. Every artifact, digest, check and
-      timing comes from the shipped <code>cement_runtime</code>.</span>
-  </div>
+  <p class="tagline">A demo, not a product. Cement runs under a chat deployment, where
+    none of it reaches the person typing. This page opens the floor.</p>
   <div class="controls">
     <button id="play" class="button primary">Run the story</button>
     <button id="reset" class="button">Reset</button>
   </div>
 </header>
 
-<main class="grid">
+<main class="split">
 
-  <section class="pane" id="pane-chat">
-    <div class="pane-head">
-      <h2>Intake assistant</h2>
-      <span class="pane-sub">chat deployment</span>
+  <section class="side" id="side-user">
+    <div class="side-head">
+      <h2>What the user sees</h2>
+      <p class="side-sub">A chat assistant, of the kind Open WebUI serves. Everything
+        below is the whole surface a person gets.</p>
     </div>
     <div class="pane-body">
       <div id="chat" class="chat"></div>
@@ -41,59 +38,62 @@
     </div>
   </section>
 
-  <section class="pane" id="pane-plane">
-    <div class="pane-head">
-      <h2>Control plane</h2>
-      <span class="pane-sub">background supervision</span>
+  <section class="side" id="side-hidden">
+    <div class="side-head">
+      <h2>None of this is visible in production</h2>
+      <p class="side-sub">Cement ships as a library and a CLI. This column stands in for
+        a terminal and whatever tooling an operator already has. The
+        <span class="chip" id="chip-partition">partition</span> and
+        <span class="chip" id="chip-operation">operation</span> below are real, and so is
+        every digest, check, receipt and timing. Only the model is simulated.</p>
     </div>
     <div class="pane-body">
-      <div class="block" id="block-categories">
-        <div class="label-row"><span class="label">Categories seen</span>
-          <span class="label-note" id="policy-note"></span></div>
-        <div id="categories"></div>
-      </div>
+
       <div class="block" id="block-review">
-        <div class="label-row"><span class="label">Review surface</span>
+        <div class="label-row"><span class="label">A supervisor decides</span>
           <span class="label-note">the only surface that shows a candidate</span></div>
         <div id="review"></div>
       </div>
-    </div>
-  </section>
 
-  <section class="pane" id="pane-function">
-    <div class="pane-head">
-      <h2>Function</h2>
-      <span class="pane-sub">compile, verify, promote, route</span>
-    </div>
-    <div class="pane-body">
-      <div class="block" id="block-lifecycle">
-        <div class="label-row"><span class="label">Lifecycle</span>
-          <span class="label-note">each gate is separate and explicit</span></div>
+      <div class="block" id="block-terminal">
+        <div class="label-row"><span class="label">An operator runs the lifecycle</span>
+          <span class="label-note" id="terminal-count"></span></div>
         <div class="lifecycle-buttons">
-          <button class="button" data-action="compile">compile</button>
-          <button class="button" data-action="verify">verify-drafts</button>
-          <button class="button" data-action="promote">promote</button>
+          <button class="button small" data-action="compile">compile</button>
+          <button class="button small" data-action="verify">function verify-drafts</button>
+          <button class="button small" data-action="promote">function promote</button>
         </div>
-        <div id="lifecycle"></div>
+        <div id="terminal" class="terminal"></div>
       </div>
+
+      <div class="block" id="block-categories">
+        <div class="label-row"><span class="label">Evidence, grouped by exact scope</span>
+          <span class="label-note" id="policy-note"></span></div>
+        <div id="categories"></div>
+      </div>
+
       <div class="block" id="block-function">
-        <div class="label-row"><span class="label">Promoted set</span>
+        <div class="label-row"><span class="label">The promoted function</span>
           <span class="label-note">one function per operation</span></div>
         <div id="function"></div>
       </div>
+
       <div class="block" id="block-routing">
         <div class="label-row"><span class="label">Operator routing</span></div>
         <div id="routing"></div>
       </div>
+
       <div class="block" id="block-metrics">
-        <div class="label-row"><span class="label">Efficiency and predictability</span></div>
+        <div class="label-row"><span class="label">What the change bought</span></div>
         <div id="metrics"></div>
       </div>
+
       <div class="block" id="block-log">
-        <div class="label-row"><span class="label">Control-plane log</span>
+        <div class="label-row"><span class="label">Ledger events</span>
           <a class="label-note link" href="/api/transcript.txt" target="_blank">transcript</a></div>
         <div id="log" class="log"></div>
       </div>
+
     </div>
   </section>
 

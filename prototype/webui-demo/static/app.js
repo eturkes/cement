@@ -104,13 +104,13 @@ function render() {
   $("chip-partition").textContent = STATE.partition;
   $("chip-operation").textContent = STATE.operation;
   $("policy-note").textContent =
-    `policy: ${STATE.policy.min_confirmations} confirmations, ` +
+    `promotes at ${STATE.policy.min_confirmations} confirmations, ` +
     `${STATE.policy.min_reviewers} reviewer`;
   renderChat();
   renderTray();
+  renderTerminal();
   renderCategories();
   renderReview();
-  renderLifecycle();
   renderFunction();
   renderSource();
   renderRouting();
@@ -122,14 +122,27 @@ function render() {
   }
 }
 
+/* --- chat: a plain chat, and nothing else ---
+   Every badge, id, digest and timing this pane once printed is machinery the
+   deployment never shows. It moved under the disclosure, so the supervised answer
+   and the cemented answer render identically. That identity is the point. */
+
 function renderChat() {
   const chat = $("chat");
+  /* A held answer is a wait, not a message: it renders as the typing indicator
+     until the review that releases it lands. */
+  const settled = new Set(
+    STATE.chat
+      .filter((message) => message.kind === "released" || message.kind === "rejected")
+      .map((message) => message.proposal_id));
+  const waiting = STATE.thinking
+    || STATE.chat.some((message) =>
+      message.kind === "held" && !settled.has(message.proposal_id));
   const messages = STATE.chat.map(chatMessage).join("");
-  const thinking = STATE.thinking
+  const thinking = waiting
     ? `<div class="msg assistant"><div class="avatar">AI</div><div class="bubble">
          <div class="thinking"><span class="dots"><span></span><span></span><span></span></span>
-         ${esc(STATE.thinking.provider)} is reading ${esc(STATE.thinking.document_id)}\u2026</div>
-       </div></div>`
+         working\u2026</div></div></div>`
     : "";
   const empty = STATE.chat.length
     ? ""
@@ -143,71 +156,82 @@ function renderChat() {
 
 function chatMessage(message) {
   if (message.kind === "document") {
-    return `<div class="msg clerk"><div class="avatar">IC</div><div class="bubble">
-      <div class="bubble-head"><span class="who">Intake clerk</span>
-        <span class="badge">layout ${esc(message.layout)}</span></div>
-      <div class="doc-title">${esc(message.title)}</div>
-      <div class="doc-meta">${esc(message.document_id)} \u00b7 ${esc(message.patient)}</div>
-      <div class="ask">${esc(message.ask)}</div>
+    return `<div class="msg user"><div class="bubble">
+      <div class="attachment"><span class="clip" aria-hidden="true"></span>
+        <span class="file">${esc(message.document_id)}.pdf</span>
+        <span class="file-kind">${esc(message.title)}</span></div>
       <details class="ocr"><summary>scanned text</summary><pre>${esc(message.text)}</pre></details>
-    </div></div>`;
+      <div class="ask">${esc(message.ask)}</div>
+    </div></div>` + under(message);
   }
-  if (message.kind === "held") {
-    return assistant("held", `
-      <div class="bubble-head"><span class="badge llm">provider \u00b7 held for review</span>
-        <span>${esc(message.provider)}</span>
-        <span>${esc(message.provider_ms)} ms simulated</span></div>
-      <div class="held-body"><div class="lockbar"></div><div>
-        <div>A supervisor must confirm this answer. The assistant releases no candidate.</div>
-        <div class="answer-meta"><span>proposal ${esc(message.proposal_id)}</span>
-          <span>review surface \u2192 control plane</span></div>
-      </div></div>`);
-  }
-  if (message.kind === "released") {
+  if (message.kind === "released" || message.kind === "cement") {
     const body = message.error
       ? `<div class="preview-error">${esc(message.error)}</div>`
       : `<pre class="json">${jsonHtml(message.output)}</pre>`;
-    return assistant("", `
-      <div class="bubble-head"><span class="badge pass">supervised \u00b7 ${esc(message.status)}</span>
-        <span>${esc(message.reviewer)}</span></div>
-      ${body}
-      <div class="answer-meta"><span>example ${esc(message.example_id)}</span>
-        <span>the plan is now confirmed evidence for this layout</span></div>`);
-  }
-  if (message.kind === "cement") {
-    const body = message.error
-      ? `<div class="preview-error">${esc(message.error)}</div>`
-      : `<pre class="json">${jsonHtml(message.output)}</pre>`;
-    return assistant("cemented", `
-      <div class="bubble-head"><span class="badge set">cement \u00b7 exact match</span>
-        <span>no provider call</span></div>
-      ${body}
-      <div class="answer-meta">
-        <span>resolve ${esc(message.resolve_ms)} ms</span>
-        <span>entries ${esc(message.entries)}</span>
-        <span>artifact ${short(message.artifact_hash)}</span>
-        <span>function ${short(message.function_hash)}</span>
-        <span>${message.checks.length} checks passed</span></div>`);
-  }
-  if (message.kind === "miss") {
-    return assistant("miss", `
-      <div class="bubble-head"><span class="badge warn">no exact match</span>
-        <span>resolve ${esc(message.resolve_ms)} ms</span></div>
-      <div>The promoted set holds no entry for layout ${esc(message.layout)}. The request
-        returns to the supervised provider path. Cement widens nothing on its own.</div>`);
+    return `<div class="msg assistant"><div class="avatar">AI</div>
+      <div class="bubble">${body}</div></div>` + under(message);
   }
   if (message.kind === "rejected") {
-    return assistant("", `
-      <div class="bubble-head"><span class="badge fail">rejected</span></div>
-      <div>The supervisor rejected the candidate. The assistant released no answer, and
-        the rejection stays as audit evidence only.</div>`);
+    return `<div class="msg assistant"><div class="avatar">AI</div><div class="bubble">
+      <div>I could not complete this request. Please try again.</div>
+    </div></div>` + under(message);
   }
+  /* `held` renders as the waiting indicator, and `miss` is invisible here by
+     design: the request simply goes to the model, and the user waits. */
   return "";
 }
 
-const assistant = (extra, inner) =>
-  `<div class="msg assistant ${extra}"><div class="avatar">AI</div>
-   <div class="bubble">${inner}</div></div>`;
+/* The peel-back. It sits outside the bubble so the chat itself stays plain. */
+function under(message) {
+  const detail = message.under;
+  if (!detail) return "";
+  const rows = (detail.rows || [])
+    .map(
+      (row) => `<div class="under-row"><span class="k">${esc(row[0])}</span>
+        <span class="v">${esc(row[1])}</span></div>`)
+    .join("");
+  const blocks = (detail.blocks || [])
+    .map(
+      (block) => `<div class="label-row" style="margin-top:10px">
+         <span class="label">${esc(block.label)}</span></div>
+       <pre class="json">${jsonHtml(block.json)}</pre>`)
+    .join("");
+  const diff = detail.diff
+    ? (detail.diff.length
+        ? `<div class="label-row" style="margin-top:10px">
+             <span class="label">${esc(detail.diff_label || "difference")}</span></div>
+           ${diffHtml(detail.diff)}`
+        : `<div class="tiny dim" style="margin-top:10px">${esc(detail.diff_empty || "")}</div>`)
+    : "";
+  const commands = (detail.commands || []).length
+    ? `<div class="label-row" style="margin-top:10px">
+         <span class="label">${esc(detail.commands_label || "the command that ran")}</span>
+         ${detail.commands_ran === false
+            ? `<span class="label-note">not run by this page</span>`
+            : ""}</div>
+       ${detail.commands.map((line) =>
+          `<pre class="shell ${detail.commands_ran === false ? "unrun" : ""}"
+            >$ ${esc(line)}</pre>`).join("")}`
+    : "";
+  const note = detail.note
+    ? `<div class="tiny dim" style="margin-top:10px">${esc(detail.note)}</div>`
+    : "";
+  return `<details class="under"><summary>what happened under this</summary>
+    <div class="under-body">
+      <div class="under-summary">${esc(detail.summary)}</div>
+      <div class="under-rows">${rows}</div>
+      ${blocks}${diff}${commands}${note}
+    </div></details>`;
+}
+
+const diffHtml = (rows) =>
+  `<div class="diff">${rows
+    .map(
+      (row) => `<div class="diff-row ${esc(row.kind)}">
+        <span class="tag">${esc(row.kind)}</span>
+        <span>${esc(row.field)}</span>
+        <span class="dim">${esc(row.detail)}</span></div>`)
+    .join("")}</div>`;
 
 function renderTray() {
   $("tray").innerHTML = STATE.documents
@@ -219,6 +243,45 @@ function renderTray() {
         <span class="kind">${esc(document_.document_type.replace(/_/g, " "))}</span>
       </button>`)
     .join("");
+}
+
+/* --- terminal: real `cement` invocations, condensed, verbatim one click away --- */
+
+function commandHtml(row) {
+  const reading = (row.reading || [])
+    .map(
+      (pair) => `<div class="read-row"><span class="rk">${esc(pair[0])}</span>
+        <span class="rv">${esc(pair[1])}</span></div>`)
+    .join("");
+  return `<div class="cmd ${row.rc === 0 ? "" : "failed"}">
+    <div class="cmd-line">$ ${esc(row.display)}</div>
+    <div class="cmd-read">${reading}</div>
+    <details class="stdout"><summary>stdout ${esc(row.bytes)} bytes
+      \u00b7 exit ${esc(row.rc)} \u00b7 ${esc(row.ms)} ms</summary>
+      <pre class="raw">${esc((row.argv || []).join(" "))}\n\n${esc(row.stdout)}</pre>
+    </details>
+  </div>`;
+}
+
+function renderTerminal() {
+  const rows = STATE.terminal || [];
+  $("terminal-count").textContent = rows.length
+    ? `${rows.length} command${rows.length === 1 ? "" : "s"} have run`
+    : "";
+  if (!rows.length) {
+    $("terminal").innerHTML =
+      `<div class="empty">No command yet. Every operator action below runs the real
+       <code>cement</code> binary against this ledger.</div>`;
+    return;
+  }
+  const preamble = (STATE.ledger.preamble || [])
+    .map((line) => `<div class="cmd-line preamble">$ ${esc(line)}</div>`)
+    .join("");
+  $("terminal").innerHTML =
+    `<div class="cmd preamble-block">${preamble}</div>` +
+    rows.map(commandHtml).join("");
+  const node = $("terminal");
+  if (!document.body.classList.contains("expanded")) node.scrollTop = node.scrollHeight;
 }
 
 function categoryStatus(category) {
@@ -268,7 +331,7 @@ function renderReview() {
   if (!STATE.pending.length) {
     $("review").innerHTML =
       `<div class="empty">No pending proposal. A held answer appears here for the
-       supervisor.</div>`;
+       supervisor, and nowhere else.</div>`;
     return;
   }
   $("review").innerHTML = STATE.pending
@@ -278,18 +341,12 @@ function renderReview() {
              ${esc(proposal.preview_error)}</div>`
         : `<pre class="json">${jsonHtml(proposal.preview)}</pre>`;
       const diff = proposal.diff.length
-        ? `<div class="diff">${proposal.diff
-            .map(
-              (row) => `<div class="diff-row ${esc(row.kind)}">
-                <span class="tag">${esc(row.kind)}</span>
-                <span>${esc(row.field)}</span>
-                <span class="dim">${esc(row.detail)}</span></div>`)
-            .join("")}</div>`
+        ? diffHtml(proposal.diff)
         : `<div class="tiny dim" style="margin-top:8px">The candidate matches the
            supervisor's plan for this layout.</div>`;
       return `<div class="proposal">
         <div class="proposal-head">
-          <span class="badge llm">pending</span>
+          <span class="badge llm">held</span>
           <span class="hash">${esc(proposal.proposal_id)}</span>
           <span class="tiny dim">${esc(proposal.document_id)} \u00b7 layout ${esc(proposal.layout)}</span>
         </div>
@@ -310,27 +367,12 @@ function renderReview() {
           <button class="button small reject" data-review="reject"
             data-proposal="${esc(proposal.proposal_id)}">reject</button>
         </div>
+        <div class="tiny dim" style="margin-top:9px">Each button runs the real command:</div>
+        <pre class="shell">$ cement proposal review ${esc(proposal.proposal_id)} \\
+    --reviewer ${esc(STATE.reviewer)} --decision &lt;accept|correct|reject&gt;</pre>
       </div>`;
     })
     .join("");
-}
-
-function renderLifecycle() {
-  const rows = [];
-  for (const draft of STATE.drafts) {
-    rows.push(row(
-      `layout ${draft.layout} \u00b7 ${draft.status}`,
-      `${draft.tests ? draft.tests + " tests \u00b7 " : ""}${short(draft.artifact_id, 14)}`));
-  }
-  for (const blocked of STATE.blocked || []) {
-    rows.push(row(
-      `layout ${blocked.layout} \u00b7 blocked`,
-      (blocked.reasons || []).join("; ")));
-  }
-  $("lifecycle").innerHTML = rows.length
-    ? rows.join("")
-    : `<div class="empty">Compile groups confirmed examples by exact scope. It creates
-       drafts, and it never promotes them.</div>`;
 }
 
 const row = (key, value) =>
@@ -339,9 +381,16 @@ const row = (key, value) =>
 function renderFunction() {
   const target = $("function");
   if (!STATE.function) {
-    target.innerHTML =
-      `<div class="empty">No promoted set yet. The operator promotes a verified draft,
-       and the whole promoted set becomes one function.</div>`;
+    const drafts = (STATE.drafts || [])
+      .map((draft) => row(
+        `layout ${draft.layout} \u00b7 ${draft.status}`,
+        `${draft.tests ? draft.tests + " tests \u00b7 " : ""}${short(draft.artifact_id, 14)}`))
+      .join("");
+    target.innerHTML = drafts
+      ? drafts + `<div class="tiny dim" style="margin-top:9px">A draft is not a
+          function. Promotion is a separate, explicit act.</div>`
+      : `<div class="empty">No promoted set yet. Compile groups confirmed examples by
+         exact scope, and it never promotes them.</div>`;
     return;
   }
   const fn = STATE.function;
@@ -402,10 +451,10 @@ function sourceHtml(fn) {
   const count = src.entries.length;
   const passed = fn.checks.filter((check) => check.passed).length;
   const head = [
-    `# cement · ${src.partition} · ${src.operation} @ revision ${src.revision}`,
+    `# cement \u00b7 ${src.partition} \u00b7 ${src.operation} @ revision ${src.revision}`,
     `# function_hash ${fn.function_hash}`,
-    `# ${count} entr${count === 1 ? "y" : "ies"} · ${passed}/${fn.checks.length} ` +
-      `checks passed · receipt ${fn.receipt_id} · ${fn.bundle_bytes} bytes`,
+    `# ${count} entr${count === 1 ? "y" : "ies"} \u00b7 ${passed}/${fn.checks.length} ` +
+      `checks passed \u00b7 receipt ${fn.receipt_id} \u00b7 ${fn.bundle_bytes} bytes`,
     "# a reading of the exported cement-function-v2 bundle; Cement seals exact " +
       "entries, and it emits no code",
   ]
@@ -413,13 +462,13 @@ function sourceHtml(fn) {
     .join("\n");
   const tail = [
     `    <span class="kw">raise</span> <span class="fn">NoMatch</span>   ` +
-      `<span class="c">${esc("# outside the verified boundary → the supervised path")}</span>`,
+      `<span class="c">${esc("# outside the verified boundary \u2192 the supervised path")}</span>`,
   ];
   for (const row of fn.excluded || []) {
     if (tail.length === 1) tail.push("", `<span class="c">${esc("# not in this function:")}</span>`);
     tail.push(`<span class="c">${esc(
-      `#   layout ${row.layout} · ${row.document_type} · ` +
-      `${row.confirmations}/${row.required} confirmations · still supervised`)}</span>`);
+      `#   layout ${row.layout} \u00b7 ${row.document_type} \u00b7 ` +
+      `${row.confirmations}/${row.required} confirmations \u00b7 still supervised`)}</span>`);
   }
   const name = String(src.operation).replace(/[^A-Za-z0-9]+/g, "_");
   return `<pre class="code">${head}\n\n<span class="kw">def</span> ` +
@@ -449,10 +498,10 @@ function elideTop(value) {
 
 function entryHtml(entry, total) {
   const meta =
-    `    # entry ${entry.index}/${total} · layout ${entry.layout} · ` +
-    `artifact ${String(entry.artifact_hash).slice(0, 12)}… · ` +
+    `    # entry ${entry.index}/${total} \u00b7 layout ${entry.layout} \u00b7 ` +
+    `artifact ${String(entry.artifact_hash).slice(0, 12)}\u2026 \u00b7 ` +
     `${entry.confirmations} confirmation${entry.confirmations === 1 ? "" : "s"}` +
-    (entry.reviewers.length ? ` · ${entry.reviewers.join(", ")}` : "");
+    (entry.reviewers.length ? ` \u00b7 ${entry.reviewers.join(", ")}` : "");
   /* The signature is bulky and the plan is the point, so the guard opens elided. The
      exact bytes stay one click away: they are what the entry actually matches on. */
   const guard =
@@ -464,6 +513,10 @@ function entryHtml(entry, total) {
   const origins = entry.originals.length
     ? `<details class="origins"><summary>the ${entry.originals.length} supervised
          request${entry.originals.length === 1 ? "" : "s"} behind this entry</summary>
+       <div class="hop-note">No command prints an entry beside its originals, and
+         <code>events</code> carries no example filter. These
+         ${entry.hops.length} commands ran to rebuild the lineage:</div>
+       <div class="hops">${entry.hops.map(commandHtml).join("")}</div>
        ${entry.originals.map(originHtml).join("")}</details>`
     : `<div class="tiny dim" style="margin:10px 0 0 32px">This session holds no request
          record for this entry.</div>`;
@@ -483,25 +536,19 @@ function originHtml(row) {
   const change = row.diff.length
     ? `<div class="label-row" style="margin-top:10px">
          <span class="label">What the supervisor changed</span></div>
-       <div class="diff">${row.diff
-         .map(
-           (line) => `<div class="diff-row ${esc(line.kind)}">
-             <span class="tag">${esc(line.kind)}</span>
-             <span>${esc(line.field)}</span>
-             <span class="dim">${esc(line.detail)}</span></div>`)
-         .join("")}</div>`
+       ${diffHtml(row.diff)}`
     : `<div class="tiny dim" style="margin-top:10px">The entry holds this plan byte for
          byte.</div>`;
   return `<div class="origin">
     <div class="origin-head">
       <span class="badge llm">request ${esc(row.document_id)}</span>
       ${verdict}
-      <span class="tiny dim">${esc(row.provider)} · ${esc(row.provider_ms)} ms
-        simulated · variant ${esc(row.variant)}</span>
+      <span class="tiny dim">${esc(row.provider)} \u00b7 ${esc(row.provider_ms)} ms
+        simulated \u00b7 variant ${esc(row.variant)}</span>
     </div>
     <div class="note">The provider ${esc(row.note)}.</div>
     <div class="label-row" style="margin-top:10px">
-      <span class="label">The plan the provider wrote for this request</span></div>
+      <span class="label">proposed_output \u2014 the plan the model wrote</span></div>
     <pre class="json">${jsonHtml(row.provider_plan)}</pre>
     ${change}
     <div class="answer-meta">
@@ -532,27 +579,19 @@ function renderMetrics() {
   const stats = STATE.stats;
   const distinct = STATE.categories.reduce(
     (best, category) => Math.max(best, category.distinct_candidates), 0);
+  const wait = stats.provider_ms_mean === null
+    ? "\u2014"
+    : (stats.provider_ms_mean / 1000).toFixed(1) + " s";
+  const resolve = stats.resolve_ms_median === null
+    ? "\u2014"
+    : stats.resolve_ms_median + " ms";
   $("metrics").innerHTML = `
-    <div class="compare">
-      <div class="compare-cell llm">
-        <h4>Provider path</h4>
-        <div class="stat">${stats.provider_calls}</div>
-        <div class="stat-note">answers, each held for a supervisor</div>
-        <div class="stat">${stats.provider_ms_mean === null ? "\u2014" : (stats.provider_ms_mean / 1000).toFixed(1) + " s"}</div>
-        <div class="stat-note">mean wait, simulated</div>
-        <div class="stat">${distinct}</div>
-        <div class="stat-note">distinct plans for one layout</div>
-      </div>
-      <div class="compare-cell set">
-        <h4>Cement path</h4>
-        <div class="stat">${stats.cement_answers}</div>
-        <div class="stat-note">answers, no supervision needed</div>
-        <div class="stat">${stats.resolve_ms_median === null ? "\u2014" : stats.resolve_ms_median + " ms"}</div>
-        <div class="stat-note">median resolve, measured</div>
-        <div class="stat">1</div>
-        <div class="stat-note">output per entry, byte-identical</div>
-      </div>
-    </div>
+    ${row("answers held for a supervisor", stats.provider_calls)}
+    ${row("answers needing no supervision", stats.cement_answers)}
+    ${row("mean model wait, simulated", wait)}
+    ${row("median resolve, measured", resolve)}
+    ${row("distinct model plans for one layout", distinct)}
+    ${row("outputs per entry, byte-identical", 1)}
     <div class="tiny dim" style="margin-top:9px">
       ${stats.provider_calls_avoided} provider call${stats.provider_calls_avoided === 1 ? "" : "s"}
       avoided \u00b7 ${stats.reviews} review${stats.reviews === 1 ? "" : "s"} recorded.
