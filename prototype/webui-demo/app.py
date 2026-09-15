@@ -16,6 +16,7 @@ import json
 from pathlib import Path
 import socketserver
 import threading
+from urllib.parse import parse_qs, urlsplit
 import webbrowser
 
 from cement_runtime import CementError
@@ -99,7 +100,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
     # -- routes --
 
     def do_GET(self) -> None:  # noqa: N802
-        path = self.path.split("?", 1)[0]
+        parts = urlsplit(self.path)
+        path = parts.path
+        query = parse_qs(parts.query)
         if path in {"/", "/index.html"}:
             self._file("index.html")
             return
@@ -113,7 +116,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._text(session().transcript())
             return
         if path == "/api/bundle.json":
-            bundle = session().bundle_text
+            bundle = session().bundle(query.get("operation", [None])[0])
             if bundle is None:
                 self._json({"error": "no verified function to export"}, status=409)
                 return
@@ -124,7 +127,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         path = self.path.split("?", 1)[0]
         actions = {
-            "/api/send": lambda body: session().send(str(body["document_id"])),
+            "/api/send": lambda body: session().send(str(body["request_id"])),
+            "/api/select": lambda body: session().select(str(body["scenario"])),
             "/api/review": lambda body: session().review(
                 str(body["proposal_id"]), str(body["decision"])
             ),
@@ -134,7 +138,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             "/api/promote": lambda body: session().promote(),
             "/api/route": lambda body: session().route(bool(body["enabled"])),
             "/api/offline": lambda body: session().evaluate_offline(
-                str(body["document_id"])
+                str(body["document_id"]),
+                str(body["operation"]) if body.get("operation") else None,
             ),
             "/api/reset": lambda body: reset(),
         }

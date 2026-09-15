@@ -26,15 +26,17 @@
   <section class="side" id="side-user">
     <div class="side-head">
       <h2>What the user sees</h2>
-      <p class="side-sub">A chat assistant, of the kind Open WebUI serves. Everything
-        below is the whole surface a person gets.</p>
+      <p class="side-sub">A chat assistant, of the kind Open WebUI serves. Staff bring it
+        several jobs, and they word the same job differently every time. Everything below
+        is the whole surface a person gets.</p>
     </div>
     <div class="pane-body">
       <div id="chat" class="chat"></div>
     </div>
     <div class="tray">
-      <div class="label-row"><span class="label">Send a scanned document</span></div>
-      <div id="tray" class="tray-cards"></div>
+      <div class="label-row"><span class="label">Ask the assistant</span>
+        <span class="label-note">five tasks, worded the way people word them</span></div>
+      <div id="tray" class="tray-groups"></div>
     </div>
   </section>
 
@@ -43,11 +45,20 @@
       <h2>None of this is visible in production</h2>
       <p class="side-sub">Cement ships as a library and a CLI. This column stands in for
         a terminal and whatever tooling an operator already has. The
-        <span class="chip" id="chip-partition">partition</span> and
-        <span class="chip" id="chip-operation">operation</span> below are real, and so is
+        <span class="chip" id="chip-partition">partition</span> below is real, and so is
         every digest, check, receipt and timing. Only the model is simulated.</p>
     </div>
     <div class="pane-body">
+
+      <div class="block" id="block-tasks">
+        <div class="label-row"><span class="label">One task at a time</span>
+          <span class="label-note">the blocks below follow this choice</span></div>
+        <div id="task-switch" class="task-switch"></div>
+        <div class="label-row" style="margin-top:14px">
+          <span class="label">Every operation in this partition</span>
+          <span class="label-note" id="coverage-note"></span></div>
+        <div id="coverage"></div>
+      </div>
 
       <div class="block" id="block-review">
         <div class="label-row"><span class="label">A supervisor decides</span>
@@ -63,6 +74,7 @@
           <button class="button small" data-action="verify">function verify-drafts</button>
           <button class="button small" data-action="promote">function promote</button>
         </div>
+        <div class="tiny dim" id="lifecycle-note"></div>
         <div id="terminal" class="terminal"></div>
       </div>
 
@@ -73,9 +85,9 @@
       </div>
 
       <div class="block" id="block-function">
-        <div class="label-row"><span class="label">The promoted function</span>
-          <span class="label-note">one function per operation</span></div>
-        <div id="function"></div>
+        <div class="label-row"><span class="label">The promoted functions</span>
+          <span class="label-note">one function per operation, not per task</span></div>
+        <div id="functions"></div>
       </div>
 
       <div class="block" id="block-routing">
@@ -103,7 +115,7 @@
   <div class="overlay-card" role="dialog" aria-modal="true" aria-labelledby="overlay-title">
     <div class="overlay-head">
       <h2 id="overlay-title">Function source</h2>
-      <span class="pane-sub">every supervised answer, condensed into one function</span>
+      <span class="pane-sub" id="overlay-sub">every supervised answer, condensed into one function</span>
       <button class="button small" id="overlay-close">close</button>
     </div>
     <div class="overlay-body" id="source"></div>

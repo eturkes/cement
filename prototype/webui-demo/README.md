@@ -1,9 +1,10 @@
 # Cement web UI demo
 
-This demo shows what Cement is for. A hospital intake desk sends scanned documents to a
-chat assistant. The same document layout returns many times. A supervisor confirms the
-answers. Cement collects that confirmed work into one deterministic function. An operator
-then routes the category to that function, and the answers stop depending on the model.
+This demo shows what Cement is for. Hospital staff send scanned documents to a chat
+assistant. They bring five different jobs, and they word each job differently every time.
+A supervisor confirms the answers. Cement collects that confirmed work into one
+deterministic function per operation. An operator then routes those operations to their
+functions, and the answers stop depending on the model.
 
 This page is a demo, not a product. Cement ships as a library and a CLI. A production
 deployment puts Cement behind a chat product such as Open WebUI, where none of this
@@ -22,44 +23,78 @@ Open <http://127.0.0.1:8765/>. Select **Run the story** for the full sequence. S
 server with Ctrl+C. The ledger is a temporary SQLite file, and it disappears with the
 process.
 
+## Five tasks, four functions
+
+The tray holds five tasks. Each task carries several requests that ask for one job in
+different words.
+
+| Task | Operations it calls |
+|---|---|
+| File it into the record | `document.extraction_plan` |
+| Send it to an outside specialist | `document.extraction_plan` + `document.phi_locators` |
+| Check the form before I accept it | `document.extraction_plan` + `document.required_fields` |
+| Where does this go? | `document.intake_queue` |
+| Code it for billing | `document.extraction_plan` + `document.billing_codes` |
+
+The model absorbs the wording. It reads each request, names the operation, and hands
+Cement one exact input. Cement never sees the words. Cement stays rigid on purpose. It
+answers an operation and an exact input, and nothing else.
+
+Four operations are decided by the document layout. Their inputs repeat, so they reach
+the confirmation floor and they cement. `document.billing_codes` is decided by the words
+of one assessment. No second note repeats those words. Every scope therefore stays at one
+confirmation, the compiler blocks it, and the model keeps answering under supervision.
+That is the design, not a gap.
+
+One function serves several tasks. **File it into the record** promotes
+`document.extraction_plan`. Three later tasks then reach the same function for free.
+
 ## What to watch
 
-1. **The chat stays plain.** The left half shows an attachment, a question and an answer.
+1. **The chat stays plain.** The left half shows an attachment, a request and an answer.
    It shows no proposal ID, no model name, no digest and no timing. A held answer looks
    like a slow answer, because that is what a user sees.
-2. **The supervised answer and the cemented answer are identical.** Document A02 is
-   answered by the model and confirmed by a person. Document A03 is answered by the
-   promoted function. The two bubbles render the same. That identity is the point.
+2. **The wording varies and the task does not.** `Extract the record fields as JSON.` and
+   `Give me the JSON for the record fields.` reach the same operation. The right half
+   names that operation under **one task at a time**.
 3. **Each message opens.** Select **what happened under this** below any message. The
-   machinery that the chat hides appears there: the signature Cement keys on, the plan
-   the model wrote, what the supervisor changed, the digests, and the commands.
+   machinery that the chat hides appears there: the exact input Cement keys on, the
+   answer each operation returned, the digests, and the commands.
 4. **The operator works in a terminal.** The right half runs the real `cement` binary
    against the demo ledger. Each row shows the command, a short reading of what it
    returned, and the exit code. Select the `stdout` line for the verbatim bytes and the
    exact argument list.
 5. **Evidence accumulates.** Documents A01, A02 and A03 hold different patients, but they
-   share one layout signature. That signature is the category. The patient values never
+   share one layout signature. That signature is the scope. The patient values never
    enter it.
-6. **The category becomes a function.** Select `compile`, `function verify-drafts` and
+6. **The scope becomes a function.** Select `compile`, `function verify-drafts` and
    `function promote`. Compile groups the confirmed examples. Verification replays them.
    Promotion makes the operator repeat the digest that `function inspect` reported.
-7. **The operator routes the category.** Turn on operator routing. Document A03 then
-   resolves from the promoted set in milliseconds, with no model call.
-8. **The boundary holds.** Send document C01. Its layout is not in the promoted set. The
-   user simply waits, and the request returns to the supervised path. The terminal shows
-   `blocked  layout C - support 1 is below required 2`. Cement widens nothing on its own.
-9. **The function travels.** Download the bundle, or answer A03 from the bundle bytes
-   alone. The bundle carries no ledger.
-10. **The function is readable.** Select **read the function**. The overlay shows the
+7. **The operator routes the promoted operations.** Turn on operator routing. Document
+   A03 then resolves from the promoted set in milliseconds, with no model call.
+8. **The supervised answer and the cemented answer are identical.** A02 is answered by
+   the model and confirmed by a person. A03 is answered by the promoted function. The two
+   bubbles render the same. That identity is the point.
+9. **One function serves the next task.** Switch to **Send it to an outside specialist**.
+   The extraction plan resolves from the function it already has, and only the identifier
+   map reaches the model. One answer, two sources, no visible seam. The function card
+   names every task that calls it.
+10. **The boundary holds.** Run **Code it for billing**. The terminal shows
+    `blocked  one note's assessment text (A01) - support 1 is below required 2`. Cement
+    widens nothing on its own.
+11. **The function travels.** Download the bundle, or answer A03 from the bundle bytes
+    alone. The bundle carries no ledger.
+12. **The function is readable.** Select **read the function**. The overlay shows the
     promoted set as one function: one guarded branch per entry, and a no-match tail. Each
     branch opens to the four commands that rebuild its lineage, and then to the requests
     themselves. Compare `proposed_output` against the entry that now answers.
 
 ## Real and simulated
 
-The model is simulated. `StubProvider` in `demo.py` samples one plan variant and one
+The model is simulated. `StubProvider` in `demo.py` samples one answer variant and one
 latency between 1.1 and 3.4 seconds. It calls no model and uses no network. The page
-labels that number `simulated`.
+labels that number `simulated`. The mapping from a request to an operation is simulated
+for the same reason. A deployment gives that reading to the model.
 
 Everything else is the shipped `cement_runtime`:
 
@@ -77,8 +112,9 @@ Everything else is the shipped `cement_runtime`:
 
 Two calls stay in process, and the page says so where it shows them. The chat submits a
 proposal and resolves an input through the library, not through a subprocess. A `cement`
-subprocess costs a flat 106 to 109 milliseconds of interpreter startup, and
-`System.resolve` costs 0.9 to 3.5 milliseconds. A subprocess would therefore report
+subprocess costs 92 to 118 milliseconds of interpreter startup, over the 50 calls of one
+story run. `System.resolve` costs 3.4 to 5.9 milliseconds in that same run. A subprocess
+would therefore report
 startup cost as the function's cost.
 
 A long argument prints as its shell variable, such as `--output "$OUTPUT"`. The exact
@@ -94,7 +130,10 @@ example filter, so the join is done by hand. `.agent/deferred.md` row `p67` reco
 gap.
 
 The demo reads the OCR corpus and the signature and extraction functions from
-`examples/hospital_ocr/`. It enters the pipeline at `submit_proposal`.
+`examples/hospital_ocr/`. Document B03 is derived in `demo.py` from an example file, with
+one required line blanked. The blank leaves the layout signature unchanged, so B03 shares
+a scope with B02 and still reads as incomplete. The demo enters the pipeline at
+`submit_proposal`.
 
 ## Proof
 
@@ -102,14 +141,15 @@ The `proof/` directory holds the evidence from one recorded run:
 
 | File | What it shows |
 |---|---|
-| `01-desk.png` | The intake desk before the first document. |
+| `01-desk.png` | Five tasks, and every operation before the first request. |
 | `02-held.png` | The user waiting, and the candidate on the review surface. |
 | `03-evidence.png` | Two confirmations against one layout signature. |
 | `04-cemented.png` | The promoted set, its hash and the six checks. |
 | `05-routed.png` | A03 answered from the function, in a bubble that looks supervised. |
-| `06-boundary.png` | The miss on layout C and the compile gate. |
-| `07-bundle.png` | The answer from the exported bundle. |
-| `08-source.png` | The function read as source, with the four hops behind one entry. |
+| `06-reuse.png` | One answer from two sources, and a function with four callers. |
+| `07-blocked.png` | Four operations sealed, and the fifth blocked by design. |
+| `08-bundle.png` | The answer from the exported bundle. |
+| `09-source.png` | The function read as source, with the four hops behind one entry. |
 | `story-full-page.png` | The whole page at the end of the story. |
 | `transcript.txt` | The ledger events of the same run. |
 
@@ -123,14 +163,18 @@ the guarantees, and [docs/architecture.md](../../docs/architecture.md) for the s
 
 Query parameters help with capture. `?reset=1` starts a new ledger. `?scene=N` plays the
 story to scene N. `?expand=1` removes the internal scrollbars for a full-page screenshot.
-`?source=1` opens the function source overlay. `?open=1` opens every disclosure except
-the raw `stdout` blocks. A screenshot cannot select a disclosure, and the raw bytes bury
-the reading they belong to.
+`?source=<operation>` opens the source overlay for that promoted operation. `?open=1`
+opens every disclosure except the raw `stdout` blocks and the lineage of later entries. A
+screenshot cannot select a disclosure. The raw bytes bury the reading they belong to, and
+the later entries repeat a lineage the first entry already shows.
 
 Regenerate the proof with `capture-proof.sh` against a running server. It drives the story
-through the API, so all nine images and the transcript come from one ledger:
+through the API, so all ten images and the transcript come from one ledger:
 
 ```bash
 uv run python prototype/webui-demo/app.py &
 prototype/webui-demo/capture-proof.sh
 ```
+
+Every capture height in that script is measured off the rendered image. Both columns
+scroll inside the page, so a block below the fold is simply absent from the file.

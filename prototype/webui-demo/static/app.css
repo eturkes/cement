@@ -425,33 +425,136 @@ details.ocr pre {
   font-family: var(--mono);
 }
 
-/* --- document tray --- */
+/* --- request tray: one heading per task, the rewordings under it --- */
 
-.tray { border-top: 1px solid var(--line-soft); padding: 11px 12px 12px; background: var(--panel-2); }
-.tray-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
-  grid-auto-rows: 1fr;
-  gap: 7px;
+.tray {
+  border-top: 1px solid var(--line-soft);
+  padding: 11px 12px 12px;
+  background: var(--panel-2);
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
-.doc-card {
+.tray-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  min-height: 0;
+  max-height: 42vh;
+  padding-right: 2px;
+}
+
+body.expanded .tray-groups { max-height: none; overflow: visible; }
+
+.task-group {
+  border: 1px solid var(--line-soft);
+  border-radius: 9px;
+  padding: 7px 8px 8px;
+  background: var(--panel);
+}
+
+.task-group.on { border-color: var(--set-edge); background: var(--set-bg); }
+
+.task-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.task-title { font-weight: 700; font-size: 12.5px; letter-spacing: .01em; }
+.task-intent { font-size: 11px; color: var(--ink-3); }
+
+.task-asks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.ask-card {
   text-align: left;
   border: 1px solid var(--line);
   background: var(--panel);
   border-radius: 8px;
-  padding: 8px 9px;
+  padding: 6px 8px;
   cursor: pointer;
   color: var(--ink);
-  font: 400 12px/1.35 "Space Grotesk", sans-serif;
+  font: 400 11.5px/1.35 "Space Grotesk", sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
-.doc-card:hover { border-color: var(--ink-3); }
-.doc-card { align-self: stretch; }
-.doc-card:disabled { opacity: .45; cursor: wait; }
-.doc-card .id { font-family: var(--mono); font-size: 11px; color: var(--set); }
-.doc-card .who2 { display: block; color: var(--ink-2); font-size: 11.5px; }
-.doc-card .kind { display: block; color: var(--ink-3); font-size: 10.5px; }
+.ask-card:hover { border-color: var(--ink-3); }
+.ask-card:disabled { opacity: .45; cursor: wait; }
+.ask-card .ask-text { color: var(--ink); }
+.ask-card .ask-doc { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); }
+
+/* --- the task switch and the operation map --- */
+
+.task-switch { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.task-pill {
+  text-align: left;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 6px 9px;
+  cursor: pointer;
+  color: var(--ink-2);
+  font: 400 11.5px/1.3 "Space Grotesk", sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.task-pill:hover { border-color: var(--ink-3); }
+.task-pill:disabled { opacity: .45; cursor: wait; }
+.task-pill.on { border-color: var(--set); background: var(--set-bg); color: var(--ink); }
+.task-pill .pill-title { font-weight: 500; }
+.task-pill .pill-ops { font-family: var(--mono); font-size: 10px; color: var(--ink-3); }
+
+.op-row {
+  padding: 7px 9px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  background: var(--panel);
+  opacity: .62;
+}
+
+/* The selected task's operations stand out; the rest stay readable, because the
+   point of this block is that one function serves tasks beyond the selected one. */
+.op-row.on { opacity: 1; border-color: var(--line); }
+
+.op-main { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.op-name { font-family: var(--mono); font-size: 11.5px; color: var(--ink); }
+.op-decides { font-size: 11.5px; color: var(--ink-2); margin-top: 3px; }
+.op-callers { font-size: 10.5px; color: var(--ink-3); margin-top: 3px; }
+
+/* --- function cards --- */
+
+.fn-card {
+  border: 1px solid var(--line-soft);
+  border-radius: 9px;
+  padding: 10px 11px;
+  margin-bottom: 10px;
+  background: var(--panel-2);
+}
+
+.fn-card.promoted { border-color: var(--set-edge); }
+.fn-card:last-child { margin-bottom: 0; }
+.fn-head { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.fn-name { font-family: var(--mono); font-size: 12px; font-weight: 500; }
+.fn-decides { font-size: 11.5px; color: var(--ink-2); margin-top: 4px; }
+.fn-callers { font-size: 11px; color: var(--wet); margin: 4px 0 8px; }
+
+.blocked-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--ink-2);
+  padding: 5px 0;
+}
 
 /* --- categories --- */
 
@@ -494,6 +597,7 @@ details.ocr pre {
 }
 
 .proposal-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.proposal-op { font-family: var(--mono); font-size: 11px; color: var(--ink-2); }
 .proposal .note { font-size: 12px; color: var(--ink-2); margin: 6px 0 2px; }
 
 .diff { margin: 8px 0 0; display: flex; flex-direction: column; gap: 3px; }

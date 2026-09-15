@@ -9,7 +9,7 @@ Production artifact = a library + CLI control plane that an interface like Open 
 ## Artifacts
 
 Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
-- Prototype web UI demo — `uv run python prototype/webui-demo/app.py` → <http://127.0.0.1:8765/>; proof = `prototype/webui-demo/proof/` (9 PNGs + `transcript.txt`, all from ONE ledger via
+- Prototype web UI demo — `uv run python prototype/webui-demo/app.py` → <http://127.0.0.1:8765/>; proof = `prototype/webui-demo/proof/` (10 PNGs + `transcript.txt`, all from ONE ledger via
   `prototype/webui-demo/capture-proof.sh`, which drives the story through the API because a
   `?scene=N` replay always restarts at scene 0).
 - Library `src/cement_runtime/` (`from cement_runtime import System`) + CLI `uv run cement --help` (README quick start = the lifecycle: `operation register` → `proposal submit/review` → `compile` → `function verify-drafts/inspect/promote/verify/export/eval`, `resolve`).
@@ -35,21 +35,38 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   production control plane. Layout = TWO HALVES, `what the user sees` | `none of this is
   visible in production`. The chat is a PLAIN chat — no badge, id, model name, digest or
   timing — so the supervised answer and the cemented answer render IDENTICALLY; that identity
-  is the demonstration. A `held` answer renders as the typing indicator until its review lands,
-  and a `miss` renders NOTHING: the user waits while the request returns to the model. Every
-  detail stripped from a bubble moves to a per-message `what happened under this` disclosure.
+  is the demonstration. A TURN is one question however many operations answer it: it renders as
+  the typing indicator until every part settles, then answers in ONE bubble; a part that misses
+  the promoted set renders nothing and returns to the model while the user waits. Chat kinds =
+  `document | held | answer | refused`. Every detail stripped from a bubble moves to a
+  per-message `what happened under this` disclosure.
   The right half runs the operator lifecycle as REAL `cement` subprocesses against the demo
   ledger (`_cli`), printing the command, its rc and a condensed reading of the bytes it
   returned, with verbatim stdout + exact argv one click away; an argument over 80 chars prints
   as its shell variable (`--output "$OUTPUT"`), which keeps a 64-char digest visible because
   repeating it IS `function promote`. Chat-side submit + resolve stay IN-PROCESS and say so:
-  measured subprocess 106-109 ms vs `System.resolve` 0.9-3.5 ms, so routing the chat through a
-  shell would report interpreter startup as the function's cost. Per-entry drill-down = the
-  FOUR REAL HOPS p67 names (`function inspect` → `artifact show` → `events` → `proposal show`),
+  measured subprocess 92-118 ms over one story's 50 calls vs `System.resolve` 3.4-5.9 ms in that
+  same run, so routing the chat through a shell would report interpreter startup as the
+  function's cost. Per-entry drill-down = the FOUR REAL HOPS p67 names
+  (`function inspect` → `artifact show` → `events` → `proposal show`),
   each a recorded invocation, with `originals` derived from `proposal show`'s own
   `proposed_output`/`final_output` rather than from session memory; `events` carries no example
   filter, so the join is done by hand and shown. Metrics keep the numbers and lose the stat
   tiles. Free interaction stays.
+  Tasks + reuse (owner-ruled): the tray holds FIVE tasks a hospital worker brings to an in-house
+  LLM, each carrying several rewordings of its own job — wording variation is WITHIN-task, never
+  a route to another task. The LLM upstream absorbs the words and NAMES the operation; Cement
+  stays rigid, keyed on operation + exact input, and never sees the request text ⇒ the
+  ask → operation routing renders per message, labelled simulated. Five tasks resolve to FOUR
+  cementable operations: `file` → `extraction_plan`, `share` → `+ phi_locators`, `check` →
+  `+ required_fields`, `route` → `intake_queue`, `bill` → `+ billing_codes`.
+  The right half is SCOPED to the selected task while the operation map shows all five, so reuse
+  is portrayed BOTH ways: the function card names its callers, and switching tasks lands on the
+  same card. A turn's parts may split across a promoted function and the model, and the bubble
+  hides that seam. `document.billing_codes` is keyed on one note's ASSESSMENT TEXT, not the
+  layout, so no second note repeats the input, every scope stays at support 1, `compile` blocks
+  it, and it stays supervised BY DESIGN — the boundary is the claim, not a gap. The story cements
+  every cementable task.
 - Human-facing prose (README, `docs/`, example README, CLI help) = ASD-STE100 register, graded by D25; everything else agent-optimized.
 - Gate tooling (owner-ruled; lands at a unit boundary): mypy 2.3.1 `strict` over `src/cement_runtime` alone; ruff 0.16.6 format + check, `extend-exclude = ["tests", ".agent", "prototype"]`; scanners = `uv audit` (native, OSV/SARIF) + gitleaks Action + ruff `S`; `license = "Apache-2.0"`. Grounds, config + firing seeds → `.claude/rules/ops.md`; checker + CI measurements → `.agent/decisions/m3u10-*`. `github.com/eturkes/cement` is PUBLIC ⇒ `push`/`pull_request` carry the gate, a cron alone is disabled after 60 idle days.
 
@@ -84,7 +101,7 @@ A prototype-only turn owes no gate run (`.claude/rules/ops.md`, census bullet); 
 `capture-proof.sh` rerun, since every proof PNG that shows the Function pane goes stale with the
 UI.
 
-Feedback landed so far, both worked into `prototype/` + `Decisions`:
+Feedback landed so far, all worked into `prototype/` + `Decisions`:
 1. The demo showed the CEREMONY around the function and never the function — the per-request plan
    was visible only while its proposal was pending, and the promoted set showed a count plus a
    hash. Answered by the function source view; owner picked source-style dispatch over an entry
@@ -92,18 +109,37 @@ Feedback landed so far, both worked into `prototype/` + `Decisions`:
 2. The intake assistant was busier than a real chat, and the page as a whole read as a production
    control plane rather than an explanation. Answered by the two-halves framing, the plain chat,
    the per-message peel-back, and the real-CLI right half (`Decisions`, demo-framing bullet).
+3. The page carried ONE task worded ONE way under a `send a scanned document` heading, so it read
+   as a single-purpose OCR toy and no function ever served a second caller. Answered by five
+   tasks with within-task rewordings, per-message ask → operation routing, an operation map
+   beside the selected task, and function cards naming their callers (`Decisions`, tasks + reuse
+   bullet).
 
 Shipped for (2): `demo.py` `_cli`/`_display`/`_hops`, rewritten `index.html`/`app.js`/`app.css`
 + `prototype/webui-demo/README.md`. Verified by driving the story through the API on a live
-server — 11 real `cement` subprocesses, every rc 0; 5 hops per entry (4 distinct commands,
-`proposal show` once per original); `blocked: layout C - support 1 is below required 2` read off
-the real `compile`; offline bundle match on A03; empty server log. `proof/` regenerated whole from
-ONE ledger, and three capture heights in `capture-proof.sh` were stale against the new block
-order: `08-source.png` → 1600x4480 (overlay card 4392 px + `.overlay` 24 px each edge; the card is
-`position: fixed`, so `--full-page` reports viewport height and cannot size it), `04-cemented.png`
-+ `07-bundle.png` → 1600x2000, the function block now sitting under the terminal + the categories
-so a 1000 px fold cut the six set checks and the bundle answer — at 1000 px `06-boundary.png` and
-`07-bundle.png` came out BYTE-IDENTICAL, the proof's own tell that a claim had lost its frame.
+server — real `cement` subprocesses, every rc 0; 5 hops per entry (4 distinct commands,
+`proposal show` once per original); the block read off the real `compile`; offline bundle match
+on A03; empty server log. Capture heights are MEASURED off the rendered PNG, and the tell that
+one is short is two frames coming out byte-identical (`.claude/rules/ops.md`, census bullet).
+
+Shipped for (3): `demo.py` — `_bundle_target` + `bundle(operation)`, `_hold` carrying
+`scope_label`/`preview`, `_row_name` over `field`|`code`|`name` (a dict-shaped billing row
+crashed the old `item["field"]`), `_promote_one` refusing to reseal an operation an earlier task
+already promoted, `state().operations` feeding the coverage strip; `app.py` — `/api/bundle.json`
+and `/api/offline` per `operation`, 409 where that operation is unpromoted; rewritten
+`index.html`/`app.js`/`app.css`/`capture-proof.sh`/`README.md`. Verified by driving the story
+through the API on a live server: 75 real `cement` subprocesses — 50 operator rows + 25 lineage
+hops over 5 sealed entries — every one rc 0; 9 provider calls, 4 cemented answers, 11 reviews,
+`System.resolve` 3.4-5.9 ms, median 4.0. `document.extraction_plan` sealed with 2 entries and
+`phi_locators` + `required_fields` + `intake_queue` with 1 each, while
+`document.billing_codes` blocked at `one note's assessment text
+(A01) - support 1 is below required 2` — the boundary the fifth task exists to show. `proof/` =
+10 PNGs + `transcript.txt` (127 lines) from ONE ledger in ~76 s, `06-boundary` + `07-bundle` +
+`08-source` retired for `06-reuse` + `07-blocked` + `08-bundle` + `09-source`, every height
+re-measured (source overlay card 6044 px + `.overlay` 24 px each edge → 6100) and
+`sha256sum proof/*.png | uniq -d` empty. Webfonts load AFTER first paint and change line heights,
+so `app.js` awaits `document.fonts.ready` before rendering — without it every auto-scroll landed
+short and the chat cut its own last bubble.
 
 Resume IMPLEMENT at M3.6a3 when the owner says go.
 
