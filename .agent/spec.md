@@ -93,13 +93,17 @@ Feedback landed so far, both worked into `prototype/` + `Decisions`:
    control plane rather than an explanation. Answered by the two-halves framing, the plain chat,
    the per-message peel-back, and the real-CLI right half (`Decisions`, demo-framing bullet).
 
-Shipped for (2): `demo.py` `_cli`/`_display`/`_hops`, rewritten `index.html`/`app.js`/`app.css`.
-Verified by running the story through the API on a live server — 9 real commands recorded rc 0,
-5 hops per entry, `blocked: layout C - support 1 is below required 2` read off the real `compile`,
-offline bundle match on A03, empty server log. STILL OPEN for this turn: `prototype/webui-demo/
-README.md` still describes the three-pane page, and `proof/` (9 PNGs + `transcript.txt`) is stale
-against the new UI ⇒ rerun `prototype/webui-demo/capture-proof.sh`, whose `08-source.png` height
-may need raising now that the hops sit inside the overlay.
+Shipped for (2): `demo.py` `_cli`/`_display`/`_hops`, rewritten `index.html`/`app.js`/`app.css`
++ `prototype/webui-demo/README.md`. Verified by driving the story through the API on a live
+server — 11 real `cement` subprocesses, every rc 0; 5 hops per entry (4 distinct commands,
+`proposal show` once per original); `blocked: layout C - support 1 is below required 2` read off
+the real `compile`; offline bundle match on A03; empty server log. `proof/` regenerated whole from
+ONE ledger, and three capture heights in `capture-proof.sh` were stale against the new block
+order: `08-source.png` → 1600x4480 (overlay card 4392 px + `.overlay` 24 px each edge; the card is
+`position: fixed`, so `--full-page` reports viewport height and cannot size it), `04-cemented.png`
++ `07-bundle.png` → 1600x2000, the function block now sitting under the terminal + the categories
+so a 1000 px fold cut the six set checks and the bundle answer — at 1000 px `06-boundary.png` and
+`07-bundle.png` came out BYTE-IDENTICAL, the proof's own tell that a claim had lost its frame.
 
 Resume IMPLEMENT at M3.6a3 when the owner says go.
 

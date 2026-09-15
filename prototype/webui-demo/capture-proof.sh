@@ -39,7 +39,9 @@ shot '' 03-evidence.png
 post compile
 post verify
 post promote
-shot '' 04-cemented.png
+# 2000 px: the function block sits under the terminal and the categories, so the six set
+# checks and the bundle answer fall below a 1000 px fold.
+shot '' 04-cemented.png 2000
 
 post route '{"enabled":true}'
 post send '{"document_id":"A03"}'
@@ -51,9 +53,11 @@ post compile
 shot '' 06-boundary.png
 
 post offline '{"document_id":"A03"}'
-shot '' 07-bundle.png
+shot '' 07-bundle.png 2000
 
-shot 'source=1&open=1' 08-source.png 2600
+# 4480 = the overlay card's own 4392 px plus the .overlay 24 px padding on both edges:
+# the card is position: fixed, so --full-page reports viewport height and cannot size it.
+shot 'source=1&open=1' 08-source.png 4480
 shot 'expand=1' story-full-page.png 1000 --full-page
 curl -sS "$BASE/api/transcript.txt" -o "$OUT/transcript.txt"
 

@@ -116,9 +116,12 @@ function render() {
   renderRouting();
   renderMetrics();
   renderLog();
-  /* Capture aid: a screenshot cannot click a disclosure open. */
+  /* Capture aid: a screenshot cannot click a disclosure open. Verbatim stdout stays
+     shut, since five raw dumps bury the reading they belong to. */
   if (OPEN_ALL) {
-    for (const node of document.querySelectorAll("details")) node.open = true;
+    for (const node of document.querySelectorAll("details:not(.stdout)")) {
+      node.open = true;
+    }
   }
 }
 
