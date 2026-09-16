@@ -13,12 +13,15 @@ set -euo pipefail
 BASE=${BASE:-http://127.0.0.1:8765}
 OUT="$(cd "$(dirname "$0")" && pwd)/proof"
 
-# Every height below is MEASURED off the rendered PNG, never guessed: both columns
-# scroll internally, so a block past the fold is simply absent and two frames can come
-# out byte-identical. Each numbered frame is sized to its whole right column.
-shot() { # shot <query> <file> [height] [--full-page]
-  webcap "$BASE/?${1}" --png "$OUT/$2" --width 1600 --height "${3:-1000}" \
-    --wait 2500 --timeout 60000 "${@:4}" >/dev/null
+# Every height is MEASURED, never guessed: both columns scroll internally, so a block
+# past the fold is simply absent and two frames can come out byte-identical. Each
+# numbered frame is sized to its whole right column, measured immediately before the
+# capture so a UI change cannot leave a stale number behind.
+shot() { # shot <query> <file> [right|left|card]
+  local height
+  height=$(node "$(dirname "$0")/measure-height.mjs" "$BASE/?${1}" "${3:-right}")
+  webcap "$BASE/?${1}" --png "$OUT/$2" --width 1600 --height "$height" \
+    --wait 2500 --timeout 60000 >/dev/null
 }
 
 post() { curl -sS -X POST -H 'Content-Type: application/json' -d "${2:-{\}}" \
@@ -46,26 +49,26 @@ seal() { post compile; post verify; post promote; }
 turn() { ask "$1"; settle; }
 
 post reset
-shot 'reset=1' 01-desk.png 1780
+shot 'reset=1' 01-desk.png
 
 ask q01
-shot '' 02-held.png 3080
+shot '' 02-answered.png
 
 settle
 turn q02
-shot '' 03-evidence.png 2280
+shot '' 03-evidence.png
 
 seal
-shot '' 04-cemented.png 2720
+shot '' 04-cemented.png
 
 post route '{"enabled":true}'
 ask q03
-shot '' 05-routed.png 2720
+shot '' 05-routed.png
 
 turn q05
 turn q06
 seal
-shot '' 06-reuse.png 3380
+shot '' 06-reuse.png
 
 turn q08
 turn q09
@@ -75,18 +78,28 @@ turn q11
 seal
 turn q12
 post compile
-shot '' 07-blocked.png 3140
+shot '' 07-blocked.png
 
 post select '{"scenario":"file"}'
 post offline '{"document_id":"A03","operation":"document.extraction_plan"}'
-shot '' 08-bundle.png 3740
+shot '' 08-bundle.png
 
-# The overlay card is position: fixed, so --full-page reports viewport height and
-# cannot size it; the height below is the card's own plus the .overlay 24 px padding
-# on both edges, measured off the rendered PNG.
-shot 'source=document.extraction_plan&open=1' 09-source.png 6100
-shot 'expand=1' story-full-page.png 1000 --full-page
+# The overlay card is position: fixed, so it is measured as the card plus the .overlay
+# 24 px padding on both edges.
+shot 'source=document.extraction_plan&open=1' 09-source.png card
+webcap "$BASE/?expand=1" --png "$OUT/story-full-page.png" --width 1600 --height 1000 \
+  --full-page --wait 2500 --timeout 60000 >/dev/null
 curl -sS "$BASE/api/transcript.txt" -o "$OUT/transcript.txt"
+
+# The README cites both costs, so the run that produced proof/ records them here.
+{
+  curl -sS "$BASE/api/state" | jq -r '
+    (.terminal | map(.ms)) as $cli |
+    "cement subprocess: \($cli | length) calls, \($cli | min)-\($cli | max) ms",
+    "provider calls: \(.stats.provider_calls) · operations answered by a function: \(.stats.cement_answers) · reviews: \(.stats.reviews)"'
+  grep -o '[0-9]\+\.[0-9] ms' "$OUT/transcript.txt" | sed 's/ ms//' | sort -g \
+    | awk 'NR==1{min=$1} {max=$1; n++} END{printf "System.resolve: %d calls, %s-%s ms\n", n, min, max}'
+} > "$OUT/timings.txt"
 
 printf 'proof regenerated from one run:\n'
 file "$OUT"/*.png | sed 's/PNG image data, //'

@@ -5,123 +5,123 @@ policy 2 confirmations, 1 reviewer, no minimum span (production default: 3 confi
 
 [   0.00s] ledger    temporary ledger created; 5 operations registered in partition example-hospital
                       document.extraction_plan, document.phi_locators, document.required_fields, document.intake_queue, document.billing_codes · policy: 2 confirmations, 1 reviewer, no minimum span
-[   5.39s] category  document.extraction_plan: a new exact scope, first seen on layout A
+[   5.00s] category  document.extraction_plan: a new exact scope, first seen on layout A
                       input_hash 047eff96a213… · keyed on 8 structural keys, no patient values
-[   5.40s] proposal  A01 · document.extraction_plan: candidate stored as prop_4c403362bbb347fca79c116e41799823
-                      acme-health/clinical-llm-4 1660 ms simulated · the candidate stays hidden until review
-[   9.94s] review    A01 · document.extraction_plan: records-supervisor corrected prop_4c403362bbb347fca79c116e41799823
-                      confirmed example ex_4b06f93adad24f5a8e786b9c0609d5c7 binds this exact input to this exact answer
-[  11.87s] proposal  A02 · document.extraction_plan: candidate stored as prop_1e65d8ed67234835b3973334bf7c0394
-                      acme-health/clinical-llm-4 1910 ms simulated · the candidate stays hidden until review
-[  11.99s] review    A02 · document.extraction_plan: records-supervisor accepted prop_1e65d8ed67234835b3973334bf7c0394
-                      confirmed example ex_a4dc01f8e50941c8b945a4bb1b6c6806 binds this exact input to this exact answer
-[  16.04s] compile   document.extraction_plan: compile created 1 draft(s), 0 scope(s) blocked
+[   5.01s] proposal  A01 · document.extraction_plan: candidate stored as prop_76acdd2f819f4ad2a0d11ebdefb8f11b
+                      acme-health/clinical-llm-4 1660 ms simulated · the answer goes to the user in this turn, and the candidate waits for a supervisor
+[  10.84s] review    A01 · document.extraction_plan: records-supervisor corrected prop_76acdd2f819f4ad2a0d11ebdefb8f11b
+                      confirmed example ex_a6fce32036bb4d6cb3b332cf33e7d0f1 binds this exact input to this exact answer
+[  12.78s] proposal  A02 · document.extraction_plan: candidate stored as prop_4899764d1168441297d4004e9ad6b367
+                      acme-health/clinical-llm-4 1910 ms simulated · the answer goes to the user in this turn, and the candidate waits for a supervisor
+[  12.99s] review    A02 · document.extraction_plan: records-supervisor accepted prop_4899764d1168441297d4004e9ad6b367
+                      confirmed example ex_0172eaba8bd9452e8a4ba3623fef43f3 binds this exact input to this exact answer
+[  18.63s] compile   document.extraction_plan: compile created 1 draft(s), 0 scope(s) blocked
                       grouped active examples by exact scope; no model runs here
-[  16.14s] verify    document.extraction_plan: verify-drafts replayed 8 sealed test(s) over 1 draft(s)
+[  18.73s] verify    document.extraction_plan: verify-drafts replayed 8 sealed test(s) over 1 draft(s)
                       every active example in the exact scope, plus partition, operation, revision and input boundary probes
-[  16.25s] promote   document.extraction_plan: informatics-lead promoted 1 artifact(s) against the verified scope hash
-                      art_677652403c4f4e2494c44fe63423d5b4
-[  17.12s] function  document.extraction_plan: set promotion sealed 1 entry(ies) under receipt fpr_65dce7f0462f4969a4055abc7fc7e0d5
-                      function_hash b29fe33684386b68… · 6 ordered checks passed
-[  22.02s] routing   operator routing enabled
+[  18.83s] promote   document.extraction_plan: informatics-lead promoted 1 artifact(s) against the verified scope hash
+                      art_87b78b3bd99746adbce529345f36fee2
+[  19.69s] function  document.extraction_plan: set promotion sealed 1 entry(ies) under receipt fpr_b1fcf0d9248e4dc4aea29d287cb332c3
+                      function_hash fba898506492d3aa… · 6 ordered checks passed
+[  25.57s] routing   operator routing enabled
                       1 promoted function(s): document.extraction_plan · a matching input resolves from the promoted set, and every other input keeps the supervised path
-[  22.04s] resolve   A03 · document.extraction_plan: answered from the promoted set in 4.1 ms
+[  25.58s] resolve   A03 · document.extraction_plan: answered from the promoted set in 4.4 ms
                       6 checks passed over 1 entry(ies) · no provider call
-[  26.90s] resolve   A01 · document.extraction_plan: answered from the promoted set in 4.4 ms
+[  31.47s] resolve   A01 · document.extraction_plan: answered from the promoted set in 3.5 ms
                       6 checks passed over 1 entry(ies) · no provider call
-[  29.08s] category  document.phi_locators: a new exact scope, first seen on layout A
+[  33.64s] category  document.phi_locators: a new exact scope, first seen on layout A
                       input_hash 047eff96a213… · keyed on 8 structural keys, no patient values
-[  29.08s] proposal  A01 · document.phi_locators: candidate stored as prop_c1f554ac8a8b42e0b8b353688c9e5d53
-                      acme-health/clinical-llm-4 2174 ms simulated · the candidate stays hidden until review
-[  29.28s] review    A01 · document.phi_locators: records-supervisor corrected prop_c1f554ac8a8b42e0b8b353688c9e5d53
-                      confirmed example ex_99f26f6660ff4526b1711e62da966b0e binds this exact input to this exact answer
-[  29.30s] resolve   A02 · document.extraction_plan: answered from the promoted set in 3.7 ms
+[  33.65s] proposal  A01 · document.phi_locators: candidate stored as prop_3a6b218cbd174269b00c267a7cb658db
+                      acme-health/clinical-llm-4 2174 ms simulated · the answer goes to the user in this turn, and the candidate waits for a supervisor
+[  33.80s] review    A01 · document.phi_locators: records-supervisor corrected prop_3a6b218cbd174269b00c267a7cb658db
+                      confirmed example ex_aeb62c99a48744acbb726d340a0e100c binds this exact input to this exact answer
+[  33.83s] resolve   A02 · document.extraction_plan: answered from the promoted set in 3.6 ms
                       6 checks passed over 1 entry(ies) · no provider call
-[  30.43s] proposal  A02 · document.phi_locators: candidate stored as prop_ca8c9351a20f4206b03b973616e0a5b3
-                      acme-health/clinical-llm-4 1127 ms simulated · the candidate stays hidden until review
-[  30.59s] review    A02 · document.phi_locators: records-supervisor accepted prop_ca8c9351a20f4206b03b973616e0a5b3
-                      confirmed example ex_962de9fba12c40e0984d10b300828199 binds this exact input to this exact answer
-[  30.71s] compile   document.extraction_plan: compile created 0 draft(s), 0 scope(s) blocked
+[  34.96s] proposal  A02 · document.phi_locators: candidate stored as prop_2bc6a24eef6841eb9c5f18fc73cdce67
+                      acme-health/clinical-llm-4 1127 ms simulated · the answer goes to the user in this turn, and the candidate waits for a supervisor
+[  35.11s] review    A02 · document.phi_locators: records-supervisor accepted prop_2bc6a24eef6841eb9c5f18fc73cdce67
+                      confirmed example ex_9b474f081af947ef8f33eeb28803461f binds this exact input to this exact answer
+[  35.23s] compile   document.extraction_plan: compile created 0 draft(s), 0 scope(s) blocked
                       grouped active examples by exact scope; no model runs here
-[  30.81s] compile   document.phi_locators: compile created 1 draft(s), 0 scope(s) blocked
+[  35.33s] compile   document.phi_locators: compile created 1 draft(s), 0 scope(s) blocked
                       grouped active examples by exact scope; no model runs here
-[  30.92s] verify    document.extraction_plan: verify-drafts replayed 0 sealed test(s) over 0 draft(s)
+[  35.44s] verify    document.extraction_plan: verify-drafts replayed 0 sealed test(s) over 0 draft(s)
                       every active example in the exact scope, plus partition, operation, revision and input boundary probes
-[  31.01s] verify    document.phi_locators: verify-drafts replayed 8 sealed test(s) over 1 draft(s)
+[  35.53s] verify    document.phi_locators: verify-drafts replayed 8 sealed test(s) over 1 draft(s)
                       every active example in the exact scope, plus partition, operation, revision and input boundary probes
-[  31.12s] promote   document.phi_locators: informatics-lead promoted 1 artifact(s) against the verified scope hash
-                      art_f211c04f67c8418dba744d7ff21d9b6f
-[  32.02s] function  document.phi_locators: set promotion sealed 1 entry(ies) under receipt fpr_2284b27655724a5da1cc3d1a5f9b4821
-                      function_hash 997e404118529740… · 6 ordered checks passed
-[  36.81s] resolve   B03 · document.extraction_plan: no promoted entry for this input (4.0 ms)
+[  35.64s] promote   document.phi_locators: informatics-lead promoted 1 artifact(s) against the verified scope hash
+                      art_44acd16b54354f6a96b119298cbcf66f
+[  36.51s] function  document.phi_locators: set promotion sealed 1 entry(ies) under receipt fpr_7d3e9bd4792342f1971eec076b3c9c3c
+                      function_hash 21c070adca2b7f44… · 6 ordered checks passed
+[  42.79s] resolve   B03 · document.extraction_plan: no promoted entry for this input (3.9 ms)
                       this part of the request returns to the supervised path
-[  40.16s] category  document.extraction_plan: a new exact scope, first seen on layout B
+[  46.13s] category  document.extraction_plan: a new exact scope, first seen on layout B
                       input_hash f699e2dfb4af… · keyed on 6 structural keys, no patient values
-[  40.16s] proposal  B03 · document.extraction_plan: candidate stored as prop_05e6dd772eb3431fa0e5d43cd985bbd0
-                      acme-health/clinical-llm-4 3347 ms simulated · the candidate stays hidden until review
-[  40.16s] category  document.required_fields: a new exact scope, first seen on layout B
+[  46.14s] proposal  B03 · document.extraction_plan: candidate stored as prop_3d00821ca6fc47e3800ea7acd3032e6a
+                      acme-health/clinical-llm-4 3347 ms simulated · the answer goes to the user in this turn, and the candidate waits for a supervisor
+[  46.14s] category  document.required_fields: a new exact scope, first seen on layout B
                       input_hash f699e2dfb4af… · keyed on 6 structural keys, no patient values
-[  40.16s] proposal  B03 · document.required_fields: candidate stored as prop_7836bcbba1134e6183f0959653867827
-                      acme-health/clinical-llm-4 3347 ms simulated · the candidate stays hidden until review
-[  40.32s] review    B03 · document.extraction_plan: records-supervisor corrected prop_05e6dd772eb3431fa0e5d43cd985bbd0
-                      confirmed example ex_d271aa63c6da49e5937d92e2d3701c41 binds this exact input to this exact answer
-[  40.44s] review    B03 · document.required_fields: records-supervisor corrected prop_7836bcbba1134e6183f0959653867827
-                      confirmed example ex_ae8d0f496ba04f45a51677e89683e825 binds this exact input to this exact answer
-[  40.47s] resolve   B01 · document.extraction_plan: no promoted entry for this input (3.4 ms)
+[  46.14s] proposal  B03 · document.required_fields: candidate stored as prop_4793a87fb3d248949a7f49af104a0132
+                      acme-health/clinical-llm-4 3347 ms simulated · the answer goes to the user in this turn, and the candidate waits for a supervisor
+[  46.29s] review    B03 · document.extraction_plan: records-supervisor corrected prop_3d00821ca6fc47e3800ea7acd3032e6a
+                      confirmed example ex_344cc45a4f6f49e083406aa5f1c1fb3d binds this exact input to this exact answer
+[  46.41s] review    B03 · document.required_fields: records-supervisor corrected prop_4793a87fb3d248949a7f49af104a0132
+                      confirmed example ex_b614adee477b484d9cdd006e15e8c6f9 binds this exact input to this exact answer
+[  46.44s] resolve   B01 · document.extraction_plan: no promoted entry for this input (3.6 ms)
                       this part of the request returns to the supervised path
-[  42.57s] proposal  B01 · document.extraction_plan: candidate stored as prop_74fd0df94d924a7987e0e25bfd3b3725
-                      acme-health/clinical-llm-4 2098 ms simulated · the candidate stays hidden until review
-[  42.57s] proposal  B01 · document.required_fields: candidate stored as prop_9e8bfd6ce156457fb6a0f4bd3103988d
-                      acme-health/clinical-llm-4 2098 ms simulated · the candidate stays hidden until review
-[  42.69s] review    B01 · document.extraction_plan: records-supervisor corrected prop_74fd0df94d924a7987e0e25bfd3b3725
-                      confirmed example ex_8d8dffbad0184450bcf8e9ce29af6525 binds this exact input to this exact answer
-[  42.80s] review    B01 · document.required_fields: records-supervisor accepted prop_9e8bfd6ce156457fb6a0f4bd3103988d
-                      confirmed example ex_41845e072bf44cbd9e98f59401979f9b binds this exact input to this exact answer
-[  42.92s] compile   document.extraction_plan: compile created 1 draft(s), 0 scope(s) blocked
+[  48.54s] proposal  B01 · document.extraction_plan: candidate stored as prop_8a0f07c1502141ec9dfbbaab4ced5b68
+                      acme-health/clinical-llm-4 2098 ms simulated · the answer goes to the user in this turn, and the candidate waits for a supervisor
+[  48.54s] proposal  B01 · document.required_fields: candidate stored as prop_39a38e058ac94f888d0a9db6cb933688
+                      acme-health/clinical-llm-4 2098 ms simulated · the answer goes to the user in this turn, and the candidate waits for a supervisor
+[  48.68s] review    B01 · document.extraction_plan: records-supervisor corrected prop_8a0f07c1502141ec9dfbbaab4ced5b68
+                      confirmed example ex_50c05fc0ebba4ed8bc58202eab0ef930 binds this exact input to this exact answer
+[  48.80s] review    B01 · document.required_fields: records-supervisor accepted prop_39a38e058ac94f888d0a9db6cb933688
+                      confirmed example ex_11029921901b4f07bd6f34687ff146e2 binds this exact input to this exact answer
+[  48.93s] compile   document.extraction_plan: compile created 1 draft(s), 0 scope(s) blocked
                       grouped active examples by exact scope; no model runs here
-[  43.03s] compile   document.required_fields: compile created 1 draft(s), 0 scope(s) blocked
+[  49.03s] compile   document.required_fields: compile created 1 draft(s), 0 scope(s) blocked
                       grouped active examples by exact scope; no model runs here
-[  43.15s] verify    document.extraction_plan: verify-drafts replayed 8 sealed test(s) over 1 draft(s)
+[  49.14s] verify    document.extraction_plan: verify-drafts replayed 8 sealed test(s) over 1 draft(s)
                       every active example in the exact scope, plus partition, operation, revision and input boundary probes
-[  43.26s] verify    document.required_fields: verify-drafts replayed 8 sealed test(s) over 1 draft(s)
+[  49.24s] verify    document.required_fields: verify-drafts replayed 8 sealed test(s) over 1 draft(s)
                       every active example in the exact scope, plus partition, operation, revision and input boundary probes
-[  43.38s] promote   document.extraction_plan: informatics-lead promoted 1 artifact(s) against the verified scope hash
-                      art_d98a2a59eccf41bb9f0ba9582b4a8ecc
-[  44.67s] function  document.extraction_plan: set promotion sealed 2 entry(ies) under receipt fpr_0d93b904357244e289896635b02c0bfe
-                      function_hash 3a2c6b80fecfe90f… · 6 ordered checks passed
-[  44.76s] promote   document.required_fields: informatics-lead promoted 1 artifact(s) against the verified scope hash
-                      art_b66c35d4333149edad2615f1ba1d0d76
-[  45.64s] function  document.required_fields: set promotion sealed 1 entry(ies) under receipt fpr_866035ec31094c959e222f01c2df1dcf
-                      function_hash f1d5792c62c28ca4… · 6 ordered checks passed
-[  48.49s] category  document.intake_queue: a new exact scope, first seen on layout C
+[  49.35s] promote   document.extraction_plan: informatics-lead promoted 1 artifact(s) against the verified scope hash
+                      art_8d6dcd5d4aac40238e0e1771bfbfab2d
+[  50.61s] function  document.extraction_plan: set promotion sealed 2 entry(ies) under receipt fpr_f98ff895205b4b25bc49ef9b081ff635
+                      function_hash f53db9d8599814f0… · 6 ordered checks passed
+[  50.70s] promote   document.required_fields: informatics-lead promoted 1 artifact(s) against the verified scope hash
+                      art_bf3c90df1bc644ba9901aa4fab0ef63d
+[  51.56s] function  document.required_fields: set promotion sealed 1 entry(ies) under receipt fpr_613325be5a5c4aea851bcecda3310a69
+                      function_hash a1513781f7ca7949… · 6 ordered checks passed
+[  54.41s] category  document.intake_queue: a new exact scope, first seen on layout C
                       input_hash c192ddc3cf29… · keyed on 6 structural keys, no patient values
-[  48.49s] proposal  C01 · document.intake_queue: candidate stored as prop_cfab6760f05043248b156cf38481b54c
-                      acme-health/clinical-llm-4 2836 ms simulated · the candidate stays hidden until review
-[  48.68s] review    C01 · document.intake_queue: records-supervisor corrected prop_cfab6760f05043248b156cf38481b54c
-                      confirmed example ex_bf1ee20e4d694267b7b6ecf8e3fb88b7 binds this exact input to this exact answer
-[  50.42s] proposal  C02 · document.intake_queue: candidate stored as prop_ebcadc0fe2fc43d5804f74d57063299b
-                      acme-health/clinical-llm-4 1715 ms simulated · the candidate stays hidden until review
-[  50.59s] review    C02 · document.intake_queue: records-supervisor accepted prop_ebcadc0fe2fc43d5804f74d57063299b
-                      confirmed example ex_9a8400757b7d4a61ae96c78117335394 binds this exact input to this exact answer
-[  50.72s] compile   document.intake_queue: compile created 1 draft(s), 0 scope(s) blocked
+[  54.41s] proposal  C01 · document.intake_queue: candidate stored as prop_6a3bbdcaf08e4d098319dd63f6982534
+                      acme-health/clinical-llm-4 2836 ms simulated · the answer goes to the user in this turn, and the candidate waits for a supervisor
+[  54.58s] review    C01 · document.intake_queue: records-supervisor corrected prop_6a3bbdcaf08e4d098319dd63f6982534
+                      confirmed example ex_0d88f297af6f4b8c8c38abaf5b26fb95 binds this exact input to this exact answer
+[  56.32s] proposal  C02 · document.intake_queue: candidate stored as prop_ac7aea9a8cd74d09857e17b6f9cfb5e2
+                      acme-health/clinical-llm-4 1715 ms simulated · the answer goes to the user in this turn, and the candidate waits for a supervisor
+[  56.44s] review    C02 · document.intake_queue: records-supervisor accepted prop_ac7aea9a8cd74d09857e17b6f9cfb5e2
+                      confirmed example ex_cfcc7ebf2b894ab992b7c6a4f16c02a1 binds this exact input to this exact answer
+[  56.57s] compile   document.intake_queue: compile created 1 draft(s), 0 scope(s) blocked
                       grouped active examples by exact scope; no model runs here
-[  50.83s] verify    document.intake_queue: verify-drafts replayed 8 sealed test(s) over 1 draft(s)
+[  56.69s] verify    document.intake_queue: verify-drafts replayed 8 sealed test(s) over 1 draft(s)
                       every active example in the exact scope, plus partition, operation, revision and input boundary probes
-[  50.95s] promote   document.intake_queue: informatics-lead promoted 1 artifact(s) against the verified scope hash
-                      art_fa7c04984b14447292a7af65c10394e7
-[  51.86s] function  document.intake_queue: set promotion sealed 1 entry(ies) under receipt fpr_d96e264fc94a4a8b81e0ee7d69592770
-                      function_hash abbf9fca01a643c1… · 6 ordered checks passed
-[  51.88s] resolve   A01 · document.extraction_plan: answered from the promoted set in 5.9 ms
+[  56.80s] promote   document.intake_queue: informatics-lead promoted 1 artifact(s) against the verified scope hash
+                      art_8d380b271850428f97da827116e90e02
+[  57.73s] function  document.intake_queue: set promotion sealed 1 entry(ies) under receipt fpr_0a3a7e0732f247de8b3713b14a433b90
+                      function_hash eb3e5fd91ebae7a2… · 6 ordered checks passed
+[  57.75s] resolve   A01 · document.extraction_plan: answered from the promoted set in 6.0 ms
                       6 checks passed over 2 entry(ies) · no provider call
-[  54.66s] category  document.billing_codes: a new exact scope, first seen on layout A
+[  60.53s] category  document.billing_codes: a new exact scope, first seen on layout A
                       input_hash a9391d624883… · keyed on the note's own assessment text, which no second visit repeats
-[  54.66s] proposal  A01 · document.billing_codes: candidate stored as prop_c05d8026200240cd96014cc160a24936
-                      acme-health/clinical-llm-4 2780 ms simulated · the candidate stays hidden until review
-[  54.84s] review    A01 · document.billing_codes: records-supervisor corrected prop_c05d8026200240cd96014cc160a24936
-                      confirmed example ex_64f2a07a62cd47b4a80a930ea84cb0eb binds this exact input to this exact answer
-[  54.96s] compile   document.extraction_plan: compile created 0 draft(s), 0 scope(s) blocked
+[  60.53s] proposal  A01 · document.billing_codes: candidate stored as prop_2507c835da62421c9f42a0b7cb335101
+                      acme-health/clinical-llm-4 2780 ms simulated · the answer goes to the user in this turn, and the candidate waits for a supervisor
+[  60.67s] review    A01 · document.billing_codes: records-supervisor corrected prop_2507c835da62421c9f42a0b7cb335101
+                      confirmed example ex_9e304cb339994156b1ff5337db1fb55e binds this exact input to this exact answer
+[  60.80s] compile   document.extraction_plan: compile created 0 draft(s), 0 scope(s) blocked
                       grouped active examples by exact scope; no model runs here
-[  55.06s] compile   document.billing_codes: compile created 0 draft(s), 1 scope(s) blocked
+[  60.89s] compile   document.billing_codes: compile created 0 draft(s), 1 scope(s) blocked
                       one note's assessment text (A01): support 1 is below required 2
-[  59.95s] bundle    A03 · document.extraction_plan: the exported bundle returned the confirmed answer
+[  67.20s] bundle    A03 · document.extraction_plan: the exported bundle returned the confirmed answer
                       3344 bytes parsed against the operator's own hash; no ledger read

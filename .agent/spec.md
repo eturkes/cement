@@ -36,17 +36,21 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   visible in production`. The chat is a PLAIN chat — no badge, id, model name, digest or
   timing — so the supervised answer and the cemented answer render IDENTICALLY; that identity
   is the demonstration. A TURN is one question however many operations answer it: it renders as
-  the typing indicator until every part settles, then answers in ONE bubble; a part that misses
-  the promoted set renders nothing and returns to the model while the user waits. Chat kinds =
-  `document | held | answer | refused`. Every detail stripped from a bubble moves to a
+  the typing indicator while the model writes, then answers in ONE bubble; a part that misses
+  the promoted set returns to the model, and the user waits for the MODEL alone. The chat NEVER
+  waits on a person: the model's answer goes out in that same turn and its candidate enters the
+  review queue behind it, so a later accept/correct/reject decides what Cement may seal and
+  never what the user already read. A correction therefore shows both — the reply the user got
+  and the answer cemented instead — inside that message's disclosure, and a rejection retracts
+  nothing. Chat kinds = `document | answer`. Every detail stripped from a bubble moves to a
   per-message `what happened under this` disclosure.
   The right half runs the operator lifecycle as REAL `cement` subprocesses against the demo
   ledger (`_cli`), printing the command, its rc and a condensed reading of the bytes it
   returned, with verbatim stdout + exact argv one click away; an argument over 80 chars prints
   as its shell variable (`--output "$OUTPUT"`), which keeps a 64-char digest visible because
   repeating it IS `function promote`. Chat-side submit + resolve stay IN-PROCESS and say so:
-  measured subprocess 92-118 ms over one story's 50 calls vs `System.resolve` 3.4-5.9 ms in that
-  same run, so routing the chat through a shell would report interpreter startup as the
+  measured subprocess 92-128 ms over one story's 50 calls vs `System.resolve` 3.5-6.0 ms in that
+  same run (`prototype/webui-demo/proof/timings.txt`, rewritten by every capture run), so routing the chat through a shell would report interpreter startup as the
   function's cost. Per-entry drill-down = the FOUR REAL HOPS p67 names
   (`function inspect` → `artifact show` → `events` → `proposal show`),
   each a recorded invocation, with `originals` derived from `proposal show`'s own
@@ -114,15 +118,20 @@ Feedback landed so far, all worked into `prototype/` + `Decisions`:
    tasks with within-task rewordings, per-message ask → operation routing, an operation map
    beside the selected task, and function cards naming their callers (`Decisions`, tasks + reuse
    bullet).
+4. The chat hung on `working…`: `send` ended a turn in a `held` state and only `review` released
+   the answer, so the first request a visitor clicked waited on an operator click whose control
+   sat below the fold. Answered by the ruling that the chat behaves like any LLM chat — the
+   model answers in the same turn and supervision moves behind it (`Decisions`, demo-framing
+   bullet). The hold also broke the identity claim it was framed by: the cemented path answered
+   in ~4 ms unattended while the supervised path answered never.
 
 Shipped for (2): `demo.py` `_cli`/`_display`/`_hops`, rewritten `index.html`/`app.js`/`app.css`
 + `prototype/webui-demo/README.md`. Verified by driving the story through the API on a live
 server — real `cement` subprocesses, every rc 0; 5 hops per entry (4 distinct commands,
 `proposal show` once per original); the block read off the real `compile`; offline bundle match
-on A03; empty server log. Capture heights are MEASURED off the rendered PNG, and the tell that
-one is short is two frames coming out byte-identical (`.claude/rules/ops.md`, census bullet).
+on A03; empty server log.
 
-Shipped for (3): `demo.py` — `_bundle_target` + `bundle(operation)`, `_hold` carrying
+Shipped for (3): `demo.py` — `_bundle_target` + `bundle(operation)`, `_queue` (spelled `_hold` then) carrying
 `scope_label`/`preview`, `_row_name` over `field`|`code`|`name` (a dict-shaped billing row
 crashed the old `item["field"]`), `_promote_one` refusing to reseal an operation an earlier task
 already promoted, `state().operations` feeding the coverage strip; `app.py` — `/api/bundle.json`
@@ -130,16 +139,36 @@ and `/api/offline` per `operation`, 409 where that operation is unpromoted; rewr
 `index.html`/`app.js`/`app.css`/`capture-proof.sh`/`README.md`. Verified by driving the story
 through the API on a live server: 75 real `cement` subprocesses — 50 operator rows + 25 lineage
 hops over 5 sealed entries — every one rc 0; 9 provider calls, 4 cemented answers, 11 reviews,
-`System.resolve` 3.4-5.9 ms, median 4.0. `document.extraction_plan` sealed with 2 entries and
+`document.extraction_plan` sealed with 2 entries and
 `phi_locators` + `required_fields` + `intake_queue` with 1 each, while
 `document.billing_codes` blocked at `one note's assessment text
-(A01) - support 1 is below required 2` — the boundary the fifth task exists to show. `proof/` =
-10 PNGs + `transcript.txt` (127 lines) from ONE ledger in ~76 s, `06-boundary` + `07-bundle` +
-`08-source` retired for `06-reuse` + `07-blocked` + `08-bundle` + `09-source`, every height
-re-measured (source overlay card 6044 px + `.overlay` 24 px each edge → 6100) and
-`sha256sum proof/*.png | uniq -d` empty. Webfonts load AFTER first paint and change line heights,
+(A01) - support 1 is below required 2` — the boundary the fifth task exists to show. `06-boundary`
++ `07-bundle` + `08-source` retired for `06-reuse` + `07-blocked` + `08-bundle` + `09-source`. Webfonts load AFTER first paint and change line heights,
 so `app.js` awaits `document.fonts.ready` before rendering — without it every auto-scroll landed
 short and the chat cut its own last bubble.
+
+Shipped for (4): `demo.py` — `send` finishing every turn itself, `_hold` → `_queue` setting the
+part from the model's own candidate, `_finish` retaining the turn with its bubble, `_refuse`
+replaced by `_record_review` (a ruling restates that message's peel-back in place and the bubble
+is never rewritten), `REVIEW_READING` over `unreviewed|accepted|corrected|rejected`, and a
+corrected part carrying a second block for what got cemented instead; `app.js` — the typing
+indicator driven by `STATE.thinking` alone, the `held`/`refused` branches gone, `sent, unreviewed`
+on the review card. Verified on a live server: one send answers in 1.68 s with the candidate
+queued; `correct` afterwards leaves the answer bytes identical (`cmp` rc 0) while the peel-back
+restates and gains the cemented plan; `reject` adds no bubble and the answer already sent
+stands; a two-operation turn still
+lands as ONE bubble. The full story = 10 turns, 10 `document` + 10 `answer` messages and NO other
+kind, 9 provider calls, 4 cemented answers, 11 reviews (7 corrected, 4 accepted), 50 operator
+rows, `System.resolve` 3.5-6.0 ms, 4 of 5 operations sealed, `billing_codes` blocked as designed,
+empty server log. `proof/` = 10 PNGs + `transcript.txt` (127 lines) plus `timings.txt`, from ONE ledger in 88 s, `02-held` retired for `02-answered`, and
+`sha256sum proof/*.png | awk '{print $1}' | sort | uniq -d` EMPTY — the filename must be
+stripped, since whole-line `uniq -d` never fires — against a positive control reporting 1.
+
+Capture heights are no longer eyeballed: `prototype/webui-demo/measure-height.mjs` reports the
+viewport the right column needs (or the fixed overlay card, whose body scrolls inside it), and
+`capture-proof.sh` measures immediately before each NUMBERED capture (the closing full-page image
+needs no height), so a UI change cannot leave a stale number behind. It reproduced all eight previously eyeballed heights within 20 px and the overlay
+card at 6095 against the recorded 6100.
 
 Resume IMPLEMENT at M3.6a3 when the owner says go.
 

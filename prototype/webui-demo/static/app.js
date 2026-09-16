@@ -143,16 +143,10 @@ function render() {
 function renderChat() {
   const chat = $("chat");
   /* A turn is one question, however many operations answer it. It shows the typing
-     indicator until every part settles, and the reply lands in one bubble. */
-  const settled = new Set(
-    STATE.chat
-      .filter((message) => message.kind === "answer" || message.kind === "refused")
-      .map((message) => message.turn));
-  const waiting = STATE.thinking
-    || STATE.chat.some((message) =>
-      message.kind === "held" && !settled.has(message.turn));
+     indicator while the model writes, and the reply lands in one bubble. The wait is
+     the model's alone: no supervisor holds up a chat. */
   const messages = STATE.chat.map(chatMessage).join("");
-  const thinking = waiting
+  const thinking = STATE.thinking
     ? `<div class="msg assistant"><div class="avatar">AI</div><div class="bubble">
          <div class="thinking"><span class="dots"><span></span><span></span><span></span></span>
          working\u2026</div></div></div>`
@@ -178,22 +172,14 @@ function chatMessage(message) {
       <div class="ask">${esc(message.ask)}</div>
     </div></div>` + under(message);
   }
-  if (message.kind === "answer") {
-    const body = message.error
-      ? `<div class="preview-error">${esc(message.error)}</div>`
-      : message.render === "text"
-        ? `<div>${esc(message.body)}</div>`
-        : `<pre class="json">${jsonHtml(message.body)}</pre>`;
-    return `<div class="msg assistant"><div class="avatar">AI</div>
-      <div class="bubble">${body}</div></div>` + under(message);
-  }
-  if (message.kind === "refused") {
-    return `<div class="msg assistant"><div class="avatar">AI</div><div class="bubble">
-      <div>I could not complete this request. Please try again.</div>
-    </div></div>` + under(message);
-  }
-  /* `held` renders as the waiting indicator above: the user simply waits. */
-  return "";
+  /* The only other kind is `answer`, and one bubble carries every part of the turn. */
+  const body = message.error
+    ? `<div class="preview-error">${esc(message.error)}</div>`
+    : message.render === "text"
+      ? `<div>${esc(message.body)}</div>`
+      : `<pre class="json">${jsonHtml(message.body)}</pre>`;
+  return `<div class="msg assistant"><div class="avatar">AI</div>
+    <div class="bubble">${body}</div></div>` + under(message);
 }
 
 /* The peel-back. It sits outside the bubble so the chat itself stays plain. */
@@ -407,8 +393,9 @@ function renderCategories() {
 function renderReview() {
   if (!STATE.pending.length) {
     $("review").innerHTML =
-      `<div class="empty">No pending proposal. A held answer appears here for the
-       supervisor, and nowhere else.</div>`;
+      `<div class="empty">No candidate waiting. The user already has every answer the
+       model wrote, and its candidate appears here for the supervisor, and nowhere
+       else.</div>`;
     return;
   }
   $("review").innerHTML = STATE.pending
@@ -427,7 +414,7 @@ function renderReview() {
            supervisor's answer for this scope.</div>`;
       return `<div class="proposal">
         <div class="proposal-head">
-          <span class="badge llm">held</span>
+          <span class="badge llm">sent, unreviewed</span>
           <span class="hash">${esc(proposal.proposal_id)}</span>
           <span class="tiny dim">${esc(proposal.document_id)} \u00b7
             ${esc(proposal.scope_label)}</span>
@@ -750,15 +737,14 @@ function renderMetrics() {
     ? "\u2014"
     : stats.resolve_ms_median + " ms";
   $("metrics").innerHTML = `
-    ${row("turns held for a supervisor", stats.provider_calls)}
-    ${row("answers needing no supervision", stats.cement_answers)}
+    ${row("turns the model answered", stats.provider_calls)}
+    ${row("operations answered by a function", stats.cement_answers)}
     ${row("operations sealed", STATE.promoted_operations.length)}
     ${row("mean model wait, simulated", wait)}
     ${row("median resolve, measured", resolve)}
     ${row("distinct model answers for one scope", distinct)}
     <div class="tiny dim" style="margin-top:9px">
-      ${plural(stats.provider_calls_avoided, "model call")}
-      avoided \u00b7 ${plural(stats.reviews, "review")} recorded.
+      ${plural(stats.reviews, "review")} recorded.
       Every resolve runs the full six-check verification and caches nothing.
     </div>`;
 }
@@ -799,7 +785,7 @@ const turn = (request) => [() => send(request), () => settle()];
 
 const SCENES = [
   { name: "desk", steps: [] },
-  { name: "held", steps: [() => send("q01")] },
+  { name: "answered", steps: [() => send("q01")] },
   { name: "evidence", steps: [() => settle(), ...turn("q02")] },
   { name: "cemented", steps: seal() },
   { name: "routed", steps: [() => route(true), () => send("q03")] },

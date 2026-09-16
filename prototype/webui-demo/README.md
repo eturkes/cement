@@ -2,8 +2,8 @@
 
 This demo shows what Cement is for. Hospital staff send scanned documents to a chat
 assistant. They bring five different jobs, and they word each job differently every time.
-A supervisor confirms the answers. Cement collects that confirmed work into one
-deterministic function per operation. An operator then routes those operations to their
+A supervisor reviews those answers afterwards. Cement collects that confirmed work into
+one deterministic function per operation. An operator then routes those operations to their
 functions, and the answers stop depending on the model.
 
 This page is a demo, not a product. Cement ships as a library and a CLI. A production
@@ -51,15 +51,18 @@ One function serves several tasks. **File it into the record** promotes
 
 ## What to watch
 
-1. **The chat stays plain.** The left half shows an attachment, a request and an answer.
-   It shows no proposal ID, no model name, no digest and no timing. A held answer looks
-   like a slow answer, because that is what a user sees.
+1. **The chat stays plain, and it never waits for a person.** The left half shows an
+   attachment, a request and an answer. It shows no proposal ID, no model name, no
+   digest and no timing. The model answers the user at once. The supervisor reads that
+   candidate afterwards, which is where the review queue on the right comes from.
 2. **The wording varies and the task does not.** `Extract the record fields as JSON.` and
    `Give me the JSON for the record fields.` reach the same operation. The right half
    names that operation under **one task at a time**.
 3. **Each message opens.** Select **what happened under this** below any message. The
    machinery that the chat hides appears there: the exact input Cement keys on, the
-   answer each operation returned, the digests, and the commands.
+   answer each operation returned, the digests, and the commands. A corrected answer
+   also shows what the supervisor cemented instead. The user keeps the answer the model
+   wrote, and that exposure is what cementing removes.
 4. **The operator works in a terminal.** The right half runs the real `cement` binary
    against the demo ledger. Each row shows the command, a short reading of what it
    returned, and the exit code. Select the `stdout` line for the verbatim bytes and the
@@ -72,9 +75,9 @@ One function serves several tasks. **File it into the record** promotes
    Promotion makes the operator repeat the digest that `function inspect` reported.
 7. **The operator routes the promoted operations.** Turn on operator routing. Document
    A03 then resolves from the promoted set in milliseconds, with no model call.
-8. **The supervised answer and the cemented answer are identical.** A02 is answered by
-   the model and confirmed by a person. A03 is answered by the promoted function. The two
-   bubbles render the same. That identity is the point.
+8. **The supervised answer and the cemented answer are identical.** A model answers A02,
+   and a person confirms that candidate afterwards. The promoted function answers A03.
+   The two bubbles render the same. That identity is the point.
 9. **One function serves the next task.** Switch to **Send it to an outside specialist**.
    The extraction plan resolves from the function it already has, and only the identifier
    map reaches the model. One answer, two sources, no visible seam. The function card
@@ -112,8 +115,9 @@ Everything else is the shipped `cement_runtime`:
 
 Two calls stay in process, and the page says so where it shows them. The chat submits a
 proposal and resolves an input through the library, not through a subprocess. A `cement`
-subprocess costs 92 to 118 milliseconds of interpreter startup, over the 50 calls of one
-story run. `System.resolve` costs 3.4 to 5.9 milliseconds in that same run. A subprocess
+subprocess costs 92 to 128 milliseconds of interpreter startup, over the 50 calls of one
+story run. `System.resolve` costs 3.5 to 6.0 milliseconds in that same run.
+`proof/timings.txt` records both, from the run that produced `proof/`. A subprocess
 would therefore report
 startup cost as the function's cost.
 
@@ -142,7 +146,7 @@ The `proof/` directory holds the evidence from one recorded run:
 | File | What it shows |
 |---|---|
 | `01-desk.png` | Five tasks, and every operation before the first request. |
-| `02-held.png` | The user waiting, and the candidate on the review surface. |
+| `02-answered.png` | The answer already with the user, and its candidate waiting for review. |
 | `03-evidence.png` | Two confirmations against one layout signature. |
 | `04-cemented.png` | The promoted set, its hash and the six checks. |
 | `05-routed.png` | A03 answered from the function, in a bubble that looks supervised. |
@@ -152,6 +156,7 @@ The `proof/` directory holds the evidence from one recorded run:
 | `09-source.png` | The function read as source, with the four hops behind one entry. |
 | `story-full-page.png` | The whole page at the end of the story. |
 | `transcript.txt` | The ledger events of the same run. |
+| `timings.txt` | The subprocess and resolve costs of the same run. |
 
 The server also serves the live log at `/api/transcript.txt`.
 
@@ -176,5 +181,6 @@ uv run python prototype/webui-demo/app.py &
 prototype/webui-demo/capture-proof.sh
 ```
 
-Every capture height in that script is measured off the rendered image. Both columns
-scroll inside the page, so a block below the fold is simply absent from the file.
+The script measures every numbered frame with `measure-height.mjs`, immediately before
+its own capture. The final full-page image needs no height. Both columns scroll inside the page, so a block below the fold is simply
+absent from the file.

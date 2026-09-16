@@ -10,7 +10,7 @@ The demo enters the pipeline at ``submit_proposal``, the explicit-candidate seam
 Two seams, deliberately split. The operator's lifecycle runs as REAL ``cement``
 subprocesses against this ledger, because the shipped control plane is a CLI and the
 page must not read as a web console. Chat-side submit and resolve stay in-process:
-a subprocess costs a flat ~105 ms of interpreter startup against a 0.9-4 ms resolve,
+a subprocess costs a flat ~110 ms of interpreter startup against a 3-6 ms resolve,
 so routing the chat through it would report startup cost as the function's cost.
 """
 
@@ -72,6 +72,14 @@ POLICY_VIEW = {
 }
 PROVIDER_NAME = "acme-health/clinical-llm-4"
 LATENCY_RANGE = (1.1, 3.4)
+# How one supervised part of an answer reads, before and after a supervisor rules. The
+# answer is already with the user in every one of these states.
+REVIEW_READING = {
+    "unreviewed": "a model answered, and nobody has reviewed it yet",
+    "accepted": f"a model answered, and {REVIEWER} accepted it afterwards",
+    "corrected": f"a model answered, and {REVIEWER} corrected it afterwards",
+    "rejected": f"a model answered, and {REVIEWER} rejected it afterwards",
+}
 
 def _display(arguments: tuple[str, ...]) -> str:
     """The short form the page prints, runnable as spelled after the preamble.
@@ -862,8 +870,10 @@ class Session:
         self.functions: dict[str, dict[str, JSONValue]] = {}
         self.bundles: dict[str, str] = {}
         self.blocked: dict[str, list[dict[str, JSONValue]]] = {}
-        # Turns still waiting on a supervisor, keyed by turn id.
+        # Turns the model is still writing, keyed by turn id.
         self.inflight: dict[str, dict[str, JSONValue]] = {}
+        # Turns the chat has already answered. A later review restates one peel-back.
+        self.answered: dict[str, dict[str, JSONValue]] = {}
         self.selected = str(SCENARIOS[0]["id"])
         self.offline: dict[str, JSONValue] | None = None
         self.routed = False
@@ -875,7 +885,6 @@ class Session:
             "provider_seconds": 0.0,
             "reviews": 0,
             "cement_answers": 0,
-            "provider_calls_avoided": 0,
             "resolve_ms": [],
         }
         self._note(
@@ -1034,7 +1043,10 @@ class Session:
 
         One turn can need several operations. Each part is tried against the promoted
         function first, and only the parts that miss reach the model. The chat shows
-        nothing until every part settles, because a person asked one question.
+        nothing until every part has an answer, because a person asked one question.
+
+        The chat never waits for a supervisor. A chat assistant answers, so the model's
+        answer goes out at once and its candidate goes to the review queue behind it.
         """
 
         with self._lock:
@@ -1097,15 +1109,8 @@ class Session:
                 float(self.stats["provider_seconds"]) + delay, 2
             )
             for part, candidate in candidates:
-                self._hold(turn, part, candidate, document, round(delay * 1000))
-            self._say(
-                "assistant",
-                "held",
-                turn=turn,
-                document_id=document["id"],
-                provider=PROVIDER_NAME,
-                provider_ms=round(delay * 1000),
-            )
+                self._queue(turn, part, candidate, document, round(delay * 1000))
+            self._finish(turn)
 
     def _intent_under(
         self, task: dict[str, JSONValue], document: dict[str, JSONValue], ask: str
@@ -1174,7 +1179,6 @@ class Session:
                 }
             )
             self.stats["cement_answers"] += 1
-            self.stats["provider_calls_avoided"] += 1
             self._note(
                 "resolve",
                 f"{document['id']} · {operation}: answered from the promoted set "
@@ -1192,7 +1196,7 @@ class Session:
         )
         return part
 
-    def _hold(
+    def _queue(
         self,
         turn: str,
         part: dict[str, JSONValue],
@@ -1200,7 +1204,7 @@ class Session:
         document: dict[str, JSONValue],
         provider_ms: int,
     ) -> None:
-        """Submit one part's candidate and hold it for a supervisor."""
+        """Answer one part from the model and queue its candidate for a supervisor."""
 
         operation = str(part["operation"])
         category = self._category(operation, document)
@@ -1221,7 +1225,14 @@ class Session:
         if digest not in category["candidates"]:
             category["candidates"].append(digest)
         reference = reference_output(operation, document)
-        part["proposal_id"] = proposal_id
+        part.update(
+            {
+                "proposal_id": proposal_id,
+                "output": candidate["plan"],
+                "status": "unreviewed",
+                "provider_ms": provider_ms,
+            }
+        )
         # An extraction plan is a rule ABOUT the document, so the reviewer reads what it
         # pulls out. Every other output already is the answer and needs no preview.
         preview, preview_error = (
@@ -1253,12 +1264,12 @@ class Session:
         self._note(
             "proposal",
             f"{document['id']} · {operation}: candidate stored as {proposal_id}",
-            f"{PROVIDER_NAME} {provider_ms} ms simulated · the candidate stays hidden "
-            "until review",
+            f"{PROVIDER_NAME} {provider_ms} ms simulated · the answer goes to the user "
+            "in this turn, and the candidate waits for a supervisor",
         )
 
     def _finish(self, turn: str) -> None:
-        """Every part of one turn has settled, so the assistant answers once."""
+        """Every part of one turn has an answer, so the assistant answers once."""
 
         unit = self.inflight.pop(turn, None)
         if unit is None:
@@ -1267,7 +1278,7 @@ class Session:
         document = self._document(str(unit["document_id"]))
         outputs = {str(part["operation"]): part["output"] for part in parts}
         answer = compose_answer(str(unit["scenario"]), document, outputs)
-        self._say(
+        message = self._say(
             "assistant",
             "answer",
             turn=turn,
@@ -1278,32 +1289,24 @@ class Session:
             error=answer["error"],
             under=self._answer_under(unit, parts, document),
         )
+        # A review lands after the user has read this, so the turn is kept with its own
+        # bubble: a later ruling restates the peel-back and never the answer.
+        unit["message"] = message
+        self.answered[turn] = unit
 
-    def _refuse(self, turn: str, proposal_id: str) -> None:
-        """One part was rejected, so the whole turn returns nothing to the user."""
+    def _record_review(
+        self, turn: str, proposal_id: str, **fields: JSONValue
+    ) -> None:
+        """Fold one ruling into the answer it followed, and redraw that peel-back."""
 
-        unit = self.inflight.pop(turn, None)
+        unit = self.answered.get(turn)
         if unit is None:
             return
-        self._say(
-            "assistant",
-            "refused",
-            turn=turn,
-            document_id=unit["document_id"],
-            under={
-                "summary": "a person refused the model's answer",
-                "rows": [
-                    ["task", str(unit["scenario_title"])],
-                    ["answered by", f"{PROVIDER_NAME} (simulated)"],
-                    ["held as", proposal_id],
-                    ["reviewer", f"{REVIEWER} rejected it"],
-                    ["confirmed example", "none created"],
-                ],
-                "commands": [str(self.terminal[-1]["display"])],
-                "commands_label": "the command the review surface ran",
-                "note": "A rejection is audit evidence. It creates no example, so it "
-                "widens no function.",
-            },
+        for part in unit["parts"]:
+            if part.get("proposal_id") == proposal_id:
+                part.update(fields)
+        unit["message"]["under"] = self._answer_under(
+            unit, list(unit["parts"]), self._document(str(unit["document_id"]))
         )
 
     def _answer_under(
@@ -1336,13 +1339,19 @@ class Session:
                     )
                 )
             else:
-                rows.append(
-                    [operation, f"a model answered, and {REVIEWER} "
-                     f"{part.get('status', 'confirmed')} it"]
-                )
+                status = str(part.get("status", "unreviewed"))
+                rows.append([operation, REVIEW_READING[status]])
                 rows.append(["   model took", f"{part.get('provider_ms')} ms (simulated)"])
-                rows.append(["   held as", str(part["proposal_id"])])
-                rows.append(["   confirmed example", str(part.get("example_id"))])
+                rows.append(["   queued as", str(part["proposal_id"])])
+                rows.append(
+                    ["   confirmed example", str(part.get("example_id") or "none")]
+                )
+                if status == "corrected":
+                    rows.append(
+                        ["   the correction",
+                         f"{len(list(part['diff']))} field(s), ruled after this reply "
+                         "went out"]
+                    )
                 if part.get("command"):
                     commands.append(str(part["command"]))
             blocks.append(
@@ -1352,8 +1361,18 @@ class Session:
                     "json": part["output"],
                 }
             )
+            if part.get("status") == "corrected":
+                blocks.append(
+                    {
+                        "label": f"what {REVIEWER} cemented instead, after the reply "
+                        "above went out",
+                        "json": part["confirmed"],
+                    }
+                )
         cemented = [part for part in parts if part["source"] == "function"]
-        if cemented and len(cemented) != len(parts):
+        supervised = [part for part in parts if part["source"] != "function"]
+        ruled = [part for part in supervised if part.get("status") != "unreviewed"]
+        if cemented and supervised:
             note = (
                 "This one answer has two sources. Cement returned the part it has "
                 "verified, and the model kept the part nobody has confirmed twice. "
@@ -1362,14 +1381,20 @@ class Session:
         elif cemented:
             note = (
                 "No model ran. Every resolve runs the full six-check verification "
-                "and caches nothing. A shell adds about 105 ms of interpreter "
+                "and caches nothing. A shell adds about 110 ms of interpreter "
                 "startup, which is why the page calls the library here."
+            )
+        elif not ruled:
+            note = (
+                "A model wrote this, and the user already has it. The supervisor "
+                "reads the candidate afterwards. A review builds the evidence that "
+                "Cement seals, and it never holds up a chat."
             )
         else:
             note = (
-                "A model wrote this, and a person confirmed it. The bubble looks "
-                "exactly like the cemented one above, because a user must not have "
-                "to care which path answered."
+                f"A model wrote this, and {REVIEWER} ruled on it afterwards. The "
+                "ruling decides what Cement may seal. It cannot change the answer "
+                "the user already read, and that exposure is what cementing removes."
             )
         detail: dict[str, JSONValue] = {
             "summary": "what happened under this answer",
@@ -1439,9 +1464,12 @@ class Session:
                     "review",
                     f"{document['id']} · {operation}: {REVIEWER} rejected "
                     f"{proposal_id}",
-                    "audit evidence only; the rejection creates no example",
+                    "audit evidence only; the rejection creates no example, and the "
+                    "answer the user already read stands",
                 )
-                self._refuse(turn, proposal_id)
+                self._record_review(
+                    turn, proposal_id, status="rejected", command=command
+                )
                 return
 
             diff = plan_diff(record["plan"], result["output"])
@@ -1472,25 +1500,17 @@ class Session:
                 f"confirmed example {result['example_id']} binds this exact input "
                 "to this exact answer",
             )
-            unit = self.inflight.get(turn)
-            if unit is None:
-                return
-            for part in unit["parts"]:
-                if part.get("proposal_id") != proposal_id:
-                    continue
-                part.update(
-                    {
-                        "settled": True,
-                        "output": result["output"],
-                        "status": result["status"],
-                        "example_id": result["example_id"],
-                        "provider_ms": record["provider_ms"],
-                        "diff": diff,
-                        "command": command,
-                    }
-                )
-            if all(part["settled"] for part in unit["parts"]):
-                self._finish(turn)
+            # The answer went out before this ruling, so the confirmed output is kept
+            # beside the model's own and never over it.
+            self._record_review(
+                turn,
+                proposal_id,
+                status=result["status"],
+                confirmed=result["output"],
+                example_id=result["example_id"],
+                diff=diff,
+                command=command,
+            )
 
     def revoke(self, example_id: str) -> None:
         with self._lock:
@@ -2054,7 +2074,10 @@ class Session:
                         ],
                     }
                 )
-            return {
+            # A snapshot, not the live objects: the handler serializes outside this
+            # lock, and a review restating one chat message mid-encode would otherwise
+            # ship a reviewed disclosure beside its own still-pending proposal.
+            return copy.deepcopy({
                 "partition": PARTITION,
                 "reviewer": REVIEWER,
                 "promoter": PROMOTER,
@@ -2137,7 +2160,7 @@ class Session:
                     if self.stats["provider_calls"]
                     else None,
                 },
-            }
+            })
 
     def transcript(self) -> str:
         """Render the control-plane log as plain text for the proof directory."""
