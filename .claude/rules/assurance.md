@@ -89,7 +89,7 @@ paths:
 ## Waves
 
 - Seed the deliverable, and seed its row SUBJECTS: filling a named locus is resumable after any death, discovering which rows exist is not. Extensions are a floor — name the row count at which extension stops, since an uncapped invitation runs unbounded (findings rising with row count is the tell, and the artifact is committed per batch, so stopping the agent costs nothing).
-- Order the graded artifact FIRST in the brief; a probe corpus answerable against baseline silently substitutes for the ungraded half, so every spike row carries BOTH a `baseline` and an `alt` observation plus a minimum addition count.
+- Order the graded artifact FIRST in the brief; a probe corpus answerable against baseline silently substitutes for the ungraded half, so every alternative-probe row carries BOTH a `baseline` and an `alt` observation plus a minimum addition count.
 - Instruct the oracle NOT to match MAIN's rulings: a divergent oracle BUILDS the branch other lenses only warn about. An oracle corpus written to demonstrate the oracle's own conformance discriminates nothing — budget conformance probes as a control and aim the rest at ruled disagreements.
 - A mid-wave contract edit expires every seeded predicate at once: re-derive them against the NEW contract and re-grade the validator both ways.
 - MAIN's fill of an exempt column belongs in an idempotent `--check` patcher carrying an `id -> (verdict, action)` map that asserts the id set and rewrites under the artifact's own serialization (determine it empirically by round-trip).

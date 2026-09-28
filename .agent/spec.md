@@ -72,18 +72,32 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   it, and it stays supervised BY DESIGN — the boundary is the claim, not a gap. The story cements
   every cementable task.
 - Human-facing prose (README, `docs/`, example README, CLI help) = ASD-STE100 register, graded by D25; everything else agent-optimized.
-- Gate tooling (owner-ruled; lands at a unit boundary): mypy 2.3.1 `strict` over `src/cement_runtime` alone; ruff 0.16.6 format + check, `extend-exclude = ["tests", ".agent", "prototype"]`; scanners = `uv audit` (native, OSV/SARIF) + gitleaks Action + ruff `S`; `license = "Apache-2.0"`. Grounds, config + firing seeds → `.claude/rules/ops.md`; checker + CI measurements → `.agent/decisions/m3u10-*`. `github.com/eturkes/cement` is PUBLIC ⇒ `push`/`pull_request` carry the gate, a cron alone is disabled after 60 idle days.
+- Gate tooling (owner-ruled; lands at a unit boundary): mypy 2.3.1 `strict` over `src/cement_runtime` alone; ruff 0.16.6 format + check, `extend-exclude = ["tests", ".agent", "prototype"]`; scanners = `uv audit` (native, OSV/SARIF) + gitleaks Action + ruff `S`; `license = "Apache-2.0"`; CI = GitHub Actions + Dependabot (`uv` + `github-actions`). The gate-tooling unit also carries p66's standing skip census, owner-approved: both are gate changes that one boundary covers. Grounds, config + firing seeds → `.claude/rules/ops.md`; checker + CI measurements → `.agent/decisions/m3u10-*`. `github.com/eturkes/cement` is PUBLIC ⇒ `push`/`pull_request` carry the gate, a cron alone is disabled after 60 idle days.
 
-## Deferred
+## Tasks
 
-Queue = `.agent/deferred.md` (`p<nn>`, one line + acceptance each, unattached; p01-p61 keep full text + evidence + grounds in `.agent/archive/polish.md`, a born row's line is its whole record; grader `uv run python .agent/decisions/m3-deferred-validate.py`). Below = the unfinished units, spine order in `Phase`; a bare `p<nn>` here means the unit owns that queue row.
-- M3.6a3 delete the 7 dead outcome types (`Outcome` + its 6 members): `src/` holds zero constructors, only `models.py` defs, `__init__.py` import/`__all__`, one `system.py` docstring. `CandidateRequest.request_id` STAYS — live on the `cement-source-v1` envelope — and leaves with M3.6b's single schema/protocol cut. Accept: burden re-measured on its own deletion set; battery per contract.
-- M3.6b schema cut v2→v3 (direct proposal columns, `requests` + index gone, refusal fixtures, 0.2.0); owns p50 p51 p04. Accept: fingerprint + `SCHEMA_VERSION` move together, suite green with the reset documented.
-- M3.7 command-runtime relocation under byte equality + blocked reverse imports (wheel already carries no `examples/`/`tests/`); owns p54. M3.8 demo + transcript regeneration via idempotent updater (`data`). M3.9a/b docs claim ledger rewrite + independent replay (`docs`).
-- M4 projection inside the boundary — plan, open design question + seeds in `.agent/archive/roadmap.md`. Accept: planned as a milestone.
-- Gate tooling + CI + scanners = p01 p66 + the IMPLEMENT law gap (no CI, no scanners, no update automation), per the ruling above; GitHub Actions + Dependabot (`uv` + `github-actions`). Owner-approved to also carry p66's standing skip census, both being gate changes that one boundary covers. Accept: one gate command rc 0 clean-tree; `RUF100` zero; a seeded violation reds EACH of format, lint, type check, audit, secret scan, skip census — `uv audit` sees 0 third-party packages today, so its seed is a pinned vulnerable dev dep in a fixture lock, and the census seed is a fourth skip reddening it by test id.
-- Committed dev tools p02 p05 p06 p19 (mutation replay, anchor validators, seam battery) + p12 p40 (human-facing register audit). Accept: each reruns from a clean checkout; the audit flags a seeded 30-word instruction + a seeded `simply`, zero over-cap sentences on the four surfaces.
-- Scope expansion p34 p35 p36 p37; reviewer identities, encryption, retention, remote registry/signatures; shadow sampling + drift telemetry; TypedDict projections; absolute URLs before publication. Accept: planned as milestones.
+- [ ] M3.6a3 delete the 7 dead outcome types (`Outcome` + its 6 members).
+  - `src/` holds zero constructors, only `models.py` defs, `__init__.py` import/`__all__`, one `system.py` docstring. `CandidateRequest.request_id` STAYS — live on the `cement-source-v1` envelope — and leaves with M3.6b's single schema/protocol cut.
+  - Accept: burden re-measured on its own deletion set; battery per contract.
+- [ ] M3.6b schema cut v2→v3 (direct proposal columns, `requests` + index gone, refusal fixtures, 0.2.0); owns p50 p51 p04.
+  - Accept: fingerprint + `SCHEMA_VERSION` move together, suite green with the reset documented.
+- [ ] M3.7 command-runtime relocation under byte equality + blocked reverse imports; owns p54.
+  - The wheel already carries no `examples/`/`tests/`.
+- [ ] M3.8 demo + transcript regeneration via idempotent updater (`data`).
+- [ ] M3.9a docs claim ledger rewrite (`docs`).
+- [ ] M3.9b independent replay of the M3.9a rewrite (`docs`).
+- [ ] M4 projection inside the boundary — plan, open design question + seeds in `.agent/archive/roadmap.md`.
+  - Accept: planned as a milestone.
+- [ ] Gate tooling + CI + scanners = p01 p66 + the IMPLEMENT law gap (no CI, no scanners, no update automation), per the `Decisions` gate-tooling ruling.
+  - Accept: one gate command rc 0 clean-tree; `RUF100` zero; a seeded violation reds EACH of format, lint, type check, audit, secret scan, skip census — `uv audit` sees 0 third-party packages today, so its seed is a pinned vulnerable dev dep in a fixture lock, and the census seed is a fourth skip reddening it by test id.
+- [ ] Committed dev tools p02 p05 p06 p19 (mutation replay, anchor validators, seam battery) + p12 p40 (human-facing register audit).
+  - Accept: each reruns from a clean checkout; the audit flags a seeded 30-word instruction + a seeded `simply`, zero over-cap sentences on the four surfaces.
+- [ ] Scope expansion p34 p35 p36 p37; reviewer identities, encryption, retention, remote registry/signatures; shadow sampling + drift telemetry; TypedDict projections; absolute URLs before publication.
+  - Accept: planned as milestones.
+- [ ] README + `prototype/` retirement.
+- [ ] Phase-close `reviewer` over the whole phase diff.
+  - Runs LAST, nothing mutating after it; each unit's closing diff draws its OWN `reviewer` first and every pass adjudicates into `.agent/review.md` ⇒ never the only pass.
+- Queue = `.agent/deferred.md` (`p<nn>`, one line + acceptance each, unattached; p01-p61 keep full text + evidence + grounds in `.agent/archive/polish.md`, a born row's line is its whole record; grader `uv run python .agent/decisions/m3-deferred-validate.py`); a bare `p<nn>` in a row = that unit owns the queue row.
 
 ## Phase
 
@@ -93,14 +107,13 @@ nested D28 = L30 skipped in every inner replay by construction; missing = format
 check, dependency audit + secret scan, all five pending the gate-tooling unit). The `CLAUDE.md`
 refresh landed as `a8109eb` + `81fad11` and reran that gate whole from EACH: `Ran 1031 tests` in
 1113.706s and 1015.317s, `OK` rc 0, `uv build` rc 0, same exclusions both times. The IMPLEMENT
-spine below is
+spine (`Tasks`) is
 SUSPENDED INTACT, not retired — `Decisions` and every unfinished unit stand as written, and the
 ITERATE outcome amends them where it lands. Reason for the return, owner-ruled: prototype
 feedback.
 
 ITERATE opens by running the artifacts + refreshing proof, then works the owner's feedback into
-`prototype/` + `Decisions`. `/goal` stays OFF here and these are interactive sessions until the
-owner says go. Start with `uv run python prototype/webui-demo/app.py` → <http://127.0.0.1:8765/>.
+`prototype/` + `Decisions`. These are interactive sessions until the owner says go. Start with `uv run python prototype/webui-demo/app.py` → <http://127.0.0.1:8765/>.
 A prototype-only turn owes no gate run (`.claude/rules/ops.md`, census bullet); it owes a
 `capture-proof.sh` rerun, since every proof PNG that shows the Function pane goes stale with the
 UI.
@@ -172,4 +185,4 @@ card at 6095 against the recorded 6100.
 
 Resume IMPLEMENT at M3.6a3 when the owner says go.
 
-Suspended IMPLEMENT order, resuming at its head: M3.6a3 → M3.6b → M3.7 → M3.8 → M3.9a/b → gate tooling + CI + scanners (p01 + the IMPLEMENT law-gap row) → README + `prototype/` retirement → phase-close `rev` over the whole phase diff → MAINTAIN. Every unit's closing diff draws its OWN `rev` first and every pass adjudicates into `.agent/review.md`, so the phase-close pass runs LAST with nothing mutating after it, and is never the only one.
+Suspended IMPLEMENT order = `Tasks` top to bottom, resuming at its head; the phase-close `reviewer` row hands over to MAINTAIN.

@@ -5,7 +5,7 @@ Usage: uv run python .agent/decisions/m3u2b-wave2-validate.py <artifact.json>
 
 The artifact's top-level ``kind`` selects the schema:
 
-  "divergences"  the diff-blind `test` author's phase-1 divergence table
+  "divergences"  the diff-blind `tester` author's phase-1 divergence table
   "attack"       the reviewer's pre-implementation contract attack
   "review"       adversarial review of LANDED code, one finding per row
   "oracle"       observations over MAIN's probe corpus, one file per implementation

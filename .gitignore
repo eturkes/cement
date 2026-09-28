@@ -16,6 +16,8 @@ dist/
 # Claude Code local/runtime state (personal; not shared)
 .claude/settings.local.json
 .claude/.headroom_wrap_marker.json
+.claude/.headroom_wrap_owners.json
+.claude/.headroom_wrap_settings.lock
 .scratch/
 
 # Personal project notes (not shared)

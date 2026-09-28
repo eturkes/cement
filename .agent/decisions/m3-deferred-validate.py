@@ -62,7 +62,7 @@ ARCHIVE = ROOT / ".agent/archive/polish.md"
 HEADER = """# Deferral queue
 
 Off-path improvements, one line + acceptance check each. The queue is monotonic and
-unattached, so nothing here reaches a session for free; `.agent/spec.md` `Deferred` names the
+unattached, so nothing here reaches a session for free; `.agent/spec.md` `Tasks` names the
 rows that block the current spine. `pri` 1 = highest. p01-p61 came from the frozen
 `.agent/archive/polish.md`, which holds their full text, evidence + grounds under the same
 `p<nn>` id; a row born here (p62 on) has no archive entry, so its own line is its whole
