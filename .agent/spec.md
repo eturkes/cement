@@ -24,7 +24,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 - `resolve` pays full P1-P6 verification per call, no cache; prose cites the measured numbers (`.claude/rules/runtime.md`), never "fast". Ambiguity quarantine leaves with `handle`.
 - Exit classes 2/3/4/5/6, the per-leaf stdout channel + `allow_abbrev` scope → `.claude/rules/runtime.md`; root `verify` exit 0 = frozen precedent, never a model.
 - Assurance: tier default `kernel`; `oracle` only where an independent implementation can diverge. A removal closes on a battery that fails when one obligation is undone or one preserved invariant disappears — never on a green suite. Each contract pins a NUMBERED gate list rerun from committed state; a gate added mid-unit voids the pins ⇒ linters/type checkers land at a unit boundary. Rulings enter tables through idempotent `--check` patchers; dispatch tips tagged `archive/m<m>u<u>-<role>`.
-- Prototype (user): `prototype/webui-demo` = behavioral reference (UX, outputs, aesthetics), never IMPLEMENT's code base; retires at phase close. Light theme, accents ≥4.5:1 on white; the provider alone is simulated + labelled, lifecycle/digests/timings are the runtime's.
+- Prototype (user): `prototype/webui-demo` = the prototype `Session flow` names, KEPT past IMPLEMENT as an explanatory aid, never production-robust (ruling → `.claude/rules/ops.md` Template rulings). Light theme, accents ≥4.5:1 on white; the provider is simulated + labelled, any other value MAY be hardcoded to visualize the concept, each labelled simulated; every unlabelled value — lifecycle, digests, timings — is the runtime's.
   Function source view (owner-ruled): the promoted set renders as a SOURCE-STYLE DISPATCH — one
   guarded branch per entry, provenance in a comment, an explicit no-match tail, excluded scopes as
   trailing comments — parsed back out of the exported bundle and labelled a rendering, since Cement
@@ -94,14 +94,14 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   - Accept: each reruns from a clean checkout; the audit flags a seeded 30-word instruction + a seeded `simply`, zero over-cap sentences on the four surfaces.
 - [ ] Scope expansion p34 p35 p36 p37; reviewer identities, encryption, retention, remote registry/signatures; shadow sampling + drift telemetry; TypedDict projections; absolute URLs before publication.
   - Accept: planned as milestones.
-- [ ] README + `prototype/` retirement.
+- [ ] README + prototype disposition: `prototype/webui-demo` stays KEPT (`.claude/rules/ops.md` Template rulings); decide its home — `prototype/` or `tools/` — and record it in `Artifacts`.
 - [ ] Phase-close `reviewer` over the whole phase diff.
   - Runs LAST, nothing mutating after it; each unit's closing diff draws its OWN `reviewer` first and every pass adjudicates into `.agent/review.md` ⇒ never the only pass.
 - Queue = `.agent/deferred.md` (`p<nn>`, one line + acceptance each, unattached; p01-p61 keep full text + evidence + grounds in `.agent/archive/polish.md`, a born row's line is its whole record; grader `uv run python .agent/decisions/m3-deferred-validate.py`); a bare `p<nn>` in a row = that unit owns the queue row.
 
 ## Phase
 
-ITERATE. M3.6a2 closed and landed on main as `ffe9848`, green on the FULL gate with `test_d28`
+ITERATE — whole product. M3.6a2 closed and landed on main as `ffe9848`, green on the FULL gate with `test_d28`
 included (`Ran 1031 tests in 1056.911s` `OK`, `uv build` rc 0; outer skipped + not-run = none,
 nested D28 = L30 skipped in every inner replay by construction; missing = format, lint, type
 check, dependency audit + secret scan, all five pending the gate-tooling unit). The `CLAUDE.md`
@@ -112,7 +112,7 @@ SUSPENDED INTACT, not retired — `Decisions` and every unfinished unit stand as
 ITERATE outcome amends them where it lands. Reason for the return, owner-ruled: prototype
 feedback.
 
-ITERATE opens by running the artifacts + refreshing proof, then works the owner's feedback into
+ITERATE opens by running the prototype artifacts + refreshing proof, then works the owner's feedback into
 `prototype/` + `Decisions`. These are interactive sessions until the owner says go. Start with `uv run python prototype/webui-demo/app.py` → <http://127.0.0.1:8765/>.
 A prototype-only turn owes no gate run (`.claude/rules/ops.md`, census bullet); it owes a
 `capture-proof.sh` rerun, since every proof PNG that shows the Function pane goes stale with the
