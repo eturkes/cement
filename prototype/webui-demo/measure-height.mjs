@@ -1,4 +1,4 @@
-// Report the viewport height one capture needs, so capture-proof.sh measures instead
+// Report the viewport height one capture needs, so capture.sh measures instead
 // of guessing. Both columns scroll inside the page, so a block past the fold is simply
 // absent from the PNG and a frame silently loses the claim it is named for.
 //

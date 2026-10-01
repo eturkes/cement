@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
-# Regenerate proof/ from ONE demo run, so every file shares the same ledger ids.
+# Capture every story frame from ONE demo run, so every file shares the same ledger ids.
+# Output = visual QA input, gitignored: $OUT (default .scratch/webui-demo-capture/).
 #
 # The story runs through the API here rather than through `?scene=N`: a scene replay
 # always restarts at scene 0, so per-scene captures would each need their own ledger.
 #
 # Needs a running server and `webcap` (headless Chrome over CDP):
 #   uv run python prototype/webui-demo/app.py &
-#   prototype/webui-demo/capture-proof.sh
+#   prototype/webui-demo/capture.sh
 
 set -euo pipefail
 
 BASE=${BASE:-http://127.0.0.1:8765}
-OUT="$(cd "$(dirname "$0")" && pwd)/proof"
+OUT=${OUT:-"$(cd "$(dirname "$0")/../.." && pwd)/.scratch/webui-demo-capture"}
+mkdir -p "$OUT"
 
 # Every height is MEASURED, never guessed: both columns scroll internally, so a block
 # past the fold is simply absent and two frames can come out byte-identical. Each
@@ -91,7 +93,7 @@ webcap "$BASE/?expand=1" --png "$OUT/story-full-page.png" --width 1600 --height 
   --full-page --wait 2500 --timeout 60000 >/dev/null
 curl -sS "$BASE/api/transcript.txt" -o "$OUT/transcript.txt"
 
-# The README cites both costs, so the run that produced proof/ records them here.
+# The README cites both costs; each run prints its own.
 {
   curl -sS "$BASE/api/state" | jq -r '
     (.terminal | map(.ms)) as $cli |
@@ -99,7 +101,7 @@ curl -sS "$BASE/api/transcript.txt" -o "$OUT/transcript.txt"
     "provider calls: \(.stats.provider_calls) · operations answered by a function: \(.stats.cement_answers) · reviews: \(.stats.reviews)"'
   grep -o '[0-9]\+\.[0-9] ms' "$OUT/transcript.txt" | sed 's/ ms//' | sort -g \
     | awk 'NR==1{min=$1} {max=$1; n++} END{printf "System.resolve: %d calls, %s-%s ms\n", n, min, max}'
-} > "$OUT/timings.txt"
+} | tee "$OUT/timings.txt"
 
-printf 'proof regenerated from one run:\n'
+printf 'frames captured from one run into %s:\n' "$OUT"
 file "$OUT"/*.png | sed 's/PNG image data, //'

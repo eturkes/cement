@@ -9,9 +9,7 @@ Production artifact = a library + CLI control plane that an interface like Open 
 ## Artifacts
 
 Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
-- Prototype web UI demo — `uv run python prototype/webui-demo/app.py` → <http://127.0.0.1:8765/>; proof = `prototype/webui-demo/proof/` (10 PNGs + `transcript.txt`, all from ONE ledger via
-  `prototype/webui-demo/capture-proof.sh`, which drives the story through the API because a
-  `?scene=N` replay always restarts at scene 0).
+- Prototype web UI demo `prototype/webui-demo/` — `uv run python prototype/webui-demo/app.py` → <http://127.0.0.1:8765/>.
 - Library `src/cement_runtime/` (`from cement_runtime import System`) + CLI `uv run cement --help` (README quick start = the lifecycle: `operation register` → `proposal submit/review` → `compile` → `function verify-drafts/inspect/promote/verify/export/eval`, `resolve`).
 - Hospital OCR example — `uv run python examples/hospital_ocr/run_demo.py` (`All checks passed.`; README transcript pinned).
 - Gate — `uv run python -m unittest discover -s tests -t .` (1031 tests; wall time splits by `test_d28`'s replay range → `.claude/rules/ops.md`) + `uv build`. Instruments = `.agent/decisions/m<m>u<u>-*`.
@@ -50,7 +48,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   as its shell variable (`--output "$OUTPUT"`), which keeps a 64-char digest visible because
   repeating it IS `function promote`. Chat-side submit + resolve stay IN-PROCESS and say so:
   measured subprocess 92-128 ms over one story's 50 calls vs `System.resolve` 3.5-6.0 ms in that
-  same run (`prototype/webui-demo/proof/timings.txt`, rewritten by every capture run), so routing the chat through a shell would report interpreter startup as the
+  same run (`prototype/webui-demo/capture.sh` prints both per run), so routing the chat through a shell would report interpreter startup as the
   function's cost. Per-entry drill-down = the FOUR REAL HOPS p67 names
   (`function inspect` → `artifact show` → `events` → `proposal show`),
   each a recorded invocation, with `originals` derived from `proposal show`'s own
@@ -95,8 +93,8 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 - [ ] Scope expansion p34 p35 p36 p37; reviewer identities, encryption, retention, remote registry/signatures; shadow sampling + drift telemetry; TypedDict projections; absolute URLs before publication.
   - Accept: planned as milestones.
 - [ ] README + prototype disposition: `prototype/webui-demo` stays KEPT (`.claude/rules/ops.md` Template rulings); decide its home — `prototype/` or `tools/` — and record it in `Artifacts`.
-- [ ] Phase-close `reviewer` over the whole phase diff.
-  - Runs LAST, nothing mutating after it; each unit's closing diff draws its OWN `reviewer` first and every pass adjudicates into `.agent/review.md` ⇒ never the only pass.
+- [ ] Phase-close review over the whole phase diff: every lens, each covered by its own `reviewer`s.
+  - Runs LAST, nothing mutating after it; each unit's closing diff draws its OWN per-lens `reviewer`s first and every pass adjudicates into `.agent/review.md` ⇒ never the only pass.
 - Queue = `.agent/deferred.md` (`p<nn>`, one line + acceptance each, unattached; p01-p61 keep full text + evidence + grounds in `.agent/archive/polish.md`, a born row's line is its whole record; grader `uv run python .agent/decisions/m3-deferred-validate.py`); a bare `p<nn>` in a row = that unit owns the queue row.
 
 ## Phase
@@ -112,11 +110,11 @@ SUSPENDED INTACT, not retired — `Decisions` and every unfinished unit stand as
 ITERATE outcome amends them where it lands. Reason for the return, owner-ruled: prototype
 feedback.
 
-ITERATE opens by running the prototype artifacts + refreshing proof, then works the owner's feedback into
+ITERATE opens by running the prototype artifacts, then works the owner's feedback into
 `prototype/` + `Decisions`. These are interactive sessions until the owner says go. Start with `uv run python prototype/webui-demo/app.py` → <http://127.0.0.1:8765/>.
 A prototype-only turn owes no gate run (`.claude/rules/ops.md`, census bullet); it owes a
-`capture-proof.sh` rerun, since every proof PNG that shows the Function pane goes stale with the
-UI.
+`prototype/webui-demo/capture.sh` run read frame by frame, since every frame that shows the
+Function pane changes with the UI.
 
 Feedback landed so far, all worked into `prototype/` + `Decisions`:
 1. The demo showed the CEREMONY around the function and never the function — the per-request plan
@@ -149,7 +147,7 @@ Shipped for (3): `demo.py` — `_bundle_target` + `bundle(operation)`, `_queue` 
 crashed the old `item["field"]`), `_promote_one` refusing to reseal an operation an earlier task
 already promoted, `state().operations` feeding the coverage strip; `app.py` — `/api/bundle.json`
 and `/api/offline` per `operation`, 409 where that operation is unpromoted; rewritten
-`index.html`/`app.js`/`app.css`/`capture-proof.sh`/`README.md`. Verified by driving the story
+`index.html`/`app.js`/`app.css`/`capture.sh`/`README.md`. Verified by driving the story
 through the API on a live server: 75 real `cement` subprocesses — 50 operator rows + 25 lineage
 hops over 5 sealed entries — every one rc 0; 9 provider calls, 4 cemented answers, 11 reviews,
 `document.extraction_plan` sealed with 2 entries and
@@ -173,16 +171,16 @@ stands; a two-operation turn still
 lands as ONE bubble. The full story = 10 turns, 10 `document` + 10 `answer` messages and NO other
 kind, 9 provider calls, 4 cemented answers, 11 reviews (7 corrected, 4 accepted), 50 operator
 rows, `System.resolve` 3.5-6.0 ms, 4 of 5 operations sealed, `billing_codes` blocked as designed,
-empty server log. `proof/` = 10 PNGs + `transcript.txt` (127 lines) plus `timings.txt`, from ONE ledger in 88 s, `02-held` retired for `02-answered`, and
-`sha256sum proof/*.png | awk '{print $1}' | sort | uniq -d` EMPTY — the filename must be
+empty server log. The capture = 10 PNGs + `transcript.txt` (127 lines) plus `timings.txt`, from ONE ledger in 88 s, `02-held` retired for `02-answered`, and
+its `sha256sum *.png | awk '{print $1}' | sort | uniq -d` EMPTY — the filename must be
 stripped, since whole-line `uniq -d` never fires — against a positive control reporting 1.
 
 Capture heights are no longer eyeballed: `prototype/webui-demo/measure-height.mjs` reports the
 viewport the right column needs (or the fixed overlay card, whose body scrolls inside it), and
-`capture-proof.sh` measures immediately before each NUMBERED capture (the closing full-page image
+`capture.sh` measures immediately before each NUMBERED capture (the closing full-page image
 needs no height), so a UI change cannot leave a stale number behind. It reproduced all eight previously eyeballed heights within 20 px and the overlay
 card at 6095 against the recorded 6100.
 
 Resume IMPLEMENT at M3.6a3 when the owner says go.
 
-Suspended IMPLEMENT order = `Tasks` top to bottom, resuming at its head; the phase-close `reviewer` row hands over to MAINTAIN.
+Suspended IMPLEMENT order = `Tasks` top to bottom, resuming at its head; the phase-close review row hands over to MAINTAIN.

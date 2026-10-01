@@ -2163,7 +2163,7 @@ class Session:
             })
 
     def transcript(self) -> str:
-        """Render the control-plane log as plain text for the proof directory."""
+        """Render the control-plane log as plain text for `/api/transcript.txt`."""
 
         with self._lock:
             lines = [

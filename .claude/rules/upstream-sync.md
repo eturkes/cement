@@ -9,24 +9,18 @@ paths:
 
 ## Recipe
 
-1. `cmp CLAUDE.md ~/.local/app/agents/claude/CLAUDE.project.md` ⇒ the working tree is upstream verbatim; else `cp` the template over it.
-2. `<last-sync>` = the upstream commit whose template equals `git show HEAD:CLAUDE.md`: `git -C ~/.local/app/agents log --format=%h -- claude/CLAUDE.project.md | while read -r c; do git -C ~/.local/app/agents show "$c:claude/CLAUDE.project.md" | cmp -s - <(git show HEAD:CLAUDE.md) && { echo "$c"; break; }; done`. The loop outranks the value recorded below, which names upstream HEAD at the last refresh, not a template commit.
-3. Delta = `git -C ~/.local/app/agents diff <last-sync> HEAD -- claude/CLAUDE.project.md` + the commit bodies of `git -C ~/.local/app/agents log <last-sync>..HEAD -- claude/`. Obligations = every clause the delta adds or changes + every migration a body names (a body may list them as `O<n>`); bodies an earlier refresh commit already answered stay answered. Upstream `claude/prompts/` reaches this repo only through a body the owner pastes.
-4. `git diff HEAD -- CLAUDE.md` = what the overwrite took away. Divergence is zero by design, so a line it removes outside the step-3 delta is reverted repo law → fold it into its owning `.claude/rules/` file; `CLAUDE.md` stays the template byte for byte.
-5. Per obligation: practice follows it, or a `.claude/rules/` ruling keyed on that clause adapts, waives or marks it inapplicable (owner's choice → ask) and enters the index below; a renamed or retired term → live law follows; a changed spec layout → unit ids before = after, proven by script.
-6. Sweep the invariants below, each retired form under a positive control naming its expected match count first.
-7. Record `last-sync = agents@$(git -C ~/.local/app/agents rev-parse --short HEAD)` here + the index, all in one commit.
+Recipe = `~/.local/app/agents/claude/prompts/refresh.md` (body below its rule), one session per refresh; its step 1 reads `last-sync` from the line below first, then walks template history. Repo addition: step 7's sweep also covers the invariants below, each retired form under a positive control naming its expected match count first. Other `claude/prompts/` bodies reach this repo only when the owner pastes one.
 
-`last-sync = agents@db19af0`.
+`last-sync = agents@9e81e38`.
 
 ## Invariants a refresh must keep, else restore
 
 - Line 1 = the `@.agent/spec.md` import. A missing import is SILENT — the check is a fresh `claude -p` answering a spec-only question with zero tool calls.
-- `Session flow` names `.agent/spec.md` (five sections: `Intent`, `Artifacts`, `Decisions`, `Tasks`, `Phase`) plus `.agent/review.md`, and binds spec size to LIVENESS — every line binds current or future work, superseded text dies in the commit that supersedes it, size emergent. A restored byte cap is a reverted upstream fix: it rewards compressing prose over deleting dead rows. `Phase` = the phase + its scope (`ITERATE — whole product`). `Artifacts` = path each, + run command where it runs, + proof path for a prototype. `Tasks` = the phase checklist: `- [ ]` open units in spine order with acceptance + binding notes as indented sub-bullets, `- [x] <sha>` once committed, on-path finds appended, ticked rows cleared at phase close, last line = the pointer to `.agent/deferred.md`, where `Engineering` routes every off-path improvement and every scratch-validator port.
+- `Session flow` names `.agent/spec.md` (five sections: `Intent`, `Artifacts`, `Decisions`, `Tasks`, `Phase`) plus `.agent/review.md`, and binds spec size to LIVENESS — every line binds current or future work, superseded text dies in the commit that supersedes it, size emergent. A restored byte cap is a reverted upstream fix: it rewards compressing prose over deleting dead rows. `Phase` = the phase + its scope (`ITERATE — whole product`). `Artifacts` = path each, + run command where it runs. `Tasks` = the phase checklist: `- [ ]` open units in spine order with acceptance + binding notes as indented sub-bullets, `- [x] <sha>` once committed, on-path finds appended, ticked rows cleared at phase close, last line = the pointer to `.agent/deferred.md`, where `Engineering` routes every off-path improvement and every scratch-validator port.
 - `Session flow` rulings bullet: `CLAUDE.md` = defaults, `.claude/rules/` = this repo's rulings on them, each keyed on the clause it overrides and naming its replacement or the owner's waiver; a retired structure stays retired ⇒ the index below lists every ruling.
 - The `.claude/rules/` two-tier bullet (bare | `paths:`) — the sole carrier of project law and of what a teammate inherits.
 - `Execution` Git: the commit body names each teammate the work used (name, role, verdict). `.claude/rules/ops.md` Commits holds this repo's stronger form.
-- `Session flow` Teammates: triggers + mechanics = global `CLAUDE.md` `Subagents`, role rules = `~/.claude/agents/<role>.md`; `consultant` on each phase plan, `reviewer` on every closing diff (one per lens in IMPLEMENT). A `Tasks` row, contract or `Accept:` line that funds review once and late contradicts it ⇒ the sweep runs over `.agent/spec.md` `Tasks` + unit `Accept:` lines, not over `CLAUDE.md` alone.
+- `Session flow` Teammates: triggers + mechanics = global `CLAUDE.md` `Subagents`, role rules = `~/.claude/agents/<role>.md`; `consultant` on each phase plan, every closing diff → every lens, each covered by its own `reviewer`s. A `Tasks` row, contract or `Accept:` line that funds review once and late contradicts it ⇒ the sweep runs over `.agent/spec.md` `Tasks` + unit `Accept:` lines, not over `CLAUDE.md` alone.
 - Thinking depth = the session's `--effort`, set at launch ⇒ no project `.claude/settings*.json` env pin and no `.claude/agents/` definition overrides the user-level models, effort or roles.
 - No `## Claude Code` section and no retired-flow reference: session slash commands, the attached ledger trio, Serena, `read-guard`, per-unit `dispatch:` lines, solo licences, `migrate.md`.
 - `Engineering` carries the `Verification integrity` bullet — `a prototype runs under PROTOTYPE law`, red-first witness, contract-owned output tables, skip/xfail approval, `green` = run + passed. `.claude/rules/assurance.md` `## Verification integrity` and `.claude/rules/ops.md` (green reporting, Commits witness) hold this repo's mechanics for it, so dropping the bullet orphans live law downstream.
@@ -43,7 +37,7 @@ Override = `adapts` | `waives` | `inapplicable`; `mechanics` = how this repo sat
 - `Engineering` deterministic + purpose-built checks → mechanics: firing seeds beside each gate → `ops.md` Purpose-built gate checks; scratch-local register audit + its port (p12, p40) → `human-facing.md`.
 - `Authoring` human-facing register → mechanics: surfaces + the D25 grader → `human-facing.md`.
 - `Session flow` spec layout, `Tasks` + deferral queue → mechanics: monotonic queue grader, `pri`, archive citation → `ops.md` Layout; THE QUEUE below.
-- `Session flow` PROTOTYPE proof → mechanics: `capture-proof.sh`, measured heights, the `uniq -d` frame check; a prototype-only revision owes no gate run → `ops.md` Tree censuses.
+- `Session flow` ITERATE, `running the prototype artifacts` → mechanics: `prototype/webui-demo/capture.sh` drives the story into gitignored `.scratch/webui-demo-capture/`, measured heights, the `uniq -d` frame check; a prototype-only revision owes no gate run → `ops.md` Tree censuses.
 - `Session flow` Teammates + review ledger → mechanics: diff-blind `tester`, `--check` patchers into `.agent/review.md` → `assurance.md` Diff-blind authorship + Waves; ARTIFACTS + `tester` below.
 - State, not a ruling: the return to ITERATE mid-IMPLEMENT, spine suspended intact in `Tasks` (owner-ruled) → `.agent/spec.md` `Phase`; it dies when IMPLEMENT resumes.
 
@@ -68,3 +62,6 @@ Override = `adapts` | `waives` | `inapplicable`; `mechanics` = how this repo sat
 - `Deferred` as the spec's unit section: the open units live in `Tasks`, the queue in `.agent/deferred.md`.
 - The `prototype/`-spelled verification carve-out, a prototype that retires at IMPLEMENT close here, and `the provider alone is simulated`: the carve-out keys on `a prototype`, this repo's is KEPT, and any value renders hardcoded when labelled simulated (`ops.md` Template rulings).
 - A scopeless `Phase`, and ITERATE running every `Artifacts` entry: ITERATE runs the prototype entries alone, since the gate is an `Artifacts` entry too.
+- Stored prototype proof — `prototype/webui-demo/proof/`, a proof path in `Artifacts`, `refreshing proof` at ITERATE open: a capture is QA input in gitignored `.scratch/webui-demo-capture/`, and each `capture.sh` run prints the costs the README cites.
+- A copy of `refresh.md`'s steps or its `last-sync` derivation here: the pointer in `## Recipe` replaces it, so a copy drifts.
+- One `reviewer` covering every lens outside IMPLEMENT: every closing diff draws its own `reviewer`s per lens.

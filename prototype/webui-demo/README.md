@@ -116,10 +116,9 @@ Everything else is the shipped `cement_runtime`:
 Two calls stay in process, and the page says so where it shows them. The chat submits a
 proposal and resolves an input through the library, not through a subprocess. A `cement`
 subprocess costs 92 to 128 milliseconds of interpreter startup, over the 50 calls of one
-story run. `System.resolve` costs 3.5 to 6.0 milliseconds in that same run.
-`proof/timings.txt` records both, from the run that produced `proof/`. A subprocess
-would therefore report
-startup cost as the function's cost.
+story run. `System.resolve` costs 3.5 to 6.0 milliseconds in that same run. A subprocess
+would therefore report startup cost as the function's cost. `capture.sh` prints both
+costs for each run that it drives.
 
 A long argument prints as its shell variable, such as `--output "$OUTPUT"`. The exact
 argument list stays under the `stdout` disclosure. The bound is 80 characters, so a
@@ -139,27 +138,6 @@ one required line blanked. The blank leaves the layout signature unchanged, so B
 a scope with B02 and still reads as incomplete. The demo enters the pipeline at
 `submit_proposal`.
 
-## Proof
-
-The `proof/` directory holds the evidence from one recorded run:
-
-| File | What it shows |
-|---|---|
-| `01-desk.png` | Five tasks, and every operation before the first request. |
-| `02-answered.png` | The answer already with the user, and its candidate waiting for review. |
-| `03-evidence.png` | Two confirmations against one layout signature. |
-| `04-cemented.png` | The promoted set, its hash and the six checks. |
-| `05-routed.png` | A03 answered from the function, in a bubble that looks supervised. |
-| `06-reuse.png` | One answer from two sources, and a function with four callers. |
-| `07-blocked.png` | Four operations sealed, and the fifth blocked by design. |
-| `08-bundle.png` | The answer from the exported bundle. |
-| `09-source.png` | The function read as source, with the four hops behind one entry. |
-| `story-full-page.png` | The whole page at the end of the story. |
-| `transcript.txt` | The ledger events of the same run. |
-| `timings.txt` | The subprocess and resolve costs of the same run. |
-
-The server also serves the live log at `/api/transcript.txt`.
-
 ## Scope
 
 This is a prototype. It shows behavior, and it is not the production shape. The library
@@ -173,14 +151,36 @@ opens every disclosure except the raw `stdout` blocks and the lineage of later e
 screenshot cannot select a disclosure. The raw bytes bury the reading they belong to, and
 the later entries repeat a lineage the first entry already shows.
 
-Regenerate the proof with `capture-proof.sh` against a running server. It drives the story
-through the API, so all ten images and the transcript come from one ledger:
+## Visual check
+
+`capture.sh` drives the story through the API against a running server. It captures
+every frame from one ledger into `.scratch/webui-demo-capture/`, which git ignores. Set
+`OUT` to write to a different directory.
 
 ```bash
 uv run python prototype/webui-demo/app.py &
-prototype/webui-demo/capture-proof.sh
+prototype/webui-demo/capture.sh
 ```
 
+Each numbered frame must show its claim:
+
+| File | What it shows |
+|---|---|
+| `01-desk.png` | Five tasks, and every operation before the first request. |
+| `02-answered.png` | The answer already with the user, and its candidate waiting for review. |
+| `03-evidence.png` | Two confirmations against one layout signature. |
+| `04-cemented.png` | The promoted set, its hash and the six checks. |
+| `05-routed.png` | A03 answered from the function, in a bubble that looks supervised. |
+| `06-reuse.png` | One answer from two sources, and a function with four callers. |
+| `07-blocked.png` | Four operations sealed, and the fifth blocked by design. |
+| `08-bundle.png` | The answer from the exported bundle. |
+| `09-source.png` | The function read as source, with the four hops behind one entry. |
+
+The run also writes `story-full-page.png`, the whole page at the end of the story.
+`transcript.txt` holds the ledger events of the run, and `timings.txt` holds its
+subprocess and resolve costs. The script also prints the costs. The server serves the
+live log at `/api/transcript.txt`.
+
 The script measures every numbered frame with `measure-height.mjs`, immediately before
-its own capture. The final full-page image needs no height. Both columns scroll inside the page, so a block below the fold is simply
-absent from the file.
+its own capture. The final full-page image needs no height. Both columns scroll inside
+the page, so a block below the fold is absent from the file.
