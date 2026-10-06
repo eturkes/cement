@@ -11,7 +11,7 @@ paths:
 
 Recipe = `~/.local/app/agents/claude/prompts/refresh.md` (body below its rule), one session per refresh; its step 1 reads `last-sync` from the line below first, then walks template history. Repo addition: step 7's sweep also covers the invariants below, each retired form under a positive control naming its expected match count first. Other `claude/prompts/` bodies reach this repo only when the owner pastes one.
 
-`last-sync = agents@9e81e38`.
+`last-sync = agents@5471e83`.
 
 ## Invariants a refresh must keep, else restore
 
@@ -20,7 +20,7 @@ Recipe = `~/.local/app/agents/claude/prompts/refresh.md` (body below its rule), 
 - `Session flow` rulings bullet: `CLAUDE.md` = defaults, `.claude/rules/` = this repo's rulings on them, each keyed on the clause it overrides and naming its replacement or the owner's waiver; a retired structure stays retired ⇒ the index below lists every ruling.
 - The `.claude/rules/` two-tier bullet (bare | `paths:`) — the sole carrier of project law and of what a teammate inherits.
 - `Execution` Git: the commit body names each teammate the work used (name, role, verdict). `.claude/rules/ops.md` Commits holds this repo's stronger form.
-- `Session flow` Teammates: triggers + mechanics = global `CLAUDE.md` `Subagents`, role rules = `~/.claude/agents/<role>.md`; `consultant` on each phase plan, every closing diff → every lens, each covered by its own `reviewer`s. A `Tasks` row, contract or `Accept:` line that funds review once and late contradicts it ⇒ the sweep runs over `.agent/spec.md` `Tasks` + unit `Accept:` lines, not over `CLAUDE.md` alone.
+- `Session flow` Teammates: triggers + mechanics = global `CLAUDE.md` `Subagents`, role rules = `~/.claude/agents/<role>.md`; `consultant` on each phase plan; `reviewer` on every closing diff — one per lens in IMPLEMENT, one covering every lens elsewhere. A `Tasks` row, contract or `Accept:` line that funds review once and late contradicts it ⇒ the sweep runs over `.agent/spec.md` `Tasks` + unit `Accept:` lines, not over `CLAUDE.md` alone.
 - Thinking depth = the session's `--effort`, set at launch ⇒ no project `.claude/settings*.json` env pin and no `.claude/agents/` definition overrides the user-level models, effort or roles.
 - No `## Claude Code` section and no retired-flow reference: session slash commands, the attached ledger trio, Serena, `read-guard`, per-unit `dispatch:` lines, solo licences, `migrate.md`.
 - `Engineering` carries the `Verification integrity` bullet — `a prototype runs under PROTOTYPE law`, red-first witness, contract-owned output tables, skip/xfail approval, `green` = run + passed. `.claude/rules/assurance.md` `## Verification integrity` and `.claude/rules/ops.md` (green reporting, Commits witness) hold this repo's mechanics for it, so dropping the bullet orphans live law downstream.
@@ -64,4 +64,4 @@ Override = `adapts` | `waives` | `inapplicable`; `mechanics` = how this repo sat
 - A scopeless `Phase`, and ITERATE running every `Artifacts` entry: ITERATE runs the prototype entries alone, since the gate is an `Artifacts` entry too.
 - Stored prototype proof — `prototype/webui-demo/proof/`, a proof path in `Artifacts`, `refreshing proof` at ITERATE open: a capture is QA input in gitignored `.scratch/webui-demo-capture/`, and each `capture.sh` run prints the costs the README cites.
 - A copy of `refresh.md`'s steps or its `last-sync` derivation here: the pointer in `## Recipe` replaces it, so a copy drifts.
-- One `reviewer` covering every lens outside IMPLEMENT: every closing diff draws its own `reviewer`s per lens.
+- Per-lens `reviewer`s on every closing diff outside IMPLEMENT, and paired blind `reviewer`s per lens: outside IMPLEMENT one `reviewer` covers every lens, and a second, blind one joins only where global `Subagents` calls a wrong verdict costly to reverse.

@@ -93,8 +93,8 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 - [ ] Scope expansion p34 p35 p36 p37; reviewer identities, encryption, retention, remote registry/signatures; shadow sampling + drift telemetry; TypedDict projections; absolute URLs before publication.
   - Accept: planned as milestones.
 - [ ] README + prototype disposition: `prototype/webui-demo` stays KEPT (`.claude/rules/ops.md` Template rulings); decide its home — `prototype/` or `tools/` — and record it in `Artifacts`.
-- [ ] Phase-close review over the whole phase diff: every lens, each covered by its own `reviewer`s.
-  - Runs LAST, nothing mutating after it; each unit's closing diff draws its OWN per-lens `reviewer`s first and every pass adjudicates into `.agent/review.md` ⇒ never the only pass.
+- [ ] Phase-close review over the whole phase diff: every lens, one `reviewer` per lens.
+  - Runs LAST, nothing mutating after it; each unit's closing diff draws its OWN `reviewer` per lens first and every pass adjudicates into `.agent/review.md` ⇒ never the only pass.
 - Queue = `.agent/deferred.md` (`p<nn>`, one line + acceptance each, unattached; p01-p61 keep full text + evidence + grounds in `.agent/archive/polish.md`, a born row's line is its whole record; grader `uv run python .agent/decisions/m3-deferred-validate.py`); a bare `p<nn>` in a row = that unit owns the queue row.
 
 ## Phase
