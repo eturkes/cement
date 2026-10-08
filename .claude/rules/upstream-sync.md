@@ -9,16 +9,16 @@ paths:
 
 ## Recipe
 
-Recipe = `~/.local/app/agents/claude/prompts/refresh.md` (body below its rule), one session per refresh; its step 1 reads `last-sync` from the line below first, then walks template history. Repo addition: step 7's sweep also covers the invariants below, each retired form under a positive control naming its expected match count first. Other `claude/prompts/` bodies reach this repo only when the owner pastes one.
+Recipe = `~/.local/app/agents/claude/prompts/auto/refresh.md` | `steered/refresh.md` (same steps; `steered/` opens with a `<request>` slot), body below its rule, one session per refresh; its step 1 reads `last-sync` from the line below first, then walks template history. Step 1's `differs` case + step 7's `--hidden` sweep + controls = refresh.md's alone, never patched here. Repo addition, widening step 7's terms: its sweep also covers the invariants below, each retired form under a positive control naming its expected match count first. Other `claude/prompts/` bodies reach this repo only when the owner pastes one.
 
-`last-sync = agents@5471e83`.
+`last-sync = agents@2cedb4f`.
 
 ## Invariants a refresh must keep, else restore
 
 - Line 1 = the `@.agent/spec.md` import. A missing import is SILENT — the check is a fresh `claude -p` answering a spec-only question with zero tool calls.
 - `Session flow` names `.agent/spec.md` (five sections: `Intent`, `Artifacts`, `Decisions`, `Tasks`, `Phase`) plus `.agent/review.md`, and binds spec size to LIVENESS — every line binds current or future work, superseded text dies in the commit that supersedes it, size emergent. A restored byte cap is a reverted upstream fix: it rewards compressing prose over deleting dead rows. `Phase` = the phase + its scope (`ITERATE — whole product`). `Artifacts` = path each, + run command where it runs. `Tasks` = the phase checklist: `- [ ]` open units in spine order with acceptance + binding notes as indented sub-bullets, `- [x] <sha>` once committed, on-path finds appended, ticked rows cleared at phase close, last line = the pointer to `.agent/deferred.md`, where `Engineering` routes every off-path improvement and every scratch-validator port.
 - `Session flow` rulings bullet: `CLAUDE.md` = defaults, `.claude/rules/` = this repo's rulings on them, each keyed on the clause it overrides and naming its replacement or the owner's waiver; a retired structure stays retired ⇒ the index below lists every ruling.
-- The `.claude/rules/` two-tier bullet (bare | `paths:`) — the sole carrier of project law and of what a teammate inherits.
+- The `.claude/rules/` two-tier bullet (bare = every context from session start | `paths:` = injected at a context's first matching touch; load timing → global `Teammate context`) — the sole carrier of project law and of what a teammate must hold.
 - `Execution` Git: the commit body names each teammate the work used (name, role, verdict). `.claude/rules/ops.md` Commits holds this repo's stronger form.
 - `Session flow` Teammates: triggers + mechanics = global `CLAUDE.md` `Subagents`, role rules = `~/.claude/agents/<role>.md`; `consultant` on each phase plan; `reviewer` on every closing diff — one per lens in IMPLEMENT, one covering every lens elsewhere. A `Tasks` row, contract or `Accept:` line that funds review once and late contradicts it ⇒ the sweep runs over `.agent/spec.md` `Tasks` + unit `Accept:` lines, not over `CLAUDE.md` alone.
 - Thinking depth = the session's `--effort`, set at launch ⇒ no project `.claude/settings*.json` env pin and no `.claude/agents/` definition overrides the user-level models, effort or roles.
@@ -64,4 +64,4 @@ Override = `adapts` | `waives` | `inapplicable`; `mechanics` = how this repo sat
 - A scopeless `Phase`, and ITERATE running every `Artifacts` entry: ITERATE runs the prototype entries alone, since the gate is an `Artifacts` entry too.
 - Stored prototype proof — `prototype/webui-demo/proof/`, a proof path in `Artifacts`, `refreshing proof` at ITERATE open: a capture is QA input in gitignored `.scratch/webui-demo-capture/`, and each `capture.sh` run prints the costs the README cites.
 - A copy of `refresh.md`'s steps or its `last-sync` derivation here: the pointer in `## Recipe` replaces it, so a copy drifts.
-- Per-lens `reviewer`s on every closing diff outside IMPLEMENT, and paired blind `reviewer`s per lens: outside IMPLEMENT one `reviewer` covers every lens, and a second, blind one joins only where global `Subagents` calls a wrong verdict costly to reverse.
+- Per-lens `reviewer`s on every closing diff outside IMPLEMENT, and paired blind `reviewer`s per lens: outside IMPLEMENT one `reviewer` covers every lens, and global `Subagents` = one teammate per question, never a blind second.
