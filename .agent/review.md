@@ -13,6 +13,26 @@ fixed before the close it reviews; a finding outside it is born as a `.agent/def
 row with its acceptance check, never as an open row here. A fix earns ONE re-review round
 against its acceptance check alone.
 
+## `CLAUDE.md` refresh agents@2cedb4f → agents@4d22203 (ITERATE, ad-hoc) — target = the diff this commit lands, base `1623535`
+
+Template delta = 4 hunks (`Execution` research, `Engineering` tier, `Session flow` ITERATE +
+phase-keyed teammates + advisor) + 12 `claude/` bodies. Reviewer = `reviewer-1`, 10 lenses fixed
+before dispatch, tree held frozen for the run (4 modified files, unchanged across it); every row
+below = MAIN's own rerun. Gate result → this commit's body (message-only amend, tree unchanged).
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | template fidelity + `last-sync` | pass | `cmp CLAUDE.md ~/.local/app/agents/claude/CLAUDE.project.md` rc 0; upstream HEAD `4d22203`, `4d22203..HEAD -- claude/` = 0 commits; `last-sync = agents@4d22203` = `upstream-sync.md:14`. |
+| R2 | obligation coverage | pass | Reviewer's independent U1-U9 map ⊆ MAIN's C1-C8 + migrations; each lands as practice or an `upstream-sync.md` invariant/index/Superseded line (commit body lists each). |
+| R3 | old-form completeness | pass | MAIN's 15 forms + control `agents@c38a706` → 2 hits (`upstream-sync.md:14`, history `review.md`); reviewer's 25 extra forms rematched by MAIN → 8 hits = `upstream-sync.md:68-69` (Superseded / substring of the new form) + 6 history paths under `.agent/archive/` + `.agent/decisions/`. |
+| R4 | spec preservation | pass | id census before = after (`cmp` rc 0), 12 checkbox rows, `Intent`/`Artifacts`/`Decisions`/`Tasks` byte-identical; `Phase` keeps the start command, prototype-only carve-out + capture obligation, adds the `iterate.md` body + close gate. |
+| R5 | check strength | pass | No gate, test or validator edited; no `tests/`/`src/`/`examples/` module reads `CLAUDE.md`, `spec.md`, `review.md` or `.claude/rules/` (`rg` rc 1), the one `deferred.md` reader selects `p12` alone (`tests/test_cli_removal_battery.py:3300`); queue grader rc 0 PASS 73 rows. |
+| R6 | claim soundness | pass | `p73`: `git log a8109eb..1623535` = 17 commits, none named by a section; `Teammates:`/`dispatch:`/neither split rematched per SHA; `capture.sh:14-15` defines `BASE` + `OUT`. |
+| R7 | law conflict | pass | New text = repo mechanics + refresh invariants; the prototype-only no-gate carve-out holds per round, the close gate comes from `iterate.md` `Met when`; screenshot stays gitignored QA. |
+| R8 | `upstream-sync.md` shape | pass | `paths: ["CLAUDE.md"]` kept, one `last-sync` line, Recipe → `~/.local/app/agents/claude/prompts/{auto,steered}/refresh.md` (both exist). |
+| R9 | step 6 settings | pass | `.claude/settings.local.json` env = `ANTHROPIC_BASE_URL` + `ENABLE_TOOL_SEARCH`, hook = Headroom selfheal; `.claude/agents/` absent ⇒ nothing removed. |
+| R10 | register | pass | `git diff --check HEAD` rc 0; one H1 per edited file; no provenance in added law. |
+
 ## `CLAUDE.md` refresh (ITERATE, ad-hoc) — target = the single commit landing the refresh
 
 Target = `a8109eb`, upstream `agents@c38a706`, scope = the fold of the new `Engineering` bullet

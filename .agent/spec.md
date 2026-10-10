@@ -110,11 +110,12 @@ SUSPENDED INTACT, not retired — `Decisions` and every unfinished unit stand as
 ITERATE outcome amends them where it lands. Reason for the return, owner-ruled: prototype
 feedback.
 
-ITERATE opens by running the prototype artifacts, then works the owner's feedback into
-`prototype/` + `Decisions`. These are interactive sessions until the owner says go. Start with `uv run python prototype/webui-demo/app.py` → <http://127.0.0.1:8765/>.
-A prototype-only turn owes no gate run (`.claude/rules/ops.md`, census bullet); it owes a
+Each ITERATE session runs one pasted `iterate.md` body: it opens by running the prototype
+artifacts, then works the owner's feedback into `prototype/` + `Decisions` in rounds until the
+owner's go, its `Met when`. Start with `uv run python prototype/webui-demo/app.py` → <http://127.0.0.1:8765/>.
+A prototype-only round owes no gate run (`.claude/rules/ops.md`, census bullet); it owes a
 `prototype/webui-demo/capture.sh` run read frame by frame, since every frame that shows the
-Function pane changes with the UI.
+Function pane changes with the UI. The close owes the full gate (`iterate.md` `Met when`).
 
 Feedback landed so far, all worked into `prototype/` + `Decisions`:
 1. The demo showed the CEREMONY around the function and never the function — the per-request plan
