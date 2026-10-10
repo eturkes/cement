@@ -94,7 +94,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   - Accept: planned as milestones.
 - [ ] README + prototype disposition: `prototype/webui-demo` stays KEPT (`.claude/rules/ops.md` Template rulings); decide its home — `prototype/` or `tools/` — and record it in `Artifacts`.
 - [ ] Phase-close review over the whole phase diff: every lens, one `reviewer` per lens.
-  - Runs LAST, nothing mutating after it; each unit's closing diff draws its OWN `reviewer` per lens first and every pass adjudicates into `.agent/review.md` ⇒ never the only pass.
+  - Runs LAST, nothing mutating after it; each unit's closing diff draws its OWN pass first (`reviewer` count per `Session flow` Teammates where MAIN dispatches), every pass adjudicated into `.agent/review.md` ⇒ never the only pass.
 - Queue = `.agent/deferred.md` (`p<nn>`, one line + acceptance each, unattached; p01-p61 keep full text + evidence + grounds in `.agent/archive/polish.md`, a born row's line is its whole record; grader `uv run python .agent/decisions/m3-deferred-validate.py`); a bare `p<nn>` in a row = that unit owns the queue row.
 
 ## Phase

@@ -13,6 +13,26 @@ fixed before the close it reviews; a finding outside it is born as a `.agent/def
 row with its acceptance check, never as an open row here. A fix earns ONE re-review round
 against its acceptance check alone.
 
+## `CLAUDE.md` refresh agents@4d22203 → agents@eac5295 (ITERATE, ad-hoc) — target = the diff this commit lands, base `604bf9b`
+
+Template delta = 4 hunks (`Execution` research, `Authoring` pasted-prompt flaw, `Engineering`
+`data` tier, `Session flow` Teammates + Advisor) + 6 `claude/` bodies. Reviewer = `reviewer-1`, 9
+lenses fixed before dispatch, tree frozen for the run (`git diff HEAD` sha256 `8a60225b…` before =
+after); every row below = MAIN's own rerun. Owner ruling this pass carries: unit-close review =
+fit form (`upstream-sync.md` index row, `spec.md` `Tasks` phase-close sub-bullet).
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| L1 | template fidelity + `last-sync` | pass | `cmp CLAUDE.md ~/.local/app/agents/claude/CLAUDE.project.md` rc 0; upstream HEAD `eac5295`, `eac5295..HEAD -- claude/` = 0 commits; `last-sync = agents@eac5295` = `upstream-sync.md:14`, 1 occurrence. |
+| L2 | obligation coverage | pass | Reviewer's independent map = MAIN's O1-O7 + migrations (9baf749 `Trigger =` → `Fit =` → rules `teammate fits` / `global fits`; e285415 steps 8-9 leave the cited steps 1 + 7 intact); each lands as practice, the Teammates invariant, a Superseded line or the owner-ruled index row (commit body lists each). |
+| L3 | old-form completeness | pass | `rg --hidden -g '!.git' -n -F -f forms.txt .` (23 forms) → `upstream-sync.md:62` + `:71`, both Superseded; reviewer's 11 extra forms → rc 1; 20/23 forms hit pre-refresh `git grep HEAD`, the 3 global-only forms hit `agents@4d22203` `claude/` 3/2/2. |
+| L4 | spec preservation | pass | id census before = after (`cmp` rc 0: 5 headers, 12 checkbox rows, M-ids, p-ids); `Intent`/`Artifacts`/`Decisions`/`Phase` byte-identical; one sub-bullet reworded to the owner ruling. |
+| L5 | check strength | pass | No gate, test or validator edited (`diff --name-status HEAD` = 3 instruction files); no `tests/`/`src/`/`examples/`/`prototype/` module reads them (`rg` rc 1, control `hospital_ocr` rc 0); gate run 1 `Ran 1031 tests in 1746.607s` `OK`, `uv build` rc 0. |
+| L6 | deferred rows added | pass | `.agent/deferred.md` `cmp` HEAD rc 0 ⇒ none; queue grader rc 0 `VERDICT: PASS`. |
+| L7 | `upstream-sync.md` shape | pass | frontmatter lines 1-4 = HEAD (`paths: ["CLAUDE.md"]`); one `last-sync` line; index rows 12 → 13, every prior row byte-preserved (`comm -23` = 0); both `prompts/{auto,steered}/refresh.md` exist. |
+| L8 | law conflict + register | pass | Every close keeps its own pass ⇒ the preamble above holds unchanged; dispatch per case at the template count; `git diff --check HEAD` rc 0; one H1 per edited file. |
+| L9 | step 6 settings | pass | `.claude/settings.local.json` env = `ANTHROPIC_BASE_URL` + `ENABLE_TOOL_SEARCH`, hook = Headroom selfheal; `.claude/agents/` absent ⇒ nothing removed. |
+
 ## `CLAUDE.md` refresh agents@2cedb4f → agents@4d22203 (ITERATE, ad-hoc) — target = the diff this commit lands, base `1623535`
 
 Template delta = 4 hunks (`Execution` research, `Engineering` tier, `Session flow` ITERATE +
