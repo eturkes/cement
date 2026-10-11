@@ -8,6 +8,8 @@ let POLL = null;
 /* The operation whose source overlay is open, or "" for none. */
 let SOURCE_OPEN = "";
 let OPEN_ALL = false;
+let DRAWER = "";
+let HISTORY = false;
 /* Re-rendering the source collapses every open <details>, so redraw only on change. */
 let SOURCE_KEY = "";
 
@@ -16,7 +18,7 @@ const esc = (value) =>
   String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const short = (value, size = 12) =>
   value ? esc(String(value).slice(0, size)) + "\u2026" : "\u2014";
-const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
+const plural = (count, word) => `${count} ${count === 1 ? word : word === "entry" ? "entries" : word + "s"}`;
 
 function jsonHtml(value) {
   if (value === null || value === undefined) return "";
@@ -109,30 +111,23 @@ const offline = (id, operation) =>
 
 function render() {
   if (!STATE) return;
-  $("chip-partition").textContent = STATE.partition;
-  $("policy-note").textContent =
-    `promotes at ${STATE.policy.min_confirmations} confirmations, ` +
-    `${STATE.policy.min_reviewers} reviewer`;
+  if (DRAWER && !STATE.selected_operations.includes(DRAWER)) DRAWER = STATE.selected_operations[0];
   renderChat();
   renderTray();
   renderTasks();
-  renderTerminal();
-  renderCategories();
   renderReview();
+  renderCategories();
   renderFunctions();
-  renderSource();
-  renderRouting();
+  renderTerminal();
   renderMetrics();
   renderLog();
-  /* Capture aid: a screenshot cannot click a disclosure open. Verbatim stdout stays
-     shut, since five raw dumps bury the reading they belong to, and per-entry lineage
-     stays as the overlay renders it: entry 1 open, the rest one click away. */
-  if (OPEN_ALL) {
-    for (const node of document.querySelectorAll(
-      "details:not(.stdout):not(.origins)")) {
-      node.open = true;
-    }
-  }
+  renderRouting();
+  renderSource();
+  $("drawer").hidden = !DRAWER;
+  $("drawer-title").textContent = DRAWER ? operationOf(DRAWER).label : "";
+  $("benefit").textContent = STATE.stats.cement_answers
+    ? `${plural(STATE.stats.cement_answers, "operation")} answered without the model. The chat looks the same.`
+    : "Repeated, checked answers can become exact deterministic entries.";
 }
 
 /* --- chat: a plain chat, and nothing else ---
@@ -145,7 +140,9 @@ function renderChat() {
   /* A turn is one question, however many operations answer it. It shows the typing
      indicator while the model writes, and the reply lands in one bubble. The wait is
      the model's alone: no supervisor holds up a chat. */
-  const messages = STATE.chat.map(chatMessage).join("");
+  const previous = STATE.chat.slice(0, -2);
+  const history = previous.length ? `<button class="button small" data-history="1">${HISTORY ? "Hide" : "Show"} ${plural(previous.length / 2, "earlier turn")}</button>${HISTORY ? previous.map(chatMessage).join("") : ""}` : "";
+  const messages = history + STATE.chat.slice(-2).map(chatMessage).join("");
   const thinking = STATE.thinking
     ? `<div class="msg assistant"><div class="avatar">AI</div><div class="bubble">
          <div class="thinking"><span class="dots"><span></span><span></span><span></span></span>
@@ -232,93 +229,39 @@ const diffHtml = (rows) =>
    names the same operation, and Cement answers that operation and an exact input. */
 
 function renderTray() {
-  $("tray").innerHTML = STATE.scenarios
-    .map((task) => {
-      const cards = task.requests
-        .map((request) => {
-          const document_ = documentOf(request.document_id);
-          return `<button class="ask-card" data-send="${esc(request.id)}"
-            ${BUSY ? "disabled" : ""}>
-            <span class="ask-text">${esc(request.ask)}</span>
-            <span class="ask-doc">${esc(request.document_id)} \u00b7
-              ${esc(document_.patient || "")}</span>
-          </button>`;
-        })
-        .join("");
-      return `<div class="task-group ${task.id === STATE.selected ? "on" : ""}">
-        <div class="task-head">
-          <span class="task-title">${esc(task.title)}</span>
-          <span class="task-intent">${esc(task.intent)}</span>
-        </div>
-        <div class="task-asks">${cards}</div>
-      </div>`;
-    })
-    .join("");
-}
-
-/* --- the task switch and the operation map --- */
-
-function operationStatus(operation) {
-  if (operation.promoted) {
-    const count = operation.entries;
-    return ["set", `sealed \u00b7 ${count} ${count === 1 ? "entry" : "entries"}`];
-  }
-  if (operation.keyed_on === "text") return ["warn", "stays supervised"];
-  if (operation.blocked) return ["llm", "below the floor"];
-  return ["", "no evidence yet"];
+  $("task-switch").innerHTML = STATE.scenarios.map(task =>
+    `<button class="task-pill ${task.id === STATE.selected ? "on" : ""}" data-select="${esc(task.id)}" ${BUSY ? "disabled" : ""}>${esc(task.title)}</button>`).join("");
+  const task = scenarioOf(STATE.selected);
+  $("tray").innerHTML = `<details><summary>Choose a wording · ${esc(task.title)}</summary>
+    ${task.requests.map(request => `<button class="ask-card" data-send="${esc(request.id)}" ${BUSY ? "disabled" : ""}>${esc(request.ask)}<small>${esc(request.document_id)} · ${esc(documentOf(request.document_id).patient || "")}</small></button>`).join("")}</details>`;
 }
 
 function renderTasks() {
-  $("task-switch").innerHTML = STATE.scenarios
-    .map(
-      (task) => `<button class="task-pill ${task.id === STATE.selected ? "on" : ""}"
-        data-select="${esc(task.id)}" ${BUSY ? "disabled" : ""}>
-        <span class="pill-title">${esc(task.title)}</span>
-        <span class="pill-ops">${task.operations.length === 1
-          ? "1 operation" : task.operations.length + " operations"}</span>
-      </button>`)
-    .join("");
-  const promoted = STATE.promoted_operations.length;
-  $("coverage-note").textContent =
-    `${promoted} of ${STATE.operations.length} sealed`;
-  $("coverage").innerHTML = STATE.operations
-    .map((operation) => {
-      const [tone, label] = operationStatus(operation);
-      const callers = operation.callers.length === 1
-        ? "1 task calls it"
-        : `${operation.callers.length} tasks call it`;
-      return `<div class="op-row ${operation.selected ? "on" : ""}">
-        <div class="op-main">
-          <span class="op-name">${esc(operation.name)}</span>
-          <span class="badge ${tone}">${esc(label)}</span>
-        </div>
-        <div class="op-decides">${esc(operation.decides)}</div>
-        <div class="op-callers" title="${esc(operation.callers.join(" \u00b7 "))}">
-          ${esc(callers)}: ${esc(operation.callers.join(" \u00b7 "))}</div>
-      </div>`;
-    })
-    .join("");
-  const names = STATE.selected_operations.join(", ");
-  $("lifecycle-note").textContent =
-    `Each button runs once per operation this task reaches: ${names}.`;
+  $("coverage-note").textContent = `${STATE.promoted_operations.length} of ${STATE.operations.length} operations sealed`;
+  $("coverage").innerHTML = `<div class="board-head"><span>Operation</span><span>Model answers</span><span>Supervised</span><span>Sealed</span><span>Routed</span></div>` + STATE.operations.map(op => {
+    const floor = STATE.policy.min_confirmations;
+    const seen = op.promoted || op.support.length || op.blocked;
+    const support = op.support.length ? op.support.map(n => `${n}/${floor}`).join(" · ") : "—";
+    return `<button class="board-row ${op.selected ? "selected" : ""}" data-operation-open="${esc(op.name)}">
+      <span class="op-label">${esc(op.label)}<small>${esc(op.callers.join(" · "))}</small></span>
+      <span class="cell ${seen ? "filled" : ""}">${seen ? "✓" : "—"}</span>
+      <span class="cell ${op.promoted ? "filled" : ""}">${esc(support)}</span>
+      <span class="cell ${op.promoted ? "filled" : op.blocked ? "boundary" : ""}">${op.promoted ? plural(op.entries, "entry") : op.blocked ? "blocked" : "—"}</span>
+      <span class="cell ${op.promoted && STATE.routed ? "filled" : ""}">${op.promoted && STATE.routed ? "✓" : "—"}</span></button>`;
+  }).join("");
+  $("boundary-note").textContent = STATE.operations.find(op => op.keyed_on === "text").blocked
+    ? `Billing stays with the model. Each note has different assessment text: only 1/${STATE.policy.min_confirmations} confirmations per exact input.`
+    : "Cement matches an operation and exact input. Repetition never widens that boundary.";
 }
 
 /* --- terminal: real `cement` invocations, condensed, verbatim one click away --- */
 
 function commandHtml(row) {
-  const reading = (row.reading || [])
-    .map(
-      (pair) => `<div class="read-row"><span class="rk">${esc(pair[0])}</span>
-        <span class="rv">${esc(pair[1])}</span></div>`)
-    .join("");
-  return `<div class="cmd ${row.rc === 0 ? "" : "failed"}">
-    <div class="cmd-line">$ ${esc(row.display)}</div>
-    <div class="cmd-read">${reading}</div>
-    <details class="stdout"><summary>stdout ${esc(row.bytes)} bytes
-      \u00b7 exit ${esc(row.rc)} \u00b7 ${esc(row.ms)} ms</summary>
-      <pre class="raw">${esc((row.argv || []).join(" "))}\n\n${esc(row.stdout)}</pre>
-    </details>
-  </div>`;
+  return `<details class="cmd"><summary>${esc(row.display.split(" ").slice(0, 3).join(" "))} · exit ${esc(row.rc)}</summary>
+    <pre class="shell">$ ${esc(row.display)}</pre>
+    ${(row.reading || []).map(pair => `<div class="row"><span>${esc(pair[0])}</span><span>${esc(pair[1])}</span></div>`).join("")}
+    <details class="stdout"><summary>Exact argv + stdout · ${esc(row.bytes)} bytes · ${esc(row.ms)} ms</summary><pre>${esc(JSON.stringify(row.argv))}
+${esc(row.stdout)}</pre></details></details>`;
 }
 
 function renderTerminal() {
@@ -326,6 +269,7 @@ function renderTerminal() {
   $("terminal-count").textContent = rows.length
     ? `${rows.length} command${rows.length === 1 ? "" : "s"} have run`
     : "";
+  if (!$("commands-details").open) { $("terminal").innerHTML = ""; return; }
   if (!rows.length) {
     $("terminal").innerHTML =
       `<div class="empty">No command yet. Every operator action below runs the real
@@ -356,7 +300,7 @@ function renderCategories() {
        input arrives for the first time.</div>`;
     return;
   }
-  $("categories").innerHTML = STATE.categories
+  $("categories").innerHTML = STATE.categories.filter(c => !DRAWER || c.operation === DRAWER)
     .map((category) => {
       const [label, tone] = categoryStatus(category);
       const percent = Math.min(100, (category.confirmations / category.required) * 100);
@@ -391,58 +335,10 @@ function renderCategories() {
 }
 
 function renderReview() {
-  if (!STATE.pending.length) {
-    $("review").innerHTML =
-      `<div class="empty">No candidate waiting. The user already has every answer the
-       model wrote, and its candidate appears here for the supervisor, and nowhere
-       else.</div>`;
-    return;
-  }
-  $("review").innerHTML = STATE.pending
-    .map((proposal) => {
-      const preview = proposal.preview_error
-        ? `<div class="preview-error">This plan does not apply to the document:
-             ${esc(proposal.preview_error)}</div>`
-        : proposal.preview
-          ? `<div class="label-row" style="margin-top:10px">
-               <span class="label">What this plan pulls out of ${esc(proposal.document_id)}</span>
-             </div><pre class="json">${jsonHtml(proposal.preview)}</pre>`
-          : "";
-      const diff = proposal.diff.length
-        ? diffHtml(proposal.diff)
-        : `<div class="tiny dim" style="margin-top:8px">The candidate matches the
-           supervisor's answer for this scope.</div>`;
-      return `<div class="proposal">
-        <div class="proposal-head">
-          <span class="badge llm">sent, unreviewed</span>
-          <span class="hash">${esc(proposal.proposal_id)}</span>
-          <span class="tiny dim">${esc(proposal.document_id)} \u00b7
-            ${esc(proposal.scope_label)}</span>
-        </div>
-        <div class="proposal-op">${esc(proposal.operation)} \u2014
-          ${esc(proposal.decides)}</div>
-        <div class="note">The model ${esc(proposal.note)}.</div>
-        <div class="label-row" style="margin-top:10px">
-          <span class="label">The answer the model wrote</span></div>
-        <pre class="json">${jsonHtml(proposal.plan)}</pre>
-        ${preview}
-        <div class="label-row" style="margin-top:10px">
-          <span class="label">Difference from the supervisor's correction</span></div>
-        ${diff}
-        <div class="actions">
-          <button class="button small accept" data-review="accept"
-            data-proposal="${esc(proposal.proposal_id)}">accept</button>
-          <button class="button small correct" data-review="correct"
-            data-proposal="${esc(proposal.proposal_id)}">correct</button>
-          <button class="button small reject" data-review="reject"
-            data-proposal="${esc(proposal.proposal_id)}">reject</button>
-        </div>
-        <div class="tiny dim" style="margin-top:9px">Each button runs the real command:</div>
-        <pre class="shell">$ cement proposal review ${esc(proposal.proposal_id)} \\
-    --reviewer ${esc(STATE.reviewer)} --decision &lt;accept|correct|reject&gt;</pre>
-      </div>`;
-    })
-    .join("");
+  $("inbox-note").textContent = `${plural(STATE.pending.length, "answer")} in this task’s inbox. Users already have their replies.`;
+  $("review").innerHTML = STATE.pending.map(p => `<div class="proposal"><div class="proposal-head">${esc(p.document_id)} · ${esc(p.scope_label)}</div>
+    <details><summary>Compare the model answer and correction</summary><p>Model answer</p><pre>${jsonHtml(p.plan)}</pre>${p.preview_error ? `<p>${esc(p.preview_error)}</p>` : ""}<p>Supervisor changes</p>${diffHtml(p.diff)}</details>
+    <div class="actions">${["accept", "correct", "reject"].map(d => `<button class="button small" data-review="${d}" data-proposal="${esc(p.proposal_id)}">${d}</button>`).join("")}</div></div>`).join("");
 }
 
 const row = (key, value) =>
@@ -453,7 +349,7 @@ const row = (key, value) =>
    card names every task that calls it. That is what reuse looks like from here. */
 
 function renderFunctions() {
-  $("functions").innerHTML = STATE.functions.map(functionCard).join("");
+  $("functions").innerHTML = STATE.functions.filter(fn => fn.operation === DRAWER).map(functionCard).join("");
 }
 
 function callerLine(fn) {
@@ -467,44 +363,15 @@ function callerLine(fn) {
 }
 
 function functionCard(fn) {
-  const head = `<div class="fn-head">
-      <span class="fn-name">${esc(fn.operation)}</span>
-      <span class="badge ${fn.promoted ? "set" : fn.keyed_on === "text" ? "warn" : "llm"}"
-        >${fn.promoted ? "promoted" : fn.keyed_on === "text"
-          ? "never cements" : "not promoted"}</span>
-    </div>
-    <div class="fn-decides">${esc(fn.decides)}</div>
-    ${callerLine(fn)}`;
-  if (!fn.promoted) return `<div class="fn-card">${head}${unpromotedBody(fn)}</div>`;
-  const checks = fn.checks
-    .map(
-      (check) => `<div class="check ${check.passed ? "" : "failed"}">
-        <span class="dot"></span><span>${esc(check.key)}</span>
-        <span class="detail">${esc(check.detail)}</span></div>`)
-    .join("");
+  const title = `<h3>${esc(fn.label)} · ${fn.promoted ? "sealed" : "not sealed"}</h3><p>${esc(fn.decides)}</p><p class="fn-callers">Called by ${esc(fn.callers.join(", "))}.</p>`;
+  if (!fn.promoted) return `<div class="fn-card">${title}${unpromotedBody(fn)}</div>`;
   const document_ = offlineDocument(fn);
-  const result = STATE.offline && STATE.offline.operation === fn.operation
-    ? offlineHtml(STATE.offline)
-    : "";
-  return `<div class="fn-card promoted">${head}
-    ${row("entries", fn.entries)}
-    ${row("verdict", fn.passed ? "verified" : "failed")}
-    ${row("receipt", fn.receipt_id)}
-    ${row("bundle", fn.bundle_bytes + " bytes")}
-    <div class="row"><span class="k">function_hash</span></div>
-    <div class="hash">${esc(fn.function_hash)}</div>
-    <div class="checks">${checks}</div>
-    ${excludedHtml(fn)}
-    <div class="actions">
-      <button class="button small primary" data-source="${esc(fn.operation)}"
-        >read the function</button>
-      ${document_ ? `<button class="button small" data-offline="${esc(document_)}"
-        data-operation="${esc(fn.operation)}">answer ${esc(document_)} from the
-        bundle</button>` : ""}
-      <a class="button small" href="/api/bundle.json?operation=${encodeURIComponent(fn.operation)}"
-        download="${esc(fn.operation)}.json">download bundle</a>
-    </div>
-    ${result}</div>`;
+  return `<div class="fn-card">${title}<p>${fn.entries} exact entries · ${fn.passed ? "verified" : "failed"}</p>
+    <div class="actions"><button class="button primary" data-source="${esc(fn.operation)}">Read the function</button>
+    ${document_ ? `<button class="button" data-offline="${esc(document_)}" data-operation="${esc(fn.operation)}">Test the bundle alone</button>` : ""}
+    <a class="button" href="/api/bundle.json?operation=${encodeURIComponent(fn.operation)}" download>Download</a></div>
+    ${STATE.offline && STATE.offline.operation === fn.operation ? offlineHtml(STATE.offline) : ""}
+    <details><summary>Identity + verification</summary>${row("function_hash", fn.function_hash)}${row("receipt", fn.receipt_id)}${row("bundle", fn.bundle_bytes + " bytes")}${fn.checks.map(c => row(c.key, `${c.passed ? "passed" : "failed"} · ${c.detail}`)).join("")}${excludedHtml(fn)}</details></div>`;
 }
 
 function unpromotedBody(fn) {
@@ -750,6 +617,7 @@ function renderMetrics() {
 }
 
 function renderLog() {
+  if (!$("events-details").open) { $("log").innerHTML = ""; return; }
   $("log").innerHTML = STATE.log
     .map(
       (entry) => `<div class="log-line">
@@ -825,9 +693,13 @@ async function runStory(upTo) {
 document.addEventListener("click", (event) => {
   const target = event.target.closest(
     "[data-send],[data-review],[data-action],[data-offline],[data-revoke]," +
-    "[data-source],[data-select]");
+    "[data-source],[data-select],[data-operation-open],[data-history]");
   if (!target || BUSY) return;
-  if (target.dataset.send) send(target.dataset.send);
+  if (target.dataset.history) { HISTORY = !HISTORY; render(); } else if (target.dataset.operationOpen) {
+    DRAWER = target.dataset.operationOpen;
+    const task = STATE.scenarios.find(t => t.id === STATE.selected && t.operations.includes(DRAWER)) || STATE.scenarios.find(t => t.operations.includes(DRAWER));
+    select(task.id);
+  } else if (target.dataset.send) send(target.dataset.send);
   else if (target.dataset.select) select(target.dataset.select);
   else if (target.dataset.review) review(target.dataset.proposal, target.dataset.review);
   else if (target.dataset.action) lifecycle(target.dataset.action);
@@ -842,6 +714,9 @@ function setSource(operation) {
   render();
 }
 
+$("commands-details").addEventListener("toggle", renderTerminal);
+$("events-details").addEventListener("toggle", renderLog);
+$("drawer-close").addEventListener("click", () => { DRAWER = ""; render(); });
 $("overlay-close").addEventListener("click", () => setSource(""));
 $("overlay").addEventListener("click", (event) => {
   if (event.target === $("overlay")) setSource("");
@@ -861,6 +736,7 @@ $("reset").addEventListener("click", async () => {
   const parameters = new URLSearchParams(location.search);
   if (parameters.has("expand")) document.body.classList.add("expanded");
   if (parameters.has("open")) OPEN_ALL = true;
+  if (parameters.has("drawer")) DRAWER = parameters.get("drawer");
   if (parameters.has("reset")) await call("/api/reset", {});
   STATE = await (await fetch("/api/state")).json();
   if (parameters.has("source")) SOURCE_OPEN = parameters.get("source");

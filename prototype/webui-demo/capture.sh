@@ -84,7 +84,7 @@ shot '' 07-blocked.png
 
 post select '{"scenario":"file"}'
 post offline '{"document_id":"A03","operation":"document.extraction_plan"}'
-shot '' 08-bundle.png
+shot 'drawer=document.extraction_plan' 08-bundle.png
 
 # The overlay card is position: fixed, so it is measured as the card plus the .overlay
 # 24 px padding on both edges.

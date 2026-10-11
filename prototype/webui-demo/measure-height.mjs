@@ -47,6 +47,7 @@ try {
       // scrollHeight reports the viewport. Swap the clipped body for its content.
       return card.offsetHeight - body.clientHeight + body.scrollHeight + 48;
     }
+    // The board stays compact; a requested drawer adds its measured content.
     const pane = document.querySelector("#side-hidden .pane-body");
     const box = pane.getBoundingClientRect();
     return box.top + pane.scrollHeight + (window.innerHeight - box.bottom);

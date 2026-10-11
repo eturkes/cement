@@ -2093,6 +2093,13 @@ class Session:
                         "promoted": name in self.functions,
                         "entries": self.functions.get(name, {}).get("entries", 0),
                         "blocked": len(self.blocked.get(name, [])),
+                        # Every scope's confirmations, unscoped by task: the board shows
+                        # all five rows, while `categories` follows the selected task.
+                        "support": [
+                            row["confirmations"]
+                            for row in categories
+                            if row["operation"] == name
+                        ],
                         "selected": name in selected,
                     }
                     for name, detail in OPERATIONS.items()

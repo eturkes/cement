@@ -11,7 +11,8 @@ deployment puts Cement behind a chat product such as Open WebUI, where none of t
 reaches the person typing.
 
 The screen has two halves. The left half is the whole surface a user gets. The right half
-is everything that stays invisible in production.
+is everything that stays invisible in production. Its center is one board: a row for each
+operation, and a column for each lifecycle stage. All other detail opens on request.
 
 ## Run
 
@@ -53,41 +54,45 @@ One function serves several tasks. **File it into the record** promotes
 
 1. **The chat stays plain, and it never waits for a person.** The left half shows an
    attachment, a request and an answer. It shows no proposal ID, no model name, no
-   digest and no timing. The model answers the user at once. The supervisor reads that
-   candidate afterwards, which is where the review queue on the right comes from.
-2. **The wording varies and the task does not.** `Extract the record fields as JSON.` and
-   `Give me the JSON for the record fields.` reach the same operation. The right half
-   names that operation under **one task at a time**.
-3. **Each message opens.** Select **what happened under this** below any message. The
+   digest and no timing. The model answers the user at once. The candidate then waits in
+   the **Review inbox** on the right.
+2. **The wording varies and the task does not.** Select a task under **Try a task**. Open
+   **Choose a wording** for its requests. `Extract the record fields as JSON.` and
+   `Give me the JSON for the record fields.` reach the same operation.
+3. **Each message opens.** Select **what happened under this** below a message. The
    machinery that the chat hides appears there: the exact input Cement keys on, the
    answer each operation returned, the digests, and the commands. A corrected answer
-   also shows what the supervisor cemented instead. The user keeps the answer the model
-   wrote, and that exposure is what cementing removes.
-4. **The operator works in a terminal.** The right half runs the real `cement` binary
-   against the demo ledger. Each row shows the command, a short reading of what it
-   returned, and the exit code. Select the `stdout` line for the verbatim bytes and the
-   exact argument list.
+   also shows what the supervisor cemented instead. The chat shows the latest turn.
+   Select **Show earlier turns** for the rest.
+4. **The board fills in.** Each row is one operation, and it names the tasks that call it.
+   The cells fill from left to right: the model answered, a supervisor confirmed, the
+   operator sealed a function, and routing is on.
 5. **Evidence accumulates.** Documents A01, A02 and A03 hold different patients, but they
    share one layout signature. That signature is the scope. The patient values never
-   enter it.
-6. **The scope becomes a function.** Select `compile`, `function verify-drafts` and
-   `function promote`. Compile groups the confirmed examples. Verification replays them.
-   Promotion makes the operator repeat the digest that `function inspect` reported.
-7. **The operator routes the promoted operations.** Turn on operator routing. Document
+   enter it. The **Supervised** cell counts confirmations against the floor.
+6. **The scope becomes a function.** Select a row to open its drawer. Under **Run the
+   lifecycle for this task**, select Compile, Verify drafts and Promote. Compile groups
+   the confirmed examples. Verification replays them. Promotion makes the operator repeat
+   the digest that `function inspect` reported.
+7. **The operator routes the promoted operations.** Turn on the routing switch. Document
    A03 then resolves from the promoted set in milliseconds, with no model call.
 8. **The supervised answer and the cemented answer are identical.** A model answers A02,
    and a person confirms that candidate afterwards. The promoted function answers A03.
    The two bubbles render the same. That identity is the point.
 9. **One function serves the next task.** Switch to **Send it to an outside specialist**.
    The extraction plan resolves from the function it already has, and only the identifier
-   map reaches the model. One answer, two sources, no visible seam. The function card
-   names every task that calls it.
-10. **The boundary holds.** Run **Code it for billing**. The terminal shows
-    `blocked  one note's assessment text (A01) - support 1 is below required 2`. Cement
-    widens nothing on its own.
-11. **The function travels.** Download the bundle, or answer A03 from the bundle bytes
-    alone. The bundle carries no ledger.
-12. **The function is readable.** Select **read the function**. The overlay shows the
+   map reaches the model. One answer, two sources, no visible seam.
+10. **The boundary holds.** Run **Code it for billing**. The billing row stops at an amber
+    **blocked** cell. Each note has its own assessment text, so no exact input repeats.
+    Cement widens nothing on its own.
+11. **The operator works with real commands.** Open **Commands, measured costs and ledger
+    events**. Each row is a real `cement` subprocess against the demo ledger, with its
+    exit code. Open a row for a short reading, then for the verbatim bytes and the exact
+    argument list.
+12. **The function travels.** In a sealed row's drawer, select **Download**, or select
+    **Test the bundle alone** to answer A03 from the bundle bytes. The bundle carries no
+    ledger.
+13. **The function is readable.** Select **Read the function**. The overlay shows the
     promoted set as one function: one guarded branch per entry, and a no-match tail. Each
     branch opens to the four commands that rebuild its lineage, and then to the requests
     themselves. Compare `proposed_output` against the entry that now answers.
@@ -146,7 +151,8 @@ the guarantees, and [docs/architecture.md](../../docs/architecture.md) for the s
 
 Query parameters help with capture. `?reset=1` starts a new ledger. `?scene=N` plays the
 story to scene N. `?expand=1` removes the internal scrollbars for a full-page screenshot.
-`?source=<operation>` opens the source overlay for that promoted operation. `?open=1`
+`?source=<operation>` opens the source overlay for that promoted operation.
+`?drawer=<operation>` opens the drawer for that operation. `?open=1`
 opens every disclosure except the raw `stdout` blocks and the lineage of later entries. A
 screenshot cannot select a disclosure. The raw bytes bury the reading they belong to, and
 the later entries repeat a lineage the first entry already shows.
@@ -166,14 +172,14 @@ Each numbered frame must show its claim:
 
 | File | What it shows |
 |---|---|
-| `01-desk.png` | Five tasks, and every operation before the first request. |
+| `01-desk.png` | Five tasks, and the empty board before the first request. |
 | `02-answered.png` | The answer already with the user, and its candidate waiting for review. |
-| `03-evidence.png` | Two confirmations against one layout signature. |
-| `04-cemented.png` | The promoted set, its hash and the six checks. |
+| `03-evidence.png` | Two confirmations against one layout signature, in the **Supervised** cell. |
+| `04-cemented.png` | The extraction plan sealed with one entry on the board. |
 | `05-routed.png` | A03 answered from the function, in a bubble that looks supervised. |
-| `06-reuse.png` | One answer from two sources, and a function with four callers. |
-| `07-blocked.png` | Four operations sealed, and the fifth blocked by design. |
-| `08-bundle.png` | The answer from the exported bundle. |
+| `06-reuse.png` | One answer from two sources, and two sealed rows that name their callers. |
+| `07-blocked.png` | Four operations sealed and routed, and the billing row blocked by design. |
+| `08-bundle.png` | The extraction plan drawer, with the answer from the exported bundle. |
 | `09-source.png` | The function read as source, with the four hops behind one entry. |
 
 The run also writes `story-full-page.png`, the whole page at the end of the story.

@@ -10,6 +10,7 @@ Production artifact = a library + CLI control plane that an interface like Open 
 
 Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 - Prototype web UI demo `prototype/webui-demo/` — `uv run python prototype/webui-demo/app.py` → <http://127.0.0.1:8765/>.
+  - Density grade: `node prototype/webui-demo/density.mjs '<url>'` at `?reset=1` + after `capture.sh`.
 - Library `src/cement_runtime/` (`from cement_runtime import System`) + CLI `uv run cement --help` (README quick start = the lifecycle: `operation register` → `proposal submit/review` → `compile` → `function verify-drafts/inspect/promote/verify/export/eval`, `resolve`).
 - Hospital OCR example — `uv run python examples/hospital_ocr/run_demo.py` (`All checks passed.`; README transcript pinned).
 - Gate — `uv run python -m unittest discover -s tests -t .` (1031 tests; wall time splits by `test_d28`'s replay range → `.claude/rules/ops.md`) + `uv build`. Instruments = `.agent/decisions/m<m>u<u>-*`.
@@ -42,6 +43,18 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   and the answer cemented instead — inside that message's disclosure, and a rejection retracts
   nothing. Chat kinds = `document | answer`. Every detail stripped from a bubble moves to a
   per-message `what happened under this` disclosure.
+  Board layout (owner-ruled, picked over a stepper + a chat-twin timeline): density is the enemy,
+  every layer past the first opens on request. Left = plain chat showing the LATEST turn, earlier
+  turns behind `Show N earlier turns`; tray = 5 task chips + `Choose a wording` disclosure. Right
+  = ONE board, 5 operation rows (callers named per row) × `Model answers → Supervised n/floor →
+  Sealed → Routed`, billing stopping at an amber `blocked` cell; under it the boundary line, the
+  routing switch, one `What this buys` sentence, the task-scoped review inbox (compare behind a
+  disclosure), then ONE collapsed `Commands, measured costs and ledger events` disclosure whose
+  bodies render only when opened. A row click opens that operation's drawer: function card,
+  `Read the function`, bundle test + download, identity + checks, evidence, lifecycle buttons.
+  No digest or check list renders without a click. Graded by `prototype/webui-demo/density.mjs` (words on
+  the first 1600×1000 screen / rendered / buttons): reset 545/774/24 → 259/282/17, story end
+  571/3947/27 → 311/338/18.
   The right half runs the operator lifecycle as REAL `cement` subprocesses against the demo
   ledger (`_cli`), printing the command, its rc and a condensed reading of the bytes it
   returned, with verbatim stdout + exact argv one click away; an argument over 80 chars prints
@@ -74,6 +87,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 
 ## Tasks
 
+- [ ] ITERATE round 5: UI dense → `board` picked over `guided` + `mirror` (`Decisions` board-layout ruling); merged, retired.
 - [ ] M3.6a3 delete the 7 dead outcome types (`Outcome` + its 6 members).
   - `src/` holds zero constructors, only `models.py` defs, `__init__.py` import/`__all__`, one `system.py` docstring. `CandidateRequest.request_id` STAYS — live on the `cement-source-v1` envelope — and leaves with M3.6b's single schema/protocol cut.
   - Accept: burden re-measured on its own deletion set; battery per contract.
@@ -175,6 +189,15 @@ rows, `System.resolve` 3.5-6.0 ms, 4 of 5 operations sealed, `billing_codes` blo
 empty server log. The capture = 10 PNGs + `transcript.txt` (127 lines) plus `timings.txt`, from ONE ledger in 88 s, `02-held` retired for `02-answered`, and
 its `sha256sum *.png | awk '{print $1}' | sort | uniq -d` EMPTY — the filename must be
 stripped, since whole-line `uniq -d` never fires — against a positive control reporting 1.
+
+5. The page was incredibly dense and hard to understand: ten stacked right-half sections, 15
+   prompt cards, a 64-char hash and six check rows on every function card. Answered by the
+   board layout (`Decisions`), owner-picked from three variants (stepper, board, chat-twin).
+
+Shipped for (5): rewritten `index.html`/`app.js`/`app.css`, `capture.sh` (`08-bundle` opens the
+drawer via `?drawer=`), `README.md`, new `density.mjs`. `demo.py` = `operations[].support` (per-scope confirmations, unscoped by task, so an unselected row keeps its real count); `app.py` unchanged.
+Verified by `capture.sh` rc 0, 10 PNGs read, duplicate-hash scan empty; density reset
+259/282/17 + story end 311/338/18 against 545/774/24 + 571/3947/27.
 
 Capture heights are no longer eyeballed: `prototype/webui-demo/measure-height.mjs` reports the
 viewport the right column needs (or the fixed overlay card, whose body scrolls inside it), and
