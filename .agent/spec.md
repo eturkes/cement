@@ -87,7 +87,8 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 
 ## Tasks
 
-- [ ] ITERATE round 5: UI dense → `board` picked over `guided` + `mirror` (`Decisions` board-layout ruling); merged, retired.
+- [x] 2547505 ITERATE round 5: UI dense → `board` picked over `guided` + `mirror` (`Decisions` board-layout ruling); merged, retired.
+- [ ] ITERATE round 6: owner continues simplifying the board in a fresh session (no go yet); open with `capture.sh` + `density.mjs`.
 - [ ] M3.6a3 delete the 7 dead outcome types (`Outcome` + its 6 members).
   - `src/` holds zero constructors, only `models.py` defs, `__init__.py` import/`__all__`, one `system.py` docstring. `CandidateRequest.request_id` STAYS — live on the `cement-source-v1` envelope — and leaves with M3.6b's single schema/protocol cut.
   - Accept: burden re-measured on its own deletion set; battery per contract.
@@ -205,6 +206,6 @@ viewport the right column needs (or the fixed overlay card, whose body scrolls i
 needs no height), so a UI change cannot leave a stale number behind. It reproduced all eight previously eyeballed heights within 20 px and the overlay
 card at 6095 against the recorded 6100.
 
-Resume IMPLEMENT at M3.6a3 when the owner says go.
+Next ITERATE session = round 6 on the board layout. Resume IMPLEMENT at M3.6a3 when the owner says go.
 
 Suspended IMPLEMENT order = `Tasks` top to bottom, resuming at its head; the phase-close review row hands over to MAINTAIN.
