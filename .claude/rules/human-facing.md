@@ -7,7 +7,7 @@ paths:
 
 # Human-facing prose law
 
-Surfaces = `README.md`, `docs/*.md`, `examples/*/README.md`, CLI `--help`. Register = ASD-STE100 per project `CLAUDE.md`; graded today by `test_d25_*` in `tests/test_cli_removal_battery.py` over paragraphs the diff changed.
+Surfaces = `README.md`, `docs/*.md`, `examples/*/README.md`, CLI `--help`. Register = ASD-STE100 per global `CLAUDE.md` `Authoring` `Human-facing`; graded today by `test_d25_*` in `tests/test_cli_removal_battery.py` over paragraphs the diff changed.
 
 - Re-derive every claim against SHIPPED CODE, never against the inventory that scoped the work: an accurate inventory of WHAT to fix still carries role errors that flow straight into new prose. An inventory is attention-directing; the source is authoritative.
 - State publication POSITIVELY: a reader must learn from prose alone that a surface exists, plus its authority, return, row cost, idempotency and failure containment. Docstrings are not publication — a unit can ship a fully documented public API that no human-facing surface names. The mechanical test is grepping each new name across README and every normative document.

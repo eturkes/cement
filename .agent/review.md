@@ -13,6 +13,30 @@ fixed before the close it reviews; a finding outside it is born as a `.agent/def
 row with its acceptance check, never as an open row here. A fix earns ONE re-review round
 against its acceptance check alone.
 
+## `CLAUDE.md` refresh agents@eac5295 → agents@5e03db6 (ITERATE, ad-hoc) — target = the diff this commit lands, base `b8a0703`
+
+Template delta = `# Alignment` → `# Phase flow` (Collaboration, Authoring, Engineering, research,
+briefs, Git, read cost → global `CLAUDE.md`), `Routing` + `Routed state`, spec bullet (`Intent`
+human-facing, `Phase` = state alone, `.agent/spec-lint`), PROTOTYPE + ITERATE quick loop, IMPLEMENT
+greenfield, per-depth Teammates + Advisor; 15 `claude/` bodies. Reviewer = `reviewer-1`, 10 lenses
+fixed before dispatch, primary tree read-only for both rounds (first pass tree `49d8d92`, re-review
+`ebc17e3`; its tracked-diff + new-file hashes equal before = after each round); every row below =
+MAIN's own rerun. Owner ruling this pass carries: 614a667 mutation-tool credit = adopted, tool
+queued (p74).
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| L1 | template fidelity + `last-sync` | pass | `cmp` `CLAUDE.md` + `.agent/spec-lint` vs upstream rc 0 each, mode 755; `last-sync = agents@5e03db6` = `upstream-sync.md:14`, 1 occurrence; upstream `5e03db6..HEAD -- claude/` = 0 commits. |
+| L2 | obligation coverage | finding, fixed | Reviewer's independent D01-D22 = MAIN's map except D16: `fdf950f`'s steered finish-line migration unmapped (F1) → O22: carrier = upstream `prompts/steered/`, no repo copy; live law follows (`upstream-sync.md` phases invariant, ITERATE index row, Superseded ITERATE line; `ops.md` census: a round's revision editing `.agent/spec.md` owes `.agent/spec-lint`). MAIN-found F2: the `Intent` (human-facing) register half was unmet, `Decisions` classing it agent-optimized → that line names `Intent` human-facing + ungraded, p75 queues the existing text (4 of 7 sentences over 25 words, 2 with ` = `). Re-review round 1: F1 + F2 resolved. |
+| L3 | old-form completeness | pass | `rg --hidden -g '!.git' -n -F` over 38 forms + `last-sync = agents@` from the root → live = `upstream-sync.md:14` (last-sync) + `:73` (Superseded `SUSPENDED INTACT`); history = `review.md:26` + `:45`, `archive/iterate-rounds.md:18`, `archive/memory.md:3`; controls: 36 forms in pre-refresh `git grep HEAD`, 2 in history. Reviewer's 23 extra forms → rc 1. |
+| L4 | spec preservation | note, fixed | Archive = `Phase` verbatim (`cmp` vs `b8a0703` lines 115-215 rc 0); spec above `Phase` vs `b8a0703` = 3 hunks (`16c16` Gate, `83c83` `Intent` human-facing, `90a91` M3.6a3 resume note); 14 `Tasks` checkbox rows identical; 30 unit ids, 0 lost. N1: the first helper counted the permitted Gate edit as lost history (false rc 1) → containment scoped to `Phase`, Gate + `Decisions` edits asserted exactly; archive-drop / Artifacts-drift / Decisions-drift seeds rc 1 each, clean rc 0. |
+| L5 | check strength | pass | `.agent/spec-lint <(git show b8a0703:.agent/spec.md)` rc 1 (`:115`, `:116`), working spec rc 0; queue grader header pin before = clean 0 / one-word drift 1, after = clean 0 / drift 1 / OLD header vs new pin 1; `tests/ src/ examples/ prototype/` diff empty (control `.agent .claude CLAUDE.md` = 8); gate run 1 on `49d8d92` `Ran 1031 tests in 1847.267s` `OK`, `uv build` rc 0, `.agent/spec-lint` rc 0. |
+| L6 | deferred rows | pass | grader rc 0 `VERDICT: PASS`, 75 rows; p74 (mutation tool, `pri=2`) + p75 (`Intent` register, `pri=4`) born ascending; p67 `behavioral reference` → `owner-ruled view`; p72 accept follows `Phase` = state alone; p71 + p72 accept commands hold (rc 1 each). |
+| L7 | `upstream-sync.md` shape | pass | frontmatter = HEAD's (`cmp` rc 0); invariants 9 → 9, each tracing to a current `CLAUDE.md` clause; index 13 → 14 (5 verbatim, 7 re-keyed to global or current template clauses, the `State` row → the spec's routed state, + mutation-tool + spec-lint rows); Superseded 14 → 16. |
+| L8 | law conflict + register | pass | mutation credit reads the same in `assurance.md`, `ops.md` Commits, `upstream-sync.md` index + Superseded, p74; gate = unittest + `uv build` + `.agent/spec-lint` in `ops.md` Env, spec `Artifacts`, queue header + grader `HEADER`; `git diff --check HEAD` rc 0; one H1 per edited or new Markdown file. |
+| L9 | step 6 settings | pass | `.claude/settings.local.json` env = `ANTHROPIC_BASE_URL` + `ENABLE_TOOL_SEARCH`, hook = Headroom selfheal; `.claude/agents/` absent ⇒ nothing removed. |
+| L10 | routed state | pass | `Phase` = `ITERATE — whole product` / `> I want to return to the ITERATE stage` (the owner's message, session `08cfd0c7`, 2026-09-10T01:38:21Z) / `Suspended: IMPLEMENT — whole product`; resume note on M3.6a3; `.agent/spec-lint` rc 0; fresh `claude -p` context-only probe: 0 tool calls, answer = IMPLEMENT + M3.6a3. |
+
 ## `CLAUDE.md` refresh agents@4d22203 → agents@eac5295 (ITERATE, ad-hoc) — target = the diff this commit lands, base `604bf9b`
 
 Template delta = 4 hunks (`Execution` research, `Authoring` pasted-prompt flaw, `Engineering`

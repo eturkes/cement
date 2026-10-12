@@ -69,8 +69,8 @@ rows that block the current spine. `pri` 1 = highest. p01-p61 came from the froz
 record and must carry every anchor a future session needs.
 
 Gate for every row unless the row says otherwise: `uv run python -m unittest discover -s tests
--t .` plus `uv build`. A row needing a scope source, an assurance tier or the unit set changed
-is spine work, not queue work.
+-t .` plus `uv build` plus `.agent/spec-lint`. A row needing a scope source, an assurance tier
+or the unit set changed is spine work, not queue work.
 
 Grader: `uv run python .agent/decisions/m3-deferred-validate.py` (floor = archive ids | the ids
 of every committed revision, so a born row cannot be dropped either; `unknown` + thin cells red).
