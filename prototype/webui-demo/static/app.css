@@ -663,3 +663,20 @@ pre {
     grid-template-columns: 1.7fr 1fr 1fr 1fr 0.8fr;
   }
 }
+
+/* Narrative belongs to the explainer half; the chat's styling stays unchanged. */
+#side-hidden .story-heading { margin-bottom: 18px; }
+#side-hidden .story-heading h3 { font-size: 20px; margin-top: 6px; }
+.story-step { display: grid; grid-template-columns: 28px 1fr; gap: 16px; padding: 7px 0 13px; }
+.story-number { border-radius: 50%; background: #edf3ef; color: #205b3e; width: 28px; height: 28px; display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+.story-step h3 { font-size: 16px; line-height: 1.35; margin: 6px 0; }
+.story-step p { color: #4d5a52; font-size: 13.5px; line-height: 1.45; margin: 0; max-width: 540px; }
+.story-illustration { font: 13px Mono; color: #205b3e; background: #edf3ef; display: inline-block; padding: 5px 12px; border-radius: 5px; }
+.story-action { margin-top: 14px; }
+.story-check { padding: 16px; border: 1px solid var(--line); margin-top: 14px; border-radius: 8px; }
+.story-check pre { max-height: 260px; overflow: auto; }
+.story-boundary .story-illustration { background: #faf0dd; color: #775018; }
+.story-footnote { font-size: 13px; color: #775018; padding: 14px 16px; background: #faf0dd; border-radius: 8px; line-height: 1.5; }
+.operator-view { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 16px; }
+.operator-view > summary { font-size: 14px; }
+.operator-job { display: block; margin: 8px 0; }

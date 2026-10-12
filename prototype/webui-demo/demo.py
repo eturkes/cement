@@ -2126,6 +2126,11 @@ class Session:
                     for document in self.documents
                 ],
                 "chat": self.chat,
+                "latest_turn": next((
+                    {"document_id": unit["document_id"], "parts": unit["parts"]}
+                    for unit in reversed(list(self.answered.values()))
+                    if unit["scenario"] == self.selected
+                ), None),
                 "log": self.log,
                 "terminal": self.terminal,
                 "ledger": {

@@ -11,8 +11,9 @@ deployment puts Cement behind a chat product such as Open WebUI, where none of t
 reaches the person typing.
 
 The screen has two halves. The left half is the whole surface a user gets. The right half
-is everything that stays invisible in production. Its center is one board: a row for each
-operation, and a column for each lifecycle stage. All other detail opens on request.
+explains the work behind the selected task in four short steps. A person checks the
+model answer. Repeated checks prepare exact answers for reuse. A person then switches
+those answers on. **Operator view** holds the commands, evidence and function source.
 
 ## Run
 
@@ -52,50 +53,23 @@ One function serves several tasks. **File it into the record** promotes
 
 ## What to watch
 
-1. **The chat stays plain, and it never waits for a person.** The left half shows an
-   attachment, a request and an answer. It shows no proposal ID, no model name, no
-   digest and no timing. The model answers the user at once. The candidate then waits in
-   the **Review inbox** on the right.
-2. **The wording varies and the task does not.** Select a task under **Try a task**. Open
-   **Choose a wording** for its requests. `Extract the record fields as JSON.` and
-   `Give me the JSON for the record fields.` reach the same operation.
-3. **Each message opens.** Select **what happened under this** below a message. The
-   machinery that the chat hides appears there: the exact input Cement keys on, the
-   answer each operation returned, the digests, and the commands. A corrected answer
-   also shows what the supervisor cemented instead. The chat shows the latest turn.
-   Select **Show earlier turns** for the rest.
-4. **The board fills in.** Each row is one operation, and it names the tasks that call it.
-   The cells fill from left to right: the model answered, a supervisor confirmed, the
-   operator sealed a function, and routing is on.
-5. **Evidence accumulates.** Documents A01, A02 and A03 hold different patients, but they
-   share one layout signature. That signature is the scope. The patient values never
-   enter it. The **Supervised** cell counts confirmations against the floor.
-6. **The scope becomes a function.** Select a row to open its drawer. Under **Run the
-   lifecycle for this task**, select Compile, Verify drafts and Promote. Compile groups
-   the confirmed examples. Verification replays them. Promotion makes the operator repeat
-   the digest that `function inspect` reported.
-7. **The operator routes the promoted operations.** Turn on the routing switch. Document
-   A03 then resolves from the promoted set in milliseconds, with no model call.
-8. **The supervised answer and the cemented answer are identical.** A model answers A02,
-   and a person confirms that candidate afterwards. The promoted function answers A03.
-   The two bubbles render the same. That identity is the point.
-9. **One function serves the next task.** Switch to **Send it to an outside specialist**.
-   The extraction plan resolves from the function it already has, and only the identifier
-   map reaches the model. One answer, two sources, no visible seam.
-10. **The boundary holds.** Run **Code it for billing**. The billing row stops at an amber
-    **blocked** cell. Each note has its own assessment text, so no exact input repeats.
-    Cement widens nothing on its own.
-11. **The operator works with real commands.** Open **Commands, measured costs and ledger
-    events**. Each row is a real `cement` subprocess against the demo ledger, with its
-    exit code. Open a row for a short reading, then for the verbatim bytes and the exact
-    argument list.
-12. **The function travels.** In a sealed row's drawer, select **Download**, or select
-    **Test the bundle alone** to answer A03 from the bundle bytes. The bundle carries no
-    ledger.
-13. **The function is readable.** Select **Read the function**. The overlay shows the
-    promoted set as one function: one guarded branch per entry, and a no-match tail. Each
-    branch opens to the four commands that rebuild its lineage, and then to the requests
-    themselves. Compare `proposed_output` against the entry that now answers.
+1. Select a task, then open **Choose a wording** and send a request.
+2. The chat answers without waiting for a person. The right half explains who did the work.
+3. Select **Check this answer**. Compare the model answer with the proposed correction.
+4. Save the correction, confirm an unchanged answer, or discard the example.
+   The chat reply stays unchanged. Only confirmed answers become evidence.
+5. Send and check another request with the same exact input.
+6. When the evidence is ready, select **Make this automatic**.
+   This runs compile, verification and promotion as real Cement commands.
+7. Select **Use the checked answers**. Matching work now uses those answers without a model call.
+8. Select **Code it for billing**. Different assessment words never accumulate repeated evidence in this demo.
+9. Open **Operator view** for all jobs, commands and evidence.
+   Select a job to inspect its function, test its bundle or download it.
+10. Select **Read the function** for its exact inputs, outputs and supervised request history.
+
+The left half keeps the latest turn visible. Earlier turns and each message’s technical
+details open on request. A reply can combine automatic work and model work without
+showing that division to the user.
 
 ## Real and simulated
 
@@ -172,13 +146,13 @@ Each numbered frame must show its claim:
 
 | File | What it shows |
 |---|---|
-| `01-desk.png` | Five tasks, and the empty board before the first request. |
+| `01-desk.png` | Five tasks and the four-step explanation before the first request. |
 | `02-answered.png` | The answer already with the user, and its candidate waiting for review. |
-| `03-evidence.png` | Two confirmations against one layout signature, in the **Supervised** cell. |
-| `04-cemented.png` | The extraction plan sealed with one entry on the board. |
+| `03-evidence.png` | Two matching checks, with **Make this automatic** as the next action. |
+| `04-cemented.png` | Checked answers prepared, with **Use the checked answers** as the next action. |
 | `05-routed.png` | A03 answered from the function, in a bubble that looks supervised. |
-| `06-reuse.png` | One answer from two sources, and two sealed rows that name their callers. |
-| `07-blocked.png` | Four operations sealed and routed, and the billing row blocked by design. |
+| `06-reuse.png` | One answer from two sources, explained in the narrative. |
+| `07-blocked.png` | Billing stays with the model because assessment words do not repeat. |
 | `08-bundle.png` | The extraction plan drawer, with the answer from the exported bundle. |
 | `09-source.png` | The function read as source, with the four hops behind one entry. |
 

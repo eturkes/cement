@@ -43,18 +43,16 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   and the answer cemented instead — inside that message's disclosure, and a rejection retracts
   nothing. Chat kinds = `document | answer`. Every detail stripped from a bubble moves to a
   per-message `what happened under this` disclosure.
-  Board layout (owner-ruled, picked over a stepper + a chat-twin timeline): density is the enemy,
-  every layer past the first opens on request. Left = plain chat showing the LATEST turn, earlier
-  turns behind `Show N earlier turns`; tray = 5 task chips + `Choose a wording` disclosure. Right
-  = ONE board, 5 operation rows (callers named per row) × `Model answers → Supervised n/floor →
-  Sealed → Routed`, billing stopping at an amber `blocked` cell; under it the boundary line, the
-  routing switch, one `What this buys` sentence, the task-scoped review inbox (compare behind a
-  disclosure), then ONE collapsed `Commands, measured costs and ledger events` disclosure whose
-  bodies render only when opened. A row click opens that operation's drawer: function card,
-  `Read the function`, bundle test + download, identity + checks, evidence, lifecycle buttons.
-  No digest or check list renders without a click. Graded by `prototype/webui-demo/density.mjs` (words on
-  the first 1600×1000 screen / rendered / buttons): reset 545/774/24 → 259/282/17, story end
-  571/3947/27 → 311/338/18.
+  Story layout (owner-ruled r6, picked over a plain-language board + a counter/rulebook): the
+  right half's first layer = `Behind this task` — four numbered plain-language steps narrating
+  the selected task's latest request (model wrote it / a person checks it / n of floor checks
+  for this exact input / you decide when to use it, or `a checked answer replied, no model ran`),
+  the ONE next human action as a button at its step, and an amber `Why not billing?` line. No
+  Cement term leads a step. Board, routing switch, inbox, drawer + commands = ONE collapsed
+  `Operator view` disclosure. Left half unchanged (latest turn, `Show N earlier turns`, tray =
+  5 task chips + `Choose a wording`). Graded by `prototype/webui-demo/density.mjs` (words on
+  the first 1600×1000 screen / rendered / buttons): reset 259/282/17 → 251/261/17, story end
+  311/338/18 → 287/301/18.
   The right half runs the operator lifecycle as REAL `cement` subprocesses against the demo
   ledger (`_cli`), printing the command, its rc and a condensed reading of the bytes it
   returned, with verbatim stdout + exact argv one click away; an argument over 80 chars prints
@@ -88,7 +86,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 ## Tasks
 
 - [x] 2547505 ITERATE round 5: UI dense → `board` picked over `guided` + `mirror` (`Decisions` board-layout ruling); merged, retired.
-- [ ] ITERATE round 6: owner continues simplifying the board in a fresh session (no go yet); open with `capture.sh` + `density.mjs`.
+- [ ] ITERATE round 7: owner reviews the story layout (round 6 picked it; no go yet); open with `capture.sh` + `density.mjs`.
 - [ ] M3.6a3 delete the 7 dead outcome types (`Outcome` + its 6 members).
   - `src/` holds zero constructors, only `models.py` defs, `__init__.py` import/`__all__`, one `system.py` docstring. `CandidateRequest.request_id` STAYS — live on the `cement-source-v1` envelope — and leaves with M3.6b's single schema/protocol cut.
   - Accept: burden re-measured on its own deletion set; battery per contract.
@@ -206,6 +204,12 @@ viewport the right column needs (or the fixed overlay card, whose body scrolls i
 needs no height), so a UI change cannot leave a stale number behind. It reproduced all eight previously eyeballed heights within 20 px and the overlay
 card at 6095 against the recorded 6100.
 
-Next ITERATE session = round 6 on the board layout. Resume IMPLEMENT at M3.6a3 when the owner says go.
+6. The right half stayed too dense to understand: board grid, review inbox, routing switch +
+   `What this buys`, and the drawer were all opaque. Answered by the story layout
+   (`Decisions`), owner-picked from three variants (plain board, story, counter + rulebook);
+   tips `archive/iter-r6-{plain,story,counter}`. Verified by `capture.sh` rc 0, frames read,
+   duplicate-hash scan empty; 50 subprocesses 98-123 ms, `System.resolve` 3.4-5.5 ms.
+
+Next ITERATE session = round 7 on the story layout. Resume IMPLEMENT at M3.6a3 when the owner says go.
 
 Suspended IMPLEMENT order = `Tasks` top to bottom, resuming at its head; the phase-close review row hands over to MAINTAIN.
