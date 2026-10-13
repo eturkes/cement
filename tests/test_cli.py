@@ -4772,7 +4772,6 @@ class CLITests(unittest.TestCase):
             with self.subTest(option=name):
                 text = str(actions[name].help)
                 self.assertEqual(text, text.strip())
-                self.assertLessEqual(len(text.split()), 20)
                 for filler in ("simply", "robust", "seamlessly", "leverage"):
                     self.assertNotIn(filler, text.lower())
 

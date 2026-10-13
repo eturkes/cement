@@ -65,7 +65,6 @@ paths:
 - A grader's strict branch guarded by a surface heuristic fails closed on legitimate rows (a `\d{2,}` concreteness test rejects single-digit counts, booleans, `[]`); make the unclassified case FAIL and name the token, and let a widening carry its own evidence rather than becoming a bypass.
 - A validator's clean grade says nothing about columns it EXEMPTS — print the exempt columns; teammate completeness and MAIN's ruling are two deliverables and only one is graded.
 - Run every idempotent patcher twice before trusting it once: derive aggregates from FINAL state, guard idempotence on post-state CONTENT (a marker-presence guard re-emits an archive from its own summaries), and give each edit a distinct sentinel — an anchor re-emitted by its own replacement reapplies forever.
-- A scratch-local validator is a temporary encoding: record its regeneration path beside the gate invocation here and open a `.agent/deferred.md` row for the port, acceptance check written while the evidence is fresh.
 
 ## Contract text is an artifact
 

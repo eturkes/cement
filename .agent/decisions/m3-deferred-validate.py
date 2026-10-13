@@ -5,9 +5,10 @@ Usage:
   uv run python .agent/decisions/m3-deferred-validate.py              # grade
   uv run python .agent/decisions/m3-deferred-validate.py --emit-stub  # seed skeleton
 
-The queue carries one line per live row of the archived polish register plus every
+The queue carries one entry per live row of the archived polish register plus every
 row born after the migration; the archive keeps the full text, evidence and grounds
-for the rows it holds. The archive id set is DERIVED and asserted as a FLOOR, not an
+for the rows it holds. An entry = its row line plus the indented lines directly under
+it, so `Accept:` and `unknown` are graded over the whole entry. The archive id set is DERIVED and asserted as a FLOOR, not an
 identity: a queue that drops an archived row fails, while a new id is admitted, since
 the queue is monotonic and takes every off-path improvement born from here on. `pri`
 is re-read from the archive for every row the archive holds, so a hand-list cannot
@@ -27,7 +28,8 @@ floor collapses at a closing commit, where HEAD IS the candidate and a dropped r
 leaves both sides at once. The floor is `archive ids | ids over the file's history`.
 
 Exits 0 only when the archive parse is total, no row of that floor is missing, every
-row parses, and no cell is `unknown`.
+row parses, every entry carries `Accept:`, and no cell is `unknown`. Cell length is
+never graded (owner ruling, global `Authoring`: strict limits stay out of checks on text).
 """
 
 from __future__ import annotations
@@ -41,10 +43,6 @@ QUEUE_RE = re.compile(r"^- `(?P<id>p\d{2,})` `pri=(?P<pri>\d)` — (?P<body>.+)$
 ARCHIVE_RE = re.compile(r"^- `(?P<id>p\d{2,})` `?pri=(?P<pri>\d)`?")
 ARCHIVE_LOOSE_RE = re.compile(r"^- `p\d{2,}`")
 ACCEPT_RE = re.compile(r"\bAccept: (?P<check>.+)$")
-# A stub cell and a one-word answer read the same to a presence test, so both
-# halves carry a length floor.
-MIN_STATEMENT = 40
-MIN_ACCEPT = 20
 
 
 def _root() -> Path:
@@ -61,20 +59,42 @@ ARCHIVE = ROOT / ".agent/archive/polish.md"
 
 HEADER = """# Deferral queue
 
-Off-path improvements, one line + acceptance check each. The queue is monotonic and
-unattached, so nothing here reaches a session for free; `.agent/spec.md` `Tasks` names the
-rows that block the current spine. `pri` 1 = highest. p01-p61 came from the frozen
-`.agent/archive/polish.md`, which holds their full text, evidence + grounds under the same
-`p<nn>` id; a row born here (p62 on) has no archive entry, so its own line is its whole
-record and must carry every anchor a future session needs.
+Off-path improvements, one entry + acceptance check each: a `p<nn>` row line plus the
+indented lines directly under it. The queue is monotonic and unattached, so nothing here
+reaches a session for free; `.agent/spec.md` `Tasks` names the rows that block the current
+spine. `pri` 1 = highest. p01-p61 came from the frozen `.agent/archive/polish.md`, which
+holds their full text, evidence + grounds under the same `p<nn>` id; a row born here (p62
+on) is absent from the archive, so its own entry is its whole record and must carry every
+anchor a future session needs.
 
 Gate for every row unless the row says otherwise: `uv run python -m unittest discover -s tests
 -t .` plus `uv build` plus `.agent/spec-lint`. A row needing a scope source, an assurance tier
 or the unit set changed is spine work, not queue work.
 
 Grader: `uv run python .agent/decisions/m3-deferred-validate.py` (floor = archive ids | the ids
-of every committed revision, so a born row cannot be dropped either; `unknown` + thin cells red).
+of every committed revision, so a born row cannot be dropped either; `unknown` cells + a missing
+`Accept:` red).
 """
+
+
+def entries(text: str, unparsed: list[str]) -> list[tuple[int, str, str, str]]:
+    """Each `(lineno, id, pri, body)`; body joins the row line's body with its indented lines."""
+    out: list[tuple[int, str, str, list[str]]] = []
+    current: list[str] | None = None
+    for lineno, line in enumerate(text.splitlines(), start=1):
+        if line.startswith("- `p"):
+            match = QUEUE_RE.match(line)
+            if not match:
+                unparsed.append(f"deferred.md:{lineno} {line[:70]!r}")
+                current = None
+                continue
+            current = [match.group("body")]
+            out.append((lineno, match.group("id"), match.group("pri"), current))
+        elif current is not None and line.strip() and line[0] in " \t":
+            current.append(line.strip())
+        else:
+            current = None
+    return [(lineno, row_id, pri, " ".join(parts)) for lineno, row_id, pri, parts in out]
 
 
 def archive_rows() -> tuple[dict[str, str], int]:
@@ -171,7 +191,6 @@ def main(argv: list[str]) -> int:
     order: list[str] = []
     bad: list[str] = []
     unknown: list[str] = []
-    thin: list[str] = []
     unparsed: list[str] = []
 
     # The header states the grading rule this file implements, and `--emit-stub` is the
@@ -182,30 +201,14 @@ def main(argv: list[str]) -> int:
     if not text.startswith(HEADER):
         bad.append("queue header has drifted from this file's HEADER constant")
 
-    for lineno, line in enumerate(text.splitlines(), start=1):
-        if not line.startswith("- `p"):
-            continue
-        match = QUEUE_RE.match(line)
-        if not match:
-            unparsed.append(f"deferred.md:{lineno} {line[:70]!r}")
-            continue
-        row_id = match.group("id")
+    for lineno, row_id, pri, body in entries(text, unparsed):
         order.append(row_id)
-        seen[row_id] = match.group("pri")
-        body = match.group("body")
-        accept = ACCEPT_RE.search(body)
-        if not accept:
+        seen[row_id] = pri
+        if not ACCEPT_RE.search(body):
             bad.append(f"deferred.md:{lineno} {row_id} has no `Accept:` clause")
             continue
-        statement = body[: accept.start()].strip()
-        check = accept.group("check").strip()
         if "unknown" in body.lower():
             unknown.append(f"deferred.md:{lineno} {row_id}")
-            continue
-        if len(statement) < MIN_STATEMENT:
-            thin.append(f"deferred.md:{lineno} {row_id} statement {len(statement)}B < {MIN_STATEMENT}")
-        if len(check) < MIN_ACCEPT:
-            thin.append(f"deferred.md:{lineno} {row_id} accept {len(check)}B < {MIN_ACCEPT}")
 
     if len(want) != loose:
         bad.append(f"archive parse read {len(want)} of {loose} `- `pNN`` rows")
@@ -230,11 +233,10 @@ def main(argv: list[str]) -> int:
     print(f"BORN-AFTER-ARCHIVE: {len(born)} {born[:10]}")
     print(f"UNPARSED: {len(unparsed)}")
     print(f"UNKNOWN-ROWS: {len(unknown)}")
-    print(f"THIN-CELLS: {len(thin)}")
     print(f"BAD: {len(bad)}")
-    for entry in (*unparsed[:10], *unknown[:10], *thin[:10], *bad[:10]):
+    for entry in (*unparsed[:10], *unknown[:10], *bad[:10]):
         print(f"  {entry}")
-    failed = bool(missing or unparsed or unknown or thin or bad) or not want
+    failed = bool(missing or unparsed or unknown or bad) or not want
     print("VERDICT: FAIL" if failed else "VERDICT: PASS")
     return 1 if failed else 0
 

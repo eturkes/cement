@@ -495,8 +495,8 @@
       "kind": "sensitivity",
       "path": "README.md",
       "anchor": "Generate a candidate with your own model or tooling. Then submit it. Cement stores it as one\npending proposal.\n",
-      "replacement": "Generate a candidate with your own model or tooling, inspect every field and identifier for correctness, retain the complete provenance record, and then submit it. Cement stores it as one\npending proposal.\n",
-      "note": "baseline=survived; probe=instruction words 9\u219225; merge the rewritten instruction into a 25-word imperative \u2192 the \u226420-word register cap fails."
+      "replacement": "Generate a candidate with your own model or tooling. Then simply submit it. Cement stores it as one\npending proposal.\n",
+      "note": "filler probe: filler hits 0\u21921; insert `simply` into the rewritten instruction \u2192 the register's filler ban fails; its baseline verdict is unmeasured. Re-aimed by owner ruling (template refresh agents@1622ede: global `Authoring` keeps text caps out of checks) from the 25-word imperative probe (instruction words 9\u219225, \u226420-word cap; that probe's baseline=survived)."
     },
     {
       "id": "M46",

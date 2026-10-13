@@ -3305,31 +3305,11 @@ class ObligationBatteryTests(unittest.TestCase):
             )
         self.assertTrue(touched_prose)
         register = "\n".join(touched_prose)
+        # Sentence length is judged, never capped: owner ruling (template refresh
+        # agents@1622ede) on global `Authoring`, which keeps text caps out of checks.
         self.assertNotRegex(
             register.lower(), r"\b(?:simply|robust|seamlessly|leverage)\b"
         )
-        sentence_violations: list[tuple[int, str]] = []
-        instruction_violations: list[tuple[int, str]] = []
-        imperatives = {
-            "run",
-            "use",
-            "pass",
-            "read",
-            "list",
-            "keep",
-            "do",
-            "set",
-            "give",
-        }
-        for sentence in re.split(r"(?<=[.!?])\s+", register):
-            plain = re.sub(r"[`*_#|]", "", sentence).strip()
-            words = re.findall(r"\b[\w-]+\b", plain)
-            if words and len(words) > 25:
-                sentence_violations.append((len(words), plain))
-            if words and words[0].lower() in imperatives and len(words) > 20:
-                instruction_violations.append((len(words), plain))
-        self.assertEqual(sentence_violations, [])
-        self.assertEqual(instruction_violations, [])
 
     def test_d30_resolve_s_cost_is_published_where_an_operator_meets_it_one(
         self,

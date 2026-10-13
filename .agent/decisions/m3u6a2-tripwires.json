@@ -29,7 +29,7 @@
       "test": "test_d22c_the_opening_text_handle_request_fence_is_protected_and"
     }
   ],
-  "head": "78a6ee8aa217a144cf38f8285b15334af3bbb7ac",
+  "head": "e4e701688c3a34a9db5257b4680a2c90d09a2c39",
   "pins": [
     {
       "lines": 76,
@@ -113,15 +113,6 @@
         "reconciliation_required",
         "request",
         "request_status"
-      ]
-    },
-    {
-      "lines": 234,
-      "locus": "tests/test_cli_removal_battery.py:3074",
-      "scope": "MIXED",
-      "test": "test_d25_rewritten_human_facing_prose_holds_the_project_registe",
-      "vocabulary": [
-        "request"
       ]
     },
     {
@@ -316,8 +307,8 @@
     }
   ],
   "totals": {
-    "pins": 16,
-    "pins_working_tree": 14,
+    "pins": 15,
+    "pins_working_tree": 13,
     "prose_documents_owned": 4,
     "prose_hit_lines": 12
   },

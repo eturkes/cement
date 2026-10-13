@@ -3077,6 +3077,10 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         CONTRACT:
         Rewritten human-facing prose holds the project register: instructions ≤20 words per
         sentence, descriptions ≤25, imperative steps, active voice, condition before command.
+
+        RULED-BY owner (template refresh agents@1622ede), superseding the word bounds above:
+        global `Authoring` keeps text caps out of checks and asks for short sentences, so
+        sentence length is judged, never capped; the filler ban stays.
         """
         surfaces = [
             "README.md",
@@ -3101,194 +3105,10 @@ class RemovalObligationBatteryTests(unittest.TestCase):
                     changed_paragraphs.append(normalized)
 
         self.assertTrue(changed_paragraphs)
-        register = "\n".join(changed_paragraphs)
+        # The root help description was graded here beside the changed prose; dropping the
+        # word bounds must not shrink the graded domain, so the filler ban covers it too.
+        register = "\n".join([*changed_paragraphs, cement_cli._parser().description or ""])
         self.assertNotRegex(register.lower(), r"\b(?:simply|robust|seamlessly|leverage)\b")
-        sentence_violations: list[tuple[int, str]] = []
-        instruction_violations: list[tuple[int, str]] = []
-        # The 20-word instruction bound applies only where the opener is recognised as a verb,
-        # so an OPEN list silently relaxes every unlisted instruction to the 25-word
-        # description bound. Both lists below are a census of the openers the changed prose
-        # actually uses, and an unclassified opener is a FAILURE, not a default to the looser
-        # bound. Adding prose therefore forces the classification rather than skipping it.
-        imperatives = {
-            "authenticate",
-            "call",
-            "canonicalize",
-            "capture",
-            "deploy",
-            "do",
-            "encode",
-            "exclude",
-            "export",
-            "generate",
-            "inspect",
-            "isolate",
-            "keep",
-            "list",
-            "make",
-            "minimize",
-            "monitor",
-            "pass",
-            "poll",
-            "put",
-            "re-run",
-            "reconcile",
-            "repeat",
-            "review",
-            "revise",
-            "run",
-            "stop",
-            "submit",
-            "treat",
-            "use",
-        }
-        descriptive = {
-            "1",
-            "2",
-            "3",
-            "4",
-            "5",
-            "6",
-            "7",
-            "8",
-            "a",
-            # Always the noun phrase "Accept/correct creates ...", never the imperative.
-            "accept",
-            "accepted",
-            "access",
-            "act",
-            "adapters",
-            "additional",
-            "an",
-            "applyplan",
-            "artifacts",
-            "both",
-            "caller",
-            "callers",
-            "candidate",
-            "cement",
-            "cement-json-v1",
-            "checkpointfunction",
-            "compilation",
-            "confirmed",
-            "conflicts",
-            "corpus",
-            "counterexamples",
-            "current",
-            "decimal",
-            # Always the noun phrase "Demo compile policy", never the imperative.
-            "demo",
-            "distinct",
-            "each",
-            "entry",
-            "every",
-            "evidence",
-            "example-hospital",
-            # Always the noun phrase "Exit failure", never the imperative.
-            "exit",
-            "fallbackfailed",
-            "for",
-            # Always the command name `function export`, never the imperative.
-            "function",
-            "historical",
-            "hospital",
-            "if",
-            "individually",
-            "inprogress",
-            "it",
-            "its",
-            "layout",
-            "layoutsignature",
-            "linux",
-            "llm",
-            "meaning",
-            "neither",
-            "no",
-            "ocr",
-            "offline",
-            "on",
-            "only",
-            "operation",
-            "otherwise",
-            "partition",
-            "patient",
-            "per-value",
-            "planadapter",
-            "production",
-            "promoter",
-            "promotion",
-            # Always the method name `propose`, never the imperative.
-            "propose",
-            "proposed",
-            "provider",
-            "reconciliationrequired",
-            "rejected",
-            "request",
-            "requestid",
-            # Always the command name `resolve`, never the imperative.
-            "resolve",
-            "resolveoffline",
-            "resolved",
-            "reviewer",
-            "reviewrequired",
-            "reviewresult",
-            "rundemo",
-            "schema",
-            # Always a noun phrase in this prose -- "Set promotion", "Set verification" --
-            # never the imperative verb.
-            "set",
-            "sqlite",
-            "status",
-            "strict",
-            "structural",
-            "submitproposal",
-            "supervised",
-            "system",
-            "that",
-            "the",
-            "then",
-            "they",
-            "this",
-            "through",
-            "two",
-            "unknown",
-            "verification",
-            "verifydrafts",
-            # A condition opener, classified with `if` and `while`.
-            "when",
-            "while",
-            "whole-set",
-        }
-        unclassified: list[str] = []
-        units: list[str] = []
-        # The register bounds a SENTENCE. A table cell routinely holds several, so cells are
-        # split into cells FIRST and then into sentences; measuring a whole cell reports a
-        # compliant pair of sentences as one oversized one.
-        for paragraph in changed_paragraphs:
-            if paragraph.startswith("|"):
-                pieces = [cell.strip() for cell in paragraph.split("|") if cell.strip()]
-            else:
-                pieces = [paragraph]
-            for piece in pieces:
-                units.extend(re.split(r"(?<=[.!?])\s+", piece))
-        root_description = cement_cli._parser().description or ""
-        units.append(root_description)
-        for sentence in units:
-            plain = re.sub(r"[`*_#|]", "", sentence).strip()
-            words = re.findall(r"\b[\w-]+\b", plain)
-            if words and len(words) > 25:
-                sentence_violations.append((len(words), plain))
-            if not words:
-                continue
-            opener = words[0].lower()
-            if opener in imperatives:
-                if len(words) > 20:
-                    instruction_violations.append((len(words), plain))
-            elif opener not in descriptive:
-                unclassified.append(opener)
-        self.assertEqual(sorted(set(unclassified)), [])
-        self.assertEqual(sentence_violations, [])
-        self.assertEqual(instruction_violations, [])
 
         # The full register audit this test approximates is scratch-local, so the
         # obligation holds only while its port stays deferred: live state is the queue
@@ -3296,14 +3116,20 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         # frozen `.agent/archive/polish.md` would hold even after the row was dropped.
         # Anchors are the row's own bytes -- the previous pin retyped the archive's p12
         # wording instead of deriving it, so it asserted literals no live file contained.
+        # A queue entry = its row line plus the indented lines directly under it.
         queue = (ROOT / ".agent/deferred.md").read_text(encoding="utf-8").splitlines()
-        rows = [line for line in queue if line.startswith("- `p12` ")]
-        self.assertEqual(len(rows), 1)
-        row = rows[0]
+        starts = [index for index, line in enumerate(queue) if line.startswith("- `p12` ")]
+        self.assertEqual(len(starts), 1)
+        entry = [queue[starts[0]]]
+        for line in queue[starts[0] + 1 :]:
+            if not line.strip() or not line.startswith((" ", "\t")):
+                break
+            entry.append(line.strip())
+        row = " ".join(entry)
         self.assertIn(".scratch/register/audit.py", row)
         self.assertIn("ASD-STE100 checker", row)
         acceptance = row.split("Accept:", 1)[1]
-        self.assertIn("30-word instruction", acceptance)
+        self.assertIn("never capped", acceptance)
         self.assertIn("`simply`", acceptance)
 
     def test_d26_root_help_describes_deterministic_resolution_plus_expl(self) -> None:

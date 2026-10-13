@@ -1354,16 +1354,16 @@ class LifecycleRemovalBattery(unittest.TestCase):
         )
 
     def test_l23_all_16_census_pins_in_section_5_are_green_after_the(self) -> None:
-        """L23. all 16 census pins in section 5 are green after the rewrite, each either satisfied by the new prose or re-scoped with grounds recorded in section 8. Sixteen, not fifteen, by C06. ANTI- WEAKENING (A17): each of the 14 working-tree pins keeps its assertion body BYTE-IDENTICAL to its `da70a56` blob unless section 8 PERMITS the delta, and every permitted delta is enumerated there. Without this, `all pins green` is satisfiable by making a pin tautological — a test with an unreachable document read and `assertIn('handle', 'handle')` scores `reads-doc True`, `vocab True`, stays in the census and keeps gate 1 green. The pins are additionally EXECUTED by id, not merely counted (X10)."""
+        """L23. all 16 census pins in section 5 are green after the rewrite, each either satisfied by the new prose or re-scoped with grounds recorded in section 8. Sixteen, not fifteen, by C06. ANTI- WEAKENING (A17): each of the 14 working-tree pins keeps its assertion body BYTE-IDENTICAL to its `da70a56` blob unless section 8 PERMITS the delta, and every permitted delta is enumerated there. Without this, `all pins green` is satisfiable by making a pin tautological — a test with an unreachable document read and `assertIn('handle', 'handle')` scores `reads-doc True`, `vocab True`, stays in the census and keeps gate 1 green. The pins are additionally EXECUTED by id, not merely counted (X10). RULED-BY owner (template refresh agents@1622ede), superseding the count above: dropping D25's word bounds removed its opener census, which held D25's one census token (`"request"`), so D25 left the census and it holds 15."""
 
         table = json.loads(
             (ROOT / ".agent/decisions/m3u6a2-tripwires.json").read_text()
         )
         rows = table["pins"]
-        self.assertEqual(len(rows), 16)
+        self.assertEqual(len(rows), 15)
         if instrument_pruned():
             rows = [row for row in rows if not row["locus"].startswith(f"{INSTRUMENT}:")]
-            self.assertEqual(len(rows), 15)
+            self.assertEqual(len(rows), 14)
 
         def flatten(suite: unittest.TestSuite):
             for test in suite:
@@ -1420,16 +1420,18 @@ class LifecycleRemovalBattery(unittest.TestCase):
             ("tests/test_proposal_binding_battery.py", "test_b27_no_public_surface_retains_the_unqualified"),
             ("tests/test_submission_battery.py", "test_d34_readme_and_the_three_normative_docs"),
         }
-        # C20. D25's vocabulary lists are a CENSUS of the prose they grade, so the L19-L22 rewrite
-        # forces them to move. A SHA pin was never available here: main's `d9e2c90` partition rename
+        # C20, re-ruled by the owner (template refresh agents@1622ede): D25's opener census only
+        # chose between its 20- and 25-word bounds, and global `Authoring` dropped text caps, so the
+        # census left with them. A SHA pin was never available here: main's `d9e2c90` partition rename
         # had already moved the body away from `da70a56` before this unit opened. The row stays an
-        # obligation rather than a blanket permission by naming the post-state the delta must buy -
-        # the sentence openers the proposal-route prose introduces, each absent at the baseline.
+        # obligation rather than a blanket permission by naming the post-state the delta must buy,
+        # each token absent at the baseline: the ruling's citation, the p12 row read from the live
+        # queue, and the `never capped` acceptance its deferred port carries.
         permitted_deltas = {
             (
                 "tests/test_cli_removal_battery.py",
                 "test_d25_rewritten_human_facing_prose_holds_the_project_registe",
-            ): ('"propose"', '"resolve"', '"submitproposal"', '"verifydrafts"', '"reviewresult"'),
+            ): ("RULED-BY owner", '".agent/deferred.md"', '"never capped"'),
             # C28. C26's refreeze moves every non-D28 frame onto the closed transition, and this
             # is the one migration-battery body L23 froze. The delta is the `ROOT` -> `self.root`
             # conversion ALONE; the assertion logic is byte-identical either side, so nothing this
@@ -1920,7 +1922,8 @@ class LifecycleRemovalBattery(unittest.TestCase):
         freezes = namespace["_freezes"]()
         # `_pins()` scans the working tree, so the pruned instrument's row leaves with it.
         # All four freezes live in `test_cli_removal_battery.py`, so that count is unaffected.
-        self.assertEqual(len(pins), 15 if instrument_pruned() else 16)
+        # D25 left the census with its opener list (owner ruling, template refresh agents@1622ede).
+        self.assertEqual(len(pins), 14 if instrument_pruned() else 15)
         self.assertEqual(len(freezes), 4)
         leaked = [
             row["locus"]
