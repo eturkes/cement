@@ -3306,7 +3306,7 @@ class ObligationBatteryTests(unittest.TestCase):
         self.assertTrue(touched_prose)
         register = "\n".join(touched_prose)
         # Sentence length is judged, never capped: owner ruling (template refresh
-        # agents@1622ede) on global `Authoring`, which keeps text caps out of checks.
+        # agents@1622ede) on `CLAUDE.md` `Authoring`, which keeps text caps out of checks.
         self.assertNotRegex(
             register.lower(), r"\b(?:simply|robust|seamlessly|leverage)\b"
         )

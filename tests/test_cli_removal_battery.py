@@ -3079,7 +3079,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         sentence, descriptions ≤25, imperative steps, active voice, condition before command.
 
         RULED-BY owner (template refresh agents@1622ede), superseding the word bounds above:
-        global `Authoring` keeps text caps out of checks and asks for short sentences, so
+        `CLAUDE.md` `Authoring` keeps text caps out of checks and asks for short sentences, so
         sentence length is judged, never capped; the filler ban stays.
         """
         surfaces = [

@@ -4,16 +4,16 @@
 //
 //   node measure-height.mjs <url> [right|card]
 //
-// Needs the chromiumfish workspace `webcap` runs on, the same dependency the capture
-// script already declares.
-import { homedir } from "node:os";
+// Needs CHROMIUMFISH_DIR = the `chromiumfish` package directory (README `Visual check`).
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const WORKSPACE = join(homedir(), ".local/share/chromiumfish/node_modules");
-const { ChromiumFish } = await import(
-  `${pathToFileURL(join(WORKSPACE, "chromiumfish")).href}/dist/index.js`
-);
+const PACKAGE = process.env.CHROMIUMFISH_DIR;
+if (!PACKAGE) {
+  process.stderr.write("measure-height.mjs: set CHROMIUMFISH_DIR (README `Visual check`)\n");
+  process.exit(2);
+}
+const { ChromiumFish } = await import(pathToFileURL(join(PACKAGE, "dist/index.js")).href);
 
 const [url, which = "right"] = process.argv.slice(2);
 if (!url) {

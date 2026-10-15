@@ -1421,7 +1421,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
             ("tests/test_submission_battery.py", "test_d34_readme_and_the_three_normative_docs"),
         }
         # C20, re-ruled by the owner (template refresh agents@1622ede): D25's opener census only
-        # chose between its 20- and 25-word bounds, and global `Authoring` dropped text caps, so the
+        # chose between its 20- and 25-word bounds, and `CLAUDE.md` `Authoring` dropped text caps, so the
         # census left with them. A SHA pin was never available here: main's `d9e2c90` partition rename
         # had already moved the body away from `da70a56` before this unit opened. The row stays an
         # obligation rather than a blanket permission by naming the post-state the delta must buy,

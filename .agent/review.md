@@ -10,8 +10,45 @@ EVERY closing diff draws a pass: each unit's close, each ad-hoc request's close,
 phase close alike — this ledger is not a phase-close step, and a unit that lands with no
 section here closed unreviewed. A finding inside the artifact's acceptance contract is
 fixed before the close it reviews; a finding outside it is born as a `.agent/deferred.md`
-row with its acceptance check, never as an open row here. A fix earns ONE re-review round
+row with its acceptance check. The one open row this ledger holds = an IMPLEMENT mutation
+survivor its unit left unruled, open until the closing-diff `reviewer` rules it against the
+contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
+
+## `CLAUDE.md` refresh agents@1622ede → agents@4a758e0 (ITERATE, ad-hoc) — target = the diff this commit lands, base `bd78d4e`
+
+Template delta = Alignment law (Collaboration, Execution, Authoring, Engineering, Teammates) moved in
+from the user-level file, roles project-local (`.claude/agents/`), `upstream-sync.md` retired, + NEW
+gate command, UI design, charts, run-the-real-app, code diff lenses, survivor rulings, UI copy.
+`reviewer-1`, 11 lenses fixed before dispatch, primary tree read-only (`git diff HEAD` sha256
+`19dc81ce…` unchanged over its run), its own clause map C01-C28 built before MAIN's O-map.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| L1 | template fidelity | pass | `cmp` rc 0: `CLAUDE.md`, `.agent/spec-lint` (mode 755), 6 roles vs agents@4a758e0. |
+| L2 | obligation coverage | finding F2 (minor), fixed | C01-C28 ⊆ MAIN's map; read cost control = moved (old global `Reading`), not new. |
+| L3 | old-form completeness | pass | 30 forms, each with a `git grep HEAD` or old-global control; live = p68/p69 (subject = the retired file, status lines) + p73 (historical section titles). |
+| L4 | `upstream-sync.md` migration | finding F1 (minor), fixed | per-close review → `ops.md` (3); `attack`/`mut` + `tester` two counts → `assurance.md`; upkeep backlog → spec; F1's two clauses → `ops.md` Layout + `assurance.md` Waves. |
+| L5 | spec preservation | pass | 14 `Tasks` rows + ordered unit/`p<nn>` tokens `cmp` rc 0; `Intent`/`Decisions`/`Phase` byte-equal; spec-lint rc 0. |
+| L6 | check strength | pass | D25, D29, L23 clean OK + red on seeds before = after; grader 10 seeds same verdicts; `.agent/gate` clean 0, missing module 1, below-3.12 shim 0 + notice. |
+| L7 | portability | pass | remaining machine names = owner-ruled prototype QA (`ops.md` Template rulings (4), p79); project `CLAUDE.md` section pointers = local law. |
+| L8 | queue soundness | findings F3 + F4 (minor), fixed | grader PASS, 81 rows; p78-p81 anchors re-derived. |
+| L9 | law consistency | finding F4, fixed | survivor open row matches `CLAUDE.md` `Engineering`; p80 had contradicted `ops.md` Layout's absence rule. |
+| L10 | code diff lenses | finding F2, fixed | gate keeps the 3-step chain + rc fold; prototype tools change dependency selection + preflight alone. |
+| L11 | claim soundness | findings F2 + F4, fixed | numbers re-derived; F2's unconditional timing claim + F4's absence claim corrected. |
+
+- F1 `upstream-sync.md` held two repo-only clauses: `Tasks` rows carry acceptance + binding notes as
+  indented sub-bullets; `general-purpose` briefs order the validator LAST → `ops.md` Layout +
+  `assurance.md` Waves (`rg -Fn` 1 hit each).
+- F2 `.agent/gate` printed no slowest tests on Python 3.11 (admitted by `pyproject.toml`) while
+  `ops.md` promised them unconditionally → notice line + `ops.md` qualifier + Fast gate key; `uv`
+  shim proof rc 0 + notice.
+- F3 p79's `sha256sum … | uniq -d` passes identical frames (paths differ per line) → the standing
+  hash-only sorted pipeline.
+- F4 p80 asserted the absence of gitignored captures → `no committed phone-width check (capture.sh
+  captures at --width 1600 alone)`.
+- Post-review, MAIN: p82 born (the demo leaks its temporary ledger on SIGTERM, found while driving
+  it) + p70 recurrence evidence (full-gate run 1); grader PASS, 82 rows.
 
 ## `CLAUDE.md` refresh agents@5e03db6 → agents@1622ede, second pass (ITERATE, ad-hoc) — target = `adb0ab9` (`e4e7016..adb0ab9` + its commit message)
 

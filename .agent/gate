@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# gate — the repo's check chain (`.claude/rules/ops.md` Env), each step's wall-clock + the suite's
+# 10 slowest tests; rc 0 only when every step passes.
+#   .agent/gate                  full gate: unittest discover (D28 included) + uv build + spec-lint
+#   .agent/gate <tests.module>…  fast gate: those modules + spec-lint; iteration only, never a closing claim
+set -u
+cd "$(dirname "$0")/.." || exit 2
+names=() rcs=() secs=()
+step() { # step <name> <cmd…>
+  local name=$1 t0=$EPOCHREALTIME rc
+  shift
+  printf '== %s: %s\n' "$name" "$*"
+  "$@"
+  rc=$?
+  names+=("$name") rcs+=("$rc") secs+=("$(awk -v a="$t0" -v b="$EPOCHREALTIME" 'BEGIN{printf "%.1f", b - a}')")
+}
+# `--durations` arrived in Python 3.12; pyproject admits 3.11.
+durations=() note="slowest tests unavailable: unittest --durations needs Python >= 3.12"
+uv run python -c 'import sys; sys.exit(sys.version_info < (3, 12))' && durations=(--durations 10) note=
+if [ $# -eq 0 ]; then
+  step unittest uv run python -m unittest discover -s tests -t . "${durations[@]}"
+  step build uv build
+else
+  step unittest uv run python -m unittest "${durations[@]}" "$@"
+fi
+step spec-lint .agent/spec-lint
+printf '\n%-10s %4s %9s\n' step rc seconds
+fail=0
+for i in "${!names[@]}"; do
+  printf '%-10s %4s %9s\n' "${names[$i]}" "${rcs[$i]}" "${secs[$i]}"
+  [ "${rcs[$i]}" -eq 0 ] || fail=1
+done
+[ -z "$note" ] || printf '%s\n' "$note"
+exit "$fail"

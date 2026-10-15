@@ -10,10 +10,10 @@ Production artifact = a library + CLI control plane that an interface like Open 
 
 Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 - Prototype web UI demo `prototype/webui-demo/` — `uv run python prototype/webui-demo/app.py` → <http://127.0.0.1:8765/>.
-  - Density grade: `node prototype/webui-demo/density.mjs '<url>'` at `?reset=1` + after `capture.sh`.
+  - Density grade: `node prototype/webui-demo/density.mjs '<url>'` at `?reset=1` + after `capture.sh` (both need `CHROMIUMFISH_DIR`, prototype README).
 - Library `src/cement_runtime/` (`from cement_runtime import System`) + CLI `uv run cement --help` (README quick start = the lifecycle: `operation register` → `proposal submit/review` → `compile` → `function verify-drafts/inspect/promote/verify/export/eval`, `resolve`).
 - Hospital OCR example — `uv run python examples/hospital_ocr/run_demo.py` (`All checks passed.`; README transcript pinned).
-- Gate — `uv run python -m unittest discover -s tests -t .` (1031 tests; wall time splits by `test_d28`'s replay range → `.claude/rules/ops.md`) + `uv build` + `.agent/spec-lint`. Instruments = `.agent/decisions/m<m>u<u>-*`.
+- Gate — `.agent/gate` = `uv run python -m unittest discover -s tests -t .` (1031 tests; wall time splits by `test_d28`'s replay range) + `uv build` + `.agent/spec-lint`, per-step wall-clock printed; fast gate = `.agent/gate <tests.module …>` (→ `.claude/rules/ops.md`). Instruments = `.agent/decisions/m<m>u<u>-*`.
 
 ## Decisions
 
@@ -87,6 +87,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 
 - [x] 2547505 ITERATE round 5: UI dense → `board` picked over `guided` + `mirror` (`Decisions` board-layout ruling); merged, retired.
 - [ ] ITERATE round 7: owner reviews the story layout (round 6 picked it; no go yet); open with `capture.sh` + `density.mjs`.
+  - Close (the owner's go) runs `Rules upkeep`; known backlog: origin stories + measured results in bare `ops.md` + `assurance.md`; area-bound law in bare `ops.md` (D28, D19, capture mechanics) → `paths:`.
 - [ ] M3.6a3 delete the 7 dead outcome types (`Outcome` + its 6 members).
   - Resume point: the suspended IMPLEMENT scope rejoins here once ITERATE closes on the owner's go.
   - `src/` holds zero constructors, only `models.py` defs, `__init__.py` import/`__all__`, one `system.py` docstring. `CandidateRequest.request_id` STAYS — live on the `cement-source-v1` envelope — and leaves with M3.6b's single schema/protocol cut.

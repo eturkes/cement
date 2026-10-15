@@ -5,13 +5,17 @@
 # The story runs through the API here rather than through `?scene=N`: a scene replay
 # always restarts at scene 0, so per-scene captures would each need their own ledger.
 #
-# Needs a running server and `webcap` (headless Chrome over CDP):
+# Needs a running server, `webcap` (headless Chrome over CDP; `WEBCAP` overrides the command)
+# and CHROMIUMFISH_DIR for measure-height.mjs (README `Visual check`):
 #   uv run python prototype/webui-demo/app.py &
 #   prototype/webui-demo/capture.sh
 
 set -euo pipefail
 
 BASE=${BASE:-http://127.0.0.1:8765}
+WEBCAP=${WEBCAP:-webcap}
+command -v "$WEBCAP" >/dev/null || { echo "capture.sh: $WEBCAP not found; set WEBCAP" >&2; exit 2; }
+: "${CHROMIUMFISH_DIR:?capture.sh: set CHROMIUMFISH_DIR (README \`Visual check\`)}"
 OUT=${OUT:-"$(cd "$(dirname "$0")/../.." && pwd)/.scratch/webui-demo-capture"}
 mkdir -p "$OUT"
 
@@ -22,7 +26,7 @@ mkdir -p "$OUT"
 shot() { # shot <query> <file> [right|left|card]
   local height
   height=$(node "$(dirname "$0")/measure-height.mjs" "$BASE/?${1}" "${3:-right}")
-  webcap "$BASE/?${1}" --png "$OUT/$2" --width 1600 --height "$height" \
+  "$WEBCAP" "$BASE/?${1}" --png "$OUT/$2" --width 1600 --height "$height" \
     --wait 2500 --timeout 60000 >/dev/null
 }
 
@@ -89,7 +93,7 @@ shot 'drawer=document.extraction_plan' 08-bundle.png
 # The overlay card is position: fixed, so it is measured as the card plus the .overlay
 # 24 px padding on both edges.
 shot 'source=document.extraction_plan&open=1' 09-source.png card
-webcap "$BASE/?expand=1" --png "$OUT/story-full-page.png" --width 1600 --height 1000 \
+"$WEBCAP" "$BASE/?expand=1" --png "$OUT/story-full-page.png" --width 1600 --height 1000 \
   --full-page --wait 2500 --timeout 60000 >/dev/null
 curl -sS "$BASE/api/transcript.txt" -o "$OUT/transcript.txt"
 

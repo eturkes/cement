@@ -137,7 +137,14 @@ the later entries repeat a lineage the first entry already shows.
 every frame from one ledger into `.scratch/webui-demo-capture/`, which git ignores. Set
 `OUT` to write to a different directory.
 
+The visual check needs two tools that this repository does not supply. `capture.sh` calls
+`webcap`, a command that captures a page in headless Chromium. Put `webcap` on `PATH`, or
+set `WEBCAP` to its path. `measure-height.mjs` and `density.mjs` load the `chromiumfish`
+Node package. Set `CHROMIUMFISH_DIR` to the package directory, which holds `dist/index.js`.
+The `.agent/deferred.md` row `p79` records the move to a browser that the demo installs.
+
 ```bash
+export CHROMIUMFISH_DIR=/path/to/node_modules/chromiumfish
 uv run python prototype/webui-demo/app.py &
 prototype/webui-demo/capture.sh
 ```

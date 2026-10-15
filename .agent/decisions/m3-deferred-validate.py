@@ -29,7 +29,7 @@ leaves both sides at once. The floor is `archive ids | ids over the file's histo
 
 Exits 0 only when the archive parse is total, no row of that floor is missing, every
 row parses, every entry carries `Accept:`, and no cell is `unknown`. Cell length is
-never graded (owner ruling, global `Authoring`: strict limits stay out of checks on text).
+never graded (owner ruling, `CLAUDE.md` `Authoring`: strict limits stay out of checks on text).
 """
 
 from __future__ import annotations
