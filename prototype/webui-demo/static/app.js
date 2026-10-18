@@ -5,6 +5,9 @@
 let STATE = null;
 let BUSY = false;
 let POLL = null;
+/* Reset bumps RUN: story steps, responses + polls from an older run are dropped. */
+let RUN = 0;
+const INFLIGHT = new Set();
 /* The operation whose source overlay is open, or "" for none. */
 let SOURCE_OPEN = "";
 let OPEN_ALL = false;
@@ -54,19 +57,24 @@ const scenarioOf = (id) => STATE.scenarios.find((row) => row.id === id) || {};
 /* --- transport --- */
 
 async function call(path, body) {
+  const run = RUN;
+  const abort = new AbortController();
+  INFLIGHT.add(abort);
   BUSY = true;
   render();
-  startPolling();
+  if (path !== "/api/reset") startPolling();
   try {
     const options = body === undefined
-      ? {}
+      ? { signal: abort.signal }
       : {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
+          signal: abort.signal,
         };
     const response = await fetch(path, options);
     const payload = await response.json();
+    if (run !== RUN) return null;
     if (!response.ok) {
       if (payload.state) STATE = payload.state;
       toast(payload.error || "request failed");
@@ -74,9 +82,15 @@ async function call(path, body) {
     }
     STATE = payload;
     return payload;
+  } catch (error) {
+    if (error.name === "AbortError") return null;
+    throw error;
   } finally {
-    stopPolling();
-    BUSY = false;
+    INFLIGHT.delete(abort);
+    if (!INFLIGHT.size) {
+      stopPolling();
+      BUSY = false;
+    }
     render();
   }
 }
@@ -84,8 +98,9 @@ async function call(path, body) {
 function startPolling() {
   if (POLL) return;
   POLL = setInterval(async () => {
+    const run = RUN;
     const response = await fetch("/api/state");
-    if (response.ok) {
+    if (response.ok && run === RUN) {
       STATE = await response.json();
       render();
     }
@@ -678,7 +693,8 @@ function renderLog() {
 /* A supervisor corrects what diverges and accepts what already matches. The first
    candidate for a scope always diverges, so a correction is always visible. */
 async function settle() {
-  while (STATE.pending.length) {
+  const run = RUN;
+  while (run === RUN && STATE.pending.length) {
     const proposal = STATE.pending[0];
     await review(proposal.proposal_id, proposal.diff.length ? "correct" : "accept");
     await pause(320);
@@ -717,13 +733,16 @@ const SCENES = [
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function runStory(upTo) {
+  const run = RUN;
   $("play").disabled = true;
   for (let index = 0; index <= upTo && index < SCENES.length; index += 1) {
     const scene = SCENES[index];
     document.body.dataset.scene = scene.name;
     for (const step of scene.steps) {
       await step();
+      if (run !== RUN) return;
       await pause(420);
+      if (run !== RUN) return;
     }
     document.body.dataset.sceneDone = String(index);
   }
@@ -773,9 +792,17 @@ document.addEventListener("keydown", (event) => {
 
 $("play").addEventListener("click", () => runStory(SCENES.length - 1));
 $("reset").addEventListener("click", async () => {
-  await call("/api/reset", {});
+  RUN += 1;
+  for (const abort of INFLIGHT) abort.abort();
+  stopPolling();
   delete document.body.dataset.sceneDone;
   delete document.body.dataset.scene;
+  SOURCE_OPEN = "";
+  DRAWER = "";
+  HISTORY = false;
+  CHECK_OPEN = false;
+  await call("/api/reset", {});
+  $("play").disabled = false;
 });
 
 (async function start() {

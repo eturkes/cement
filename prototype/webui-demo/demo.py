@@ -849,6 +849,8 @@ class Session:
     def __init__(self, seed: int = 20260908) -> None:
         self.seed = seed
         self._lock = threading.RLock()
+        # Set by `close`: a turn still waiting on the model wakes and drops its answer.
+        self._closed = threading.Event()
         self._temporary = tempfile.TemporaryDirectory(prefix="cement-demo-")
         self.database = str(Path(self._temporary.name) / "cement.db")
         self.system = System(self.database)
@@ -899,7 +901,9 @@ class Session:
     # -- plumbing --
 
     def close(self) -> None:
-        self._temporary.cleanup()
+        self._closed.set()
+        with self._lock:
+            self._temporary.cleanup()
 
     def _next(self) -> int:
         self._sequence += 1
@@ -1100,9 +1104,12 @@ class Session:
                 for part in unanswered
             ]
 
-        time.sleep(delay)
+        if self._closed.wait(delay):
+            return
 
         with self._lock:
+            if self._closed.is_set():
+                return
             self.thinking = None
             self.stats["provider_calls"] += 1
             self.stats["provider_seconds"] = round(
