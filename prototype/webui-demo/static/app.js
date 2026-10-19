@@ -857,7 +857,6 @@ const lastBubble = () => [...document.querySelectorAll("#chat .msg.assistant .bu
 const lastTool = () => [...document.querySelectorAll("#chat .tool-call")].pop();
 const STORY = [
   { beats: [
-    { el: "#how", title: "Three steps", text: () => "Ask, learn, switch on.", side: "bottom" },
     { el: "#side-user", title: "What users see", text: () => "A normal AI chat.", side: "right" },
     { el: "#side-hidden", title: "Behind the scenes", text: () => "What Cement does. Users never see it.", side: "left" } ] },
   { run: async () => { await select("file"); await send("q01"); }, beats: [
