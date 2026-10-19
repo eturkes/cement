@@ -29,7 +29,7 @@
       "test": "test_d22c_the_opening_text_handle_request_fence_is_protected_and"
     }
   ],
-  "head": "42a1b9674b792148f790dc6e57e243c441497a06",
+  "head": "ea2c9363c840a50e7ad0c1804cd9af31911d7703",
   "pins": [
     {
       "lines": 76,
@@ -287,13 +287,52 @@
       ],
       "owner": "M3.6a1",
       "total_lines": 248
+    },
+    {
+      "document": "examples/open_webui/README.md",
+      "grounds": "tool/filter chat requests describe the new example, not the deleted lifecycle",
+      "hit_lines": 5,
+      "hits": [
+        {
+          "line": 5,
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "line": 11,
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "line": 12,
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "line": 20,
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "line": 24,
+          "tokens": [
+            "request"
+          ]
+        }
+      ],
+      "owner": "M5.3",
+      "total_lines": 92
     }
   ],
   "totals": {
     "pins": 15,
     "pins_working_tree": 12,
     "prose_documents_owned": 4,
-    "prose_hit_lines": 9
+    "prose_hit_lines": 14
   },
   "unit": "M3.6a2",
   "vocabulary": "\\bhandle\\b|request_status|retry_failed|invalidated_generators|resolved_by_artifact|\\brequests?\\b|\\blease\\b|in_progress|fallback_failed|reconciliation_required|[Aa]mbigu\\w*"

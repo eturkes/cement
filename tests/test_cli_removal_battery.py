@@ -2993,15 +2993,14 @@ class RemovalObligationBatteryTests(unittest.TestCase):
             *sorted((ROOT / "docs").glob("*.md")),
             *sorted(ROOT.glob("examples/*/README.md")),
         ]
+        baseline_surfaces = {
+            "README.md", "examples/command_source/README.md", "docs/architecture.md",
+            "docs/threat-model.md", "examples/hospital_ocr/README.md",
+        }
+        added_surfaces = {"examples/open_webui/README.md"}
         self.assertEqual(
             {path.relative_to(ROOT).as_posix() for path in surfaces},
-            {
-                "README.md",
-                "examples/command_source/README.md",
-                "docs/architecture.md",
-                "docs/threat-model.md",
-                "examples/hospital_ocr/README.md",
-            },
+            baseline_surfaces | added_surfaces,
         )
 
         parser = cement_cli._parser()
@@ -3026,8 +3025,20 @@ class RemovalObligationBatteryTests(unittest.TestCase):
                 if namespace.command in REMOVED_LEAVES:
                     removed_routes.append((relative, argv))
 
-        self.assertEqual(len(surfaces), 5)
-        self.assertEqual(len(invocations), 18)
+        baseline_commands = sum(
+            _cement_argv(command) is not None
+            for relative in baseline_surfaces
+            for command in _shell_commands(_git_bytes("635a473", relative).decode())
+        )
+        added_commands = sum(
+            _cement_argv(command) is not None
+            for relative in added_surfaces
+            for command in _shell_commands((ROOT / relative).read_text())
+        )
+        self.assertEqual(len(surfaces), len(baseline_surfaces | added_surfaces))
+        self.assertEqual(baseline_commands, 18)
+        self.assertGreater(added_commands, 0)
+        self.assertEqual(len(invocations), baseline_commands + added_commands)
         self.assertEqual(failures, [])
         self.assertEqual(removed_routes, [])
         for removed in sorted(REMOVED_LEAVES):

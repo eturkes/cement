@@ -50,6 +50,7 @@ DOCS: tuple[str, ...] = (
     "examples/command_source/README.md",
     "docs/threat-model.md",
     "examples/hospital_ocr/README.md",
+    "examples/open_webui/README.md",
 )
 
 # The convention. Every count in the emitted table is taken under exactly this pattern.
@@ -118,6 +119,10 @@ OWNERS: dict[str, tuple[str, str]] = {
     "docs/threat-model.md": (
         "M3.6a2",
         "`handle` request ID as an idempotency key, and lease recovery, both cease to exist",
+    ),
+    "examples/open_webui/README.md": (
+        "M5.3",
+        "tool/filter chat requests describe the new example, not the deleted lifecycle",
     ),
     "examples/hospital_ocr/README.md": (
         "M3.6a1",
