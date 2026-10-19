@@ -10,10 +10,11 @@ This page is a demo, not a product. Cement ships as a library and a CLI. A produ
 deployment puts Cement behind a chat product such as Open WebUI, where none of this
 reaches the person typing.
 
-The screen has two halves. The left half is the whole surface a user gets. The right half
-explains the work behind the selected task in four short steps. A person checks the
-model answer. Repeated checks prepare exact answers for reuse. A person then switches
-those answers on. **Operator view** holds the commands, evidence and function source.
+The page opens with one sentence of purpose and four steps: **Ask**, **Check**, **Save**
+and **Switch on**. The left half is the chat that staff see. The right half shows the same
+four steps for the selected task, the step that it has reached, and the one next action.
+**Show technical details** opens the per-message details, the scanned text and the
+**Operator view**, which holds the commands, the evidence and the function source.
 
 ## Run
 
@@ -53,23 +54,18 @@ One function serves several tasks. **File it into the record** promotes
 
 ## What to watch
 
-1. Select a task, then open **Choose a wording** and send a request.
-2. The chat answers without waiting for a person. The right half explains who did the work.
-3. Select **Check this answer**. Compare the model answer with the proposed correction.
-4. Save the correction, confirm an unchanged answer, or discard the example.
-   The chat reply stays unchanged. Only confirmed answers become evidence.
-5. Send and check another request with the same exact input.
-6. When the evidence is ready, select **Make this automatic**.
-   This runs compile, verification and promotion as real Cement commands.
-7. Select **Use the checked answers**. Matching work now uses those answers without a model call.
-8. Select **Code it for billing**. Different assessment words never accumulate repeated evidence in this demo.
-9. Open **Operator view** for all jobs, commands and evidence.
-   Select a job to inspect its function, test its bundle or download it.
-10. Select **Read the function** for its exact inputs, outputs and supervised request history.
-
-The left half keeps the latest turn visible. Earlier turns and each message’s technical
-details open on request. A reply can combine automatic work and model work without
-showing that division to the user.
+1. Select a task, then send one of its requests.
+2. The chat answers at once. The right half moves to **Check**.
+3. Select **Check the answer**. Save the correction, or confirm an answer that needs no change.
+   The reply in the chat stays unchanged.
+4. Send and check another document of the same kind.
+5. Select **Save as a fixed answer**. This runs compile, verification and promotion as real
+   Cement commands.
+6. Select **Use fixed answers**. The next document of that kind gets its answer without an
+   AI call. The chat looks the same.
+7. Select **Code it for billing**. Billing never gets a fixed answer, because no two notes
+   repeat the same words.
+8. Select **Show technical details** for the commands, the evidence and the function source.
 
 ## Real and simulated
 
@@ -126,7 +122,8 @@ the guarantees, and [docs/architecture.md](../../docs/architecture.md) for the s
 Query parameters help with capture. `?reset=1` starts a new ledger. `?scene=N` plays the
 story to scene N. `?expand=1` removes the internal scrollbars for a full-page screenshot.
 `?source=<operation>` opens the source overlay for that promoted operation.
-`?drawer=<operation>` opens the drawer for that operation. `?open=1`
+`?drawer=<operation>` opens the drawer for that operation. `?tech=1` shows the technical
+details, and `?drawer`, `?source` and `?open` also show them. `?open=1`
 opens every disclosure except the raw `stdout` blocks and the lineage of later entries. A
 screenshot cannot select a disclosure. The raw bytes bury the reading they belong to, and
 the later entries repeat a lineage the first entry already shows.
@@ -153,13 +150,13 @@ Each numbered frame must show its claim:
 
 | File | What it shows |
 |---|---|
-| `01-desk.png` | Five tasks and the four-step explanation before the first request. |
-| `02-answered.png` | The answer already with the user, and its candidate waiting for review. |
-| `03-evidence.png` | Two matching checks, with **Make this automatic** as the next action. |
-| `04-cemented.png` | Checked answers prepared, with **Use the checked answers** as the next action. |
-| `05-routed.png` | A03 answered from the function, in a bubble that looks supervised. |
-| `06-reuse.png` | One answer from two sources, explained in the narrative. |
-| `07-blocked.png` | Billing stays with the model because assessment words do not repeat. |
+| `01-desk.png` | The purpose, the four steps and five tasks before the first request. |
+| `02-answered.png` | The answer already with the user, and the task at **Check**. |
+| `03-evidence.png` | Two checks, with **Save as a fixed answer** as the next action. |
+| `04-cemented.png` | The fixed answer saved, with **Use fixed answers** as the next action. |
+| `05-routed.png` | A03 answered without the AI, in a bubble that looks the same. |
+| `06-reuse.png` | One answer from a fixed answer and the AI together. |
+| `07-blocked.png` | Billing stays with the AI because assessment words do not repeat. |
 | `08-bundle.png` | The extraction plan drawer, with the answer from the exported bundle. |
 | `09-source.png` | The function read as source, with the four hops behind one entry. |
 

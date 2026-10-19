@@ -13,6 +13,8 @@ let SOURCE_OPEN = "";
 let OPEN_ALL = false;
 let DRAWER = "";
 let HISTORY = false;
+/* Off = the plain explanation; on = per-message details, scanned text + operator view. */
+let TECH = false;
 /* Re-rendering the source collapses every open <details>, so redraw only on change. */
 let SOURCE_KEY = "";
 
@@ -124,6 +126,14 @@ const offline = (id, operation) =>
 
 /* --- render --- */
 
+function setTech(on) {
+  TECH = on;
+  document.body.classList.toggle("tech", on);
+  $("tech").textContent = on ? "Hide technical details" : "Show technical details";
+  $("tech").setAttribute("aria-pressed", String(on));
+  $("operator-view").open = on;
+}
+
 function render() {
   if (!STATE) return;
   if (DRAWER && !STATE.selected_operations.includes(DRAWER)) DRAWER = STATE.selected_operations[0];
@@ -166,8 +176,7 @@ function renderChat() {
     : "";
   const empty = STATE.chat.length
     ? ""
-    : `<div class="empty">Staff send the assistant a document and a request. Pick one
-       below; the wording varies on purpose.</div>`;
+    : `<div class="empty">Pick a task below and send a request with its document.</div>`;
   chat.innerHTML = empty + messages + thinking;
   const pane = chat.closest(".pane-body");
   if (pane && !document.body.classList.contains("expanded")) {
@@ -248,8 +257,8 @@ function renderTray() {
   $("task-switch").innerHTML = STATE.scenarios.map(task =>
     `<button class="task-pill ${task.id === STATE.selected ? "on" : ""}" data-select="${esc(task.id)}" ${BUSY ? "disabled" : ""}>${esc(task.title)}</button>`).join("");
   const task = scenarioOf(STATE.selected);
-  $("tray").innerHTML = `<details><summary>Choose a wording · ${esc(task.title)}</summary>
-    ${task.requests.map(request => `<button class="ask-card" data-send="${esc(request.id)}" ${BUSY ? "disabled" : ""}>${esc(request.ask)}<small>${esc(request.document_id)} · ${esc(documentOf(request.document_id).patient || "")}</small></button>`).join("")}</details>`;
+  $("tray").innerHTML = `<p class="tiny">Send a request. Staff word the same job in different ways.</p><div class="asks">
+    ${task.requests.map(request => `<button class="ask-card" data-send="${esc(request.id)}" ${BUSY ? "disabled" : ""}>${esc(request.ask)}<small>${esc(request.document_id)}.pdf \u00b7 ${esc(documentOf(request.document_id).title || "")}</small></button>`).join("")}</div>`;
 }
 
 function renderTasks() {
@@ -259,50 +268,94 @@ function renderTasks() {
 }
 
 let CHECK_OPEN = false;
+const PLAIN_DIFF = {
+  missing: "The AI left out",
+  extra: "The AI added something that does not belong:",
+  changed: "The AI got this wrong:",
+};
 
-function storyStep(number, symbol, title, body, action = "", tone = "") {
-  return `<section class="story-step ${tone}"><span class="story-number">${number}</span><div><div class="story-illustration" aria-hidden="true">${symbol}</div><h3>${title}</h3><p>${body}</p>${action}</div></section>`;
+/* The right half restates the header's four steps for the selected task alone: the
+   current step carries its sentence + the ONE next action, finished steps keep a short
+   result, later steps keep their name. Everything else sits behind technical details. */
+function storyStep(number, name, state, text, action = "", tone = "") {
+  const body = state === "todo" ? "" : `<p>${text}</p>${action}`;
+  return `<section class="story-step ${state} ${tone}"><span class="story-number">${state === "done" ? "✓" : number}</span><div><h3>${name}</h3>${body}</div></section>`;
 }
 
-function renderStory() {
-  const task = scenarioOf(STATE.selected);
+function taskStage() {
   const turn = STATE.latest_turn;
   const parts = turn ? turn.parts : [];
   const model = parts.filter(p => p.source !== "function");
   const fixed = parts.filter(p => p.source === "function");
   const pending = STATE.pending.find(p => parts.some(part => part.proposal_id === p.proposal_id));
-  const checked = model.filter(p => p.status === "corrected" || p.status === "accepted");
-  const rejected = model.some(p => p.status === "rejected");
   const doc = turn ? documentOf(turn.document_id) : {};
   const categories = STATE.categories.filter(c => c.keyed_on === "text" ? c.document_id === doc.id : c.layout === doc.layout);
   const needed = STATE.selected_operations.filter(name => operationOf(name).keyed_on !== "text");
-  const prepared = needed.length && needed.every(name => categories.some(c => c.operation === name && c.promoted) && STATE.functions.some(fn => fn.operation === name && fn.passed));
-  const ready = prepared || (needed.length && needed.every(name => categories.some(c => c.operation === name && c.confirmations >= c.required)));
-  const floor = STATE.policy.min_confirmations;
+  const prepared = Boolean(turn) && needed.length > 0 && needed.every(name => categories.some(c => c.operation === name && c.promoted) && STATE.functions.some(fn => fn.operation === name && fn.passed));
+  const ready = prepared || (needed.length > 0 && needed.every(name => categories.some(c => c.operation === name && c.confirmations >= c.required)));
   const support = categories.filter(c => c.keyed_on !== "text").map(c => c.confirmations);
   const count = support.length ? Math.min(...support) : 0;
+  const step = !turn ? 1 : pending ? 2 : STATE.selected === "bill" || !prepared ? 3 : 4;
+  return { turn, model, fixed, pending, doc, prepared, ready, count, step,
+    rejected: model.some(p => p.status === "rejected"),
+    corrected: model.some(p => p.status === "corrected") };
+}
+
+function renderStory() {
+  const task = scenarioOf(STATE.selected);
+  const s = taskStage();
+  const floor = STATE.policy.min_confirmations;
   const billing = STATE.selected === "bill";
+  const kind = s.doc.title ? `${esc(s.doc.title).toLowerCase()}s` : "documents";
+  const state = (n) => n < s.step ? "done" : n === s.step ? "now" : "todo";
   const button = (label, attr) => `<button class="button primary story-action" ${attr} ${BUSY ? "disabled" : ""}>${label}</button>`;
-  let html = `<div class="story-heading"><span class="eyebrow">Behind this task</span><h3>${esc(task.title)}</h3>${turn ? `<p class="tiny dim">Most recent request for this task: ${esc(turn.document_id)}.pdf</p>` : ""}</div>`;
-  html += storyStep(1, fixed.length && !model.length ? "✓ → reply" : "model → reply",
-    !turn ? "First, the model answers." : !model.length ? "A checked answer replied. No model ran." : fixed.length ? "Part was automatic. The model answered the rest." : "The model wrote this answer.",
-    !turn ? "Send a request on the left. The user gets the reply before anyone checks it." : "The chat looks the same either way. The user never waits for a supervisor.");
-  let checkBody = !turn ? "A person checks the answer because a model can make mistakes." : !model.length ? "Earlier answers were checked before this work became automatic." : rejected ? "The supervisor rejected this answer. It cannot teach Cement anything." : checked.length ? `A supervisor ${model.some(p => p.status === "corrected") ? "fixed mistakes in" : "accepted"} the answer after the user received it.` : "A person must check what the model wrote before Cement can reuse it.";
-  let checkAction = pending ? button("Check this answer", 'data-check-open="1"') : "";
-  if (pending && CHECK_OPEN) {
-    checkAction = `<div class="story-check"><p>What the model wrote</p><pre>${jsonHtml(pending.plan)}</pre><p>What the supervisor would change</p>${pending.diff.length ? diffHtml(pending.diff) : "<p>No changes needed.</p>"}<div class="actions">${button(pending.diff.length ? "Save the corrected answer" : "Confirm this answer", `data-review="${pending.diff.length ? "correct" : "accept"}" data-proposal="${esc(pending.proposal_id)}"`)}<button class="button" data-review="reject" data-proposal="${esc(pending.proposal_id)}">Discard this example</button></div><p>The reply already sent stays unchanged.</p></div>`;
+  document.querySelectorAll("#how li").forEach(li => li.classList.toggle("now", Number(li.dataset.step) === s.step));
+
+  const ask = !s.turn ? "Send a request on the left. The AI answers right away."
+    : !s.model.length ? "A fixed answer replied. The AI was not used."
+    : s.fixed.length ? "Part of this job repeats, so a fixed answer did it. The AI did the part that does not repeat."
+    : "The AI answered.";
+
+  let check = s.rejected ? "A person rejected the answer, so Cement learns nothing from it."
+    : s.corrected ? "A person fixed a mistake. Staff kept the reply they already had."
+    : s.model.length ? "A person confirmed the answer." : "Checked earlier, before the answer was saved.";
+  let checkAction = "";
+  if (s.pending) {
+    check = "A person now checks what the AI wrote. Staff already have their reply, so nobody waits.";
+    checkAction = button("Check the answer", 'data-check-open="1"');
+    if (CHECK_OPEN) {
+      const p = s.pending;
+      checkAction = `<div class="story-check"><p>${p.diff.length ? "The checker finds these mistakes:" : "The checker finds nothing to change."}</p>${p.diff.length ? `<ul class="plain-diff">${p.diff.map(row => `<li>${PLAIN_DIFF[row.kind] || "The AI got this wrong:"} <b>${esc(row.field.replace(/_/g, " "))}</b></li>`).join("")}</ul>` : ""}<div class="actions">${button(p.diff.length ? "Save the correction" : "Confirm the answer", `data-review="${p.diff.length ? "correct" : "accept"}" data-proposal="${esc(p.proposal_id)}"`)}<button class="button" data-review="reject" data-proposal="${esc(p.proposal_id)}">Reject it</button></div></div>`;
+    }
   }
-  html += storyStep(2, "reply → person → checked", "A person checks the answer.", checkBody, checkAction);
-  const repeated = billing ? "The note’s words never repeat in this demo." : prepared ? "Checked answers are ready to reuse." : `${count} of ${floor} checks for this exact input.`;
-  html += storyStep(3, billing ? "note A ≠ note B" : `${Math.min(count, floor)} / ${floor}`, repeated,
-    billing ? "Billing depends on each note’s assessment words, not its form layout. Each different note starts over at one check." : `Cement needs ${floor} matching checks for each exact input. A different input still needs its own evidence.`,
-    ready && !prepared && !pending ? button("Make this automatic", 'data-make-automatic="1"') : "", billing ? "story-boundary" : "");
-  html += storyStep(4, billing ? "model → reply" : STATE.routed && prepared ? "checked → reply" : "person → switch",
-    billing ? "Billing stays with the model." : STATE.routed && prepared ? "Matching work is now automatic." : prepared ? "You decide when to use it." : "Then you choose to make it automatic.",
-    billing ? "Nothing repeats twice here, so there is no checked billing answer to reuse. Other parts of this task can be automatic." : STATE.routed && prepared ? "The next matching input uses the checked answer without a model call. Anything else goes back to the model." : "Preparing an answer does not switch the model off. A person must choose to use the checked answers.",
-    prepared && !STATE.routed ? button("Use the checked answers", 'data-enable-automatic="1"') : "");
-  if (!billing) html += `<p class="story-footnote">Why not billing? Every note has different assessment words. Nothing repeats, so the model keeps doing that work.</p>`;
-  $("story").innerHTML = html;
+
+  let save = s.prepared ? "Saved as a fixed answer." : "";
+  let saveAction = "";
+  if (billing) {
+    save = "Billing depends on each note’s own words. No two notes are alike, so this work never repeats and never becomes a fixed answer. It stays with the AI and a person, on purpose.";
+  } else if (!s.prepared) {
+    save = s.ready
+      ? `Checked ${floor} times. Cement can now save this work as a fixed answer for ${kind}.`
+      : `Checked ${Math.min(s.count, floor)} of ${floor} times for ${kind}. Send another one to check this work again. Cement saves how to handle this kind of form, not one patient’s details.`;
+    if (s.ready && !s.pending) saveAction = button("Save as a fixed answer", 'data-make-automatic="1"');
+  }
+
+  const on = STATE.routed;
+  const switchText = on
+    ? `Fixed answers are on. The next ${kind.replace(/s$/, "")} skips the AI. Anything new still goes to the AI and a person.`
+    : "The fixed answer is saved but not used yet. You decide when it replaces the AI.";
+  const switchAction = !on ? button("Use fixed answers", 'data-enable-automatic="1"') : "";
+
+  $("story").innerHTML = `<div class="story-heading"><span class="eyebrow">This task</span><h3>${esc(task.title)}</h3></div>` +
+    storyStep(1, "Ask", state(1), ask) +
+    storyStep(2, "Check", state(2), check, checkAction) +
+    storyStep(3, "Save", billing && s.step >= 3 ? "now" : state(3), save, saveAction, billing ? "story-boundary" : "") +
+    storyStep(4, billing ? "Switch on · not for this task" : "Switch on", billing ? "todo" : state(4), switchText, switchAction);
+
+  const st = STATE.stats;
+  $("tally").textContent = st.provider_calls || st.cement_answers
+    ? `So far the AI answered ${plural(st.provider_calls, "request")}. Fixed answers replaced the AI ${st.cement_answers} ${st.cement_answers === 1 ? "time" : "times"}.`
+    : "";
 }
 
 async function makeAutomatic() {
@@ -781,6 +834,7 @@ function setSource(operation) {
 
 $("commands-details").addEventListener("toggle", renderTerminal);
 $("events-details").addEventListener("toggle", renderLog);
+$("tech").addEventListener("click", () => setTech(!TECH));
 $("drawer-close").addEventListener("click", () => { DRAWER = ""; render(); });
 $("overlay-close").addEventListener("click", () => setSource(""));
 $("overlay").addEventListener("click", (event) => {
@@ -809,7 +863,8 @@ $("reset").addEventListener("click", async () => {
   const parameters = new URLSearchParams(location.search);
   if (parameters.has("expand")) document.body.classList.add("expanded");
   if (parameters.has("open")) OPEN_ALL = true;
-  if (parameters.has("drawer")) { DRAWER = parameters.get("drawer"); $("operator-view").open = true; }
+  if (["open", "drawer", "source", "tech"].some(key => parameters.has(key))) setTech(true);
+  if (parameters.has("drawer")) DRAWER = parameters.get("drawer");
   if (parameters.has("reset")) await call("/api/reset", {});
   STATE = await (await fetch("/api/state")).json();
   if (parameters.has("source")) SOURCE_OPEN = parameters.get("source");

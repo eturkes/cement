@@ -31,8 +31,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   confirmed examples; each entry drills down to the requests behind it, showing the plan the
   provider wrote and what the supervisor changed.
   Demo framing (owner-ruled): the prototype explains a concept and must never read as a
-  production control plane. Layout = TWO HALVES, `what the user sees` | `none of this is
-  visible in production`. The chat is a PLAIN chat — no badge, id, model name, digest or
+  production control plane. Layout = TWO HALVES, `What staff see` | `Behind the scenes`. The chat is a PLAIN chat — no badge, id, model name, digest or
   timing — so the supervised answer and the cemented answer render IDENTICALLY; that identity
   is the demonstration. A TURN is one question however many operations answer it: it renders as
   the typing indicator while the model writes, then answers in ONE bubble; a part that misses
@@ -42,17 +41,22 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   never what the user already read. A correction therefore shows both — the reply the user got
   and the answer cemented instead — inside that message's disclosure, and a rejection retracts
   nothing. Chat kinds = `document | answer`. Every detail stripped from a bubble moves to a
-  per-message `what happened under this` disclosure.
-  Story layout (owner-ruled r6, picked over a plain-language board + a counter/rulebook): the
-  right half's first layer = `Behind this task` — four numbered plain-language steps narrating
-  the selected task's latest request (model wrote it / a person checks it / n of floor checks
-  for this exact input / you decide when to use it, or `a checked answer replied, no model ran`),
-  the ONE next human action as a button at its step, and an amber `Why not billing?` line. No
-  Cement term leads a step. Board, routing switch, inbox, drawer + commands = ONE collapsed
-  `Operator view` disclosure. Left half unchanged (latest turn, `Show N earlier turns`, tray =
-  5 task chips + `Choose a wording`). Graded by `prototype/webui-demo/density.mjs` (words on
-  the first 1600×1000 screen / rendered / buttons): reset 259/282/17 → 251/261/17, story end
-  311/338/18 → 287/301/18.
+  per-message `what happened under this` disclosure, shown only under technical details.
+  Layperson framing (owner-ruled r7, Swamp's homepage as the clarity reference, not its look):
+  the page leads with ONE purpose sentence + a four-step workflow strip `Ask` → `Check` →
+  `Save` → `Switch on`, plain words, no Cement term; the right half restates those four steps
+  for the selected task — current step = its sentence + the ONE next action (`Check the
+  answer`, `Save as a fixed answer`, `Use fixed answers`), done steps = a short result, later
+  steps = name only — and the header strip marks the same step. `Save` names what is saved:
+  how to handle a KIND of form, never one patient's details. Billing = the amber `Save` step
+  (no two notes repeat), `Switch on` marked not for this task. A tally line counts AI answers
+  vs fixed answers. Requests show directly under the five task pills. ONE `Show technical
+  details` switch (off by default; `?tech`, `?drawer`, `?source`, `?open` turn it on) holds
+  every per-message disclosure, the scanned text + the `Operator view` (board, routing switch,
+  inbox, drawer, commands). Mistakes in the check panel read as plain sentences (`The AI left
+  out provider`). Density (words on the first 1600×1000 screen / rendered / buttons): reset
+  260/260/12, story end 330/334/13 — the purpose + strip add words that the layperson reading
+  needs, so word count is no longer the grade.
   The right half runs the operator lifecycle as REAL `cement` subprocesses against the demo
   ledger (`_cli`), printing the command, its rc and a condensed reading of the bytes it
   returned, with verbatim stdout + exact argv one click away; an argument over 80 chars prints
@@ -86,7 +90,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 ## Tasks
 
 - [x] 2547505 ITERATE round 5: UI dense → `board` picked over `guided` + `mirror` (`Decisions` board-layout ruling); merged, retired.
-- [ ] ITERATE round 7: owner reviews the story layout (round 6 picked it; no go yet); open with `capture.sh` + `density.mjs`.
+- [ ] ITERATE round 7: still dense + confusing → layperson framing (purpose sentence, four-step workflow, technical details behind one switch); owner reviews it.
   - Close (the owner's go) runs `Rules upkeep`; known backlog: origin stories + measured results in bare `ops.md` + `assurance.md`; area-bound law in bare `ops.md` (D28, D19, capture mechanics) → `paths:`.
 - [ ] M3.6a3 delete the 7 dead outcome types (`Outcome` + its 6 members).
   - Resume point: the suspended IMPLEMENT scope rejoins here once ITERATE closes on the owner's go.

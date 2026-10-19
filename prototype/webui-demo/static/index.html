@@ -3,24 +3,41 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Cement · from repeated answers to deterministic entries</title>
+    <title>Cement · fixed answers from checked AI work</title>
     <link rel="stylesheet" href="/static/app.css" />
   </head>
   <body>
     <header class="top">
       <a class="brand" href="/">cement<span>Concept demo</span></a>
-      <p>Keep the chat. Replace repeated model work with checked, exact answers.</p>
+      <div class="hero">
+        <h1>Let checked AI work become fixed answers.</h1>
+        <p>
+          Staff keep using their AI assistant. People check its answers in the background. Work
+          that repeats and passes those checks becomes a fixed answer: the same result every
+          time, no AI call, and a record of who approved it.
+        </p>
+      </div>
       <div class="actions">
         <button id="play" class="button primary">Run the story</button
         ><button id="reset" class="button">Reset</button>
       </div>
     </header>
+    <ol class="how" id="how">
+      <li data-step="1"><span class="story-number">1</span><div><b>Ask</b>
+        <span>Staff ask the AI assistant, as they do today.</span></div></li>
+      <li data-step="2"><span class="story-number">2</span><div><b>Check</b>
+        <span>A person checks each answer later. Nobody waits.</span></div></li>
+      <li data-step="3"><span class="story-number">3</span><div><b>Save</b>
+        <span>Work that repeats and passes the checks becomes a fixed answer.</span></div></li>
+      <li data-step="4"><span class="story-number">4</span><div><b>Switch on</b>
+        <span>You decide when fixed answers replace the AI.</span></div></li>
+    </ol>
     <main class="split">
       <section class="side" id="side-user">
         <div class="side-head">
-          <span class="eyebrow">01 · The experience stays the same</span>
-          <h2>What the user sees</h2>
-          <p>An assistant answers hospital staff. Only the model is simulated.</p>
+          <span class="eyebrow">The chat</span>
+          <h2>What staff see</h2>
+          <p>A normal AI assistant at a hospital. The AI model is simulated.</p>
         </div>
         <div class="pane-body"><div id="chat" class="chat"></div></div>
         <div class="tray">
@@ -31,12 +48,14 @@
       </section>
       <section class="side" id="side-hidden">
         <div class="side-head">
-          <span class="eyebrow">02 · The work underneath changes</span>
-          <h2>None of this is visible in production</h2>
-          <p>A person checks what the model wrote. Repeated, checked work can become automatic.</p>
+          <span class="eyebrow">Cement</span>
+          <h2>Behind the scenes</h2>
+          <p>Staff never see this part.</p>
         </div>
         <div class="pane-body">
           <div id="story"></div>
+          <p id="tally" class="tally"></p>
+          <button id="tech" class="button small" aria-pressed="false">Show technical details</button>
           <details id="operator-view" class="operator-view">
             <summary>Operator view</summary>
             <p>Real Cement commands, exact answers and their evidence.</p>
