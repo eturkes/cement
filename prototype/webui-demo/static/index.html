@@ -18,7 +18,7 @@
         </p>
       </div>
       <div class="actions">
-        <button id="play" class="button primary">Run the story</button
+        <button id="play" class="button primary">Play the story</button
         ><button id="reset" class="button">Reset</button>
       </div>
     </header>
@@ -32,10 +32,19 @@
       <li data-step="4"><span class="story-number">4</span><div><b>Switch on</b>
         <span>You decide when fixed answers replace the AI.</span></div></li>
     </ol>
+    <section class="narration" id="narration" aria-live="polite">
+      <div>
+        <span class="eyebrow" id="narration-step">What just happened</span>
+        <p id="narration-text"></p>
+      </div>
+      <div class="actions">
+        <button id="story-next" class="button primary" hidden>Next</button
+        ><button id="story-exit" class="button" hidden>Leave the story</button>
+      </div>
+    </section>
     <main class="split">
       <section class="side" id="side-user">
         <div class="side-head">
-          <span class="eyebrow">The chat</span>
           <h2>What staff see</h2>
           <p>A normal AI assistant at a hospital. The AI model is simulated.</p>
         </div>
@@ -48,11 +57,11 @@
       </section>
       <section class="side" id="side-hidden">
         <div class="side-head">
-          <span class="eyebrow">Cement</span>
           <h2>Behind the scenes</h2>
           <p>Staff never see this part.</p>
         </div>
         <div class="pane-body">
+          <div id="mechanism"></div>
           <div id="story"></div>
           <p id="tally" class="tally"></p>
           <button id="tech" class="button small" aria-pressed="false">Show technical details</button>

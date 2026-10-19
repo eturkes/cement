@@ -57,6 +57,18 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   out provider`). Density (words on the first 1600×1000 screen / rendered / buttons): reset
   260/260/12, story end 330/334/13 — the purpose + strip add words that the layperson reading
   needs, so word count is no longer the grade.
+  Mechanism + narration (owner-ruled r8; unclear = what clicks did, the auto story, JSON
+  replies): the right half opens with `What happened to the latest request` = three boxes,
+  the document (id, kind, first scanned lines) → the METHOD used per part, in plain rows
+  (`Patient name ← the "Patient:" line`), badged `Written by the AI · not checked yet / a person
+  fixed it / confirmed` or `Fixed answer · no AI` with its check count, a correction marking
+  each added/fixed/removed row → the reply staff got. This makes the saved thing visible: a
+  method for a KIND of form, which plain code applies to a new patient's form. A `What just
+  happened` band under the strip captions every action in plain words (send, check, save,
+  switch on, task change). `Play the story` = 11 narrated steps, one per `Next`, captions read
+  live state (the AI's actual mistake, the patient's name); any manual click leaves the story.
+  Chat + reply render as labelled fields, never JSON. Density at story end 381/430/13 —
+  the mechanism's words are the explanation.
   The right half runs the operator lifecycle as REAL `cement` subprocesses against the demo
   ledger (`_cli`), printing the command, its rc and a condensed reading of the bytes it
   returned, with verbatim stdout + exact argv one click away; an argument over 80 chars prints
@@ -90,7 +102,8 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 ## Tasks
 
 - [x] 2547505 ITERATE round 5: UI dense → `board` picked over `guided` + `mirror` (`Decisions` board-layout ruling); merged, retired.
-- [ ] ITERATE round 7: still dense + confusing → layperson framing (purpose sentence, four-step workflow, technical details behind one switch); owner reviews it.
+- [x] d9fe5df ITERATE round 7: still dense + confusing → layperson framing (purpose sentence, four-step workflow, technical details behind one switch).
+- [ ] ITERATE round 8: still unclear what happens → mechanism boxes (document → method → reply), `What just happened` captions, narrated step-through story, readable replies; owner reviews it.
   - Close (the owner's go) runs `Rules upkeep`; known backlog: origin stories + measured results in bare `ops.md` + `assurance.md`; area-bound law in bare `ops.md` (D28, D19, capture mechanics) → `paths:`.
 - [ ] M3.6a3 delete the 7 dead outcome types (`Outcome` + its 6 members).
   - Resume point: the suspended IMPLEMENT scope rejoins here once ITERATE closes on the owner's go.

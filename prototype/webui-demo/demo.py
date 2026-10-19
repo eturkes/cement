@@ -1238,6 +1238,7 @@ class Session:
                 "output": candidate["plan"],
                 "status": "unreviewed",
                 "provider_ms": provider_ms,
+                "note": candidate["note"],
             }
         )
         # An extraction plan is a rule ABOUT the document, so the reviewer reads what it

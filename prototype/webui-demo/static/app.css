@@ -104,7 +104,7 @@ a {
 .how {
   list-style: none;
   margin: 0;
-  padding: 16px 36px;
+  padding: 12px 36px;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 24px;
@@ -690,3 +690,62 @@ body:not(.tech) #operator-view {
 .tray .tiny { margin: 0; }
 .story-check .story-action { margin-top: 0; }
 .plain-diff { margin: 0 0 14px; padding-left: 18px; font-size: 13.5px; line-height: 1.6; }
+
+/* What just happened: one band under the steps, captioning every action. */
+.narration {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 16px 24px 0;
+  padding: 12px 20px;
+  background: #edf5ef;
+  border: 1px solid #c9ddcf;
+  border-radius: 10px;
+}
+.narration p {
+  margin: 4px 0 0;
+  font-size: 15px;
+  max-width: 1100px;
+}
+.narration.story {
+  background: #fff;
+  border-color: var(--green);
+  box-shadow: inset 4px 0 0 var(--green);
+}
+.split {
+  padding-top: 16px;
+}
+
+/* Document → method → reply. */
+.mechanism { margin-bottom: 22px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.flow { display: grid; grid-template-columns: 1fr 16px 1.35fr 16px 1fr; gap: 6px; align-items: start; margin-top: 10px; }
+.flow-arrow { color: var(--quiet); padding-top: 40px; text-align: center; }
+.flow-box, .method { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 12.5px; min-width: 0; }
+.flow-methods { display: grid; gap: 8px; min-width: 0; }
+.flow h4, .method h4 { margin: 4px 0 6px; font-size: 13.5px; }
+.flow .tiny { margin: 0 0 6px; }
+.method-badge { font-size: 11px; font-weight: 700; color: var(--quiet); }
+.method.ai { background: #fdf6ea; border-color: #ecd6b0; }
+.method.ai .method-badge { color: var(--amber); }
+.method.checked { background: #fafbf9; }
+.method.fixed { background: #edf5ef; border-color: #a9cbb5; }
+.method.fixed .method-badge { color: var(--green); }
+.method-row { display: grid; grid-template-columns: 1fr 1.3fr; gap: 6px; padding: 3px 0; border-top: 1px solid #0000000d; }
+.method-row em { grid-column: 1 / -1; font-style: normal; font-size: 11px; color: var(--green); }
+.method-row.added, .method-row.changed { background: #e3f1e7; }
+.method-row.removed span { text-decoration: line-through; color: var(--quiet); }
+.method-foot { font-size: 11.5px; color: var(--quiet); margin: 6px 0 0; line-height: 1.4; }
+.scan { font-size: 10.5px; padding: 8px; margin: 0; line-height: 1.5; }
+.reply { margin-top: 6px; overflow-wrap: break-word; }
+.reply .fields { grid-template-columns: 1fr; gap: 0; }
+.reply .fields dt { font-size: 11px; margin-top: 5px; }
+.fields { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 0; }
+.fields dt { color: var(--quiet); }
+.fields dd { margin: 0; overflow-wrap: anywhere; }
+.bubble .fields { font-size: 14px; }
+@media (max-width: 1000px) {
+  .flow { grid-template-columns: 1fr; }
+  .flow-arrow { padding: 0; transform: rotate(90deg); }
+  .narration { flex-direction: column; align-items: flex-start; margin: 12px 12px 0; }
+}

@@ -11,7 +11,11 @@ deployment puts Cement behind a chat product such as Open WebUI, where none of t
 reaches the person typing.
 
 The page opens with one sentence of purpose and four steps: **Ask**, **Check**, **Save**
-and **Switch on**. The left half is the chat that staff see. The right half shows the same
+and **Switch on**. A band under the steps tells you what just happened after each action.
+The left half is the chat that staff see. The right half first shows what happened to the
+latest request: the document, the method used on it and the reply. The method is either
+written by the AI or a fixed answer. A fixed answer is a method for one kind of form, so
+plain code can read a new patient's form with it. Below that, the right half shows the
 four steps for the selected task, the step that it has reached, and the one next action.
 **Show technical details** opens the per-message details, the scanned text and the
 **Operator view**, which holds the commands, the evidence and the function source.
@@ -22,7 +26,7 @@ four steps for the selected task, the step that it has reached, and the one next
 uv run python prototype/webui-demo/app.py
 ```
 
-Open <http://127.0.0.1:8765/>. Select **Run the story** for the full sequence. Stop the
+Open <http://127.0.0.1:8765/>. Select **Play the story** for a guided tour. Select **Next** to go to each step. Stop the
 server with Ctrl+C. The ledger is a temporary SQLite file, and it disappears with the
 process.
 
@@ -120,13 +124,11 @@ and the CLI are the shipped artifacts. Read the [repository overview](../../READ
 the guarantees, and [docs/architecture.md](../../docs/architecture.md) for the state model.
 
 Query parameters help with capture. `?reset=1` starts a new ledger. `?scene=N` plays the
-story to scene N. `?expand=1` removes the internal scrollbars for a full-page screenshot.
+story to step N + 1. `?expand=1` removes the internal scrollbars for a full-page screenshot.
 `?source=<operation>` opens the source overlay for that promoted operation.
 `?drawer=<operation>` opens the drawer for that operation. `?tech=1` shows the technical
-details, and `?drawer`, `?source` and `?open` also show them. `?open=1`
-opens every disclosure except the raw `stdout` blocks and the lineage of later entries. A
-screenshot cannot select a disclosure. The raw bytes bury the reading they belong to, and
-the later entries repeat a lineage the first entry already shows.
+details, and `?drawer`, `?source` and `?open` also show them. The source overlay opens the
+lineage of its first entry, because a screenshot cannot select a disclosure.
 
 ## Visual check
 

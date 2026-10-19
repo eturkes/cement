@@ -10,7 +10,6 @@ let RUN = 0;
 const INFLIGHT = new Set();
 /* The operation whose source overlay is open, or "" for none. */
 let SOURCE_OPEN = "";
-let OPEN_ALL = false;
 let DRAWER = "";
 let HISTORY = false;
 /* Off = the plain explanation; on = per-message details, scanned text + operator view. */
@@ -42,6 +41,25 @@ function jsonBlock(value, pad) {
     .split("\n")
     .map((line, index) => (index ? pad + line : line))
     .join("\n");
+}
+
+const ACRONYMS = { mrn: "MRN", dob: "DOB", id: "ID" };
+const humanKey = (key) => String(key).split("_")
+  .map((word, index) => ACRONYMS[word] || (index ? word : word.replace(/^./, (c) => c.toUpperCase())))
+  .join(" ");
+
+/* A reply as a person reads it: one labelled row per field, lists as lines. */
+function fieldsHtml(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => esc(item && typeof item === "object"
+      ? Object.values(item).join(" \u2014 ") : item)).join("<br>");
+  }
+  if (value && typeof value === "object") {
+    return `<dl class="fields">${Object.entries(value).map(([key, item]) =>
+      `<dt>${esc(humanKey(key))}</dt><dd>${item && typeof item === "object"
+        ? fieldsHtml(item) : item === "" || item === null ? "\u2014" : esc(item)}</dd>`).join("")}</dl>`;
+  }
+  return esc(value);
 }
 
 function toast(message) {
@@ -140,6 +158,8 @@ function render() {
   renderChat();
   renderTray();
   renderStory();
+  renderMechanism();
+  renderNarration();
   renderTasks();
   renderReview();
   renderCategories();
@@ -199,7 +219,7 @@ function chatMessage(message) {
     ? `<div class="preview-error">${esc(message.error)}</div>`
     : message.render === "text"
       ? `<div>${esc(message.body)}</div>`
-      : `<pre class="json">${jsonHtml(message.body)}</pre>`;
+      : fieldsHtml(message.body);
   return `<div class="msg assistant"><div class="avatar">AI</div>
     <div class="bubble">${body}</div></div>` + under(message);
 }
@@ -356,6 +376,81 @@ function renderStory() {
   $("tally").textContent = st.provider_calls || st.cement_answers
     ? `So far the AI answered ${plural(st.provider_calls, "request")}. Fixed answers replaced the AI ${st.cement_answers} ${st.cement_answers === 1 ? "time" : "times"}.`
     : "";
+}
+
+/* --- what happened to the latest request: document → method → reply ---
+   The middle box is the point: Cement saves the METHOD for a kind of form, never one
+   patient's values, so plain code can answer a new patient's form from it. */
+
+const METHOD = {
+  "document.extraction_plan": ["How to read this kind of form", (o) => (o.fields || []).map((f) => [
+    humanKey(f.name),
+    f.locator && f.locator.kind === "section" ? `the “${f.locator.heading}” section`
+      : f.locator && f.locator.label ? `the “${f.locator.label}:” line` : JSON.stringify(f.locator)])],
+  "document.phi_locators": ["Which details identify the patient", (o) =>
+    (o.identifiers || []).map((r) => [humanKey(r.field), String(r.category).replace(/_/g, " ")])],
+  "document.required_fields": ["Which fields must be filled in", (o) => [
+    ["Required", (o.required || []).map(humanKey).join(", ")],
+    ["Optional", (o.optional || []).map(humanKey).join(", ") || "none"]]],
+  "document.intake_queue": ["Which team gets this kind of form", (o) => [
+    ["Team", o.queue], ["Turnaround", `${o.sla_hours} hours`], ["Confirms receipt", o.acknowledge ? "yes" : "no"]]],
+  "document.billing_codes": ["Billing codes for this note", (o) =>
+    (o.codes || []).map((c) => [c.code, c.description])],
+};
+
+/* The checker's version, with each row the AI got wrong marked against it. */
+function methodRows(operation, ai, confirmed) {
+  const rows = METHOD[operation][1];
+  const mine = new Map(rows(ai || {}));
+  if (!confirmed) return [...mine].map(([k, v]) => ({ k, v, mark: "" }));
+  const fixed = rows(confirmed);
+  const keys = new Set(fixed.map(([k]) => k));
+  return fixed.map(([k, v]) => ({ k, v, mark: !mine.has(k) ? "added" : mine.get(k) !== v ? "changed" : "" }))
+    .concat([...mine].filter(([k]) => !keys.has(k)).map(([k, v]) => ({ k, v, mark: "removed" })));
+}
+
+function methodBox(part, doc) {
+  const fixed = part.source === "function";
+  const category = STATE.categories.find((c) => c.operation === part.operation && c.layout === doc.layout);
+  const checks = category ? category.confirmations : 0;
+  const reviewed = part.status === "corrected" || part.status === "accepted";
+  const badge = fixed ? `Fixed answer · no AI`
+    : `Written by the AI · ${part.status === "unreviewed" ? "not checked yet"
+      : part.status === "rejected" ? "rejected by a person"
+      : part.status === "corrected" ? "a person fixed it" : "a person confirmed it"}`;
+  const foot = fixed ? `Saved after ${plural(checks, "check")} by a person.`
+    : part.status === "corrected" ? `The AI ${esc(part.note)}. The marked rows show the fix.`
+    : part.status === "unreviewed" ? "A person checks this later. The reply already went out."
+    : "";
+  const rows = methodRows(part.operation, part.output, part.status === "corrected" ? part.confirmed : null)
+    .map((r) => `<div class="method-row ${r.mark}"><span>${esc(r.k)}</span><span>${esc(r.v)}</span>${r.mark ? `<em>${r.mark === "added" ? "added by the checker" : r.mark === "removed" ? "removed by the checker" : "fixed by the checker"}</em>` : ""}</div>`).join("");
+  return `<div class="method ${fixed ? "fixed" : reviewed ? "checked" : "ai"}">
+    <span class="method-badge">${badge}</span>
+    <h4>${esc(METHOD[part.operation][0])}</h4>${rows}
+    ${foot ? `<p class="method-foot">${foot}</p>` : ""}</div>`;
+}
+
+function latestAnswer(turn) {
+  return [...STATE.chat].reverse().find((m) => m.kind === "answer" && m.document_id === turn.document_id && m.scenario === STATE.selected);
+}
+
+function renderMechanism() {
+  const turn = STATE.latest_turn;
+  if (!turn) { $("mechanism").innerHTML = ""; return; }
+  const doc = documentOf(turn.document_id);
+  const excerpt = String(doc.text || "").split("\n").filter((line) => line.trim()).slice(0, 5).join("\n");
+  const answer = latestAnswer(turn);
+  const reply = !answer ? "…" : answer.error ? esc(answer.error)
+    : answer.render === "text" ? esc(answer.body) : fieldsHtml(answer.body);
+  $("mechanism").innerHTML = `<div class="mechanism"><span class="eyebrow">What happened to the latest request</span>
+    <div class="flow">
+      <div class="flow-box"><span class="method-badge">The document</span><h4>${esc(doc.id)}.pdf</h4>
+        <p class="tiny">${esc(doc.title || "")}</p><pre class="scan">${esc(excerpt)}</pre></div>
+      <div class="flow-arrow" aria-hidden="true">→</div>
+      <div class="flow-methods">${turn.parts.map((part) => methodBox(part, doc)).join("")}</div>
+      <div class="flow-arrow" aria-hidden="true">→</div>
+      <div class="flow-box"><span class="method-badge">The reply staff got</span><div class="reply">${reply}</div></div>
+    </div></div>`;
 }
 
 async function makeAutomatic() {
@@ -741,7 +836,49 @@ function renderLog() {
   if (!document.body.classList.contains("expanded")) log.scrollTop = log.scrollHeight;
 }
 
-/* --- the story: cement every cementable task, and show the one that cannot --- */
+/* --- narration: what just happened, after every action ---
+   Free mode captions each click; story mode walks fixed steps with Next. */
+
+let CAPTION = "Pick a task and send a request, or select Play the story for a guided tour.";
+let STORY_AT = -1;
+
+function renderNarration() {
+  const story = STORY_AT >= 0;
+  $("narration-text").textContent = CAPTION;
+  $("narration-step").textContent = story ? `The story · step ${STORY_AT + 1} of ${STORY.length}` : "What just happened";
+  $("narration").classList.toggle("story", story);
+  $("story-next").hidden = !story || STORY_AT >= STORY.length - 1;
+  $("story-exit").hidden = !story;
+  $("story-next").disabled = BUSY;
+}
+
+function narrate(text) {
+  CAPTION = text;
+  renderNarration();
+}
+
+const turnParts = () => (STATE.latest_turn ? STATE.latest_turn.parts : []);
+const kindOf = (id) => String(documentOf(id).title || "document").toLowerCase();
+
+function sentCaption() {
+  const turn = STATE.latest_turn;
+  if (!turn) return CAPTION;
+  const parts = turnParts();
+  const fixed = parts.filter((p) => p.source === "function").length;
+  const name = `${turn.document_id}.pdf`;
+  if (fixed === parts.length) return `${name} is a ${kindOf(turn.document_id)}. A fixed answer handled it, so the AI was not called. Plain code read this patient’s form the saved way.`;
+  if (fixed) return `Part of this job already had a fixed answer, so only the rest went to the AI. The reply went out at once. A person checks the AI’s part later.`;
+  return `The AI worked out how to handle ${name} and replied at once. Nobody has checked its work yet.`;
+}
+
+function reviewCaption(decision, note) {
+  if (decision === "reject") return "A person rejected the AI’s work. Cement learns nothing from it, and the reply already sent stands.";
+  if (decision === "accept") return "A person checked the AI’s work and found nothing wrong. That counts as one check.";
+  return `A person checked the AI’s work and fixed it: the AI ${note}. The reply already sent does not change. Cement keeps the fixed version as one check.`;
+}
+
+const SAVED = "Cement tested the checked work and saved it as a fixed answer. It saves how to handle this kind of form, not any patient’s details. Nothing changes for staff until someone switches it on.";
+const SWITCHED = "Fixed answers are switched on. Matching forms now skip the AI. Anything new still goes to the AI and a person.";
 
 /* A supervisor corrects what diverges and accepts what already matches. The first
    candidate for a scope always diverges, so a correction is always visible. */
@@ -750,56 +887,62 @@ async function settle() {
   while (run === RUN && STATE.pending.length) {
     const proposal = STATE.pending[0];
     await review(proposal.proposal_id, proposal.diff.length ? "correct" : "accept");
-    await pause(320);
   }
 }
 
-const seal = () => [
-  () => lifecycle("compile"),
-  () => lifecycle("verify"),
-  () => lifecycle("promote"),
+const turn = async (request) => { await send(request); await settle(); };
+const firstNote = () => (turnParts().find((p) => p.note) || {}).note || "made a mistake";
+const patientOf = () => (STATE.latest_turn ? documentOf(STATE.latest_turn.document_id).patient : "");
+
+const STORY = [
+  { say: () => "Hospital staff use an AI assistant all day. A common job: pull the record fields out of a scanned physician progress note. Select Next to send the first one." },
+  { run: async () => { await select("file"); await send("q01"); },
+    say: () => `A clerk sent A01.pdf and asked for the record fields. The AI worked out how to read this kind of form, and the reply went out at once. The AI made a mistake that nobody has seen yet: it ${firstNote()}. Compare the boxes on the right.` },
+  { run: settle,
+    say: () => "Later, a records supervisor checked the AI’s work and fixed it. The clerk’s reply stays as it was. Cement keeps the fixed version: that is the first check for progress notes." },
+  { run: () => turn("q02"),
+    say: () => {
+      const status = (turnParts()[0] || {}).status;
+      return `A second progress note, A02.pdf, arrived with different wording. The AI read it ${status === "accepted" ? "correctly, and the supervisor confirmed it" : "with a mistake again, and the supervisor fixed it"}. Progress notes now have 2 checks, enough for Cement to save the work.`;
+    } },
+  { run: makeAutomatic,
+    say: () => "Cement tested the checked work and saved “how to read a progress note” as a fixed answer. It saved the reading method, not any patient’s details. Staff see no change yet." },
+  { run: () => route(true),
+    say: () => "An operator switched fixed answers on. From now on, a progress note skips the AI." },
+  { run: () => send("q03"),
+    say: () => `A03.pdf is a new patient’s progress note, worded differently again. The fixed answer was used, so the AI was not called. Plain code read ${patientOf()}’s details off the form. The reply looks the same as the AI’s would.` },
+  { run: async () => { await turn("q05"); await turn("q06"); await makeAutomatic(); },
+    say: () => "A different job, removing patient details before a note is shared, reuses the same reading method and adds one new step: which details identify the patient. The reading came from the fixed answer. The AI did the new step, a person checked it twice, and Cement saved that too." },
+  { run: async () => { await turn("q08"); await turn("q09"); await makeAutomatic(); await turn("q10"); await turn("q11"); await makeAutomatic(); },
+    say: () => "The same happened for two more jobs: checking a form for blanks, and choosing which team gets it. Each job needed its own two checks before Cement saved it." },
+  { run: async () => { await turn("q12"); await lifecycle("compile"); },
+    say: () => "Billing is different. The codes depend on the doctor’s own words in each note, and no two notes say the same thing. Nothing repeats, so Cement never saves a fixed answer for billing. It stays with the AI and a person, on purpose." },
+  { say: () => `End of the story. The AI answered ${plural(STATE.stats.provider_calls, "request")}. Fixed answers replaced it ${STATE.stats.cement_answers} times with the same replies. Every fixed answer traces back to the people who checked it: select Show technical details to see that record.` },
 ];
 
-const turn = (request) => [() => send(request), () => settle()];
-
-const SCENES = [
-  { name: "desk", steps: [] },
-  { name: "answered", steps: [() => send("q01")] },
-  { name: "evidence", steps: [() => settle(), ...turn("q02")] },
-  { name: "cemented", steps: seal() },
-  { name: "routed", steps: [() => route(true), () => send("q03")] },
-  { name: "reuse", steps: [...turn("q05"), ...turn("q06"), ...seal()] },
-  {
-    name: "covered",
-    steps: [
-      ...turn("q08"), ...turn("q09"), ...seal(),
-      ...turn("q10"), ...turn("q11"), ...seal(),
-    ],
-  },
-  { name: "blocked", steps: [...turn("q12"), () => lifecycle("compile")] },
-  {
-    name: "bundle",
-    steps: [() => select("file"), () => offline("A03", "document.extraction_plan")],
-  },
-];
-
-const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-async function runStory(upTo) {
+async function advanceStory(index) {
   const run = RUN;
-  $("play").disabled = true;
-  for (let index = 0; index <= upTo && index < SCENES.length; index += 1) {
-    const scene = SCENES[index];
-    document.body.dataset.scene = scene.name;
-    for (const step of scene.steps) {
-      await step();
-      if (run !== RUN) return;
-      await pause(420);
-      if (run !== RUN) return;
-    }
-    document.body.dataset.sceneDone = String(index);
+  const step = STORY[index];
+  STORY_AT = index;
+  narrate("Working…");
+  if (step.run) await step.run();
+  if (run !== RUN) return;
+  narrate(step.say());
+  document.body.dataset.sceneDone = String(index);
+}
+
+async function playStory(upTo = 0) {
+  RUN += 1;
+  await call("/api/reset", {});
+  CHECK_OPEN = false;
+  for (let index = 0; index <= upTo && index < STORY.length; index += 1) {
+    await advanceStory(index);
   }
-  $("play").disabled = false;
+}
+
+function leaveStory() {
+  STORY_AT = -1;
+  renderNarration();
 }
 
 /* --- wiring --- */
@@ -810,16 +953,23 @@ document.addEventListener("click", (event) => {
     "[data-source],[data-select],[data-operation-open],[data-history]," +
     "[data-check-open],[data-make-automatic],[data-enable-automatic]");
   if (!target || BUSY) return;
+  if (!target.dataset.checkOpen && !target.dataset.history && STORY_AT >= 0) leaveStory();
   if (target.dataset.checkOpen) { CHECK_OPEN = !CHECK_OPEN; renderStory(); }
-  else if (target.dataset.makeAutomatic) makeAutomatic();
-  else if (target.dataset.enableAutomatic) route(true);
+  else if (target.dataset.makeAutomatic) makeAutomatic().then(() => narrate(SAVED));
+  else if (target.dataset.enableAutomatic) route(true).then(() => narrate(SWITCHED));
   else if (target.dataset.history) { HISTORY = !HISTORY; render(); } else if (target.dataset.operationOpen) {
     DRAWER = target.dataset.operationOpen;
     const task = STATE.scenarios.find(t => t.id === STATE.selected && t.operations.includes(DRAWER)) || STATE.scenarios.find(t => t.operations.includes(DRAWER));
     select(task.id);
-  } else if (target.dataset.send) send(target.dataset.send);
-  else if (target.dataset.select) select(target.dataset.select);
-  else if (target.dataset.review) { CHECK_OPEN = false; review(target.dataset.proposal, target.dataset.review); }
+  } else if (target.dataset.send) send(target.dataset.send).then(() => narrate(sentCaption()));
+  else if (target.dataset.select) {
+    select(target.dataset.select).then(() => narrate(`Task: ${scenarioOf(STATE.selected).title}. Send one of its requests.`));
+  } else if (target.dataset.review) {
+    CHECK_OPEN = false;
+    const decision = target.dataset.review;
+    const note = (STATE.pending.find((p) => p.proposal_id === target.dataset.proposal) || {}).note;
+    review(target.dataset.proposal, decision).then(() => narrate(reviewCaption(decision, note)));
+  }
   else if (target.dataset.action) lifecycle(target.dataset.action);
   else if (target.dataset.offline) {
     offline(target.dataset.offline, target.dataset.operation);
@@ -844,25 +994,26 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && SOURCE_OPEN) setSource("");
 });
 
-$("play").addEventListener("click", () => runStory(SCENES.length - 1));
+$("play").addEventListener("click", () => playStory(0));
+$("story-next").addEventListener("click", () => { if (!BUSY) advanceStory(STORY_AT + 1); });
+$("story-exit").addEventListener("click", leaveStory);
 $("reset").addEventListener("click", async () => {
   RUN += 1;
   for (const abort of INFLIGHT) abort.abort();
   stopPolling();
   delete document.body.dataset.sceneDone;
-  delete document.body.dataset.scene;
   SOURCE_OPEN = "";
   DRAWER = "";
   HISTORY = false;
   CHECK_OPEN = false;
+  STORY_AT = -1;
+  CAPTION = "Pick a task and send a request, or select Play the story for a guided tour.";
   await call("/api/reset", {});
-  $("play").disabled = false;
 });
 
 (async function start() {
   const parameters = new URLSearchParams(location.search);
   if (parameters.has("expand")) document.body.classList.add("expanded");
-  if (parameters.has("open")) OPEN_ALL = true;
   if (["open", "drawer", "source", "tech"].some(key => parameters.has(key))) setTech(true);
   if (parameters.has("drawer")) DRAWER = parameters.get("drawer");
   if (parameters.has("reset")) await call("/api/reset", {});
@@ -872,5 +1023,5 @@ $("reset").addEventListener("click", async () => {
   /* The webfonts load after the first paint and change every line height, so the
      scroll offsets computed above land short. Render again once they are in. */
   if (document.fonts) await document.fonts.ready.then(render);
-  if (parameters.has("scene")) await runStory(Number(parameters.get("scene")));
+  if (parameters.has("scene")) await playStory(Number(parameters.get("scene")));
 })();
