@@ -35,16 +35,67 @@ from cement_runtime import (
     NotFoundError,
     PendingProposalGap,
     ProposalView,
-    ReviewRequired,
     ReviewResult,
     StateError,
     System,
     ValidationError,
 )
-import cement_runtime.models as models_module
 import cement_runtime.store as store_module
 import cement_runtime.system as system_module
 
+
+
+# M3.4's close. B14 + the B-frame below grade the export census M3.4 LEFT, a closed transition,
+# so they read git objects here (pin-repair ruling): M3.6a3 deletes `Outcome` and its members.
+M3U4_CLOSE = "77f44b0"
+
+
+def _git_source(revision: str, path: str) -> str:
+    import subprocess
+
+    return subprocess.run(
+        ["git", "show", f"{revision}:{path}"],
+        cwd=__import__("pathlib").Path(__file__).resolve().parents[1],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+
+
+def _outcome_members_at(revision: str) -> tuple[str, ...]:
+    import ast as _ast
+
+    tree = _ast.parse(_git_source(revision, "src/cement_runtime/models.py"))
+    alias = next(
+        node.value
+        for node in tree.body
+        if isinstance(node, _ast.AnnAssign)
+        and isinstance(node.target, _ast.Name)
+        and node.target.id == "Outcome"
+    )
+    names: list[str] = []
+
+    def walk(node: _ast.expr) -> None:
+        if isinstance(node, _ast.BinOp):
+            walk(node.left)
+            walk(node.right)
+        elif isinstance(node, _ast.Name):
+            names.append(node.id)
+
+    walk(alias)
+    return tuple(names)
+
+
+def _all_at(revision: str) -> list[str]:
+    import ast as _ast
+
+    tree = _ast.parse(_git_source(revision, "src/cement_runtime/__init__.py"))
+    for node in tree.body:
+        if isinstance(node, _ast.Assign) and any(
+            isinstance(target, _ast.Name) and target.id == "__all__" for target in node.targets
+        ):
+            return list(_ast.literal_eval(node.value))
+    raise AssertionError("no __all__")
 
 class _Clock:
     def __init__(self, now_us: int = 1_000_000) -> None:
@@ -864,7 +915,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         self.assertTrue(
             {"ProposalView", "PendingProposalGap", "ReviewResult"} <= exported
         )
-        self.assertNotIn(ReviewResult, typing.get_args(models_module.Outcome))
+        self.assertNotIn("ReviewResult", _outcome_members_at(M3U4_CLOSE))
         for shape in (ProposalView, PendingProposalGap, ReviewResult):
             self.assertNotIn("request_id", shape.__dataclass_fields__)
 
@@ -1089,15 +1140,15 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         Reproduction: pin ReviewResult's exact neighboring exports and the complete
         request-lifecycle Outcome union, with ReviewResult excluded from that union.
         """
-        exports = list(cement_runtime.__all__)
+        exports = _all_at(M3U4_CLOSE)
         review_index = exports.index("ReviewResult")
         self.assertEqual(
             exports[review_index - 1 : review_index + 2],
             ["ReviewRequired", "ReviewResult", "StaleRevisionAnomaly"],
         )
-        outcome_members = typing.get_args(models_module.Outcome)
+        outcome_members = _outcome_members_at(M3U4_CLOSE)
         self.assertEqual(
-            tuple(member.__name__ for member in outcome_members),
+            outcome_members,
             (
                 "Resolved",
                 "ReviewRequired",
@@ -1107,7 +1158,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                 "ReconciliationRequired",
             ),
         )
-        self.assertNotIn(ReviewResult, outcome_members)
+        self.assertNotIn("ReviewResult", outcome_members)
         self.assertIs(cement_runtime.ReviewResult, ReviewResult)
 
     def test_b15_a08_write_order_the_exact_ordered_1(self) -> None:

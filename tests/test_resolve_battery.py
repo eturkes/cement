@@ -18,7 +18,6 @@ from cement_runtime import (
     Candidate,
     CompilePolicy,
     FunctionResolution,
-    Resolved,
     System,
 )
 

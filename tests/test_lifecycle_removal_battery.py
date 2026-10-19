@@ -721,9 +721,15 @@ class LifecycleRemovalBattery(unittest.TestCase):
         current = parsed_all(_git_text(CLOSE_SHA, "src/cement_runtime/__init__.py"))
         self.assertEqual(current, baseline)
 
-    def test_l12_six_package_exports_are_identical_model_bindings(self) -> None:
-        import cement_runtime
-        import cement_runtime.models as models
+    def _closed_package_facts(self) -> dict[str, object]:
+        """Import M3.6a2's CLOSED package (`CLOSE_SHA`, extracted by `git archive`) in an isolated
+        interpreter: L12's binding + vector claims are about live objects at that close, and
+        M3.6a3 deleted those objects from the working tree (pin-repair ruling)."""
+
+        import json
+        import subprocess
+        import sys
+        import tempfile
 
         names = (
             "FallbackFailed",
@@ -733,36 +739,50 @@ class LifecycleRemovalBattery(unittest.TestCase):
             "Resolved",
             "ReviewRequired",
         )
-        for name in names:
+        code = (
+            "import json, sys\n"
+            "sys.path.insert(0, sys.argv[1])\n"
+            "import cement_runtime, cement_runtime.models as models\n"
+            "import cement_runtime.system as system_module\n"
+            "names = json.loads(sys.argv[2])\n"
+            "print(json.dumps({'file': cement_runtime.__file__,"
+            " 'identity': {n: getattr(cement_runtime, n) is getattr(models, n) for n in names},"
+            " 'vector': {n: [hasattr(models, n), n in cement_runtime.__all__,"
+            " hasattr(cement_runtime, n), hasattr(system_module, n)]"
+            " for n in [*names, 'Outcome']}}))\n"
+        )
+        with tempfile.TemporaryDirectory(prefix="cement-l12-") as directory:
+            archive = subprocess.run(
+                ["git", "archive", CLOSE_SHA, "src/cement_runtime"],
+                cwd=ROOT,
+                capture_output=True,
+                check=True,
+            ).stdout
+            subprocess.run(["tar", "-x", "-C", directory], input=archive, check=True)
+            source = f"{directory}/src"
+            result = subprocess.run(
+                [sys.executable, "-I", "-c", code, source, json.dumps(names)],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            facts = json.loads(result.stdout)
+            self.assertTrue(str(facts["file"]).startswith(source), facts["file"])
+        return {"names": names, **facts}
+
+    def test_l12_six_package_exports_are_identical_model_bindings(self) -> None:
+        facts = self._closed_package_facts()
+        for name in facts["names"]:
             with self.subTest(name=name):
-                self.assertIs(getattr(cement_runtime, name), getattr(models, name))
+                self.assertIs(facts["identity"][name], True)
 
     def test_l12_post_state_model_definition_export_import_vector(self) -> None:
-        import cement_runtime
-        import cement_runtime.models as models
-
-        exported = (
-            "FallbackFailed",
-            "InProgress",
-            "ReconciliationRequired",
-            "Rejected",
-            "Resolved",
-            "ReviewRequired",
-        )
-        vector = {
-            name: (
-                hasattr(models, name),
-                name in cement_runtime.__all__,
-                hasattr(cement_runtime, name),
-                hasattr(system_module, name),
-            )
-            for name in (*exported, "Outcome")
-        }
+        facts = self._closed_package_facts()
         self.assertEqual(
-            vector,
+            facts["vector"],
             {
-                **{name: (True, True, True, False) for name in exported},
-                "Outcome": (True, False, False, False),
+                **{name: [True, True, True, False] for name in facts["names"]},
+                "Outcome": [True, False, False, False],
             },
         )
 

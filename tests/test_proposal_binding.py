@@ -329,8 +329,8 @@ class FrozenPublicShapeTests(unittest.TestCase):
                 self.assertNotIn("request_id", shape.__dataclass_fields__)
 
     def test_handle_lifecycle_shapes_keep_their_request_identity(self) -> None:
-        # D10: these are handle-lifecycle values owned by a later unit. They keep the field;
-        # what changed is that no review or proposal read reaches them.
+        # D10's later unit = M3.6a3, which deletes the six handle-lifecycle values (an intended
+        # inversion of this pin); `CandidateRequest` keeps the field until M3.6b's cut.
         for name in (
             "Resolved",
             "Rejected",
@@ -338,8 +338,10 @@ class FrozenPublicShapeTests(unittest.TestCase):
             "InProgress",
             "FallbackFailed",
             "ReconciliationRequired",
-            "CandidateRequest",
         ):
+            with self.subTest(shape=name):
+                self.assertFalse(hasattr(models, name))
+        for name in ("CandidateRequest",):
             with self.subTest(shape=name):
                 self.assertIn(
                     "request_id", getattr(models, name).__dataclass_fields__

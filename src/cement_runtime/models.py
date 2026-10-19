@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Literal, TypeAlias, cast
+from typing import Literal, cast
 
 from .errors import ValidationError
 from .function import FunctionDocument, FunctionMatch
@@ -66,58 +66,6 @@ class CandidateRequest:
     operation_revision: int
     request_id: str
     input: JSONValue
-
-
-@dataclass(frozen=True, slots=True)
-class Resolved:
-    request_id: str
-    output: JSONValue
-    source: Literal["artifact", "confirmed"]
-    artifact_id: str | None = None
-    example_id: str | None = None
-    status: Literal["resolved"] = "resolved"
-
-
-@dataclass(frozen=True, slots=True)
-class ReviewRequired:
-    request_id: str
-    proposal_id: str
-    status: Literal["review_required"] = "review_required"
-
-
-@dataclass(frozen=True, slots=True)
-class InProgress:
-    request_id: str
-    retry_after_seconds: int
-    status: Literal["in_progress"] = "in_progress"
-
-
-@dataclass(frozen=True, slots=True)
-class FallbackFailed:
-    request_id: str
-    code: str
-    status: Literal["fallback_failed"] = "fallback_failed"
-
-
-@dataclass(frozen=True, slots=True)
-class Rejected:
-    request_id: str
-    proposal_id: str
-    status: Literal["rejected"] = "rejected"
-
-
-@dataclass(frozen=True, slots=True)
-class ReconciliationRequired:
-    request_id: str
-    reason: str
-    artifact_id: str | None = None
-    example_id: str | None = None
-    status: Literal["reconciliation_required"] = "reconciliation_required"
-
-
-Outcome: TypeAlias = (
-    Resolved | ReviewRequired | InProgress | FallbackFailed | Rejected | ReconciliationRequired
-)
 
 
 @dataclass(frozen=True, slots=True)

@@ -2268,7 +2268,7 @@ class CLITests(unittest.TestCase):
         self.assertEqual(second.stderr_text, "")
 
     def test_function_inspect_emits_the_tail_beyond_one_hundred_entries(self) -> None:
-        from cement_runtime.models import Candidate, ReviewRequired
+        from cement_runtime.models import Candidate
 
         class _Source:
             def propose(self, request: typing.Any) -> Candidate:

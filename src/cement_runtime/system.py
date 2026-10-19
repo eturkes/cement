@@ -652,7 +652,7 @@ def _write_proposal_request_status(
 class System:
     """Local learning loop.
 
-    All returned values are pure data. A caller may apply a ``Resolved`` plan only
+    All returned values are pure data. A caller applies a resolved plan only
     after its own live authorization/policy gate. Cement makes no principal or
     permission decision. Every control-plane mutation and every read relies on the
     embedding application's access control, and database access is the trust
