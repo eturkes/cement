@@ -801,9 +801,9 @@ function sentCaption() {
   if (!turn) return CAPTION;
   const parts = turnParts();
   const fixed = parts.filter((p) => p.source === "function").length;
-  if (fixed === parts.length) return `${turn.document_id}: fixed answer, no AI.`;
-  if (fixed) return `${turn.document_id}: part fixed, the rest by the AI.`;
-  return `${turn.document_id}: the AI answered. Not checked yet.`;
+  if (fixed === parts.length) return "Answered by a fixed answer. No AI.";
+  if (fixed) return "Part answered by a fixed answer, the rest by the AI.";
+  return "The user got the AI’s reply. Nobody has checked it yet.";
 }
 
 function reviewCaption(decision, note) {
@@ -838,18 +838,18 @@ const STORY = [
     { el: "#side-user", title: "What users see", text: () => "A normal AI chat.", side: "right" },
     { el: "#side-hidden", title: "Behind the scenes", text: () => "What Cement does. Users never see it.", side: "left" } ] },
   { run: async () => { await select("file"); await send("q01"); }, beats: [
-    { el: lastBubble, title: "The AI answers", text: () => "A01 gets a reply at once.", side: "right" },
+    { el: lastBubble, title: "The AI answers", text: () => "The user gets the reply right away. Nobody checks it first.", side: "right" },
     { el: "#mechanism .method", title: "Its method", text: () => `How the AI read the form. It ${firstNote()}.`, side: "bottom" } ] },
   { run: settle, beats: [
     { el: "#mechanism .method", title: "A person checks", text: () => "Marked rows are the fix. The reply stays as sent.", side: "bottom" } ] },
   { run: () => turn("q02"), beats: [
-    { el: "#mechanism .method", title: "Checked twice", text: () => "A02 is the same kind of form. ●● = ready to save.", side: "bottom" } ] },
+    { el: "#mechanism .method", title: "Checked twice", text: () => "A second progress note, checked too. Two checks: ready to save.", side: "bottom" } ] },
   { run: makeAutomatic, beats: [
     { el: '#how li[data-step="3"]', title: "Saved", text: () => "How to read this form. No patient data.", side: "bottom" } ] },
   { run: () => route(true), beats: [
     { el: '#how li[data-step="4"]', title: "Switched on", text: () => "Matching forms now skip the AI.", side: "bottom" } ] },
   { run: () => send("q03"), beats: [
-    { el: lastBubble, title: "A new patient", text: () => `A03, ${patientOf()}. The reply looks the same.`, side: "right" },
+    { el: lastBubble, title: "A new patient", text: () => `Another progress note, for ${patientOf()}. The reply looks the same.`, side: "right" },
     { el: "#mechanism .method.fixed", title: "No AI", text: () => "The saved method read the form.", side: "bottom" } ] },
   { run: async () => { await turn("q05"); await turn("q06"); await makeAutomatic(); }, beats: [
     { el: "#mechanism .flow-methods", title: "Reuse", text: () => "A new job reuses the method. Only its new part went to the AI.", side: "bottom" } ] },
