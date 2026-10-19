@@ -24,10 +24,16 @@ and the reply. An amber **AI script** chip marks a script that the AI wrote. A g
 **Function** chip marks a learned function that ran without the AI. A function holds a
 script for each kind of form, so plain code can read a new patient's form with it. Below the
 boxes, **Functions** lists the functions of the selected task. Each function has a **Read**
-button and its own switch.
+button and its own switch. The switch writes the runtime's real setting: **on** selects
+`follow`, and **off** selects `off`. A function in `follow` uses each new version that the
+learning pass publishes. Learning never changes the switch.
 
 **Show technical details** opens the per-message details, the scanned text and the
-**Operator view**, which holds the commands, the evidence and the function source.
+**Operator view**, which holds the commands, the evidence and the function source. In that
+view, **Read the function** also shows the versions and the change from the previous version.
+These are the results of `function versions` and `function diff`, with their commands and
+verbatim output. The version history is read-only. The library supports pins and rollback;
+this demo exposes only the on/off switch.
 
 ## Run
 
@@ -97,33 +103,45 @@ no build step and no network access.
 
 The model is simulated. `StubProvider` in `demo.py` returns a fixed script and samples one
 latency between 1.1 and 3.4 seconds. The first script for a kind of form reads less than the
-next one, for example no Provider row on the first progress note. The learning pass is simulated too: it merges the
-scripts of each case into that case's reference answer, and it reviews each retained answer
-as `learning-pass`. Compile, verification and promotion after it are real. It calls no model and uses no network. The page
-labels that number `simulated`. The mapping from a request to an operation is simulated
-for the same reason. A deployment gives that reading to the model.
+next one, for example no Provider row on the first progress note. The learning pass is
+simulated too. It reads `learn cases` and reviews the retained answers as `learning-pass`.
+When a later script extends an extraction plan or identifier map, `example supersede`
+replaces the earlier confirmation with the merged plan. The earlier example stays with its
+version. Only the replacement counts for the next build, so each request counts once.
+Other stand-in answers contain fixed mistakes that the pass corrects to the reference answer.
+Compile, verification, version publication and switching are real. The demo calls no model
+and uses no network. The page labels the model latency and learning pass as simulated.
+The mapping from a request to an operation is simulated for the same reason. A deployment
+gives that reading to the model.
 
 Everything else is the shipped `cement_runtime`:
 
 - The proposals, reviews, confirmed examples, drafts, verification reports, promotions and
   receipts are real ledger rows.
-- The lifecycle runs as real `cement` subprocesses against the same ledger. The review by
-  the learning pass, compile, verify-drafts, promote, inspect, verify and export commands all
-  execute. The page prints what they printed. The operator view is read-only, apart from
-  the switches: no person rules on a single answer.
+- The lifecycle runs as real `cement` subprocesses against the same ledger. Only
+  `operation register` creates the ledger. The pass reads, reviews, supersedes, compiles,
+  verifies drafts, inspects the prospective function, and promotes that function by hash.
+  Each promotion creates a version receipt. The page prints what each command returned.
+- Each function starts off. The switch calls `function switch` with the person's actor.
+  Chat calls `System.resolve` even while the switch is off; the runtime decides whether
+  to return a function answer or a miss. The operator view is read-only apart from these
+  switches: no person rules on a single answer.
+- The policy uses the runtime defaults: two confirmations, one reviewer and no minimum span.
 - The artifact digests, the `function_hash` and the six set checks come from those
   commands.
-- The exported bundle is the real `cement-function-v2` document.
+- The exported bundle is the real `cement-function-v2` document. The demo exports the
+  latest published receipt with `--receipt-id`, so you can read it before switching it on.
+  This read does not enable the function. Without that option, the CLI exports the version
+  that the switch selects, and it refuses while the switch is off.
 - The function source overlay parses that bundle back and reads its entries. The `def`
   and `if` lines are a rendering for the reader. Cement seals exact entries, and it emits
   no code.
 
 Two calls stay in process, and the page says so where it shows them. The chat submits a
-proposal and resolves an input through the library, not through a subprocess. A `cement`
-subprocess costs 92 to 128 milliseconds of interpreter startup, over the 50 calls of one
-story run. `System.resolve` costs 3.5 to 6.0 milliseconds in that same run. A subprocess
-would therefore report startup cost as the function's cost. `capture.sh` prints both
-costs for each run that it drives.
+proposal and resolves an input through the library, not through a subprocess. A subprocess
+adds interpreter startup to the work. `capture.sh` prints both costs for each run that it
+drives. Its resolve sample includes switched-off calls, which perform no verification,
+and enabled calls, which verify the selected function.
 
 A long argument prints as its shell variable, such as `--output "$OUTPUT"`. The exact
 argument list stays under the `stdout` disclosure. The bound is 80 characters, so a
@@ -133,9 +151,11 @@ requires.
 Walking one entry back to its requests costs four commands, and the overlay runs all of
 them: `function inspect` gives the artifact ID, `artifact show` gives the example IDs,
 `events` gives the proposal IDs, and `proposal show` gives `proposed_output` beside
-`final_output`. No command prints an entry beside its originals, and `events` accepts no
-example filter, so the join is done by hand. `.agent/deferred.md` row `p67` records that
-gap.
+`final_output`. The event join follows each supersession back to the original review.
+The overlay keeps that earlier confirmation and shows the merged answer from `artifact show`.
+No command prints an entry beside its originals, and `events` accepts no example filter,
+so the join is done by hand. The demo reads every event page. `.agent/deferred.md` row `p67`
+records that gap.
 
 The demo reads the OCR corpus and the signature and extraction functions from
 `examples/hospital_ocr/`. Document B03 is derived in `demo.py` from an example file, with

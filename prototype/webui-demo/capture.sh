@@ -30,7 +30,7 @@ shot() { # shot <query> <file> [right|left|card]
     --wait 2500 --timeout 60000 >/dev/null
 }
 
-post() { curl -sS -X POST -H 'Content-Type: application/json' -d "${2:-{\}}" \
+post() { curl -fsS -X POST -H 'Content-Type: application/json' -d "${2:-{\}}" \
   "$BASE/api/$1" >/dev/null; }
 
 ask() { post send "{\"request_id\":\"$1\"}"; }

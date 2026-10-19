@@ -1,9 +1,8 @@
 """Session backend for the Cement web UI demo.
 
 The session drives the shipped ``cement_runtime`` over one temporary SQLite ledger.
-Only the provider is simulated: ``StubProvider`` samples a plan variant and a latency
-instead of calling a model, so every artifact, digest, check, receipt and resolve
-timing the page shows comes from the real system.
+The provider and learning pass are simulated: fixed scripts stand in for model output.
+Every artifact, digest, check, receipt, switch and resolve timing comes from the runtime.
 
 The demo enters the pipeline at ``submit_proposal``, the explicit-candidate seam.
 
@@ -64,13 +63,14 @@ PARTITION = "example-hospital"
 # No person rules on single answers: the learning pass (a simulated LLM) is the only reviewer,
 # and a person's one act is switching a learned function on or off.
 REVIEWER = "learning-pass"
-PROMOTER = "informatics-lead"
-DEMO_POLICY = CompilePolicy(min_confirmations=2, min_reviewers=1, min_span_seconds=0)
+PROMOTER = REVIEWER
+SWITCH_ACTOR = "informatics-lead"
+DEMO_POLICY = CompilePolicy()
 POLICY_VIEW = {
-    "min_confirmations": 2,
-    "min_reviewers": 1,
-    "min_span_seconds": 0,
-    "production_default": "3 confirmations, 2 reviewers, a 7-day span",
+    "min_confirmations": DEMO_POLICY.min_confirmations,
+    "min_reviewers": DEMO_POLICY.min_reviewers,
+    "min_span_seconds": DEMO_POLICY.min_span_seconds,
+    "production_default": "2 confirmations, 1 reviewer, no minimum span",
 }
 PROVIDER_NAME = "acme-health/clinical-llm-4"
 LATENCY_RANGE = (1.1, 3.4)
@@ -80,6 +80,7 @@ REVIEW_READING = {
     "unreviewed": "a model answered, and no learning pass has read it yet",
     "accepted": f"a model answered, and the {REVIEWER} kept its script as written",
     "corrected": f"a model answered, and the {REVIEWER} merged its script into the shared one",
+    "superseded": f"a model answered, and the {REVIEWER} extended its earlier confirmation",
     "rejected": f"a model answered, and the {REVIEWER} discarded it",
 }
 
@@ -853,9 +854,6 @@ class Session:
         self._closed = threading.Event()
         self._temporary = tempfile.TemporaryDirectory(prefix="cement-demo-")
         self.database = str(Path(self._temporary.name) / "cement.db")
-        self.system = System(self.database)
-        for operation in OPERATIONS:
-            self.system.register_operation(PARTITION, operation, policy=DEMO_POLICY)
         self.documents = document_catalog()
         self.provider = StubProvider(seed)
         self.chat: list[dict[str, JSONValue]] = []
@@ -878,8 +876,6 @@ class Session:
         self.answered: dict[str, dict[str, JSONValue]] = {}
         self.selected = str(SCENARIOS[0]["id"])
         self.offline: dict[str, JSONValue] | None = None
-        # Operations a person has switched on; each learned function has its own switch.
-        self.routed: set[str] = set()
         self.thinking: dict[str, JSONValue] | None = None
         self.started = time.time()
         self._sequence = 0
@@ -890,6 +886,9 @@ class Session:
             "cement_answers": 0,
             "resolve_ms": [],
         }
+        for operation in OPERATIONS:
+            self._cli("operation", "register", operation)
+        self.system = System(self.database, create=False)
         self._note(
             "ledger",
             f"temporary ledger created; {len(OPERATIONS)} operations registered "
@@ -1164,8 +1163,6 @@ class Session:
             "output": None,
             "proposal_id": None,
         }
-        if operation not in self.routed or self.functions.get(operation) is None:
-            return part
         start = time.perf_counter()
         resolution = self.system.resolve(
             PARTITION, operation, operation_input(operation, document)
@@ -1174,7 +1171,8 @@ class Session:
         self.stats["resolve_ms"].append(elapsed)
         verification = resolution.verification
         match = resolution.match
-        if verification.passed and match is not None and match.matched:
+        part["switch"] = resolution.switch.mode
+        if verification is not None and verification.passed and match is not None and match.matched:
             part.update(
                 {
                     "settled": True,
@@ -1196,11 +1194,17 @@ class Session:
                 f"{verification.entries} entry(ies) · no provider call",
             )
             return part
-        part["fallback"] = f"no promoted entry for this input ({elapsed} ms)"
+        reason = (
+            "function switched off; no verification ran"
+            if resolution.switch.mode == "off"
+            else "selected version failed verification"
+            if verification is None or not verification.passed
+            else "no entry for this input in the selected version"
+        )
+        part["fallback"] = f"{reason} ({elapsed} ms)"
         self._note(
             "resolve",
-            f"{document['id']} · {operation}: no promoted entry for this input "
-            f"({elapsed} ms)",
+            f"{document['id']} · {operation}: {reason} ({elapsed} ms)",
             "this part of the request goes to the model",
         )
         return part
@@ -1221,6 +1225,7 @@ class Session:
             PARTITION,
             operation,
             operation_input(operation, document),
+            source_id=f"demo:{turn}:{operation}:{document['id']}",
             candidate=Candidate(
                 output=candidate["plan"],
                 provenance={
@@ -1367,7 +1372,7 @@ class Session:
                 rows.append(
                     ["   confirmed example", str(part.get("example_id") or "none")]
                 )
-                if status == "corrected":
+                if status in {"corrected", "superseded"}:
                     rows.append(
                         ["   the correction",
                          f"{len(list(part['diff']))} field(s), ruled after this reply "
@@ -1382,7 +1387,7 @@ class Session:
                     "json": part["output"],
                 }
             )
-            if part.get("status") == "corrected":
+            if part.get("status") in {"corrected", "superseded"}:
                 blocks.append(
                     {
                         "label": f"what {REVIEWER} cemented instead, after the reply "
@@ -1673,38 +1678,10 @@ class Session:
                 self._promote_one(operation)
 
     def _promote_one(self, operation: str) -> None:
-        promoted: list[str] = []
-        for draft in self.drafts.values():
-            if draft["status"] != "verified" or draft["operation"] != operation:
-                continue
-            self._cli(
-                "promote",
-                str(draft["artifact_id"]),
-                "--scope-hash",
-                str(draft["scope_hash"]),
-                "--actor",
-                PROMOTER,
-                reading=lambda value: [
-                    ["promoted", str(value["artifact_id"])],
-                    ["replaced", str(len(value["replaced_artifact_ids"]))],
-                ],
-            )
-            draft["status"] = "promoted"
-            promoted.append(str(draft["artifact_id"]))
-            category = self.categories.get(f"{operation}|{draft['input_hash']}")
-            if category is not None:
-                category["promoted"] = True
-                category["artifact_id"] = draft["artifact_id"]
-        if promoted:
-            self._note(
-                "promote",
-                f"{operation}: {PROMOTER} promoted {len(promoted)} artifact(s) "
-                "against the verified scope hash",
-                ", ".join(promoted),
-            )
-        # A task that reaches an already-sealed operation adds nothing to it, and a
-        # second checkpoint would reseal the same entries under a fresh receipt.
-        if promoted or operation not in self.functions:
+        if any(
+            draft["status"] == "verified" and draft["operation"] == operation
+            for draft in self.drafts.values()
+        ):
             self._checkpoint(operation)
 
     def _checkpoint(self, operation: str) -> None:
@@ -1740,6 +1717,14 @@ class Session:
                 ["members", f"{len(value['member_artifact_ids'])} artifact(s)"],
             ],
         )
+        for artifact_id in promotion["member_artifact_ids"]:
+            draft = self.drafts.get(artifact_id)
+            if draft is not None:
+                draft["status"] = "promoted"
+                category = self.categories.get(f"{operation}|{draft['input_hash']}")
+                if category is not None:
+                    category["promoted"] = True
+                    category["artifact_id"] = artifact_id
         verification = self._cli(
             "function",
             "verify",
@@ -1759,6 +1744,8 @@ class Session:
             "function",
             "export",
             operation,
+            "--receipt-id",
+            str(promotion["receipt_id"]),
             reading=lambda value: [
                 ["abi", str(value["abi"])],
                 ["sealed entries", str(len(value["entries"]))],
@@ -1779,6 +1766,7 @@ class Session:
             "bundle_bytes": len(self.bundles[operation].encode("utf-8")),
             "source": self._source_view(operation, function_hash),
         }
+        self._versions(operation)
         self.offline = None
         self._note(
             "function",
@@ -1786,6 +1774,36 @@ class Session:
             f"under receipt {promotion['receipt_id']}",
             f"function_hash {function_hash[:16]}… · "
             f"{len(verification['checks'])} ordered checks passed",
+        )
+
+    def _versions(self, operation: str) -> None:
+        start = len(self.terminal)
+        versions: list[dict[str, JSONValue]] = []
+        cursor: list[str] = []
+        while True:
+            page = self._cli(
+                "function", "versions", operation, *cursor,
+                reading=lambda value: [["versions", str(len(value["versions"]))]],
+            )
+            versions.extend(page["versions"])
+            before = page["next_before_sequence"]
+            if before is None:
+                break
+            cursor = ["--before-sequence", str(before)]
+        difference = None
+        if len(versions) > 1:
+            difference = self._cli(
+                "function", "diff", operation,
+                "--from", str(versions[1]["receipt"]["function_hash"]),
+                "--to", str(versions[0]["receipt"]["function_hash"]),
+                reading=lambda value: [
+                    [name, str(len(value[name])) + " case(s)"]
+                    for name in ("added", "removed", "changed")
+                ],
+            )
+        self.functions[operation].update(
+            versions=versions, version_diff=difference,
+            version_commands=list(self.terminal[start:]),
         )
 
     def _hops(
@@ -1816,35 +1834,48 @@ class Session:
         )
         wanted = set(artifact["evidence_ids"])
 
-        def matched(stream: JSONValue) -> list[tuple[str, str]]:
-            return [
-                (str(row["subject_id"]), str(row["payload"]["example_id"]))
-                for row in stream
-                if row["subject_type"] == "proposal"
-                and isinstance(row.get("payload"), dict)
-                and row["payload"].get("example_id") in wanted
-            ]
-
-        events = self._cli(
-            "events",
-            "--limit",
-            "400",
-            reading=lambda value: [
-                ["scanned", f"{len(value)} event(s); no example filter exists"],
-                [
-                    "matched",
-                    ", ".join(pair[0] for pair in matched(value)) or "none",
+        events: list[dict[str, JSONValue]] = []
+        after = 0
+        while True:
+            page = self._cli(
+                "events", "--after", str(after), "--limit", "1000",
+                reading=lambda value: [
+                    ["scanned", f"{len(value)} event(s); no example filter exists"],
                 ],
-            ],
-            sink=rows,
-        )
+                sink=rows,
+            )
+            events.extend(page)
+            if len(page) < 1000:
+                break
+            after = int(page[-1]["sequence"])
+        previous = {
+            str(row["payload"]["example_id"]): str(row["subject_id"])
+            for row in events if row["kind"] == "example.superseded"
+        }
+        roots = {}
+        for example_id in wanted:
+            root = example_id
+            while root in previous:
+                root = previous[root]
+            roots[root] = example_id
+        matched = [
+            (str(row["subject_id"]), roots[row["payload"]["example_id"]])
+            for row in events
+            if row["subject_type"] == "proposal"
+            and isinstance(row.get("payload"), dict)
+            and row["payload"].get("example_id") in roots
+        ]
+        rows[-1]["reading"].append([
+            "joined through supersessions",
+            ", ".join(pair[0] for pair in matched) or "none",
+        ])
         by_proposal = {
             str(row["proposal_id"]): row
             for group in self.lineage.values()
             for row in group
         }
         originals: list[dict[str, JSONValue]] = []
-        for proposal_id, example_id in matched(events):
+        for proposal_id, example_id in matched:
             shown = self._cli(
                 "proposal",
                 "show",
@@ -1869,8 +1900,11 @@ class Session:
                     "note": session_row.get("note", ""),
                     "provider_plan": shown["proposed_output"],
                     "confirmed_plan": shown["final_output"],
-                    "diff": plan_diff(shown["proposed_output"], shown["final_output"]),
-                    "status": shown["status"],
+                    "merged_plan": artifact["document"]["behavior"]["value"],
+                    "diff": plan_diff(shown["proposed_output"], artifact["document"]["behavior"]["value"]),
+                    "status": (
+                        "superseded" if example_id in previous else shown["status"]
+                    ),
                     "reviewer": shown["reviewer"],
                 }
             )
@@ -1944,16 +1978,19 @@ class Session:
         with self._lock:
             targets = [operation] if operation else sorted(self.functions)
             for name in targets:
-                if enabled and name in self.functions:
-                    self.routed.add(name)
-                else:
-                    self.routed.discard(name)
+                if name not in self.functions:
+                    raise ValueError("learn a function before switching it on")
+                self._cli(
+                    "function", "switch", name, "--mode", "follow" if enabled else "off",
+                    "--actor", SWITCH_ACTOR,
+                    reading=lambda value: [["switch", str(value["mode"])]],
+                )
+                self._versions(name)
             self._note(
                 "routing",
                 f"{', '.join(targets) or 'no function'} switched "
                 f"{'on' if enabled else 'off'}",
-                f"on: {', '.join(sorted(self.routed)) or 'none'} · a matching input "
-                "resolves from the promoted set, and every other input goes to the model",
+                "follow serves the newest promoted version; off sends requests to the model",
             )
 
     def learn(self) -> None:
@@ -1967,12 +2004,61 @@ class Session:
         """
 
         with self._lock:
-            for proposal_id, record in list(self.pending.items()):
-                self.review(proposal_id, "correct" if record["diff"] else "accept")
-            touched = sorted(
-                {str(row["operation"]) for row in self.categories.values()}
-            )
+            touched = sorted({str(row["operation"]) for row in self.categories.values()})
             for operation in touched:
+                work = self._learning_cases(operation)
+                if work["nothing_to_learn"]:
+                    continue
+                for case in work["cases"]:
+                    for proposal_id in case["pending_proposal_ids"]:
+                        record = self.pending[proposal_id]
+                        extends = operation in {"document.extraction_plan", "document.phi_locators"}
+                        self.review(proposal_id, "correct" if record["diff"] and not extends else "accept")
+                # Extraction/identifier scripts extend one another. The other stand-ins
+                # contain mistakes, corrected above. Never invent an unobserved extension.
+                for case in self._learning_cases(operation)["cases"]:
+                    outputs = case["outputs"]
+                    if len(outputs) < 2:
+                        continue
+                    category = self.categories[f"{operation}|{case['key_hash']}"]
+                    reference = reference_output(operation, self._document(category["document_id"]))
+                    merged = next(row["output"] for row in outputs if row["output"] == reference)
+                    older = [
+                        example_id for row in outputs if row["output"] != merged
+                        for example_id in row["example_ids"]
+                    ]
+                    if older:
+                        result = self._cli(
+                            "example", "supersede", operation, *older,
+                            "--output", json.dumps(merged, separators=(",", ":")),
+                            "--reviewer", REVIEWER,
+                            "--note", "simulated learning pass: merge the observed scripts",
+                            reading=lambda value: [[
+                                "replaced confirmations", str(len(value["example_ids"]))
+                            ]],
+                        )
+                        replacements = dict(zip(older, result["example_ids"]))
+                        for group in self.lineage.values():
+                            for origin in group:
+                                replacement = replacements.get(origin["example_id"])
+                                if replacement is None:
+                                    continue
+                                origin["example_id"] = replacement
+                                unit = next(
+                                    unit for unit in self.answered.values()
+                                    if any(part.get("proposal_id") == origin["proposal_id"]
+                                           for part in unit["parts"])
+                                )
+                                self._record_review(
+                                    str(unit["turn"]), str(origin["proposal_id"]),
+                                    status="superseded", confirmed=merged, example_id=replacement,
+                                    diff=plan_diff(origin["provider_plan"], merged),
+                                    command=str(self.terminal[-1]["display"]),
+                                )
+                        self._note(
+                            "supersede", f"{operation}: extended {len(older)} confirmation(s)",
+                            "the earlier evidence stays with its version; each request counts once",
+                        )
                 self._compile_one(operation)
                 if any(
                     row["operation"] == operation and row["status"] == "draft"
@@ -1980,6 +2066,15 @@ class Session:
                 ):
                     self._verify_one(operation)
                     self._promote_one(operation)
+
+    def _learning_cases(self, operation: str) -> JSONValue:
+        return self._cli(
+            "learn", "cases", operation,
+            reading=lambda value: [
+                ["cases", str(len(value["cases"]))],
+                ["pending", str(sum(len(case["pending_proposal_ids"]) for case in value["cases"]))],
+            ],
+        )
 
     def _bundle_target(self, operation: str | None) -> str:
         """Name the operation a bundle request means, defaulting to the task's own."""
@@ -2051,6 +2146,8 @@ class Session:
         grouped: dict[str, list[dict[str, JSONValue]]] = {}
         for operation in OPERATIONS:
             for row in self.system.examples(PARTITION, operation):
+                if row["superseded_by"] is not None:
+                    continue
                 # `examples` returns the values, not their digests; the ledger groups
                 # by the same canonical-JSON digest the compiler uses for a scope.
                 key = f"{operation}|{_digest(row['input'])}"
@@ -2067,6 +2164,8 @@ class Session:
     def state(self) -> dict[str, JSONValue]:
         with self._lock:
             evidence = self._evidence()
+            switches = {name: self.system.switch(PARTITION, name) for name in OPERATIONS}
+            routed = sorted(name for name, switch in switches.items() if switch.mode != "off")
             categories = []
             for key, category in self.categories.items():
                 rows = evidence.get(key, [])
@@ -2105,6 +2204,7 @@ class Session:
                 functions.append(
                     {
                         **function,
+                        "switch": switches[operation].mode,
                         "keyed_on": OPERATIONS[operation]["keyed_on"],
                         "promoted": True,
                         "blocked": self.blocked.get(operation, []),
@@ -2204,8 +2304,8 @@ class Session:
                 "functions": functions,
                 "promoted_operations": sorted(self.functions),
                 "offline": self.offline,
-                "routed": bool(self.routed),
-                "routed_operations": sorted(self.routed),
+                "routed": bool(routed),
+                "routed_operations": routed,
                 "thinking": self.thinking,
                 "stats": {
                     **{

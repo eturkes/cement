@@ -609,7 +609,7 @@ function renderSource() {
     overlay.hidden = true;
     return;
   }
-  const key = [fn.operation, fn.function_hash]
+  const key = [fn.operation, fn.function_hash, fn.switch]
     .concat((fn.excluded || []).map((scope) => scope.label + ":" + scope.confirmations))
     .join("|");
   if (overlay.hidden || key !== SOURCE_KEY) {
@@ -620,6 +620,18 @@ function renderSource() {
     SOURCE_KEY = key;
   }
   overlay.hidden = false;
+}
+
+function versionsHtml(fn) {
+  const versions = fn.versions || [];
+  const diff = fn.version_diff;
+  return `<section class="version-history"><h3>Versions</h3>
+    <p>Switch: ${esc(fn.switch)}. Switching on follows the newest version. This history is read-only.</p>
+    ${versions.map((version, index) => row(
+      `Version ${versions.length - index}${version.selected ? " · selected" : ""}`,
+      `${short(version.receipt.function_hash, 16)} · revision ${version.receipt.operation_revision}`)).join("")}
+    <p>${diff ? `Newest change: ${diff.added.length} added, ${diff.removed.length} removed, ${diff.changed.length} changed cases.` : "First version. There is no earlier version to compare."}</p>
+    ${(fn.version_commands || []).map(commandHtml).join("")}</section>`;
 }
 
 function sourceHtml(fn) {
@@ -648,7 +660,7 @@ function sourceHtml(fn) {
       "confirmations \u00b7 still with the AI")}</span>`);
   }
   const name = String(src.operation).replace(/[^A-Za-z0-9]+/g, "_");
-  return `<pre class="code">${head}\n\n<span class="kw">def</span> ` +
+  return versionsHtml(fn) + `<pre class="code">${head}\n\n<span class="kw">def</span> ` +
     `<span class="fn">${esc(name)}</span>(input):</pre>` +
     src.entries.map((entry) => entryHtml(entry, count)).join("") +
     `<pre class="code">${tail.join("\n")}</pre>`;
@@ -710,8 +722,9 @@ function entryHtml(entry, total) {
 }
 
 function originHtml(origin) {
-  const verdict = origin.diff.length
-    ? `<span class="badge set">corrected</span>`
+  const verdict = origin.status === "superseded"
+    ? `<span class="badge set">extended by learning</span>`
+    : origin.diff.length ? `<span class="badge set">corrected</span>`
     : `<span class="badge pass">accepted unchanged</span>`;
   const change = origin.diff.length
     ? `<div class="label-row" style="margin-top:10px">
@@ -730,6 +743,7 @@ function originHtml(origin) {
     <div class="label-row" style="margin-top:10px">
       <span class="label">proposed_output \u2014 what the model wrote</span></div>
     <pre class="json">${jsonHtml(origin.provider_plan)}</pre>
+    ${origin.status === "superseded" ? `<details><summary>Earlier confirmation, kept with its version</summary><pre class="json">${jsonHtml(origin.confirmed_plan)}</pre></details>` : ""}
     ${change}
     <div class="answer-meta">
       <span>proposal ${esc(origin.proposal_id)}</span>
