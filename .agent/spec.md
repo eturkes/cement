@@ -133,10 +133,10 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   - Accept: burden re-measured on its own deletion set; battery per contract.
 - [x] 9c2d0ff M4/M5 contract (`kernel`): switch + versions, learning pass + skill, projection IR + its verification, v3 tables, Open WebUI example; `researcher` on the Open WebUI tool/filter API + the Agent Skills format; `consultant` on the contract before code.
   - Accept: `.agent/decisions/m45-contract.md` committed — testable predicates + tier + numbered gate list per unit; consultant verdict adjudicated in `.agent/review.md`.
-- [ ] M3.6b schema cut v2→v3 (direct proposal columns, `requests` + index gone, receipts index, switch + projection tables per the M4/M5 contract, refusal fixtures, 0.2.0); owns p50 p51 p04.
-  - Resume point: IMPLEMENT resumes here — unlanded stack (machine-local worktrees under `.scratch/worktrees/`, each a committed branch): `impl/m3u6b-land` (M3.6b on the M3.6a3 squash) → `wt/gp1-m3u7` (M3.7) → `impl/m5u1` → `impl/m4u2` (M4.1 squash, its fix commits included, then M4.2) → `impl/m5u2` → `impl/m5u3` → `wt/general-purpose-4` (M3.8) → `wt/general-purpose-2` (prototype). Land in that order: rebase onto main, full gate under `heavy`, squash + records.
+- [x] 93007ac M3.6b schema cut v2→v3 (direct proposal columns, `requests` + index gone, receipts index, switch + projection tables per the M4/M5 contract, refusal fixtures, 0.2.0); owns p50 p51 p04.
   - Accept: fingerprint + `SCHEMA_VERSION` move together, suite green with the reset documented.
 - [ ] M3.7 command-runtime relocation under byte equality + blocked reverse imports; owns p54.
+  - Resume point: IMPLEMENT resumes here — unlanded stack (machine-local worktrees under `.scratch/worktrees/<unit>-land`, each one commit over the layer below): `impl/m3u7-land` → `impl/m5u1-land` → `impl/m4u1-land` → `impl/m4u2-land` → `impl/m5u2-land` → `impl/m5u3-land` → `impl/m3u8-land` → `wt/general-purpose-2` (prototype). Land in that order: rebase onto main, full gate under `heavy`, squash + records.
   - The wheel already carries no `examples/`/`tests/`.
 - [ ] M5.1 switch + versions: per operation `off` | `follow` | `pinned`; rollback = pin; `resolve` + `function export` serve the selected version; `function versions` + Read diff.
 - [ ] M4.1 projection IR `cement-projection-v1`: a pure, total, terminating interpreter; `tester` differential oracle.

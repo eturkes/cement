@@ -425,5 +425,72 @@ class ExistingOnlyBattery(_Ledger):
         self.assertEqual([path.name for path in self.root.iterdir()], ["ledger.db"])
 
 
+class ReceiptFeedPlanBattery(_Ledger):
+    """p04: a receipt page reads `function_receipts_feed` in order and stops near its size.
+
+    The SQL graded is the statement `System.function_receipts` executes (a trace callback, bound
+    values expanded), so the pin follows the shipped query rather than a retyped copy.
+    """
+
+    def _statement(self, system: System, **cursor: int) -> str:
+        from unittest import mock
+
+        seen: list[str] = []
+        connect = Store._connect
+
+        def traced(store: Store, *, read_only: bool = False) -> sqlite3.Connection:
+            connection = connect(store, read_only=read_only)
+            connection.set_trace_callback(seen.append)
+            return connection
+
+        with mock.patch.object(Store, "_connect", traced), contextlib.suppress(IntegrityError):
+            # Fabricated rows fail receipt validation on read, after the page query ran.
+            system.function_receipts("tenant_a", "plan", limit=3, **cursor)
+        (statement,) = [sql for sql in seen if re.match(r"\s*SELECT \* FROM function_receipts", sql)]
+        return statement
+
+    def test_p04_receipt_pages_read_the_feed_index_without_a_temp_sort(self) -> None:
+        system = System(self.db)
+        with closing(sqlite3.connect(self.db)) as connection:
+            connection.executemany(
+                """
+                INSERT INTO function_receipts(
+                    id, partition, operation, operation_revision, policy_hash, function_hash,
+                    membership_hash, member_count, candidate_artifact_ids_hash, candidate_count,
+                    retired_artifact_ids_hash, retired_count, promoted_by, promoted_at_us,
+                    receipt_hash
+                ) VALUES (?, 'tenant_a', ?, ?, 'p', 'f', 'm', 0, 'c', 0, 'r', 0, 'x', ?, ?)
+                """,
+                [
+                    (f"fr_{n}", "plan" if n % 2 else "other", 1 + n % 3, n, f"h{n}")
+                    for n in range(1, 2003)
+                ],
+            )
+            connection.commit()
+        for label, cursor in (("default", {}), ("cursor", {"before_sequence": 1501})):
+            with self.subTest(page=label):
+                statement = self._statement(system, **cursor)
+                with closing(sqlite3.connect(self.db)) as connection:
+                    plan = " | ".join(
+                        str(row[3]) for row in connection.execute(f"EXPLAIN QUERY PLAN {statement}")
+                    )
+                    steps = [0]
+
+                    def step() -> int:
+                        steps[0] += 1
+                        return 0
+
+                    connection.set_progress_handler(step, 1)
+                    self.assertEqual(len(connection.execute(statement).fetchall()), 4)
+                    page = steps[0]
+                    steps[0] = 0
+                    connection.execute(re.sub(r"LIMIT \d+", "LIMIT 100000", statement)).fetchall()
+                    full = steps[0]
+                self.assertIn("function_receipts_feed", plan)
+                self.assertNotIn("TEMP B-TREE", plan)
+                # 1,001 matching rows: a page of 4 must cost a small fraction of reading them all.
+                self.assertLess(page * 20, full, (page, full))
+
+
 if __name__ == "__main__":
     unittest.main()

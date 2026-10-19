@@ -15,6 +15,53 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## M3.6b close (IMPLEMENT, unit) — target `93007ac` (squash; review read `fc752eb`, the same unit on the pre-squash M3.6a3 lineage), records in the next commit
+
+Check set fixed before the diff was read: the three code lenses of `CLAUDE.md` `Engineering`
+(correctness L1-L10 + the unit's predicates S1-S4, S6, supersession schema, p50, p51,
+pin-repair non-weakening; cleanup L1-L8; altitude L1-L5) + MAIN's security lens. Raw tables:
+`reviewer-1` (correctness, stopped after its 3 last rows waited on a held CPU slot; those rows
+adjudicated below from MAIN's probe), `reviewer-2` (cleanup), `reviewer-3` (altitude). Every
+verdict below = MAIN's, on the reviewers' anchors rematched against `fc752eb` bytes.
+
+| row | verdict | evidence |
+|---|---|---|
+| correctness L1/L5 (F1) + altitude L4 (L4-F1) | fixed | `parse_function` set-membership on a JSON `abi` raised `TypeError` for `[]`/`{}` (CLI exit 1 + traceback). Fix = exact-type check before membership; pins `test_s1_an_unhashable_bundle_abi_refuses_as_validation` red at `fc752eb` (errors=3) |
+| correctness L3 (F2) | fixed | `tests/test_source.py` fixture still passed the removed `CandidateRequest.request_id`; the module was outside the unit's burden runs (timing-sensitive). Fix = the fixture keyword dropped, every test + assertion kept; `test_source` green alone (10 tests) |
+| correctness L2, L4, L6-L10 | pass | deleted invariants re-homed (`store.py` direct proposal scope, `review` transition guard); 122 modified + 14 added + 0 deleted test methods; expectations derive from live rows |
+| S1 | pass + extended | real v2 ledger from `1935f68` refused both modes + CLI exit 5; package version pin `test_s1_the_package_version_is_the_cut` red at `fc752eb` (0.1.0) → 0.2.0 |
+| S2, S3, supersession schema | pass | `.agent/decisions/m3u6b-constraint-probe.py`: deleting each of 8 constraints alone (3 append-only triggers, pin-scope trigger, switch CHECK, composite FK, superseded CHECK, supersedes UNIQUE) reds its owning test, survivors none. The supersession pin `test_s2_supersession_columns_bind_origin_and_supersede_each_example_once` was missing (reviewer-1 X-schema) and added |
+| S4, S6, p50, p51 | pass | residue census with survivor equality; source-id refusal before ID/clock/event work; every non-register CLI leaf exits 5 creating nothing; register grades values first |
+| pin repairs | pass | full tests sweep: no equality loosened, no count relaxed; the one assertion-count decrease merges two exclusive branches into one stricter `assertRaisesRegex` |
+| cleanup L4-a, L4-b | fixed | binding-adapter comment kept the v2 request-row design; `submit_proposal` docstring kept the unconditional retry claim → both state v3 |
+| cleanup L1-L3, L5-L8 | pass | shared `_unsupported_schema` + `_validate_ledger`; derived transport bound; no new closure |
+| cleanup register R1 | fixed | `.claude/rules/runtime.md` census 13 tables / 3 nullable INTEGER → measured 15 / 2 |
+| altitude L1-L3 | pass | `create` on Store + System (A3), register-only creation, `source_id` as a `--submission` key keep every invariant in its owning layer |
+| altitude L5 (L5-F1) | fixed | same docstring as cleanup L4-b |
+| altitude handoffs | fixed | `--submission` help names `source_id?`; pyproject 0.2.0 |
+| MAIN security lens | pass | existing-only open creates nothing (missing check precedes any connection; `mode=ro` refuses a missing file; symlinks refuse first); `source_id` ≤ 512 UTF-8 bytes, control-free, bound as a parameter; transport caps derive from library limits |
+
+MAIN-found while fixing (same close): README + `docs/adapter-protocol.md` still stated the
+request row, three records, unconditional no-idempotency and `request_id` on the source
+envelope → rewritten to v3 (two records, source id, no per-call identifier); the envelope's
+protocol moved `cement-candidate-v1` → `cement-candidate-v2` (a removed field = a new protocol);
+10 prose/census pins re-targeted under the pin-repair approval. Partial review fields passed
+`_validate_proposal_shape` as pending (general-purpose-1 report) → each field graded on its own.
+
+Round-4 pin repairs after the review (general-purpose-1 Part A, owner pin-repair approval; each re-targets a prose/census pin at MAIN's v3 prose or reads a closed transition from git): test_cli_channels_battery d23; test_cli_removal_battery d22a, d14; test_lifecycle_removal_battery l21, l23 ×2, l24, l29; test_submission_battery d25, d41, d34; test_outcome_removal_battery o4, o5 (preservation at CLOSE = `17896eb`). MAIN's AST census over the Part A range (`283552f..2b57a3a`): 11 changed test bodies, `assert*` calls never fewer (d23 11 → 12, d25 5 → 6), no test deleted; o4/o5 keep exact equality on the closed package.
+
+p04's acceptance (feed plan without a temp sort, page visits near its size) had no committed pin at the squash → `ReceiptFeedPlanBattery` lands with these records; its control drops `function_receipts_feed` → `USE TEMP B-TREE FOR ORDER BY`, 2 failures.
+
+Findings: 8 raised (2 major), all fixed in the squash; 0 open.
+
+Rulings that bind beyond this pass:
+
+- A module a burden run excludes (timing-sensitive `tests/test_source.py`, D28) still carries the
+  unit's burden: run it alone before the squash, or the squash lands red on it.
+- A wire envelope that loses a field gets a new protocol name, even pre-1.0.
+
+Gate at the squash: `.agent/gate` on `93007ac` rc 0 (clean tree, `heavy`): unittest 2241.3 s, Ran 1060, outer skipped none, nested D28 = L30, D28 15 revisions / 15 replayed (the 0.2.0 `uv.lock` re-keyed every verdict); slowest D28 1920.7 s, L29 183.9 s.
+
 ## M3.6a3 close (IMPLEMENT, unit) — target `17896eb` (squash of `archive/m3u6a3-impl`), records in the next commit
 
 Check set fixed before the diff was read, one `reviewer` per lens: correctness C1-C6 + contract O1-O6 (reviewer-18), cleanup L1-L5 (reviewer-19), altitude AL1-AL4 (reviewer-20); target `55588a8` = the branch before its review fixes. Raw tables: `.scratch/review/m3u6a3/` (scratch; rulings restated here).
