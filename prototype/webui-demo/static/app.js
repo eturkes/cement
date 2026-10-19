@@ -864,7 +864,7 @@ const STORY = [
     { el: lastBubble, title: "An ordinary answer", text: () => "No change from an ordinary chatbot answer. Cement has nothing reusable for this yet.", side: "right" },
     { el: "#mechanism .method", title: "The AI’s script", text: () => "To answer, the AI wrote a small script for this form. This request needed no Provider row.", side: "bottom" } ] },
   { run: () => send("q02"), beats: [
-    { el: "#mechanism .method", title: "The same job again", text: () => "Another progress note. This script also reads the Provider line.", side: "bottom" } ] },
+    { el: "#mechanism .method", title: "Provider needed", text: () => "Another progress note. This time the Provider field was needed, so the script also reads that line.", side: "bottom" } ] },
   { run: learnAll, beats: [
     { el: "#functions-list", title: "Learn", text: () => "An AI pass read the chats, found the repeat, and merged both scripts into one function.", side: "top" },
     { el: "#fnview .overlay-card", fn: "document.extraction_plan", title: "One function", text: () => "Shared rows came from both scripts; Provider from the one that needed it. It covers both requests.", side: "left" } ] },

@@ -72,7 +72,8 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
     `shared` (in every merged script) or `from <request>` (only the scripts that needed it),
     computed from the entry's lineage — the union is how one function generalizes over
     requests (owner-ruled r13). The stand-in AI is fixed, not sampled: a case's first script
-    reads less (progress note: no Provider row), every later one is complete. Tally = chips `AI n`
+    reads less (progress note: no Provider row), every later one is complete; the second
+    progress-note request asks for the provider, so the difference reads as request-driven (r14). Tally = chips `AI n`
     `Function m`.
   - Chat + reply = labelled fields, never JSON. Users = `users`, never `staff`. Requests show under
     the five task pills. ONE `Show technical details` switch (off by default; `?tech`,

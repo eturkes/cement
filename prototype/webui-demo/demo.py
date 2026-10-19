@@ -205,7 +205,7 @@ REQUESTS: list[dict[str, str]] = [
     {"id": "q01", "scenario": "file", "document_id": "A01",
      "ask": "Extract the record fields as JSON."},
     {"id": "q02", "scenario": "file", "document_id": "A02",
-     "ask": "Give me the JSON for the record fields."},
+     "ask": "Give me the record fields as JSON, including the provider."},
     {"id": "q03", "scenario": "file", "document_id": "A03",
      "ask": "Same as the others - pull the fields into JSON."},
     {"id": "q04", "scenario": "file", "document_id": "C01",
