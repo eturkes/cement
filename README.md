@@ -275,8 +275,8 @@ also an error, so the command never silently keeps one of two values.
 
 Success prints one key, `proposal_id`, at status 0. The command echoes no part of the candidate.
 
-Cement gives no idempotency here. Two identical submissions write two proposals and return two
-identifiers. Do not retry a failed submission. List the partition's pending proposals instead:
+Without a source id, Cement gives no idempotency here. Two identical submissions write two proposals
+and return two identifiers. With one, the second submission exits 4 and writes nothing. Do not retry a failed submission. List the partition's pending proposals instead:
 
 ```bash
 uv run cement --db demo.db --partition acme proposal list --status pending
@@ -331,8 +331,9 @@ uv run cement --db demo.db --partition acme learn cases form.plan --program - < 
 
 Two commands change earlier confirmations. `example supersede` replaces earlier examples with a
 re-merged output that extends them: one new example for each old one, with the same input. It
-writes nothing and exits 2 for an empty or repeated id, an unknown, revoked or already superseded
-example, an example of another operation, or an output equal to the old one. `example revoke` withdraws an example that is wrong, and it also
+writes nothing and refuses an empty or repeated id, an example of another operation, or an output
+equal to the old one (exit 2), an unknown example (exit 3), and a revoked or already superseded
+example (exit 4). `example revoke` withdraws an example that is wrong, and it also
 stops every version built on that example from answering.
 
 ## Library API
@@ -363,6 +364,19 @@ proposal_id = system.propose(
 Put every fact that can change the answer into the JSON input, including identity, locale,
 permissions, time, external-state revision, and policy revision. Cement cannot compile hidden context
 safely.
+
+The `System` methods group by purpose. Each write runs in one transaction and writes one event; a
+refusal writes nothing:
+
+| Purpose | Methods |
+|---|---|
+| Retain answers | `submit_proposal`, `propose` (pending proposals; optional `source_id`, a repeat raises `ConflictError`) |
+| Review | `review` (`ReviewResult`), `supersede_examples`, `revoke_example`, `challenge`, `suspend_artifact` |
+| Projection | `test_projection` (preview, writes nothing), `set_projection` (V1-V4 or `ValidationError`), `projection` (the stored program or `None`) |
+| Learning pass | `learning_cases` (cases by key + unfinished work, read-only) |
+| Build | `compile`, `verify_drafts`, `inspect_function_promotion`, `promote_function` (repeats the inspected hash or raises `ConflictError`) |
+| Versions + switch | `function_receipts`, `function_versions`, `diff_versions`, `set_switch` (`off`, `follow`, `pinned`), `switch`, `serving` |
+| Answer | `resolve`, `verify_function`, `function_report`, `reconstruct_function_receipt`; `evaluate` + `parse_function` answer from a bundle with no ledger |
 
 ### Explicit proposal submission
 

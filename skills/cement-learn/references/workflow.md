@@ -80,7 +80,8 @@ step for that case: the conflicting examples need a supersession or a revocation
 A pass can stop at any point. If `program.json` from the stopped pass exists and `cement
 projection show "$OP"` does not show that program, the pass stopped before `projection set`:
 group by the saved program (`cement learn cases "$OP" --program - < program.json`) and continue
-from step 3. Otherwise run `cement learn cases "$OP"` again. Proposals that you reviewed
+from step 3. Under the saved program, a case with more than one active output stopped during the
+merge step even when `work` is empty: `work` describes the stored program alone. Otherwise run `cement learn cases "$OP"` again. Proposals that you reviewed
 are no longer pending, so the rerun shows only what remains. A case in `work.merge_key_hashes`
 stopped during the merge step: supersede or revoke its examples that differ from the merge.
 Then continue from the first step that `work` lists. A rerun after a complete pass

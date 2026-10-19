@@ -149,8 +149,9 @@ The case key is the canonical input in exact mode, or the projected key under a 
 
 `partition` is mandatory to prevent accidental cross-tenant/workflow learning. Every explicit
 operation revision retires prior builds, including a revision that keeps the same numeric thresholds.
-A revision retires every older build at once. Cement withholds the cached output, and a pending
-proposal from an older revision cannot become an example. Callers reconcile prior effects, then work
+A revision retires every older build at once. Cement withholds the cached output from `follow`, and
+a pending proposal from an older revision cannot become an example. A pinned version keeps answering
+across a revision until one of its members is revoked, suspended, or challenged. Callers reconcile prior effects, then work
 under the current revision.
 
 Confirmed receipt data and artifact evidence edges are immutable. Revocation is a separate tombstone;

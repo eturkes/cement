@@ -3964,6 +3964,7 @@ class System:
                 AND a.input_hash = c.input_hash AND a.output_hash <> c.output_hash
             LEFT JOIN example_revocations AS x ON x.example_id = c.id
             WHERE m.receipt_id = ? AND c.origin = 'challenge' AND x.example_id IS NULL
+              AND NOT EXISTS (SELECT 1 FROM examples AS s WHERE s.supersedes_example_id = c.id)
               AND a.projection_hash IS NULL
             """
         )
@@ -3988,6 +3989,7 @@ class System:
                 LEFT JOIN example_revocations AS x ON x.example_id = c.id
                 WHERE c.partition = ? AND c.operation = ? AND c.operation_revision = ?
                   AND c.origin = 'challenge' AND x.example_id IS NULL
+                  AND NOT EXISTS (SELECT 1 FROM examples AS s WHERE s.supersedes_example_id = c.id)
                 """,
                 (
                     receipt_row["partition"],
@@ -4133,17 +4135,11 @@ class System:
             documents = [
                 self._reconstruct_function_receipt(connection, row).document for row in rows
             ]
-            programs: list[JSONValue] = []
-            for row in rows:
-                stored = None
-                if row["projection_hash"] is not None:
-                    stored = connection.execute(
-                        "SELECT program_json FROM projection_programs WHERE program_hash = ?",
-                        (row["projection_hash"],),
-                    ).fetchone()
-                    if stored is None:
-                        raise IntegrityError("a version names a projection program that is absent")
-                programs.append(None if stored is None else parse_json(str(stored[0])).value)
+            # Reconstruction already loaded, validated and embedded each version's program.
+            programs: list[JSONValue] = [
+                None if doc.projection is None else doc.projection.canonical.value
+                for doc in documents
+            ]
         before, after = (
             {
                 str(entry["input_hash"]): str(entry["output_hash"])

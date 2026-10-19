@@ -40,7 +40,8 @@ and continue from what it shows. Stop and report any other code. The workflow re
    If `program.json` exists from an earlier pass and `cement projection show "$OP"` does not
    show that program, the earlier pass stopped before step 4. Run `cement learn cases "$OP"
    --program - < program.json` instead, finish step 3 for any case that still lists pending
-   proposals, and continue with step 4.
+   proposals or more than one active output (a merge stopped before its supersession), and
+   continue with step 4.
 
    Otherwise, if `nothing_to_learn` is `true`, report "nothing to learn" and stop. If no
    proposal is pending but `work` lists unfinished steps, an earlier pass was interrupted.
