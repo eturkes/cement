@@ -15,6 +15,23 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## M4.1 close (IMPLEMENT, unit) — target `535a0a9` (squash of `archive/m4u1-land`; review read `e448ad2`), records in the next commit
+
+Check set fixed before the diff was read: correctness (reviewer-13: contract §4 + AM1-AM6, 24 rows), cleanup (reviewer-14, 8 rows), altitude (one unnamed reviewer). The `tester` (tester-1) wrote the diff-blind suite + the differential oracle `tests/projection_oracle.py` before MAIN's interpreter was read. Raw tables: `.scratch/review/m4u1/`.
+
+| id | lens | verdict | ruling (MAIN-verified) |
+|---|---|---|---|
+| C1 (AM3) | correctness | finding (minor) → fixed | TAB around a label/heading key is equivalent to its trimmed key (AM3), yet `strip(" ")` in place of `strip(_EDGE)` left all 72 tests green; label + heading TAB pins added (ab67311); the mutant now reds 2 tests in RuntimeGrammarTests. |
+| F1 | altitude | finding (minor) → fixed | the module exported 22 names, §4 names seven; `__all__` = the seven (e5b7f26), pinned by `test_exports_exactly_the_contract_api` (red at ab67311: AttributeError). |
+| other correctness rows | correctness | pass | 21,278 adversarial texts + 2,091 derived-layout matches + 242 program mutations: zero runtime/oracle divergences, exceptions or bound violations. 3.12/3.14 execution rides CI (AM6). |
+| L1-L8 | cleanup | pass | — |
+
+Red-first: the tester's suite (archive/m4u1-test = 54ede5d) is absence-red at 3817417 (no `cement_runtime.projection`); MAIN's interpreter landed green against it with the AM2 TAB patch the contract amended.
+
+Mutation credit + survivor ruling: `uv run python .agent/mutate tests.test_projection_ir --rev bdb5205 --workers 3` → killed 569, survived 103 (65 in projection.py, 38 in json_value.py outside this diff), invalid 10 of 682. reviewer-30 ruled the 65 independently: 4 equivalent, 50 contract-open (work-counter formula edits that keep the I7 bound, AM4 "any honest counter"), 11 missing-test in four families → pinned by `RuntimeMutantRulingTests` (the commit after the squash): a value whose type compares equal to everything is refused as `ValidationError` at 7 sites (§4 `parse_program(value: object)`), U+D7FF/U+E000 are legal literals beside the surrogate range, a repeated `keep` field that sorts low is refused, a lower title is no match. One mutant per family (lines 72, 90, 117, 235) now reds the new tests (`.scratch` kill check). 0 survivors unruled.
+
+Gate at the squash: `.agent/gate` on `535a0a9` rc 0 (clean tree, `heavy`): unittest 628.9 s, Ran 1156, outer skipped none, nested D28 = L30, D28 19 revisions / 1 replayed.
+
 ## M5.1 close (IMPLEMENT, unit) — target `1289797` (squash of `archive/m5u1-land`) (review read `5f4c2b4` on the pre-stack lineage), records in the next commit
 
 Check set fixed before the diff was read, one `reviewer` per lens: correctness (reviewer-7: m45-contract §3 switch + versions + pinned checks P-a..P-d + the read census), cleanup (reviewer-8), altitude (reviewer-9). Raw tables: `.scratch/review/m5u1/`.
