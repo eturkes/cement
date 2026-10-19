@@ -10,13 +10,17 @@ This page is a demo, not a product. Cement ships as a library and a CLI. A produ
 deployment puts Cement behind a chat product such as Open WebUI, where none of this
 reaches the person typing.
 
-The page opens with one sentence of purpose and four steps: **Ask**, **Check**, **Save**
-and **Switch on**. A band under the steps tells you what just happened after each action.
-The left half is the chat that users see. The right half first shows what happened to the
-latest request: the document, the method used on it and the reply. The method is either
-written by the AI or a fixed answer. A fixed answer is a method for one kind of form, so
-plain code can read a new patient's form with it. Below that, the right half shows the
-four steps for the selected task, the step that it has reached, and the one next action.
+The page opens with one headline and four icons: **Ask**, **Check**, **Save** and
+**Switch on**. The icons also show the step that the selected task has reached. A band
+under the icons tells you what just happened, and it holds the one next action.
+
+The left half is the chat that users see. The right half shows what happened to the latest
+request in three boxes: the form, the method used on it, and the reply. An amber **AI** chip
+marks a method that the AI wrote. A green **Fixed** chip marks a saved method that ran
+without the AI. The dots count the checks by a person. A `+`, `✎` or `–` mark shows a row
+that the checker added, fixed or removed. A fixed answer is a method for one kind of form,
+so plain code can read a new patient's form with it.
+
 **Show technical details** opens the per-message details, the scanned text and the
 **Operator view**, which holds the commands, the evidence and the function source.
 
@@ -26,8 +30,8 @@ four steps for the selected task, the step that it has reached, and the one next
 uv run python prototype/webui-demo/app.py
 ```
 
-Open <http://127.0.0.1:8765/>. Select **Play the story** for a guided tour. Select **Next** to go to each step. Stop the
-server with Ctrl+C. The ledger is a temporary SQLite file, and it disappears with the
+Open <http://127.0.0.1:8765/>. Select **Play the story** for a guided tour. Select **Next** to go to each step.
+Stop the server with Ctrl+C. The ledger is a temporary SQLite file, and it disappears with the
 process.
 
 ## Five tasks, four functions
@@ -58,18 +62,16 @@ One function serves several tasks. **File it into the record** promotes
 
 ## What to watch
 
-1. Select a task, then send one of its requests.
-2. The chat answers at once. The right half moves to **Check**.
-3. Select **Check the answer**. Save the correction, or confirm an answer that needs no change.
-   The reply in the chat stays unchanged.
-4. Send and check another document of the same kind.
-5. Select **Save as a fixed answer**. This runs compile, verification and promotion as real
-   Cement commands.
-6. Select **Use fixed answers**. The next document of that kind gets its answer without an
-   AI call. The chat looks the same.
-7. Select **Code it for billing**. Billing never gets a fixed answer, because no two notes
-   repeat the same words.
-8. Select **Show technical details** for the commands, the evidence and the function source.
+1. Select a task, then send one of its requests. The chat answers at once.
+2. Select **Check** in the band. A simulated checker fixes a wrong answer or confirms a
+   correct one. The reply in the chat stays unchanged.
+3. Send and check another form of the same kind. The dots fill.
+4. Select **Save**. This runs compile, verification and promotion as real Cement commands.
+5. Select **Switch on**. The next form of that kind gets its answer without an AI call. The
+   chat looks the same.
+6. Select **Code it for billing**. **Save** and **Switch on** are struck through, because no
+   two notes repeat the same words.
+7. Select **Show technical details** for the commands, the evidence and the function source.
 
 ## Real and simulated
 
@@ -152,10 +154,10 @@ Each numbered frame must show its claim:
 
 | File | What it shows |
 |---|---|
-| `01-desk.png` | The purpose, the four steps and five tasks before the first request. |
-| `02-answered.png` | The answer already with the user, and the task at **Check**. |
-| `03-evidence.png` | Two checks, with **Save as a fixed answer** as the next action. |
-| `04-cemented.png` | The fixed answer saved, with **Use fixed answers** as the next action. |
+| `01-desk.png` | The headline, the four icons and five tasks before the first request. |
+| `02-answered.png` | The answer already with the user, and **Check** in the band. |
+| `03-evidence.png` | Two checks, with **Save** in the band. |
+| `04-cemented.png` | The fixed answer saved, with **Switch on** in the band. |
 | `05-routed.png` | A03 answered without the AI, in a bubble that looks the same. |
 | `06-reuse.png` | One answer from a fixed answer and the AI together. |
 | `07-blocked.png` | Billing stays with the AI because assessment words do not repeat. |

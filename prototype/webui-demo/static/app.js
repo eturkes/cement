@@ -157,7 +157,7 @@ function render() {
   if (DRAWER && !STATE.selected_operations.includes(DRAWER)) DRAWER = STATE.selected_operations[0];
   renderChat();
   renderTray();
-  renderStory();
+  renderAction();
   renderMechanism();
   renderNarration();
   renderTasks();
@@ -196,7 +196,7 @@ function renderChat() {
     : "";
   const empty = STATE.chat.length
     ? ""
-    : `<div class="empty">Pick a task below and send a request with its document.</div>`;
+    : `<div class="empty">Pick a task, then a request.</div>`;
   chat.innerHTML = empty + messages + thinking;
   const pane = chat.closest(".pane-body");
   if (pane && !document.body.classList.contains("expanded")) {
@@ -277,8 +277,8 @@ function renderTray() {
   $("task-switch").innerHTML = STATE.scenarios.map(task =>
     `<button class="task-pill ${task.id === STATE.selected ? "on" : ""}" data-select="${esc(task.id)}" ${BUSY ? "disabled" : ""}>${esc(task.title)}</button>`).join("");
   const task = scenarioOf(STATE.selected);
-  $("tray").innerHTML = `<p class="tiny">Send a request. Users word the same job in different ways.</p><div class="asks">
-    ${task.requests.map(request => `<button class="ask-card" data-send="${esc(request.id)}" ${BUSY ? "disabled" : ""}>${esc(request.ask)}<small>${esc(request.document_id)}.pdf \u00b7 ${esc(documentOf(request.document_id).title || "")}</small></button>`).join("")}</div>`;
+  $("tray").innerHTML = `<div class="asks">
+    ${task.requests.map(request => `<button class="ask-card" data-send="${esc(request.id)}" ${BUSY ? "disabled" : ""}>${esc(request.ask)}<small>${esc(request.document_id)} \u00b7 ${esc(documentOf(request.document_id).title || "")}</small></button>`).join("")}</div>`;
 }
 
 function renderTasks() {
@@ -287,95 +287,37 @@ function renderTasks() {
   $("boundary-note").textContent = "Only the exact checked input matches. Other inputs return to the model.";
 }
 
-let CHECK_OPEN = false;
-const PLAIN_DIFF = {
-  missing: "The AI left out",
-  extra: "The AI added something that does not belong:",
-  changed: "The AI got this wrong:",
-};
-
-/* The right half restates the header's four steps for the selected task alone: the
-   current step carries its sentence + the ONE next action, finished steps keep a short
-   result, later steps keep their name. Everything else sits behind technical details. */
-function storyStep(number, name, state, text, action = "", tone = "") {
-  const body = state === "todo" ? "" : `<p>${text}</p>${action}`;
-  return `<section class="story-step ${state} ${tone}"><span class="story-number">${state === "done" ? "✓" : number}</span><div><h3>${name}</h3>${body}</div></section>`;
-}
-
 function taskStage() {
   const turn = STATE.latest_turn;
   const parts = turn ? turn.parts : [];
-  const model = parts.filter(p => p.source !== "function");
-  const fixed = parts.filter(p => p.source === "function");
   const pending = STATE.pending.find(p => parts.some(part => part.proposal_id === p.proposal_id));
   const doc = turn ? documentOf(turn.document_id) : {};
   const categories = STATE.categories.filter(c => c.keyed_on === "text" ? c.document_id === doc.id : c.layout === doc.layout);
   const needed = STATE.selected_operations.filter(name => operationOf(name).keyed_on !== "text");
   const prepared = Boolean(turn) && needed.length > 0 && needed.every(name => categories.some(c => c.operation === name && c.promoted) && STATE.functions.some(fn => fn.operation === name && fn.passed));
   const ready = prepared || (needed.length > 0 && needed.every(name => categories.some(c => c.operation === name && c.confirmations >= c.required)));
-  const support = categories.filter(c => c.keyed_on !== "text").map(c => c.confirmations);
-  const count = support.length ? Math.min(...support) : 0;
   const step = !turn ? 1 : pending ? 2 : STATE.selected === "bill" || !prepared ? 3 : 4;
-  return { turn, model, fixed, pending, doc, prepared, ready, count, step,
-    rejected: model.some(p => p.status === "rejected"),
-    corrected: model.some(p => p.status === "corrected") };
+  return { turn, pending, prepared, ready, step };
 }
 
-function renderStory() {
-  const task = scenarioOf(STATE.selected);
+/* The header strip doubles as this task's progress; the band holds its ONE next action. */
+function renderAction() {
   const s = taskStage();
-  const floor = STATE.policy.min_confirmations;
   const billing = STATE.selected === "bill";
-  const kind = s.doc.title ? `${esc(s.doc.title).toLowerCase()}s` : "documents";
-  const state = (n) => n < s.step ? "done" : n === s.step ? "now" : "todo";
-  const button = (label, attr) => `<button class="button primary story-action" ${attr} ${BUSY ? "disabled" : ""}>${label}</button>`;
-  document.querySelectorAll("#how li").forEach(li => li.classList.toggle("now", Number(li.dataset.step) === s.step));
-
-  const ask = !s.turn ? "Send a request on the left. The AI answers right away."
-    : !s.model.length ? "A fixed answer replied. The AI was not used."
-    : s.fixed.length ? "Part of this job repeats, so a fixed answer did it. The AI did the part that does not repeat."
-    : "The AI answered.";
-
-  let check = s.rejected ? "A person rejected the answer, so Cement learns nothing from it."
-    : s.corrected ? "A person fixed a mistake. The user kept the reply they already had."
-    : s.model.length ? "A person confirmed the answer." : "Checked earlier, before the answer was saved.";
-  let checkAction = "";
-  if (s.pending) {
-    check = "A person now checks what the AI wrote. The user already has the reply, so nobody waits.";
-    checkAction = button("Check the answer", 'data-check-open="1"');
-    if (CHECK_OPEN) {
-      const p = s.pending;
-      checkAction = `<div class="story-check"><p>${p.diff.length ? "The checker finds these mistakes:" : "The checker finds nothing to change."}</p>${p.diff.length ? `<ul class="plain-diff">${p.diff.map(row => `<li>${PLAIN_DIFF[row.kind] || "The AI got this wrong:"} <b>${esc(row.field.replace(/_/g, " "))}</b></li>`).join("")}</ul>` : ""}<div class="actions">${button(p.diff.length ? "Save the correction" : "Confirm the answer", `data-review="${p.diff.length ? "correct" : "accept"}" data-proposal="${esc(p.proposal_id)}"`)}<button class="button" data-review="reject" data-proposal="${esc(p.proposal_id)}">Reject it</button></div></div>`;
-    }
-  }
-
-  let save = s.prepared ? "Saved as a fixed answer." : "";
-  let saveAction = "";
-  if (billing) {
-    save = "Billing depends on each note’s own words. No two notes are alike, so this work never repeats and never becomes a fixed answer. It stays with the AI and a person, on purpose.";
-  } else if (!s.prepared) {
-    save = s.ready
-      ? `Checked ${floor} times. Cement can now save this work as a fixed answer for ${kind}.`
-      : `Checked ${Math.min(s.count, floor)} of ${floor} times for ${kind}. Send another one to check this work again. Cement saves how to handle this kind of form, not one patient’s details.`;
-    if (s.ready && !s.pending) saveAction = button("Save as a fixed answer", 'data-make-automatic="1"');
-  }
-
-  const on = STATE.routed;
-  const switchText = on
-    ? `Fixed answers are on. The next ${kind.replace(/s$/, "")} skips the AI. Anything new still goes to the AI and a person.`
-    : "The fixed answer is saved but not used yet. You decide when it replaces the AI.";
-  const switchAction = !on ? button("Use fixed answers", 'data-enable-automatic="1"') : "";
-
-  $("story").innerHTML = `<div class="story-heading"><span class="eyebrow">This task</span><h3>${esc(task.title)}</h3></div>` +
-    storyStep(1, "Ask", state(1), ask) +
-    storyStep(2, "Check", state(2), check, checkAction) +
-    storyStep(3, "Save", billing && s.step >= 3 ? "now" : state(3), save, saveAction, billing ? "story-boundary" : "") +
-    storyStep(4, billing ? "Switch on · not for this task" : "Switch on", billing ? "todo" : state(4), switchText, switchAction);
-
+  document.querySelectorAll("#how li").forEach(li => {
+    const n = Number(li.dataset.step);
+    li.classList.toggle("now", n === s.step);
+    li.classList.toggle("done", n < s.step);
+    li.classList.toggle("blocked", billing && n >= 3);
+  });
+  const button = (label, attr, tone = "primary") => `<button class="button ${tone}" ${attr} ${BUSY ? "disabled" : ""}>${label}</button>`;
+  let html = "";
+  if (s.pending) html = button("Check", `data-check="${esc(s.pending.proposal_id)}"`) + button("Reject", `data-review="reject" data-proposal="${esc(s.pending.proposal_id)}"`, "");
+  else if (!billing && s.ready && !s.prepared) html = button("Save", 'data-make-automatic="1"');
+  else if (!billing && s.prepared && !STATE.routed) html = button("Switch on", 'data-enable-automatic="1"');
+  $("band-actions").innerHTML = STORY_AT >= 0 ? "" : html;
   const st = STATE.stats;
-  $("tally").textContent = st.provider_calls || st.cement_answers
-    ? `So far the AI answered ${plural(st.provider_calls, "request")}. Fixed answers replaced the AI ${st.cement_answers} ${st.cement_answers === 1 ? "time" : "times"}.`
-    : "";
+  $("tally").innerHTML = `<span class="chip ai" title="answers written by the AI">AI ${st.provider_calls}</span><span class="chip fixed" title="answers from a fixed answer">Fixed ${st.cement_answers}</span>`;
 }
 
 /* --- what happened to the latest request: document → method → reply ---
@@ -383,18 +325,18 @@ function renderStory() {
    patient's values, so plain code can answer a new patient's form from it. */
 
 const METHOD = {
-  "document.extraction_plan": ["How to read this kind of form", (o) => (o.fields || []).map((f) => [
+  "document.extraction_plan": ["How to read this form", (o) => (o.fields || []).map((f) => [
     humanKey(f.name),
-    f.locator && f.locator.kind === "section" ? `the “${f.locator.heading}” section`
-      : f.locator && f.locator.label ? `the “${f.locator.label}:” line` : JSON.stringify(f.locator)])],
-  "document.phi_locators": ["Which details identify the patient", (o) =>
+    f.locator && f.locator.kind === "section" ? `“${f.locator.heading}” section`
+      : f.locator && f.locator.label ? `“${f.locator.label}:” line` : JSON.stringify(f.locator)])],
+  "document.phi_locators": ["Patient identifiers", (o) =>
     (o.identifiers || []).map((r) => [humanKey(r.field), String(r.category).replace(/_/g, " ")])],
-  "document.required_fields": ["Which fields must be filled in", (o) => [
+  "document.required_fields": ["Required fields", (o) => [
     ["Required", (o.required || []).map(humanKey).join(", ")],
     ["Optional", (o.optional || []).map(humanKey).join(", ") || "none"]]],
-  "document.intake_queue": ["Which team gets this kind of form", (o) => [
+  "document.intake_queue": ["Team for this form", (o) => [
     ["Team", o.queue], ["Turnaround", `${o.sla_hours} hours`], ["Confirms receipt", o.acknowledge ? "yes" : "no"]]],
-  "document.billing_codes": ["Billing codes for this note", (o) =>
+  "document.billing_codes": ["Billing codes", (o) =>
     (o.codes || []).map((c) => [c.code, c.description])],
 };
 
@@ -409,25 +351,21 @@ function methodRows(operation, ai, confirmed) {
     .concat([...mine].filter(([k]) => !keys.has(k)).map(([k, v]) => ({ k, v, mark: "removed" })));
 }
 
+const MARK = { added: "+", changed: "✎", removed: "–" };
+
 function methodBox(part, doc) {
   const fixed = part.source === "function";
-  const category = STATE.categories.find((c) => c.operation === part.operation && c.layout === doc.layout);
-  const checks = category ? category.confirmations : 0;
-  const reviewed = part.status === "corrected" || part.status === "accepted";
-  const badge = fixed ? `Fixed answer · no AI`
-    : `Written by the AI · ${part.status === "unreviewed" ? "not checked yet"
-      : part.status === "rejected" ? "rejected by a person"
-      : part.status === "corrected" ? "a person fixed it" : "a person confirmed it"}`;
-  const foot = fixed ? `Saved after ${plural(checks, "check")} by a person.`
-    : part.status === "corrected" ? `The AI ${esc(part.note)}. The marked rows show the fix.`
-    : part.status === "unreviewed" ? "A person checks this later. The reply already went out."
-    : "";
+  const category = STATE.categories.find((c) => c.operation === part.operation && (c.keyed_on === "text" ? c.document_id === doc.id : c.layout === doc.layout));
+  const checks = category ? Math.min(category.confirmations, category.required) : 0;
+  const dots = category && category.keyed_on !== "text"
+    ? `<span class="dots-check" title="${checks} of ${category.required} checks">${"●".repeat(checks)}${"○".repeat(category.required - checks)}</span>`
+    : `<span class="dots-check never" title="no two notes share these words">never repeats</span>`;
+  const state = fixed ? "" : { unreviewed: "unchecked", corrected: "fixed by a person", accepted: "confirmed", rejected: "rejected" }[part.status] || "";
   const rows = methodRows(part.operation, part.output, part.status === "corrected" ? part.confirmed : null)
-    .map((r) => `<div class="method-row ${r.mark}"><span>${esc(r.k)}</span><span>${esc(r.v)}</span>${r.mark ? `<em>${r.mark === "added" ? "added by the checker" : r.mark === "removed" ? "removed by the checker" : "fixed by the checker"}</em>` : ""}</div>`).join("");
-  return `<div class="method ${fixed ? "fixed" : reviewed ? "checked" : "ai"}">
-    <span class="method-badge">${badge}</span>
-    <h4>${esc(METHOD[part.operation][0])}</h4>${rows}
-    ${foot ? `<p class="method-foot">${foot}</p>` : ""}</div>`;
+    .map((r) => `<div class="method-row ${r.mark}"><span>${r.mark ? `<i title="${r.mark} by a person">${MARK[r.mark]}</i>` : ""}${esc(r.k)}</span><span>${esc(r.v)}</span></div>`).join("");
+  return `<div class="method ${fixed ? "fixed" : part.status === "unreviewed" ? "ai" : "checked"}">
+    <div class="method-head"><span class="chip ${fixed ? "fixed" : "ai"}">${fixed ? "Fixed" : "AI"}</span><span class="method-state">${state}</span>${dots}</div>
+    <h4>${esc(METHOD[part.operation][0])}</h4>${rows}</div>`;
 }
 
 function latestAnswer(turn) {
@@ -442,14 +380,14 @@ function renderMechanism() {
   const answer = latestAnswer(turn);
   const reply = !answer ? "…" : answer.error ? esc(answer.error)
     : answer.render === "text" ? esc(answer.body) : fieldsHtml(answer.body);
-  $("mechanism").innerHTML = `<div class="mechanism"><span class="eyebrow">What happened to the latest request</span>
+  $("mechanism").innerHTML = `<div class="mechanism">
     <div class="flow">
-      <div class="flow-box"><span class="method-badge">The document</span><h4>${esc(doc.id)}.pdf</h4>
-        <p class="tiny">${esc(doc.title || "")}</p><pre class="scan">${esc(excerpt)}</pre></div>
+      <div class="flow-box"><span class="method-badge">Form</span><h4>${esc(doc.id)}.pdf</h4>
+        <pre class="scan">${esc(excerpt)}</pre></div>
       <div class="flow-arrow" aria-hidden="true">→</div>
       <div class="flow-methods">${turn.parts.map((part) => methodBox(part, doc)).join("")}</div>
       <div class="flow-arrow" aria-hidden="true">→</div>
-      <div class="flow-box"><span class="method-badge">The reply the user got</span><div class="reply">${reply}</div></div>
+      <div class="flow-box"><span class="method-badge">Reply</span><div class="reply">${reply}</div></div>
     </div></div>`;
 }
 
@@ -839,13 +777,13 @@ function renderLog() {
 /* --- narration: what just happened, after every action ---
    Free mode captions each click; story mode walks fixed steps with Next. */
 
-let CAPTION = "Pick a task and send a request, or select Play the story for a guided tour.";
+let CAPTION = "Pick a task, then a request — or play the story.";
 let STORY_AT = -1;
 
 function renderNarration() {
   const story = STORY_AT >= 0;
   $("narration-text").textContent = CAPTION;
-  $("narration-step").textContent = story ? `The story · step ${STORY_AT + 1} of ${STORY.length}` : "What just happened";
+  $("narration-step").textContent = story ? `${STORY_AT + 1} / ${STORY.length}` : "";
   $("narration").classList.toggle("story", story);
   $("story-next").hidden = !story || STORY_AT >= STORY.length - 1;
   $("story-exit").hidden = !story;
@@ -855,30 +793,29 @@ function renderNarration() {
 function narrate(text) {
   CAPTION = text;
   renderNarration();
+  renderAction();
 }
 
 const turnParts = () => (STATE.latest_turn ? STATE.latest_turn.parts : []);
-const kindOf = (id) => String(documentOf(id).title || "document").toLowerCase();
 
 function sentCaption() {
   const turn = STATE.latest_turn;
   if (!turn) return CAPTION;
   const parts = turnParts();
   const fixed = parts.filter((p) => p.source === "function").length;
-  const name = `${turn.document_id}.pdf`;
-  if (fixed === parts.length) return `${name} is a ${kindOf(turn.document_id)}. A fixed answer handled it, so the AI was not called. Plain code read this patient’s form the saved way.`;
-  if (fixed) return `Part of this job already had a fixed answer, so only the rest went to the AI. The reply went out at once. A person checks the AI’s part later.`;
-  return `The AI worked out how to handle ${name} and replied at once. Nobody has checked its work yet.`;
+  if (fixed === parts.length) return `${turn.document_id}: fixed answer, no AI.`;
+  if (fixed) return `${turn.document_id}: part fixed, the rest by the AI.`;
+  return `${turn.document_id}: the AI answered. Not checked yet.`;
 }
 
 function reviewCaption(decision, note) {
-  if (decision === "reject") return "A person rejected the AI’s work. Cement learns nothing from it, and the reply already sent stands.";
-  if (decision === "accept") return "A person checked the AI’s work and found nothing wrong. That counts as one check.";
-  return `A person checked the AI’s work and fixed it: the AI ${note}. The reply already sent does not change. Cement keeps the fixed version as one check.`;
+  if (decision === "reject") return "Rejected. Nothing learned.";
+  if (decision === "accept") return "Checked: correct.";
+  return `Checked: the AI ${note}. Fixed.`;
 }
 
-const SAVED = "Cement tested the checked work and saved it as a fixed answer. It saves how to handle this kind of form, not any patient’s details. Nothing changes for users until someone switches it on.";
-const SWITCHED = "Fixed answers are switched on. Matching forms now skip the AI. Anything new still goes to the AI and a person.";
+const SAVED = "Saved: a method for this kind of form. No patient data.";
+const SWITCHED = "On: matching forms skip the AI.";
 
 /* A supervisor corrects what diverges and accepts what already matches. The first
    candidate for a scope always diverges, so a correction is always visible. */
@@ -895,36 +832,28 @@ const firstNote = () => (turnParts().find((p) => p.note) || {}).note || "made a 
 const patientOf = () => (STATE.latest_turn ? documentOf(STATE.latest_turn.document_id).patient : "");
 
 const STORY = [
-  { say: () => "Users at a hospital use an AI assistant all day. A common job: pull the record fields out of a scanned physician progress note. Select Next to send the first one." },
+  { say: () => "Users ask an AI to read hospital forms. Press Next." },
   { run: async () => { await select("file"); await send("q01"); },
-    say: () => `A user sent A01.pdf and asked for the record fields. The AI worked out how to read this kind of form, and the reply went out at once. The AI made a mistake that nobody has seen yet: it ${firstNote()}. Compare the boxes on the right.` },
-  { run: settle,
-    say: () => "Later, a records supervisor checked the AI’s work and fixed it. The user’s reply stays as it was. Cement keeps the fixed version: that is the first check for progress notes." },
-  { run: () => turn("q02"),
-    say: () => {
-      const status = (turnParts()[0] || {}).status;
-      return `A second progress note, A02.pdf, arrived with different wording. The AI read it ${status === "accepted" ? "correctly, and the supervisor confirmed it" : "with a mistake again, and the supervisor fixed it"}. Progress notes now have 2 checks, enough for Cement to save the work.`;
-    } },
-  { run: makeAutomatic,
-    say: () => "Cement tested the checked work and saved “how to read a progress note” as a fixed answer. It saved the reading method, not any patient’s details. Users see no change yet." },
-  { run: () => route(true),
-    say: () => "An operator switched fixed answers on. From now on, a progress note skips the AI." },
-  { run: () => send("q03"),
-    say: () => `A03.pdf is a new patient’s progress note, worded differently again. The fixed answer was used, so the AI was not called. Plain code read ${patientOf()}’s details off the form. The reply looks the same as the AI’s would.` },
+    say: () => `A01: the AI answered at once — and ${firstNote()}.` },
+  { run: settle, say: () => "A person fixed it. The user’s reply is unchanged." },
+  { run: () => turn("q02"), say: () => "A02: same kind of form, checked again. ●●" },
+  { run: makeAutomatic, say: () => "Saved: how to read this form. No patient data." },
+  { run: () => route(true), say: () => "Switched on." },
+  { run: () => send("q03"), say: () => `A03: new patient, no AI. The saved method read ${patientOf()}’s form.` },
   { run: async () => { await turn("q05"); await turn("q06"); await makeAutomatic(); },
-    say: () => "A different job, removing patient details before a note is shared, reuses the same reading method and adds one new step: which details identify the patient. The reading came from the fixed answer. The AI did the new step, a person checked it twice, and Cement saved that too." },
+    say: () => "A new job reuses that method. Only its new part went to the AI." },
   { run: async () => { await turn("q08"); await turn("q09"); await makeAutomatic(); await turn("q10"); await turn("q11"); await makeAutomatic(); },
-    say: () => "The same happened for two more jobs: checking a form for blanks, and choosing which team gets it. Each job needed its own two checks before Cement saved it." },
+    say: () => "Two more jobs, saved the same way." },
   { run: async () => { await turn("q12"); await lifecycle("compile"); },
-    say: () => "Billing is different. The codes depend on the doctor’s own words in each note, and no two notes say the same thing. Nothing repeats, so Cement never saves a fixed answer for billing. It stays with the AI and a person, on purpose." },
-  { say: () => `End of the story. The AI answered ${plural(STATE.stats.provider_calls, "request")}. Fixed answers replaced it ${STATE.stats.cement_answers} times with the same replies. Every fixed answer traces back to the people who checked it: select Show technical details to see that record.` },
+    say: () => "Billing: every note’s words differ, nothing repeats. It stays with the AI." },
+  { say: () => `Done. AI ${STATE.stats.provider_calls}, fixed ${STATE.stats.cement_answers}, same replies.` },
 ];
 
 async function advanceStory(index) {
   const run = RUN;
   const step = STORY[index];
   STORY_AT = index;
-  narrate("Working…");
+  narrate("…");
   if (step.run) await step.run();
   if (run !== RUN) return;
   narrate(step.say());
@@ -934,7 +863,6 @@ async function advanceStory(index) {
 async function playStory(upTo = 0) {
   RUN += 1;
   await call("/api/reset", {});
-  CHECK_OPEN = false;
   for (let index = 0; index <= upTo && index < STORY.length; index += 1) {
     await advanceStory(index);
   }
@@ -951,11 +879,15 @@ document.addEventListener("click", (event) => {
   const target = event.target.closest(
     "[data-send],[data-review],[data-action],[data-offline],[data-revoke]," +
     "[data-source],[data-select],[data-operation-open],[data-history]," +
-    "[data-check-open],[data-make-automatic],[data-enable-automatic]");
+    "[data-check],[data-make-automatic],[data-enable-automatic]");
   if (!target || BUSY) return;
-  if (!target.dataset.checkOpen && !target.dataset.history && STORY_AT >= 0) leaveStory();
-  if (target.dataset.checkOpen) { CHECK_OPEN = !CHECK_OPEN; renderStory(); }
-  else if (target.dataset.makeAutomatic) makeAutomatic().then(() => narrate(SAVED));
+  if (!target.dataset.history && STORY_AT >= 0) leaveStory();
+  if (target.dataset.check) {
+    /* The checker is simulated: it confirms a correct answer and fixes a wrong one. */
+    const pending = STATE.pending.find((p) => p.proposal_id === target.dataset.check);
+    const decision = pending.diff.length ? "correct" : "accept";
+    review(pending.proposal_id, decision).then(() => narrate(reviewCaption(decision, pending.note)));
+  } else if (target.dataset.makeAutomatic) makeAutomatic().then(() => narrate(SAVED));
   else if (target.dataset.enableAutomatic) route(true).then(() => narrate(SWITCHED));
   else if (target.dataset.history) { HISTORY = !HISTORY; render(); } else if (target.dataset.operationOpen) {
     DRAWER = target.dataset.operationOpen;
@@ -963,9 +895,8 @@ document.addEventListener("click", (event) => {
     select(task.id);
   } else if (target.dataset.send) send(target.dataset.send).then(() => narrate(sentCaption()));
   else if (target.dataset.select) {
-    select(target.dataset.select).then(() => narrate(`Task: ${scenarioOf(STATE.selected).title}. Send one of its requests.`));
+    select(target.dataset.select).then(() => narrate(`${scenarioOf(STATE.selected).title}: pick a request.`));
   } else if (target.dataset.review) {
-    CHECK_OPEN = false;
     const decision = target.dataset.review;
     const note = (STATE.pending.find((p) => p.proposal_id === target.dataset.proposal) || {}).note;
     review(target.dataset.proposal, decision).then(() => narrate(reviewCaption(decision, note)));
@@ -1005,9 +936,8 @@ $("reset").addEventListener("click", async () => {
   SOURCE_OPEN = "";
   DRAWER = "";
   HISTORY = false;
-  CHECK_OPEN = false;
   STORY_AT = -1;
-  CAPTION = "Pick a task and send a request, or select Play the story for a guided tour.";
+  CAPTION = "Pick a task, then a request — or play the story.";
   await call("/api/reset", {});
 });
 

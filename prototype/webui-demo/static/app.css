@@ -87,51 +87,6 @@ a {
   text-transform: uppercase;
   color: var(--quiet);
 }
-.hero {
-  flex: 1;
-  max-width: 860px;
-}
-.hero h1 {
-  font-size: 24px;
-  line-height: 1.25;
-  margin: 0 0 6px;
-}
-.hero p {
-  margin: 0;
-  font-size: 15px;
-  color: var(--quiet);
-}
-.how {
-  list-style: none;
-  margin: 0;
-  padding: 12px 36px;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 24px;
-  background: white;
-  border-bottom: 1px solid var(--line);
-}
-.how li {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  font-size: 14px;
-  line-height: 1.4;
-}
-.how b {
-  display: block;
-  font-size: 15px;
-}
-.how span:not(.story-number) {
-  color: var(--quiet);
-}
-.how .story-number {
-  flex-shrink: 0;
-}
-.how li.now .story-number {
-  background: var(--green);
-  color: white;
-}
 .actions {
   display: flex;
   gap: 8px;
@@ -647,28 +602,12 @@ pre {
   .top {
     gap: 14px;
   }
-  .hero {
-    flex-basis: 100%;
-  }
-  .how {
-    grid-template-columns: 1fr 1fr;
-    padding: 14px 18px;
-  }
   body {
     height: auto;
   }
 }
 
 /* Narrative belongs to the explainer half; the chat's styling stays unchanged. */
-#side-hidden .story-heading { margin-bottom: 18px; }
-#side-hidden .story-heading h3 { font-size: 20px; margin-top: 6px; }
-.story-step { display: grid; grid-template-columns: 28px 1fr; gap: 16px; padding: 7px 0 13px; }
-.story-number { border-radius: 50%; background: #edf3ef; color: #205b3e; width: 28px; height: 28px; display: grid; place-items: center; font-size: 13px; font-weight: 700; }
-.story-step h3 { font-size: 16px; line-height: 1.35; margin: 6px 0; }
-.story-step p { color: #4d5a52; font-size: 13.5px; line-height: 1.45; margin: 0; max-width: 540px; }
-.story-action { margin-top: 14px; }
-.story-check { padding: 16px; border: 1px solid var(--line); margin-top: 14px; border-radius: 8px; }
-.story-check pre { max-height: 260px; overflow: auto; }
 .operator-view { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 16px; }
 .operator-view > summary { font-size: 14px; }
 .operator-job { display: block; margin: 8px 0; }
@@ -679,17 +618,9 @@ body:not(.tech) .ocr,
 body:not(.tech) #operator-view {
   display: none;
 }
-.story-step.todo h3 { color: var(--quiet); font-weight: 400; }
-.story-step.todo .story-number { background: transparent; border: 1px solid var(--line); color: var(--quiet); }
-.story-step.now .story-number { background: var(--green); color: white; }
-.story-step.done p { color: var(--quiet); }
-.story-step.now.story-boundary .story-number { background: var(--amber); }
-.tally { font-size: 14px; border-top: 1px solid var(--line); padding-top: 14px; }
 .asks { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8px; }
 @media (max-width: 1000px) { .asks { grid-template-columns: 1fr; } }
 .tray .tiny { margin: 0; }
-.story-check .story-action { margin-top: 0; }
-.plain-diff { margin: 0 0 14px; padding-left: 18px; font-size: 13.5px; line-height: 1.6; }
 
 /* What just happened: one band under the steps, captioning every action. */
 .narration {
@@ -703,7 +634,6 @@ body:not(.tech) #operator-view {
   border: 1px solid #c9ddcf;
   border-radius: 10px;
 }
-.narration p {
   margin: 4px 0 0;
   font-size: 15px;
   max-width: 1100px;
@@ -721,7 +651,7 @@ body:not(.tech) #operator-view {
 .mechanism { margin-bottom: 22px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
 .flow { display: grid; grid-template-columns: 1fr 16px 1.35fr 16px 1fr; gap: 6px; align-items: start; margin-top: 10px; }
 .flow-arrow { color: var(--quiet); padding-top: 40px; text-align: center; }
-.flow-box, .method { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 12.5px; min-width: 0; }
+.flow-box, .method { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; font-size: 13.5px; min-width: 0; }
 .flow-methods { display: grid; gap: 8px; min-width: 0; }
 .flow h4, .method h4 { margin: 4px 0 6px; font-size: 13.5px; }
 .flow .tiny { margin: 0 0 6px; }
@@ -732,11 +662,9 @@ body:not(.tech) #operator-view {
 .method.fixed { background: #edf5ef; border-color: #a9cbb5; }
 .method.fixed .method-badge { color: var(--green); }
 .method-row { display: grid; grid-template-columns: 1fr 1.3fr; gap: 6px; padding: 3px 0; border-top: 1px solid #0000000d; }
-.method-row em { grid-column: 1 / -1; font-style: normal; font-size: 11px; color: var(--green); }
 .method-row.added, .method-row.changed { background: #e3f1e7; }
 .method-row.removed span { text-decoration: line-through; color: var(--quiet); }
-.method-foot { font-size: 11.5px; color: var(--quiet); margin: 6px 0 0; line-height: 1.4; }
-.scan { font-size: 10.5px; padding: 8px; margin: 0; line-height: 1.5; }
+.scan { font-size: 11.5px; padding: 8px; margin: 0; line-height: 1.5; }
 .reply { margin-top: 6px; overflow-wrap: break-word; }
 .reply .fields { grid-template-columns: 1fr; gap: 0; }
 .reply .fields dt { font-size: 11px; margin-top: 5px; }
@@ -749,3 +677,38 @@ body:not(.tech) #operator-view {
   .flow-arrow { padding: 0; transform: rotate(90deg); }
   .narration { flex-direction: column; align-items: flex-start; margin: 12px 12px 0; }
 }
+
+.hero { flex: 1; margin: 0; font-size: 24px; }
+/* The workflow as four icons; the selected task's progress colours them. */
+.how { list-style: none; margin: 0; padding: 12px 36px; display: flex; gap: 10px; align-items: center; background: white; border-bottom: 1px solid var(--line); }
+.how li { display: flex; gap: 10px; align-items: center; flex: 1; color: var(--quiet); }
+.how li + li::before { content: "→"; color: #b7c8c0; margin-right: 6px; }
+.how svg { width: 34px; height: 34px; padding: 7px; border-radius: 50%; background: #edf3ef; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; flex-shrink: 0; }
+.how b { display: block; font-size: 15px; color: var(--ink); }
+.how span { font-size: 12.5px; }
+.how li.done svg { color: var(--green); }
+.how li.now svg { background: var(--green); color: white; }
+.how li.blocked svg { background: #faf0dd; color: var(--amber); }
+.how li.blocked b { color: var(--amber); text-decoration: line-through; }
+.side-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.side-head h2 { margin: 0; }
+.tag { font-size: 12px; color: var(--quiet); }
+#tally { margin-left: auto; display: flex; gap: 6px; }
+.chip { font-size: 11.5px; font-weight: 700; border-radius: 20px; padding: 2px 9px; background: #edf3ef; color: var(--green); }
+.chip.ai { background: #faf0dd; color: var(--amber); }
+.narration { display: grid; grid-template-columns: auto 1fr auto auto; }
+.narration p { margin: 0; font-size: 16px; }
+.narration .eyebrow:empty { display: none; }
+.method-head { display: flex; gap: 8px; align-items: center; }
+.method-state { font-size: 11px; color: var(--quiet); }
+.dots-check { margin-left: auto; color: var(--green); letter-spacing: 3px; font-size: 15px; }
+.method.ai .dots-check { color: var(--amber); }
+.method-row i { font-style: normal; font-weight: 700; color: var(--green); margin-right: 4px; }
+@media (max-width: 1000px) {
+  .hero { flex-basis: 100%; font-size: 20px; }
+  .how { flex-wrap: wrap; padding: 10px 18px; }
+  .how li { flex: 1 1 40%; }
+  .how li + li::before { display: none; }
+  .narration { grid-template-columns: 1fr; }
+}
+.dots-check.never { font-size: 11px; letter-spacing: 0; color: var(--amber); font-weight: 700; }

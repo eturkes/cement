@@ -9,61 +9,44 @@
   <body>
     <header class="top">
       <a class="brand" href="/">cement<span>Concept demo</span></a>
-      <div class="hero">
-        <h1>Let checked AI work become fixed answers.</h1>
-        <p>
-          Users keep using their AI assistant. People check its answers in the background. Work
-          that repeats and passes those checks becomes a fixed answer: the same result every
-          time, no AI call, and a record of who approved it.
-        </p>
-      </div>
+      <h1 class="hero">Let checked AI work become fixed answers.</h1>
       <div class="actions">
         <button id="play" class="button primary">Play the story</button
         ><button id="reset" class="button">Reset</button>
       </div>
     </header>
     <ol class="how" id="how">
-      <li data-step="1"><span class="story-number">1</span><div><b>Ask</b>
-        <span>Users ask the AI assistant, as they do today.</span></div></li>
-      <li data-step="2"><span class="story-number">2</span><div><b>Check</b>
-        <span>A person checks each answer later. Nobody waits.</span></div></li>
-      <li data-step="3"><span class="story-number">3</span><div><b>Save</b>
-        <span>Work that repeats and passes the checks becomes a fixed answer.</span></div></li>
-      <li data-step="4"><span class="story-number">4</span><div><b>Switch on</b>
-        <span>You decide when fixed answers replace the AI.</span></div></li>
+      <li data-step="1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg><div><b>Ask</b><span>AI replies</span></div></li>
+      <li data-step="2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><div><b>Check</b><span>a person reviews</span></div></li>
+      <li data-step="3"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg><div><b>Save</b><span>repeats become fixed</span></div></li>
+      <li data-step="4"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h8a5 5 0 010 10H8A5 5 0 018 7zm8 2.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z"/></svg><div><b>Switch on</b><span>you decide</span></div></li>
     </ol>
     <section class="narration" id="narration" aria-live="polite">
-      <div>
-        <span class="eyebrow" id="narration-step">What just happened</span>
-        <p id="narration-text"></p>
-      </div>
+      <span class="eyebrow" id="narration-step"></span>
+      <p id="narration-text"></p>
+      <div class="actions" id="band-actions"></div>
       <div class="actions">
         <button id="story-next" class="button primary" hidden>Next</button
-        ><button id="story-exit" class="button" hidden>Leave the story</button>
+        ><button id="story-exit" class="button" hidden>Leave</button>
       </div>
     </section>
     <main class="split">
       <section class="side" id="side-user">
         <div class="side-head">
-          <h2>What users see</h2>
-          <p>A normal AI assistant at a hospital. The AI model is simulated.</p>
+          <h2>What users see</h2><span class="tag">AI simulated</span>
         </div>
         <div class="pane-body"><div id="chat" class="chat"></div></div>
         <div class="tray">
-          <h3>Try a task</h3>
           <div id="task-switch"></div>
           <div id="tray"></div>
         </div>
       </section>
       <section class="side" id="side-hidden">
         <div class="side-head">
-          <h2>Behind the scenes</h2>
-          <p>Users never see this part.</p>
+          <h2>Behind the scenes</h2><span class="tag">hidden from users</span><span id="tally"></span>
         </div>
         <div class="pane-body">
           <div id="mechanism"></div>
-          <div id="story"></div>
-          <p id="tally" class="tally"></p>
           <button id="tech" class="button small" aria-pressed="false">Show technical details</button>
           <details id="operator-view" class="operator-view">
             <summary>Operator view</summary>

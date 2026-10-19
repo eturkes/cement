@@ -42,33 +42,27 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   and the answer cemented instead — inside that message's disclosure, and a rejection retracts
   nothing. Chat kinds = `document | answer`. Every detail stripped from a bubble moves to a
   per-message `what happened under this` disclosure, shown only under technical details.
-  Layperson framing (owner-ruled r7, Swamp's homepage as the clarity reference, not its look):
-  the page leads with ONE purpose sentence + a four-step workflow strip `Ask` → `Check` →
-  `Save` → `Switch on`, plain words, no Cement term; the right half restates those four steps
-  for the selected task — current step = its sentence + the ONE next action (`Check the
-  answer`, `Save as a fixed answer`, `Use fixed answers`), done steps = a short result, later
-  steps = name only — and the header strip marks the same step. `Save` names what is saved:
-  how to handle a KIND of form, never one patient's details. Billing = the amber `Save` step
-  (no two notes repeat), `Switch on` marked not for this task. A tally line counts AI answers
-  vs fixed answers. Requests show directly under the five task pills. ONE `Show technical
-  details` switch (off by default; `?tech`, `?drawer`, `?source`, `?open` turn it on) holds
-  every per-message disclosure, the scanned text + the `Operator view` (board, routing switch,
-  inbox, drawer, commands). Mistakes in the check panel read as plain sentences (`The AI left
-  out provider`). Density (words on the first 1600×1000 screen / rendered / buttons): reset
-  260/260/12, story end 330/334/13 — the purpose + strip add words that the layperson reading
-  needs, so word count is no longer the grade.
-  Mechanism + narration (owner-ruled r8; unclear = what clicks did, the auto story, JSON
-  replies): the right half opens with `What happened to the latest request` = three boxes,
-  the document (id, kind, first scanned lines) → the METHOD used per part, in plain rows
-  (`Patient name ← the "Patient:" line`), badged `Written by the AI · not checked yet / a person
-  fixed it / confirmed` or `Fixed answer · no AI` with its check count, a correction marking
-  each added/fixed/removed row → the reply the user got. This makes the saved thing visible: a
-  method for a KIND of form, which plain code applies to a new patient's form. A `What just
-  happened` band under the strip captions every action in plain words (send, check, save,
-  switch on, task change). `Play the story` = 11 narrated steps, one per `Next`, captions read
-  live state (the AI's actual mistake, the patient's name); any manual click leaves the story.
-  Chat + reply render as labelled fields, never JSON. Density at story end 381/430/13 —
-  the mechanism's words are the explanation.
+  Presentation (owner-ruled r7-r9: dense, then unclear what happens, then too wordy; Swamp's
+  homepage = the clarity reference, not its look): words stripped, the workflow shown, no Cement
+  term on the default page.
+  - Header = headline alone. Strip = four icons `Ask` → `Check` → `Save` → `Switch on`, one word +
+    a 2-3 word sub each, doubling as the selected task's progress (done / now; billing strikes
+    `Save` + `Switch on`).
+  - Band under the strip = one short line on what just happened + the ONE next action: `Check`
+    (simulated checker: fixes a wrong answer, confirms a right one) + `Reject`, `Save`, `Switch
+    on`; in the story `Next` / `Leave`. `Play the story` = 11 steps, one per `Next`, one-line
+    captions read from live state (the AI's actual mistake, the patient); a manual click leaves it.
+  - Right half = the latest request as three boxes `Form` (first scanned lines) → method →
+    `Reply`. The method = what Cement saves, a way to handle a KIND of form in plain rows
+    (`Patient name | "Patient:" line`), never a patient's values; chips amber `AI` (+ unchecked /
+    fixed / confirmed) vs green `Fixed`, check dots ●○, billing `never repeats`, correction
+    marks `+ ✎ –`. Tally = chips `AI n` `Fixed m`.
+  - Chat + reply = labelled fields, never JSON. Users = `users`, never `staff`. Requests show under
+    the five task pills. ONE `Show technical details` switch (off by default; `?tech`,
+    `?drawer`, `?source`, `?open` turn it on) holds every per-message disclosure, the scanned text
+    + the `Operator view` (board, routing switch, inbox, drawer, commands).
+  - Density (first 1600×1000 screen words / rendered / buttons): reset 145/145/12, story end
+    228/228/13 (r6: 251/261/17, 287/301/18).
   The right half runs the operator lifecycle as REAL `cement` subprocesses against the demo
   ledger (`_cli`), printing the command, its rc and a condensed reading of the bytes it
   returned, with verbatim stdout + exact argv one click away; an argument over 80 chars prints
@@ -103,7 +97,8 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 
 - [x] 2547505 ITERATE round 5: UI dense → `board` picked over `guided` + `mirror` (`Decisions` board-layout ruling); merged, retired.
 - [x] d9fe5df ITERATE round 7: still dense + confusing → layperson framing (purpose sentence, four-step workflow, technical details behind one switch).
-- [ ] ITERATE round 8: still unclear what happens → mechanism boxes (document → method → reply), `What just happened` captions, narrated step-through story, readable replies; owner reviews it.
+- [x] 46c95e8 ITERATE round 8: still unclear what happens → mechanism boxes, `What just happened` captions, narrated story, readable replies; ba5230d `staff` → `users`.
+- [ ] ITERATE round 9: too wordy → icon workflow as progress, one-line band + one action, chips/dots/marks in the boxes; owner reviews it.
   - Close (the owner's go) runs `Rules upkeep`; known backlog: origin stories + measured results in bare `ops.md` + `assurance.md`; area-bound law in bare `ops.md` (D28, D19, capture mechanics) → `paths:`.
 - [ ] M3.6a3 delete the 7 dead outcome types (`Outcome` + its 6 members).
   - Resume point: the suspended IMPLEMENT scope rejoins here once ITERATE closes on the owner's go.
