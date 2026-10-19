@@ -145,9 +145,9 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 - [x] ef06a25 M3.8 demo + transcript regeneration via idempotent updater (`data`): the hospital example on projection + learning pass + switch.
 - [x] a97bbc3 Prototype on the real switch + versions (PROTOTYPE law).
 - [x] 92a162e M3.9a docs claim ledger rewrite (`docs`): README paragraph 1 + `docs/` + CLI help follow `Intent`; README install/run/configure current for everything shipped.
-- [ ] M3.9b independent replay of the M3.9a rewrite (`docs`).
-  - Resume point: IMPLEMENT resumes here — the replay (reviewer-31) ran on 92a162e: 16 holds / 8 fail (F1-F8, prose); the fixes land as one docs commit, then the disposition row, rules upkeep and the phase-close review.
+- [x] baf2743 M3.9b independent replay of the M3.9a rewrite (`docs`).
 - [ ] README + prototype disposition: `prototype/webui-demo` stays at `prototype/` (owner-ruled) → `Artifacts`.
+  - Resume point: IMPLEMENT resumes here — the disposition row, rules upkeep, then the phase-close review (tables seeded in `.scratch/review/phase/`, machine-local).
 - [ ] Phase-close review over the whole phase diff: every lens, one `reviewer` per lens + MAIN's security lens.
   - Runs LAST, after the close's rules upkeep (`CLAUDE.md` `Rules upkeep`), nothing mutating after it; each unit's closing diff draws its OWN pass first (`reviewer` count per `Session flow` Teammates where MAIN dispatches), every pass adjudicated into `.agent/review.md` ⇒ never the only pass.
 - Queue = `.agent/deferred.md` (`p<nn>`, one entry + acceptance each, unattached; p01-p61 keep full text + evidence + grounds in `.agent/archive/polish.md`, a born row's entry is its whole record; grader `uv run python .agent/decisions/m3-deferred-validate.py`); a bare `p<nn>` in a row = that unit owns the queue row.

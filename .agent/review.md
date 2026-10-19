@@ -15,6 +15,24 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## M3.9b replay (IMPLEMENT, unit, tier `docs`) — target `92a162e`, fixes in `baf2743`
+
+Independent replay of the M3.9a claim ledger (reviewer-31): C01-C21 + D1 (README blocks run as printed) + D2 (no superseded model stated) + D3 (publication stated positively). 16 hold, 8 fail; raw table `.scratch/review/m3u9b/table.md`. Every ruling below = MAIN's, on the reviewer's code probes (pinned resolve → 4 checks; a reviewed proposal changes status; revoking the contradicting example restores the old receipt; follow serves v2 with no switch write; `source_id` accepted as a fourth key; distinct reviewer names gate compile).
+
+| id | verdict | ruling (MAIN-verified) |
+|---|---|---|
+| F1 (D1) | major → fixed | `candidate.json` + `program.json` had no producer in their blocks: each block now writes its file (heredoc); the projection block names its `form.plan` operation and the set precondition (a confirmed example per layout). The candidate block driven: submit rc 0, a repeat with the same `source_id` exit 4. |
+| F2 | major → fixed | README promised seven checks in every resolve: `checks` = seven under `follow`, four pinned checks under `pinned`, none under `off`; the cost line + the threat model's export line say the same. |
+| F3 | minor → fixed | architecture called proposals append-only; only projection programs/settings + switch settings are. |
+| F4 | minor → fixed | contradiction also clears when the contradicting example is revoked or superseded (README ×2, architecture, threat model). |
+| F5 | major → fixed | the threat model said a person stands between every learned version and production; `follow` is a standing choice, `pinned` keeps one version, `off` is the default. |
+| F6 | minor → fixed | `example supersede` now states its refusals (exit 2, nothing written). |
+| F7 | major → fixed | the submission object takes four keys; `source_id` and its exit-4 refusal are named. |
+| F8 | minor → fixed | Cement authenticates no reviewer name and counts distinct names toward the reviewer gate. |
+| other rows | holds | 184 cited tests + the hospital demo + 45 CLI help nodes green. |
+
+Checks after the fixes: register audit rc 0; `tests.test_cli`, `test_cli_channels`, `test_cli_channels_battery`, `test_cli_removal_battery`, `test_submission_battery`, `test_proposal_binding_battery`, `test_authority_removal`, `test_lifecycle_removal_battery` → Ran 523 OK (586.3 s).
+
 ## M3.9a close (IMPLEMENT, unit, tier `docs`) — target `92a162e` (squash of `archive/m3u9a-land`), records in the next commit
 
 Tier `docs` = consistency pass: MAIN's register audit (rc 0, filler 0 on every Markdown surface) + the README quick start driven end to end through the CLI (every command rc 0) + the claim ledger `.agent/decisions/m3u9a-claims.md` (C01-C21), which M3.9b replays independently (its own section). Prose-pin repair (general-purpose-6, `.scratch/m3u9a-repair/table.md`, 7 rows): D22c D23 D26 L22 L23 D34 re-targeted at the rewritten claims (strings derived from the shipped files; D23's frozen baseline stays at 635a473, its new count derives from the live docs — a pre-squash SHA dependency was refused); B26, x28 and L24 were satisfied by prose (event-payload claim restored, one-line leaf sentence, inputs not requests). AST census: no id lost, `assert*` calls never fewer.
