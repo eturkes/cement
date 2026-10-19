@@ -109,3 +109,16 @@ card at 6095 against the recorded 6100.
 Next ITERATE session = round 7 on the story layout. Resume IMPLEMENT at M3.6a3 when the owner says go.
 
 Suspended IMPLEMENT order = `Tasks` top to bottom, resuming at its head; the phase-close review row hands over to MAINTAIN.
+
+## Rounds r5-r17, closed on the owner's go (ITERATE → IMPLEMENT)
+
+`Tasks` rows as they stood at the close, verbatim; later rounds r12-r17 = `b5ff826`, `fb1d7b7`, `314074f`, `215647c`, `33d6812`, `6f8c858`, `d34548c`, `6b90eb9`.
+
+- [x] 2547505 ITERATE round 5: UI dense → `board` picked over `guided` + `mirror` (`Decisions` board-layout ruling); merged, retired.
+- [x] d9fe5df ITERATE round 7: still dense + confusing → layperson framing (purpose sentence, four-step workflow, technical details behind one switch).
+- [x] 46c95e8 ITERATE round 8: still unclear what happens → mechanism boxes, `What just happened` captions, narrated story, readable replies; ba5230d `staff` → `users`.
+- [x] 8722f0b ITERATE round 9: too wordy → icon workflow as progress, one-line band + one action, chips/dots/marks in the boxes.
+- [x] cbafe70 ITERATE round 10: audience needs gaze guidance → driver.js spotlight beats on the story; b7757b5 captions without file ids.
+- [x] 002c68d ITERATE round 11: ordinary-chatbot captions + tool-call line; 548e00b mistake-stake captions.
+- [ ] ITERATE round 12: human role corrected (Intent rewritten) → Ask → Learn → Switch on, learning pass = sole reviewer, per-function switch + `Read`; r13 generalization shown (`shared` / `from <request>` rows); owner's go at the close.
+  - Rules upkeep ran at the close: `ops.md` compressed, D28/D19 law → `history-gates.md`, capture mechanics → `prototype.md`.

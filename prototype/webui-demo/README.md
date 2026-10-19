@@ -107,9 +107,10 @@ Everything else is the shipped `cement_runtime`:
 
 - The proposals, reviews, confirmed examples, drafts, verification reports, promotions and
   receipts are real ledger rows.
-- The operator lifecycle runs as real `cement` subprocesses against the same ledger. The
-  review, revoke, compile, verify-drafts, promote, inspect, verify and export commands all
-  execute. The page prints what they printed.
+- The lifecycle runs as real `cement` subprocesses against the same ledger. The review by
+  the learning pass, compile, verify-drafts, promote, inspect, verify and export commands all
+  execute. The page prints what they printed. The operator view is read-only, apart from
+  the switches: no person rules on a single answer.
 - The artifact digests, the `function_hash` and the six set checks come from those
   commands.
 - The exported bundle is the real `cement-function-v2` document.

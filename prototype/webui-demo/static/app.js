@@ -136,10 +136,6 @@ function stopPolling() {
 let FAST = false;
 const send = (id) => call("/api/send", { request_id: id, fast: FAST });
 const select = (id) => call("/api/select", { scenario: id });
-const review = (proposalId, decision) =>
-  call("/api/review", { proposal_id: proposalId, decision });
-const revoke = (exampleId) => call("/api/revoke", { example_id: exampleId });
-const lifecycle = (action) => call("/api/" + action, {});
 const route = (enabled, operation) => call("/api/route", { enabled, operation });
 const offline = (id, operation) =>
   call("/api/offline", { document_id: id, operation });
@@ -177,7 +173,7 @@ function render() {
   $("drawer-title").textContent = DRAWER ? operationOf(DRAWER).label : "";
   $("benefit").textContent = STATE.stats.cement_answers
     ? `${plural(STATE.stats.cement_answers, "operation")} answered without the model, each shown in the chat as a tool call.`
-    : "Repeated, checked answers can become exact deterministic entries.";
+    : "Answers that repeat can become exact deterministic entries.";
 }
 
 /* --- chat: an ordinary chatbot ---
@@ -291,8 +287,8 @@ function renderTray() {
 
 function renderTasks() {
   $("coverage-note").textContent = `${STATE.promoted_operations.length} of ${STATE.operations.length} jobs prepared`;
-  $("coverage").innerHTML = STATE.operations.map(op => `<button class="operator-job button" data-operation-open="${esc(op.name)}">${esc(op.label)} · ${op.promoted ? "checked answer prepared" : op.blocked ? "not enough repeated evidence" : "still learning"}</button>`).join("");
-  $("boundary-note").textContent = "Only the exact checked input matches. Other inputs return to the model.";
+  $("coverage").innerHTML = STATE.operations.map(op => `<button class="operator-job button" data-operation-open="${esc(op.name)}">${esc(op.label)} · ${op.promoted ? "function learned" : op.blocked ? "not enough repeated evidence" : "still learning"}</button>`).join("");
+  $("boundary-note").textContent = "Only an exact learned input matches. Other inputs go to the model.";
 }
 
 const cementable = () => STATE.selected_operations.filter((name) => operationOf(name).keyed_on !== "text");
@@ -369,7 +365,7 @@ function renderFnView() {
   }
   lines.push("  <span class=\"kw\">otherwise</span>:", "      ask the AI");
   $("fnview-title").textContent = METHOD[fn.operation][0];
-  $("fnview-sub").textContent = `${plural(fn.entries, "kind")} of form · ${isOn(fn.operation) ? "on" : "off"}`;
+  $("fnview-sub").textContent = `readable rendering · ${plural(fn.entries, "kind")} of form · ${isOn(fn.operation) ? "on" : "off"}`;
   $("fnview-body").innerHTML = lines.join("\n");
 }
 
@@ -478,9 +474,7 @@ function renderCategories() {
       const chips = category.examples
         .map(
           (example) => `<span class="example-chip">${esc(example.origin)}
-            ${short(example.example_id, 10)}
-            <span class="link" data-revoke="${esc(example.example_id)}"
-              title="revoke this example">\u00d7</span></span>`)
+            ${short(example.example_id, 10)}</span>`)
         .join(" ");
       const scope = category.keyed_on === "text"
         ? `assessment text of ${esc(category.document_id)}`
@@ -506,10 +500,10 @@ function renderCategories() {
 }
 
 function renderReview() {
-  $("inbox-note").textContent = `${plural(STATE.pending.length, "answer")} in this task’s inbox. Users already have their replies.`;
+  /* Read-only: no person rules on single answers; Learn is the only reviewer (owner-ruled). */
+  $("inbox-note").textContent = `${plural(STATE.pending.length, "answer")} retained. Users already have their replies.`;
   $("review").innerHTML = STATE.pending.map(p => `<div class="proposal"><div class="proposal-head">${esc(p.document_id)} · ${esc(p.scope_label)}</div>
-    <details><summary>Compare the model answer and correction</summary><p>Model answer</p><pre>${jsonHtml(p.plan)}</pre>${p.preview_error ? `<p>${esc(p.preview_error)}</p>` : ""}<p>What the learning pass merged</p>${diffHtml(p.diff)}</details>
-    <div class="actions">${["accept", "correct", "reject"].map(d => `<button class="button small" data-review="${d}" data-proposal="${esc(p.proposal_id)}">${d}</button>`).join("")}</div></div>`).join("");
+    <details><summary>Compare the model answer and correction</summary><p>Model answer</p><pre>${jsonHtml(p.plan)}</pre>${p.preview_error ? `<p>${esc(p.preview_error)}</p>` : ""}<p>What the learning pass will merge</p>${diffHtml(p.diff)}</details></div>`).join("");
 }
 
 const row = (key, value) =>
@@ -867,7 +861,7 @@ const STORY = [
   { run: () => send("q02"), beats: [
     { el: "#mechanism .method", title: "A slight change from the last script", text: () => "Another progress note. This time the Provider field was needed, so the script also reads that line.", side: "bottom" } ] },
   { run: learnAll, beats: [
-    { el: "#functions-list", title: "Learn", text: () => "An AI pass read the chats, found the repeat, and merged both scripts into one function.", side: "top" },
+    { el: "#functions-list", title: "Learn", text: () => "An AI pass (simulated here) read the chats, found the repeat, and merged both scripts into one function.", side: "top" },
     { el: "#fnview .overlay-card", fn: "document.extraction_plan", title: "One function", text: () => "Shared rows came from both scripts; Provider from the one that needed it. It covers both requests.", side: "left" } ] },
   { run: () => switchTo(["document.extraction_plan"], true), beats: [
     { el: "#functions-list .switch", title: "Switch on", text: () => "Your one decision. Matching forms now skip the AI.", side: "top" } ] },
@@ -998,7 +992,7 @@ function leaveStory() {
 
 document.addEventListener("click", (event) => {
   const target = event.target.closest(
-    "[data-send],[data-review],[data-action],[data-offline],[data-revoke]," +
+    "[data-send],[data-offline]," +
     "[data-source],[data-select],[data-operation-open],[data-history]," +
     "[data-learn],[data-read],[data-switch]");
   if (!target || BUSY) return;
@@ -1017,14 +1011,9 @@ document.addEventListener("click", (event) => {
   } else if (target.dataset.send) send(target.dataset.send).then(() => narrate(sentCaption()));
   else if (target.dataset.select) {
     select(target.dataset.select).then(() => narrate(`${scenarioOf(STATE.selected).title}: pick a request.`));
-  } else if (target.dataset.review) {
-    review(target.dataset.proposal, target.dataset.review);
-  }
-  else if (target.dataset.action) lifecycle(target.dataset.action);
-  else if (target.dataset.offline) {
+  } else if (target.dataset.offline) {
     offline(target.dataset.offline, target.dataset.operation);
-  } else if (target.dataset.revoke) revoke(target.dataset.revoke);
-  else if (target.dataset.source) setSource(target.dataset.source);
+  } else if (target.dataset.source) setSource(target.dataset.source);
 });
 
 function setSource(operation) {

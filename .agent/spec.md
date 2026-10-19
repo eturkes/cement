@@ -57,11 +57,15 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   - Band under the strip = one short line on what just happened + the next action: `Learn from
     chats` while answers are retained, `Switch on` for a learned function that is off; in the
     story `Leave the story`.
-  - Story = 10 steps (send, send, learn, read, switch on, tool call, reuse, more jobs, billing,
-    done), each running then showing 1-3 spotlight beats (owner-ruled r10, driverjs.com as the
-    reference): vendored driver.js `highlight()` on ONE element, never the header strip (r15), with a 2-3 word title + one line
-    read from live state; Next + Back in the popover (Back across a step = reset + fast replay to the previous step — no model sleep, same seeded state — then its last beat), × or `Leave the story` exits; animation off under
-    reduced motion; a manual click leaves it. driver.js 1.10.2 MIT,
+  - Story = 10 steps: orientation (`What users see`, `Behind the scenes`), first send, second
+    send, learn + `Read` (two beats), switch on, tool call, reuse, more jobs, billing, done. Each
+    runs, then shows 1-3 spotlight beats (owner-ruled r10, driverjs.com as the reference):
+    vendored driver.js `highlight()` on ONE element, never the header strip (r15), with a short
+    title + one line read from live state; Next + Back in the popover (Back across a step = reset
+    + fast replay to the previous step — no model sleep, same seeded state — then its last beat),
+    × or `Leave the story` exits; animation off under reduced motion; a manual click leaves it.
+    Owner wording kept: the first script's caption says nothing about Provider (r14); the second
+    script's beat = `A slight change from the last script` (r16). driver.js 1.10.2 MIT,
     `static/vendor/driver.js-1.10.2/` (iife build + css + license, registry-integrity checked).
   - Right half = the latest request as three boxes `Form` (first scanned lines) → script →
     `Reply`. The script = a way to handle a KIND of form in plain rows (`Patient name | "Patient:"
@@ -78,8 +82,11 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   - Chat + reply = labelled fields, never JSON. Users = `users`, never `staff`. Requests show under
     the five task pills. ONE `Show technical details` switch (off by default; `?tech`,
     `?drawer`, `?source`, `?open` turn it on) holds every per-message disclosure, the scanned text
-    + the `Operator view` (board, routing switch for all functions, retained-answer inbox,
-    drawer, commands).
+    + the `Operator view`, READ-ONLY apart from switches (board, one switch for all functions,
+    answers retained for the next learning pass, drawer, commands): no accept/correct/reject,
+    no manual compile/verify/promote, no revoke (r12 + close review R1).
+  - The learning pass reads `learning simulated` on the right half's tag + its story beat;
+    `Read` heads `readable rendering`, since Cement seals exact entries and emits no code.
   The right half runs the operator lifecycle as REAL `cement` subprocesses against the demo
   ledger (`_cli`), printing the command, its rc and a condensed reading of the bytes it
   returned, with verbatim stdout + exact argv one click away; an argument over 80 chars prints
@@ -112,16 +119,8 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 
 ## Tasks
 
-- [x] 2547505 ITERATE round 5: UI dense → `board` picked over `guided` + `mirror` (`Decisions` board-layout ruling); merged, retired.
-- [x] d9fe5df ITERATE round 7: still dense + confusing → layperson framing (purpose sentence, four-step workflow, technical details behind one switch).
-- [x] 46c95e8 ITERATE round 8: still unclear what happens → mechanism boxes, `What just happened` captions, narrated story, readable replies; ba5230d `staff` → `users`.
-- [x] 8722f0b ITERATE round 9: too wordy → icon workflow as progress, one-line band + one action, chips/dots/marks in the boxes.
-- [x] cbafe70 ITERATE round 10: audience needs gaze guidance → driver.js spotlight beats on the story; b7757b5 captions without file ids.
-- [x] 002c68d ITERATE round 11: ordinary-chatbot captions + tool-call line; 548e00b mistake-stake captions.
-- [ ] ITERATE round 12: human role corrected (Intent rewritten) → Ask → Learn → Switch on, learning pass = sole reviewer, per-function switch + `Read`; r13 generalization shown (`shared` / `from <request>` rows); owner reviews it.
-  - Close (the owner's go) runs `Rules upkeep`; known backlog: origin stories + measured results in bare `ops.md` + `assurance.md`; area-bound law in bare `ops.md` (D28, D19, capture mechanics) → `paths:`.
 - [ ] M3.6a3 delete the 7 dead outcome types (`Outcome` + its 6 members).
-  - Resume point: the suspended IMPLEMENT scope rejoins here once ITERATE closes on the owner's go.
+  - Resume point: IMPLEMENT resumes here.
   - `src/` holds zero constructors, only `models.py` defs, `__init__.py` import/`__all__`, one `system.py` docstring. `CandidateRequest.request_id` STAYS — live on the `cement-source-v1` envelope — and leaves with M3.6b's single schema/protocol cut.
   - Accept: burden re-measured on its own deletion set; battery per contract.
 - [ ] M3.6b schema cut v2→v3 (direct proposal columns, `requests` + index gone, refusal fixtures, 0.2.0); owns p50 p51 p04.
@@ -131,7 +130,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 - [ ] M3.8 demo + transcript regeneration via idempotent updater (`data`).
 - [ ] M3.9a docs claim ledger rewrite (`docs`).
 - [ ] M3.9b independent replay of the M3.9a rewrite (`docs`).
-- [ ] Learning pass in the shipped library (Intent r12): the skill that reads retained answers + merges recurring scripts per exact case, its reviewer identity in place of a human reviewer, per-operation switch-on; docs + README paragraph 1 follow Intent.
+- [ ] Learning pass in the shipped library (Intent r12): the skill that reads retained answers + merges recurring scripts per exact case, its reviewer identity in place of a human reviewer, per-operation switch-on; docs, README paragraph 1 + CLI help (`cement --help` opens "Supervised proposal capture…") follow Intent.
   - Accept: planned as a milestone beside M4, its trust-boundary contract reviewed by a `consultant` before code.
 - [ ] M4 projection inside the boundary — plan, open design question + seeds in `.agent/archive/roadmap.md`.
   - Accept: planned as a milestone.
@@ -148,8 +147,4 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 
 ## Phase
 
-ITERATE — whole product
-
-> I want to return to the ITERATE stage
-
-Suspended: IMPLEMENT — whole product
+IMPLEMENT — whole product

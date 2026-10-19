@@ -15,6 +15,33 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## ITERATE close (phase, owner's go) — target `d3635b5..6b90eb9`, fixes land in the close commit
+
+Check set fixed before reading: (a) every `Artifacts` entry runs by its recorded command; (b) `Decisions` hold
+every owner ruling, each readable without the prototype; (c) every stub, shortcut + hard-coded value reads as
+one wherever the owner could take it as real; (d) `spec.md` matches what shipped + passes `.agent/spec-lint`.
+(a) = MAIN alone (it holds port 8765); (b)-(d) = `reviewer-1`, 23 seeded rows (validator graded both ways:
+seed 23, filled 0), owner rulings O1-O18 handed verbatim; every row below = MAIN's rematch of the bytes at HEAD.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | artifacts run | pass | `app.py` serving 8765; `capture.sh` rc 0, 10 frames, duplicate check empty; `density.mjs` reset 150/150/12; `run_demo.py` rc 0 `All checks passed.`; `uv run cement --help` rc 0; full gate run 1 at load 9-15 = `FAILED (errors=2)`, both D28 `TimeoutExpired` (`ffe9848`, `adb0ab9`), each green replayed alone (p70 recurrence); rerun `Ran 1031 tests in 2655.256s` `OK`, gate rc 0 (outer skipped none, nested D28 = L30). |
+| D1-D9 | rulings held | pass | O1-O11 + O17 each named in `Decisions` / `Intent` (Intent paragraph = the approved text, em dashes kept). |
+| D10-D11 | rulings readable | finding F1, fixed | O14 (first caption silent on Provider) + O16 (owner's title) were in code only; the spec's `2-3 word title` contradicted O16 → story bullet rewritten. |
+| D12, P2 | no superseded text | finding F3, fixed | ticked rounds r5-r17 + the stale "owner reviews it" → `.agent/archive/iterate-rounds.md`; `Phase` = IMPLEMENT. |
+| S1, S3, S4, S6 | stubs labelled | pass | `AI simulated` on the chat half; ask→operation reading labelled in the request disclosure; fixed stand-in scripts in `Decisions` + README; tally / tool ms / cases / switch = runtime values. |
+| S2 | learning pass labelled | finding F2, fixed | Default page labelled the chat AI alone → right-half tag `learning simulated` + the Learn beat `(simulated here)`. |
+| S5 | renderings labelled | finding F5, fixed | Default `Read` lacked the rendering qualifier the source-view ruling requires → `readable rendering ·` heads it. |
+| P3 | Decisions = shipped | findings F1 F2 F4 F5, fixed | Story order now orientation + learn/`Read` in one step (F4); operator view read-only (R1). |
+| P4, P5 | README + spec-lint | pass | README walkthrough, frame table, params, third-party match the code; `spec-lint` rc 0. |
+| R1 | per-answer controls | finding, fixed | Reviewer lead, rematched: the operator view still offered accept/correct/reject (`renderReview`), manual compile/verify/promote and revoke × — contrary to r12 (a person's ONE act = switching) → removed, the view read-only apart from switches; stale `checked` board wording → `function learned`. |
+
+Register: Back's replay speed (9.3 s across a learn at load ~18) = an owner option, born as `p86`. Library-side
+consequences of r12 (learning-pass skill, reviewer identity, per-operation switch, README paragraph 1, docs, CLI
+help) = the open `Tasks` library row. Rules upkeep at this close: `ops.md` 22.6 → 12.1 KB, D28/D19 law →
+`history-gates.md` (`paths:` tests/examples/m3u6a*), capture + server mechanics → `prototype.md` (`paths:`
+prototype/**), two moved-law pointers repointed (`assurance.md`, `p79`).
+
 ## `CLAUDE.md` refresh agents@1622ede → agents@4a758e0 (ITERATE, ad-hoc) — target = the diff this commit lands, base `bd78d4e`
 
 Template delta = Alignment law (Collaboration, Execution, Authoring, Engineering, Teammates) moved in
