@@ -1,6 +1,8 @@
 # M4/M5 contract — schema v3, switch + versions, projection, learning pass, Open WebUI example
 
-Status: REVISION 3 — consultant-1 rows C1-C8 + X1-X7 + its re-review of revision 2 ruled
+Status: REVISION 3 + implementation amendments (A1 receipt ABI name, A2 S7 read-side, A3
+p50/p51 surface, A4 source_id submission key, A5 contradiction = state, A6 `--program` channel) —
+consultant-1 rows C1-C8 + X1-X7 + its re-review of revision 2 ruled
 (`.agent/review.md` M4/M5 contract section), owner rulings O1-O9 below. Every unit = tier `kernel` unless marked. Every predicate =
 a test or a gate check; a unit closes on its numbered gate list rerun from committed state (§9).
 
@@ -56,8 +58,11 @@ source id" — the burden run lists them by id.
 
 Kept from the M3.6b plan: proposals get direct `operation`, `operation_revision`, `input_json`,
 `input_hash` columns; `requests` + `requests_scope` deleted; refusal of v2 ledgers; package
-0.2.0; p04 receipts index; p50 existing-only read-only construction; p51 no ledger creation from
-a typo'd `--db` on read leaves.
+0.2.0; p04 receipts index; p50 existing-only read-only construction = keyword-only
+`System(path, create=False)` / `Store(path, create=False)` (missing ledger → `IntegrityError`
+before any connection, validation on the read-only connection, nothing written); p51 = ONLY
+`operation register` constructs `create=True`, after grading partition, operation, actor and
+policy, so no other leaf creates a ledger from a typo'd `--db` (exit 5).
 
 New or changed, all STRICT, append-only where marked (no-update + no-delete triggers):
 - `proposals.source_id` TEXT NULL (1-512 chars, no control characters) + partial UNIQUE INDEX
@@ -66,8 +71,9 @@ New or changed, all STRICT, append-only where marked (no-update + no-delete trig
   REFERENCES examples(id) (each example superseded at most once); `source_id` TEXT NULL copied
   from its proposal (or from the superseded example). Examples stay immutable.
 - `projection_programs` (`program_hash` TEXT PRIMARY KEY, `program_json` TEXT, `abi` TEXT) —
-  append-only; insert-or-ignore by hash; the trigger rejects a row whose stored JSON does not
-  hash to its key (recomputed on read too).
+  append-only; insert-or-ignore by hash; a stored row whose JSON does not hash to its key is
+  refused ON READ (`IntegrityError`) — SQLite triggers cannot compute sha256, so S7 is a read-side
+  check owned by the M4.2 battery.
 - `projection_settings` (`sequence` PK AUTOINCREMENT, `id` UNIQUE, `partition`, `operation`,
   `operation_revision` ≥ 1, `program_hash` REFERENCES projection_programs, `set_by`,
   `set_at_us`) — append-only; index (partition, operation, operation_revision, sequence).
@@ -80,7 +86,7 @@ New or changed, all STRICT, append-only where marked (no-update + no-delete trig
 - `artifacts.projection_hash` TEXT NULL REFERENCES projection_programs (NULL = exact mode);
   joins the immutable build fields and `build_hash`.
 - `function_receipts.projection_hash` TEXT NULL; the receipt hash covers it (receipt hash format
-  `cement-receipt-v3`). The function ABI moves with the cut: from M3.6b on, a v3 ledger builds
+  `cement-function-promotion-v2`). The function ABI moves with the cut: from M3.6b on, a v3 ledger builds
   `cement-function-v3` documents only (exact mode = `projection: null`), so every v3-ledger receipt
   binds a v3 function hash and reconstruction never needs the v2 builder; the v2 READER stays for
   external bundles (L6). M4.2 fills `projection`.
@@ -122,8 +128,10 @@ Predicates:
   X1b supersession never raises support (support before = after for the superseded set); X1c a
   superseded example still validates v1 when v1 is pinned (it is a revised judgment, not contrary
   evidence); X1d refusal cases write nothing (row + event counts unchanged).
-- `submit_proposal(..., source_id=None)`; CLI `proposal submit --source-id ID` (or a `source_id` key
-  in the `--submission` object — one channel, chosen in M3.6b and pinned).
+- `submit_proposal(..., source_id=None)` (≤ `SOURCE_ID_MAX_BYTES` = 512 UTF-8 bytes, control-free);
+  CLI channel = an optional `source_id` key of the `--submission` object (no flag: the submit
+  grammar stays one positional + one option), `SUBMISSION_MAX_BYTES` derived with it; pinned by
+  `tests/test_schema_v3_battery.py` S6. Supersession receipts = `cement-supersession-v1`.
 
 ## 3. Switch + versions (M5.1)
 
@@ -164,7 +172,11 @@ Library:
     lifecycle trigger) — the explicit route for a pin after a reset or a supersession. Review no
     longer auto-suspends: a confirmation that conflicts with a promoted artifact makes the LIVE set
     fail verification (follow → failed verdict → LLM) and leaves every artifact's status alone, so a
-    pin on a still-promoted v1 survives it. Any failure → failed verdict, never an answer.
+    pin on a still-promoted v1 survives it. Contrary evidence is a ledger STATE, never corruption:
+    read surfaces (`artifact show`, `function_report`) and `challenge` grade a promoted artifact's
+    integrity alone; the promotion plan refuses (`StateError`, exit 4) while a contradicted member
+    has no verified replacement, naming supersede, revoke or suspend as the remedies. Any failure →
+    failed verdict, never an answer.
     P-d's per-call cost (projecting the revision's challenge examples) is measured at 1 / 1,000 /
     50,000 entries and cited, never called cheap.
   - `expected_function_hash` must equal the selected version's hash, else a failed verdict.
@@ -355,7 +367,7 @@ Predicates:
 
 - `CompilePolicy()` defaults 2 / 1 / 0 (O2); bounds unchanged.
 - `System.learning_cases(partition, operation, *, program=None)` + `cement learn cases <op>
-  [--program FILE]` (read-only): groups pending proposals AND active examples by case key under
+  [--program JSON|-]` (read-only; the same input channel as `projection test|set`): groups pending proposals AND active examples by case key under
   `program` (a candidate — X1 bootstrap), else the build-current program, else exact input hash.
   Per case: pending proposal ids, active example ids, distinct outputs each with the ids carrying
   it, support, readiness; plus `unprojected` proposals; plus duplicate warnings (same source_id
@@ -372,7 +384,7 @@ Predicates:
   2. Decide projectability (O6): only when every output is a procedure over the input (a plan or
      script that READS values) and contains no value; never for answers interpreted from values.
      If projectable: draft or extend the program from layouts seen in raw inputs only, and rerun
-     `learn cases --program FILE` to group by the candidate keys BEFORE confirming (X1 bootstrap).
+     `learn cases --program -` to group by the candidate keys BEFORE confirming (X1 bootstrap).
   3. Per case: merge the scripts into one output covering every request's needs (union of rows,
      request-driven differences kept, no patient value). Review each pending proposal (`accept`
      when equal, `correct --output` otherwise, `reject` when unusable; reviewer `learning-pass`,

@@ -132,7 +132,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 - [ ] M3.6a3 delete the 7 dead outcome types (`Outcome` + its 6 members).
   - `src/` holds zero constructors, only `models.py` defs, `__init__.py` import/`__all__`, one `system.py` docstring. `CandidateRequest.request_id` STAYS — live on the `cement-source-v1` envelope — and leaves with M3.6b's single schema/protocol cut.
   - Accept: burden re-measured on its own deletion set; battery per contract.
-- [ ] M4/M5 contract (`kernel`): switch + versions, learning pass + skill, projection IR + its verification, v3 tables, Open WebUI example; `researcher` on the Open WebUI tool/filter API + the Agent Skills format; `consultant` on the contract before code.
+- [x] 9c2d0ff M4/M5 contract (`kernel`): switch + versions, learning pass + skill, projection IR + its verification, v3 tables, Open WebUI example; `researcher` on the Open WebUI tool/filter API + the Agent Skills format; `consultant` on the contract before code.
   - Accept: `.agent/decisions/m45-contract.md` committed — testable predicates + tier + numbered gate list per unit; consultant verdict adjudicated in `.agent/review.md`.
 - [ ] M3.6b schema cut v2→v3 (direct proposal columns, `requests` + index gone, receipts index, switch + projection tables per the M4/M5 contract, refusal fixtures, 0.2.0); owns p50 p51 p04.
   - Accept: fingerprint + `SCHEMA_VERSION` move together, suite green with the reset documented.
