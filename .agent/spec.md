@@ -2,9 +2,9 @@
 
 ## Intent
 
-Cement turns repeatedly supervised LLM answers into narrowly scoped deterministic behavior. In a chat-style deployment such as Open WebUI, one kind of task — an OCR extraction, say — is requested many times with slight variations (different documents, slightly different asks). Those requests and their supervised answers are retained in the background, and Cement is the process that realizes such a category can be routed to one deterministic function: a regular, if large, function that grows over time to cover the variations and edge cases as each is supervised, and that is deterministic once built and verified. When ready, an operator decides to route applicable requests to that function — or to sibling functions for other categories — so results depend less on probabilistic LLM processing. Aggregating repeated work this way would be hard to reach without LLMs; repetition alone never widens a rule beyond what was verified.
+Cement turns repeated LLM work into narrowly scoped deterministic functions. In a chat deployment such as Open WebUI, one kind of task — an OCR extraction, say — is requested many times with slight variations (different documents, slightly different asks). The LLM answers each request, often by writing a small script, and the requests and answers are retained in the background. Periodically, an LLM-driven learning pass reads those transcripts, finds the requests that recur, and combines their slightly different scripts into one deterministic function that covers every case it has seen: a regular, if large, function that grows as new variations appear, each case kept exact. A person can read the function and decides whether to switch it on or off in production. While it is on, matching requests are answered by the function instead of the LLM, so results stop depending on probabilistic processing; anything it does not cover still goes to the LLM. Learning never widens a case beyond the inputs it has seen.
 
-Production artifact = a library + CLI control plane that an interface like Open WebUI calls; not a web UI. Prototype artifact = a web UI demo that clarifies the purpose, the situations it serves, the output to expect, and how that output makes processes more efficient and predictable.
+Production artifact = a library + CLI control plane that an interface like Open WebUI calls, plus the learning pass as a skill the operator runs; not a web UI. Prototype artifact = a web UI demo that clarifies the purpose, the situations it serves, the output to expect, and how that output makes processes more efficient and predictable.
 
 ## Artifacts
 
@@ -29,7 +29,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   trailing comments — parsed back out of the exported bundle and labelled a rendering, since Cement
   seals exact entries and emits no code. Per-request history retains ONLY proposals that became
   confirmed examples; each entry drills down to the requests behind it, showing the plan the
-  provider wrote and what the supervisor changed.
+  provider wrote and what the learning pass merged it into.
   Demo framing (owner-ruled): the prototype explains a concept and must never read as a
   production control plane. Layout = TWO HALVES, `What users see` | `Behind the scenes` (owner-ruled: `users`, never `staff`). The chat = an ordinary chatbot: no badge, id, model name or digest; an AI answer = a
   plain reply, captioned `No change from an ordinary chatbot answer` while Cement has nothing
@@ -38,39 +38,43 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   body is identical either way (owner-ruled r11; supersedes identical rendering). A TURN is one question however many operations answer it: it renders as
   the typing indicator while the model writes, then answers in ONE bubble; a part that misses
   the promoted set returns to the model, and the user waits for the MODEL alone. The chat NEVER
-  waits on a person: the model's answer goes out in that same turn and its candidate enters the
-  review queue behind it, so a later accept/correct/reject decides what Cement may seal and
-  never what the user already read. A correction therefore shows both — the reply the user got
-  and the answer cemented instead — inside that message's disclosure, and a rejection retracts
-  nothing. Chat kinds = `document | answer`. Every detail stripped from a bubble moves to a
+  waits on anyone: the model's answer goes out in that same turn and is retained for the next
+  learning pass, which decides what Cement may seal and never what the user already read. Chat kinds = `document | answer`. Every detail stripped from a bubble moves to a
   per-message `what happened under this` disclosure, shown only under technical details.
-  Presentation (owner-ruled r7-r9: dense, then unclear what happens, then too wordy; Swamp's
+  Learning + switching (owner-ruled r12; Intent): no person rules on single answers. `Learn from
+  chats` = the learning pass, an LLM run periodically (production: a skill the operator runs;
+  demo: simulated + labelled, merged script = the case's reference answer) and the ONLY reviewer
+  (`learning-pass`): it reads every retained answer, merges each exact case's scripts, then the
+  real lifecycle compiles (the floor of 2 = recurrence; a case seen once stays with the AI),
+  verifies + promotes. A person's ONE act = switching each learned function on or off (per
+  operation, `route(enabled, operation)`), optionally after `Read`ing the function alone.
+  Presentation (owner-ruled r7-r12: dense, unclear, wordy, then the human role corrected; Swamp's
   homepage = the clarity reference, not its look): words stripped, the workflow shown, no Cement
   term on the default page.
-  - Header = headline alone. Strip = four icons `Ask` → `Check` → `Save` → `Switch on`, one word +
-    a 2-3 word sub each, doubling as the selected task's progress (done / now; billing strikes
-    `Save` + `Switch on`).
-  - Band under the strip = one short line on what just happened + the ONE next action: `Check`
-    (simulated checker: fixes a wrong answer, confirms a right one) + `Reject`, `Save`, `Switch
-    on`; in the story `Next` / `Leave`. `Play the story` = 11 steps, one per `Next`, one-line
-    captions read from live state (the AI's actual mistake, the patient); a manual click leaves it.
-  - Story spotlight (owner-ruled r10, driverjs.com as the reference): each story step runs, then
-    shows 1-3 beats = vendored driver.js `highlight()` on ONE element (strip, a chat bubble, a
-    method box, the tally, the technical-details switch) with a 2-3 word title + one line; Next
-    sits in the popover, × or `Leave the story` exits; animation off under reduced motion.
-    driver.js 1.10.2 MIT, `static/vendor/driver.js-1.10.2/` (iife build + css + license,
-    registry-integrity checked), no build step.
-  - Right half = the latest request as three boxes `Form` (first scanned lines) → method →
-    `Reply`. The method = what Cement saves, a way to handle a KIND of form in plain rows
-    (`Patient name | "Patient:" line`), never a patient's values; chips amber `AI` (+ unchecked /
-    fixed / confirmed) vs green `Fixed`, check dots ●○, billing `never repeats`, correction
-    marks `+ ✎ –`. Tally = chips `AI n` `Fixed m`.
+  - Header = headline alone. Strip = three icons `Ask` → `Learn` → `Switch on`, one word + a
+    2-3 word sub each, doubling as the selected task's progress (done / now; billing strikes
+    `Switch on`).
+  - Band under the strip = one short line on what just happened + the next action: `Learn from
+    chats` while answers are retained, `Switch on` for a learned function that is off; in the
+    story `Leave the story`.
+  - Story = 10 steps (send, send, learn, read, switch on, tool call, reuse, more jobs, billing,
+    done), each running then showing 1-3 spotlight beats (owner-ruled r10, driverjs.com as the
+    reference): vendored driver.js `highlight()` on ONE element with a 2-3 word title + one line
+    read from live state; Next in the popover, × or `Leave the story` exits; animation off under
+    reduced motion; a manual click leaves it. driver.js 1.10.2 MIT,
+    `static/vendor/driver.js-1.10.2/` (iife build + css + license, registry-integrity checked).
+  - Right half = the latest request as three boxes `Form` (first scanned lines) → script →
+    `Reply`. The script = a way to handle a KIND of form in plain rows (`Patient name | "Patient:"
+    line`), never a patient's values; chip amber `AI script` vs green `Function`. Below it
+    `Functions` = one row per operation of the selected task: `ƒ <operation>`, `n kinds of form`,
+    `Read`, its own switch; `not learned yet` / billing `never repeats`. `Read` = the function
+    alone as code (`if form is a <kind>:` rows … `otherwise: ask the AI`). Tally = chips `AI n`
+    `Function m`.
   - Chat + reply = labelled fields, never JSON. Users = `users`, never `staff`. Requests show under
     the five task pills. ONE `Show technical details` switch (off by default; `?tech`,
     `?drawer`, `?source`, `?open` turn it on) holds every per-message disclosure, the scanned text
-    + the `Operator view` (board, routing switch, inbox, drawer, commands).
-  - Density (first 1600×1000 screen words / rendered / buttons): reset 145/145/12, story end
-    228/228/13 (r6: 251/261/17, 287/301/18).
+    + the `Operator view` (board, routing switch for all functions, retained-answer inbox,
+    drawer, commands).
   The right half runs the operator lifecycle as REAL `cement` subprocesses against the demo
   ledger (`_cli`), printing the command, its rc and a condensed reading of the bytes it
   returned, with verbatim stdout + exact argv one click away; an argument over 80 chars prints
@@ -96,7 +100,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   same card. A turn's parts may split across a promoted function and the model; the bubble shows
   the function part's tool call and nothing for the model part. `document.billing_codes` is keyed on one note's ASSESSMENT TEXT, not the
   layout, so no second note repeats the input, every scope stays at support 1, `compile` blocks
-  it, and it stays supervised BY DESIGN — the boundary is the claim, not a gap. The story cements
+  it, and it stays with the model BY DESIGN — the boundary is the claim, not a gap. The story cements
   every cementable task.
 - Human-facing prose (README, `docs/`, example README, CLI help, this spec's `Intent`) = ASD-STE100 register, graded by D25 except `Intent` (ungraded, p75); everything else agent-optimized.
 - Gate tooling (owner-ruled; lands at a unit boundary): mypy 2.3.1 `strict` over `src/cement_runtime` alone; ruff 0.16.6 format + check, `extend-exclude = ["tests", ".agent", "prototype"]`; scanners = `uv audit` (native, OSV/SARIF) + gitleaks Action + ruff `S`; `license = "Apache-2.0"`; CI = GitHub Actions + Dependabot (`uv` + `github-actions`). The gate-tooling unit also carries p66's standing skip census, owner-approved: both are gate changes that one boundary covers. Grounds + config → `.claude/rules/ops.md`; firing seeds + records → `.claude/rules/gate-checks.md`, its `paths:` extended to the new check files; checker + CI measurements → `.agent/decisions/m3u10-*`. `github.com/eturkes/cement` is PUBLIC ⇒ `push`/`pull_request` carry the gate, a cron alone is disabled after 60 idle days.
@@ -108,7 +112,8 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 - [x] 46c95e8 ITERATE round 8: still unclear what happens → mechanism boxes, `What just happened` captions, narrated story, readable replies; ba5230d `staff` → `users`.
 - [x] 8722f0b ITERATE round 9: too wordy → icon workflow as progress, one-line band + one action, chips/dots/marks in the boxes.
 - [x] cbafe70 ITERATE round 10: audience needs gaze guidance → driver.js spotlight beats on the story; b7757b5 captions without file ids.
-- [ ] ITERATE round 11: first answers read as an ordinary chatbot (nothing reusable yet); a promoted-function answer shows a tool-call line; owner reviews it.
+- [x] 002c68d ITERATE round 11: ordinary-chatbot captions + tool-call line; 548e00b mistake-stake captions.
+- [ ] ITERATE round 12: human role corrected (Intent rewritten) → Ask → Learn → Switch on, learning pass = sole reviewer, per-function switch + `Read`; owner reviews it.
   - Close (the owner's go) runs `Rules upkeep`; known backlog: origin stories + measured results in bare `ops.md` + `assurance.md`; area-bound law in bare `ops.md` (D28, D19, capture mechanics) → `paths:`.
 - [ ] M3.6a3 delete the 7 dead outcome types (`Outcome` + its 6 members).
   - Resume point: the suspended IMPLEMENT scope rejoins here once ITERATE closes on the owner's go.
@@ -121,6 +126,8 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 - [ ] M3.8 demo + transcript regeneration via idempotent updater (`data`).
 - [ ] M3.9a docs claim ledger rewrite (`docs`).
 - [ ] M3.9b independent replay of the M3.9a rewrite (`docs`).
+- [ ] Learning pass in the shipped library (Intent r12): the skill that reads retained answers + merges recurring scripts per exact case, its reviewer identity in place of a human reviewer, per-operation switch-on; docs + README paragraph 1 follow Intent.
+  - Accept: planned as a milestone beside M4, its trust-boundary contract reviewed by a `consultant` before code.
 - [ ] M4 projection inside the boundary — plan, open design question + seeds in `.agent/archive/roadmap.md`.
   - Accept: planned as a milestone.
 - [ ] Gate tooling + CI + scanners = p01 p66 + the IMPLEMENT law gap (no CI, no scanners, no update automation), per the `Decisions` gate-tooling ruling.

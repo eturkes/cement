@@ -61,7 +61,9 @@ if str(EXAMPLE_DIR) not in sys.path:
 import pipeline  # noqa: E402
 
 PARTITION = "example-hospital"
-REVIEWER = "records-supervisor"
+# No person rules on single answers: the learning pass (a simulated LLM) is the only reviewer,
+# and a person's one act is switching a learned function on or off.
+REVIEWER = "learning-pass"
 PROMOTER = "informatics-lead"
 DEMO_POLICY = CompilePolicy(min_confirmations=2, min_reviewers=1, min_span_seconds=0)
 POLICY_VIEW = {
@@ -72,13 +74,13 @@ POLICY_VIEW = {
 }
 PROVIDER_NAME = "acme-health/clinical-llm-4"
 LATENCY_RANGE = (1.1, 3.4)
-# How one supervised part of an answer reads, before and after a supervisor rules. The
-# answer is already with the user in every one of these states.
+# How one model-answered part reads before and after a learning pass. The answer is
+# already with the user in every one of these states.
 REVIEW_READING = {
-    "unreviewed": "a model answered, and nobody has reviewed it yet",
-    "accepted": f"a model answered, and {REVIEWER} accepted it afterwards",
-    "corrected": f"a model answered, and {REVIEWER} corrected it afterwards",
-    "rejected": f"a model answered, and {REVIEWER} rejected it afterwards",
+    "unreviewed": "a model answered, and no learning pass has read it yet",
+    "accepted": f"a model answered, and the {REVIEWER} kept its script as written",
+    "corrected": f"a model answered, and the {REVIEWER} merged its script into the shared one",
+    "rejected": f"a model answered, and the {REVIEWER} discarded it",
 }
 
 def _display(arguments: tuple[str, ...]) -> str:
@@ -878,7 +880,8 @@ class Session:
         self.answered: dict[str, dict[str, JSONValue]] = {}
         self.selected = str(SCENARIOS[0]["id"])
         self.offline: dict[str, JSONValue] | None = None
-        self.routed = False
+        # Operations a person has switched on; each learned function has its own switch.
+        self.routed: set[str] = set()
         self.thinking: dict[str, JSONValue] | None = None
         self.started = time.time()
         self._sequence = 0
@@ -1162,7 +1165,7 @@ class Session:
             "output": None,
             "proposal_id": None,
         }
-        if not self.routed or self.functions.get(operation) is None:
+        if operation not in self.routed or self.functions.get(operation) is None:
             return part
         start = time.perf_counter()
         resolution = self.system.resolve(
@@ -1273,7 +1276,7 @@ class Session:
             "proposal",
             f"{document['id']} · {operation}: candidate stored as {proposal_id}",
             f"{PROVIDER_NAME} {provider_ms} ms simulated · the answer goes to the user "
-            "in this turn, and the candidate waits for a supervisor",
+            "in this turn, and the candidate waits for the next learning pass",
         )
 
     def _finish(self, turn: str) -> None:
@@ -1405,7 +1408,7 @@ class Session:
             )
         elif not ruled:
             note = (
-                "A model wrote this, and the user already has it. The supervisor "
+                "A model wrote this, and the user already has it. The learning pass "
                 "reads the candidate afterwards. A review builds the evidence that "
                 "Cement seals, and it never holds up a chat."
             )
@@ -1850,7 +1853,7 @@ class Session:
                 reading=lambda value: [
                     ["status", f"{value['status']} by {value['reviewer']}"],
                     ["proposed_output", "what the model wrote"],
-                    ["final_output", "what the supervisor kept"],
+                    ["final_output", "what the learning pass kept"],
                 ],
                 sink=rows,
             )
@@ -1936,19 +1939,48 @@ class Session:
             "entries": entries,
         }
 
-    def route(self, enabled: bool) -> None:
+    def route(self, enabled: bool, operation: str | None = None) -> None:
+        """Switch one learned function on or off, or every learned one when none is named."""
+
         with self._lock:
-            self.routed = bool(enabled)
-            promoted = sorted(self.functions)
+            targets = [operation] if operation else sorted(self.functions)
+            for name in targets:
+                if enabled and name in self.functions:
+                    self.routed.add(name)
+                else:
+                    self.routed.discard(name)
             self._note(
                 "routing",
-                f"operator routing {'enabled' if self.routed else 'disabled'}",
-                f"{len(promoted)} promoted function(s): " + ", ".join(promoted)
-                + " · a matching input resolves from the promoted set, and every "
-                "other input keeps the supervised path"
-                if self.routed
-                else "every request returns to the supervised provider path",
+                f"{', '.join(targets) or 'no function'} switched "
+                f"{'on' if enabled else 'off'}",
+                f"on: {', '.join(sorted(self.routed)) or 'none'} · a matching input "
+                "resolves from the promoted set, and every other input goes to the model",
             )
+
+    def learn(self) -> None:
+        """The learning pass: an LLM reads every retained answer, groups the recurring ones
+        and merges their slightly different scripts into one per exact case.
+
+        Simulated: the merged script is that case's reference answer. The rest is the real
+        lifecycle — each answer is reviewed by the pass, compile groups them by exact case
+        and blocks any case seen fewer than the floor's times, and verified drafts are
+        promoted. Nothing is switched on: that stays a person's decision.
+        """
+
+        with self._lock:
+            for proposal_id, record in list(self.pending.items()):
+                self.review(proposal_id, "correct" if record["diff"] else "accept")
+            touched = sorted(
+                {str(row["operation"]) for row in self.categories.values()}
+            )
+            for operation in touched:
+                self._compile_one(operation)
+                if any(
+                    row["operation"] == operation and row["status"] == "draft"
+                    for row in self.drafts.values()
+                ):
+                    self._verify_one(operation)
+                    self._promote_one(operation)
 
     def _bundle_target(self, operation: str | None) -> str:
         """Name the operation a bundle request means, defaulting to the task's own."""
@@ -2173,7 +2205,8 @@ class Session:
                 "functions": functions,
                 "promoted_operations": sorted(self.functions),
                 "offline": self.offline,
-                "routed": self.routed,
+                "routed": bool(self.routed),
+                "routed_operations": sorted(self.routed),
                 "thinking": self.thinking,
                 "stats": {
                     **{

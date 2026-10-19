@@ -138,7 +138,7 @@ const review = (proposalId, decision) =>
   call("/api/review", { proposal_id: proposalId, decision });
 const revoke = (exampleId) => call("/api/revoke", { example_id: exampleId });
 const lifecycle = (action) => call("/api/" + action, {});
-const route = (enabled) => call("/api/route", { enabled });
+const route = (enabled, operation) => call("/api/route", { enabled, operation });
 const offline = (id, operation) =>
   call("/api/offline", { document_id: id, operation });
 
@@ -159,6 +159,8 @@ function render() {
   renderTray();
   renderAction();
   renderMechanism();
+  renderFunctionsList();
+  renderFnView();
   renderNarration();
   renderTasks();
   renderReview();
@@ -223,7 +225,7 @@ function chatMessage(message) {
   /* A promoted-function answer shows as a tool call, as a chat product shows any tool. */
   const tools = (message.tools || []).map((tool) => `<details class="tool-call">
     <summary><span class="tool-icon" aria-hidden="true">ƒ</span>Used <code>${esc(tool.operation)}</code><span class="tool-ms">${esc(tool.resolve_ms)} ms</span></summary>
-    <p>Cement’s saved, checked method for this form. The AI was not called for this part.</p></details>`).join("");
+    <p>Cement’s learned function answered this part. The AI was not called for it.</p></details>`).join("");
   return `<div class="msg assistant"><div class="avatar">AI</div>
     <div class="bubble">${tools}${body}</div></div>` + under(message);
 }
@@ -291,37 +293,73 @@ function renderTasks() {
   $("boundary-note").textContent = "Only the exact checked input matches. Other inputs return to the model.";
 }
 
+const cementable = () => STATE.selected_operations.filter((name) => operationOf(name).keyed_on !== "text");
+const isLearned = (name) => STATE.promoted_operations.includes(name);
+const isOn = (name) => STATE.routed_operations.includes(name);
+
 function taskStage() {
   const turn = STATE.latest_turn;
-  const parts = turn ? turn.parts : [];
-  const pending = STATE.pending.find(p => parts.some(part => part.proposal_id === p.proposal_id));
-  const doc = turn ? documentOf(turn.document_id) : {};
-  const categories = STATE.categories.filter(c => c.keyed_on === "text" ? c.document_id === doc.id : c.layout === doc.layout);
-  const needed = STATE.selected_operations.filter(name => operationOf(name).keyed_on !== "text");
-  const prepared = Boolean(turn) && needed.length > 0 && needed.every(name => categories.some(c => c.operation === name && c.promoted) && STATE.functions.some(fn => fn.operation === name && fn.passed));
-  const ready = prepared || (needed.length > 0 && needed.every(name => categories.some(c => c.operation === name && c.confirmations >= c.required)));
-  const step = !turn ? 1 : pending ? 2 : STATE.selected === "bill" || !prepared ? 3 : 4;
-  return { turn, pending, prepared, ready, step };
+  const ops = cementable();
+  const learned = ops.length > 0 && ops.every(isLearned);
+  const on = learned && ops.every(isOn);
+  const step = !turn ? 1 : !learned ? 2 : 3;
+  return { turn, learned, on, step };
 }
 
-/* The header strip doubles as this task's progress; the band holds its ONE next action. */
+/* The header strip doubles as this task's progress; the band holds its next action. */
 function renderAction() {
   const s = taskStage();
   const billing = STATE.selected === "bill";
-  document.querySelectorAll("#how li").forEach(li => {
+  document.querySelectorAll("#how li").forEach((li) => {
     const n = Number(li.dataset.step);
     li.classList.toggle("now", n === s.step);
-    li.classList.toggle("done", n < s.step);
-    li.classList.toggle("blocked", billing && n >= 3);
+    li.classList.toggle("done", n < s.step || (n === 3 && s.on));
+    li.classList.toggle("blocked", billing && n === 3);
   });
-  const button = (label, attr, tone = "primary") => `<button class="button ${tone}" ${attr} ${BUSY ? "disabled" : ""}>${label}</button>`;
+  const button = (label, attr) => `<button class="button primary" ${attr} ${BUSY ? "disabled" : ""}>${label}</button>`;
   let html = "";
-  if (s.pending) html = button("Check", `data-check="${esc(s.pending.proposal_id)}"`) + button("Reject", `data-review="reject" data-proposal="${esc(s.pending.proposal_id)}"`, "");
-  else if (!billing && s.ready && !s.prepared) html = button("Save", 'data-make-automatic="1"');
-  else if (!billing && s.prepared && !STATE.routed) html = button("Switch on", 'data-enable-automatic="1"');
+  if (STATE.pending.length) html += button("Learn from chats", 'data-learn="1"');
+  if (s.learned && !s.on) html += button("Switch on", `data-switch="${esc(cementable().join(" "))}" data-on="1"`);
   $("band-actions").innerHTML = STORY_AT >= 0 ? "" : html;
   const st = STATE.stats;
-  $("tally").innerHTML = `<span class="chip ai" title="answers written by the AI">AI ${st.provider_calls}</span><span class="chip fixed" title="answers from a fixed answer">Fixed ${st.cement_answers}</span>`;
+  $("tally").innerHTML = `<span class="chip ai" title="answers written by the AI">AI ${st.provider_calls}</span><span class="chip fixed" title="answers from a learned function">Function ${st.cement_answers}</span>`;
+}
+
+/* One row per operation the selected task reaches: its learned function, its switch. */
+function renderFunctionsList() {
+  const rows = STATE.selected_operations.map((name) => {
+    const fn = STATE.functions.find((row) => row.operation === name && row.promoted);
+    if (!fn) {
+      const never = operationOf(name).keyed_on === "text";
+      return `<div class="fn-row muted"><span class="tool-icon" aria-hidden="true">ƒ</span><code>${esc(name)}</code>
+        <span class="fn-note ${never ? "never" : ""}">${never ? "never repeats" : "not learned yet"}</span></div>`;
+    }
+    const on = isOn(name);
+    return `<div class="fn-row"><span class="tool-icon" aria-hidden="true">ƒ</span><code>${esc(name)}</code>
+      <span class="fn-note">${plural(fn.entries, "kind")} of form</span>
+      <button class="button small" data-read="${esc(name)}">Read</button>
+      <button class="switch ${on ? "on" : ""}" data-switch="${esc(name)}" data-on="${on ? "" : "1"}" aria-pressed="${on}" aria-label="${on ? "Switch off" : "Switch on"} ${esc(name)}" ${BUSY ? "disabled" : ""}><span class="knob"></span></button></div>`;
+  });
+  $("functions-list").innerHTML = `<div class="fn-list"><h3>Functions</h3>${rows.join("")}</div>`;
+}
+
+/* The function alone, as a person reads it before switching it on. */
+let FN_OPEN = "";
+function renderFnView() {
+  const fn = STATE.functions.find((row) => row.operation === FN_OPEN && row.promoted && row.source);
+  $("fnview").hidden = !fn;
+  if (!fn) return;
+  const lines = [`function ${fn.operation}(form):`];
+  for (const entry of fn.source.entries) {
+    lines.push(`  if form is a ${humanKey(entry.input.document_type || "form")}:`);
+    const rows = METHOD[fn.operation][1](entry.output || {});
+    const width = Math.max(...rows.map(([k]) => k.length));
+    rows.forEach(([k, v]) => lines.push(`      ${k.padEnd(width)}  ←  ${v}`));
+  }
+  lines.push("  otherwise:", "      ask the AI");
+  $("fnview-title").textContent = METHOD[fn.operation][0];
+  $("fnview-sub").textContent = `${plural(fn.entries, "kind")} of form · ${isOn(fn.operation) ? "on" : "off"}`;
+  $("fnview-body").textContent = lines.join("\n");
 }
 
 /* --- what happened to the latest request: document → method → reply ---
@@ -344,31 +382,12 @@ const METHOD = {
     (o.codes || []).map((c) => [c.code, c.description])],
 };
 
-/* The checker's version, with each row the AI got wrong marked against it. */
-function methodRows(operation, ai, confirmed) {
-  const rows = METHOD[operation][1];
-  const mine = new Map(rows(ai || {}));
-  if (!confirmed) return [...mine].map(([k, v]) => ({ k, v, mark: "" }));
-  const fixed = rows(confirmed);
-  const keys = new Set(fixed.map(([k]) => k));
-  return fixed.map(([k, v]) => ({ k, v, mark: !mine.has(k) ? "added" : mine.get(k) !== v ? "changed" : "" }))
-    .concat([...mine].filter(([k]) => !keys.has(k)).map(([k, v]) => ({ k, v, mark: "removed" })));
-}
-
-const MARK = { added: "+", changed: "✎", removed: "–" };
-
-function methodBox(part, doc) {
+function methodBox(part) {
   const fixed = part.source === "function";
-  const category = STATE.categories.find((c) => c.operation === part.operation && (c.keyed_on === "text" ? c.document_id === doc.id : c.layout === doc.layout));
-  const checks = category ? Math.min(category.confirmations, category.required) : 0;
-  const dots = category && category.keyed_on !== "text"
-    ? `<span class="dots-check" title="${checks} of ${category.required} checks">${"●".repeat(checks)}${"○".repeat(category.required - checks)}</span>`
-    : `<span class="dots-check never" title="no two notes share these words">never repeats</span>`;
-  const state = fixed ? "" : { unreviewed: "unchecked", corrected: "fixed by a person", accepted: "confirmed", rejected: "rejected" }[part.status] || "";
-  const rows = methodRows(part.operation, part.output, part.status === "corrected" ? part.confirmed : null)
-    .map((r) => `<div class="method-row ${r.mark}"><span>${r.mark ? `<i title="${r.mark} by a person">${MARK[r.mark]}</i>` : ""}${esc(r.k)}</span><span>${esc(r.v)}</span></div>`).join("");
-  return `<div class="method ${fixed ? "fixed" : part.status === "unreviewed" ? "ai" : "checked"}">
-    <div class="method-head"><span class="chip ${fixed ? "fixed" : "ai"}">${fixed ? "Fixed" : "AI"}</span><span class="method-state">${state}</span>${dots}</div>
+  const rows = METHOD[part.operation][1](part.output || {})
+    .map(([k, v]) => `<div class="method-row"><span>${esc(k)}</span><span>${esc(v)}</span></div>`).join("");
+  return `<div class="method ${fixed ? "fixed" : "ai"}">
+    <div class="method-head"><span class="chip ${fixed ? "fixed" : "ai"}">${fixed ? "Function" : "AI script"}</span></div>
     <h4>${esc(METHOD[part.operation][0])}</h4>${rows}</div>`;
 }
 
@@ -389,16 +408,10 @@ function renderMechanism() {
       <div class="flow-box"><span class="method-badge">Form</span><h4>${esc(doc.id)}.pdf</h4>
         <pre class="scan">${esc(excerpt)}</pre></div>
       <div class="flow-arrow" aria-hidden="true">→</div>
-      <div class="flow-methods">${turn.parts.map((part) => methodBox(part, doc)).join("")}</div>
+      <div class="flow-methods">${turn.parts.map(methodBox).join("")}</div>
       <div class="flow-arrow" aria-hidden="true">→</div>
       <div class="flow-box"><span class="method-badge">Reply</span><div class="reply">${reply}</div></div>
     </div></div>`;
-}
-
-async function makeAutomatic() {
-  for (const action of ["compile", "verify", "promote"]) {
-    if (!await lifecycle(action)) return;
-  }
 }
 
 /* --- terminal: real `cement` invocations, condensed, verbatim one click away --- */
@@ -807,65 +820,58 @@ function sentCaption() {
   const fixed = parts.filter((p) => p.source === "function").length;
   if (fixed === parts.length) return "A tool call to Cement answered. No AI.";
   if (fixed) return "A tool call to Cement did part. The AI did the rest.";
-  return taskStage().prepared && !STATE.routed
-    ? "An ordinary chatbot answer. A fixed answer is saved but not switched on."
+  return taskStage().learned && !taskStage().on
+    ? "An ordinary chatbot answer. A function exists but is switched off."
     : "An ordinary chatbot answer. Cement has nothing reusable for this yet.";
 }
 
-function reviewCaption(decision, note) {
-  if (decision === "reject") return "Rejected. Nothing learned.";
-  if (decision === "accept") return "Checked: correct.";
-  return `Checked: the AI ${note}. Fixed.`;
+async function learnNow() {
+  const read = STATE.pending.length;
+  const before = STATE.promoted_operations.length;
+  await call("/api/learn", {});
+  const added = STATE.promoted_operations.length - before;
+  return `Learned from ${plural(read, "answer")}: ${added ? `${plural(added, "new function")}` : "no new function"}. Requests seen once stay with the AI.`;
 }
 
-const SAVED = "Saved: a method for this kind of form. No patient data.";
-const SWITCHED = "On: matching forms skip the AI.";
-
-/* A supervisor corrects what diverges and accepts what already matches. The first
-   candidate for a scope always diverges, so a correction is always visible. */
-async function settle() {
-  const run = RUN;
-  while (run === RUN && STATE.pending.length) {
-    const proposal = STATE.pending[0];
-    await review(proposal.proposal_id, proposal.diff.length ? "correct" : "accept");
-  }
+async function switchTo(names, on) {
+  for (const name of names) await route(on, name);
+  return on ? "On: matching forms are answered by the function." : "Off: the AI answers again.";
 }
 
-const turn = async (request) => { await send(request); await settle(); };
+const learnAll = async () => { await learnNow(); };
+const switchAllOn = async () => { await switchTo(STATE.promoted_operations, true); };
 const firstNote = () => (turnParts().find((p) => p.note) || {}).note || "made a mistake";
 const patientOf = () => (STATE.latest_turn ? documentOf(STATE.latest_turn.document_id).patient : "");
 
 /* Each step runs once, then shows its beats: a spotlight (driver.js) on one element with
    a short title + line, so the audience knows where to look. Next lives in the popover. */
 const lastBubble = () => [...document.querySelectorAll("#chat .msg.assistant .bubble")].pop();
+const lastTool = () => [...document.querySelectorAll("#chat .tool-call")].pop();
 const STORY = [
   { beats: [
-    { el: "#how", title: "Four steps", text: () => "Ask, check, save, switch on.", side: "bottom" },
+    { el: "#how", title: "Three steps", text: () => "Ask, learn, switch on.", side: "bottom" },
     { el: "#side-user", title: "What users see", text: () => "A normal AI chat.", side: "right" },
     { el: "#side-hidden", title: "Behind the scenes", text: () => "What Cement does. Users never see it.", side: "left" } ] },
   { run: async () => { await select("file"); await send("q01"); }, beats: [
     { el: lastBubble, title: "An ordinary answer", text: () => "No change from an ordinary chatbot answer. Cement has nothing reusable for this yet.", side: "right" },
-    { el: "#mechanism .method", title: "A hidden mistake", text: () => `The AI’s method ${firstNote()}. Saved like this, every later form would repeat it.`, side: "bottom" } ] },
-  { run: settle, beats: [
-    { el: "#mechanism .method", title: "A person checks", text: () => "The marked row is the fix. Only a checked method can be saved.", side: "bottom" } ] },
-  { run: () => turn("q02"), beats: [
-    { el: "#mechanism .method", title: "Checked twice", text: () => "A second progress note, checked too. Two checks: ready to save.", side: "bottom" } ] },
-  { run: makeAutomatic, beats: [
-    { el: '#how li[data-step="3"]', title: "Saved", text: () => "How to read this form. No patient data.", side: "bottom" } ] },
-  { run: () => route(true), beats: [
-    { el: '#how li[data-step="4"]', title: "Switched on", text: () => "Matching forms now skip the AI.", side: "bottom" } ] },
+    { el: "#mechanism .method", title: "The AI’s script", text: () => `To answer, the AI wrote a small script for this form. This one ${firstNote()}.`, side: "bottom" } ] },
+  { run: () => send("q02"), beats: [
+    { el: "#mechanism .method", title: "The same job again", text: () => "Another progress note. The AI wrote a slightly different script.", side: "bottom" } ] },
+  { run: learnAll, beats: [
+    { el: "#functions-list", title: "Learn", text: () => "An AI pass read the chats, found the repeat, and merged the scripts into one function.", side: "top" },
+    { el: "#fnview .overlay-card", fn: "document.extraction_plan", title: "The function", text: () => "Readable. One branch per kind of form. Anything else goes to the AI.", side: "left" } ] },
+  { run: () => switchTo(["document.extraction_plan"], true), beats: [
+    { el: "#functions-list .switch", title: "Switch on", text: () => "Your one decision. Matching forms now skip the AI.", side: "top" } ] },
   { run: () => send("q03"), beats: [
-    { el: () => [...document.querySelectorAll("#chat .tool-call")].pop(), title: "A tool call", text: () => `Another progress note, for ${patientOf()}. Cement’s saved method answered. No AI.`, side: "right" },
-    { el: "#mechanism .method.fixed", title: "No AI", text: () => "The saved method read the form.", side: "bottom" } ] },
-  { run: async () => { await turn("q05"); await turn("q06"); await makeAutomatic(); }, beats: [
-    { el: "#mechanism .flow-methods", title: "Reuse", text: () => "A new job reuses the method. Only its new part went to the AI.", side: "bottom" } ] },
-  { run: async () => { await turn("q08"); await turn("q09"); await makeAutomatic(); await turn("q10"); await turn("q11"); await makeAutomatic(); }, beats: [
-    { el: "#tally", title: "Two more jobs", text: () => `Saved the same way. AI ${STATE.stats.provider_calls}, fixed ${STATE.stats.cement_answers}.`, side: "bottom" } ] },
-  { run: async () => { await turn("q12"); await lifecycle("compile"); }, beats: [
-    { el: "#mechanism .method.checked:last-child, #mechanism .method.ai:last-child", title: "Never repeats", text: () => "Every note’s words differ. Billing stays with the AI.", side: "bottom" },
-    { el: "#how", title: "No save", text: () => "Save and switch on are struck out for billing.", side: "bottom" } ] },
+    { el: lastTool, title: "A tool call", text: () => `Another progress note, for ${patientOf()}. The function answered. No AI.`, side: "right" } ] },
+  { run: async () => { await send("q05"); await send("q06"); await learnAll(); await switchAllOn(); }, beats: [
+    { el: "#functions-list", title: "Reuse", text: () => "A new job reuses the function. Learn added a second one for its new part.", side: "top" } ] },
+  { run: async () => { for (const id of ["q08", "q09", "q10", "q11"]) await send(id); await learnAll(); await switchAllOn(); }, beats: [
+    { el: "#tally", title: "Two more jobs", text: () => `Learned and switched on the same way. AI ${STATE.stats.provider_calls}, function ${STATE.stats.cement_answers}.`, side: "bottom" } ] },
+  { run: async () => { await send("q12"); await learnAll(); }, beats: [
+    { el: "#functions-list", title: "Never repeats", text: () => "Every note’s words differ, so Learn finds no repeat. Billing stays with the AI.", side: "top" } ] },
   { beats: [
-    { el: "#tally", title: "Done", text: () => `AI ${STATE.stats.provider_calls}, fixed ${STATE.stats.cement_answers}. Same replies.`, side: "bottom" },
+    { el: "#tally", title: "Done", text: () => `AI ${STATE.stats.provider_calls}, function ${STATE.stats.cement_answers}. Same replies.`, side: "bottom" },
     { el: "#tech", title: "For experts", text: () => "Real commands and evidence.", side: "top" } ] },
 ];
 
@@ -891,6 +897,8 @@ function tour() {
 function showBeat() {
   const beats = STORY[STORY_AT].beats;
   const beat = beats[BEAT];
+  FN_OPEN = beat.fn || "";
+  renderFnView();
   const element = typeof beat.el === "function" ? beat.el() : document.querySelector(beat.el);
   const last = STORY_AT === STORY.length - 1 && BEAT === beats.length - 1;
   narrate(beat.text());
@@ -939,6 +947,8 @@ async function playStory(upTo = 0) {
 
 function leaveStory() {
   STORY_AT = -1;
+  FN_OPEN = "";
+  renderFnView();
   if (TOUR && TOUR.isActive()) TOUR.destroy();
   renderNarration();
   renderAction();
@@ -950,17 +960,17 @@ document.addEventListener("click", (event) => {
   const target = event.target.closest(
     "[data-send],[data-review],[data-action],[data-offline],[data-revoke]," +
     "[data-source],[data-select],[data-operation-open],[data-history]," +
-    "[data-check],[data-make-automatic],[data-enable-automatic]");
+    "[data-learn],[data-read],[data-switch]");
   if (!target || BUSY) return;
   if (!target.dataset.history && STORY_AT >= 0) leaveStory();
-  if (target.dataset.check) {
-    /* The checker is simulated: it confirms a correct answer and fixes a wrong one. */
-    const pending = STATE.pending.find((p) => p.proposal_id === target.dataset.check);
-    const decision = pending.diff.length ? "correct" : "accept";
-    review(pending.proposal_id, decision).then(() => narrate(reviewCaption(decision, pending.note)));
-  } else if (target.dataset.makeAutomatic) makeAutomatic().then(() => narrate(SAVED));
-  else if (target.dataset.enableAutomatic) route(true).then(() => narrate(SWITCHED));
-  else if (target.dataset.history) { HISTORY = !HISTORY; render(); } else if (target.dataset.operationOpen) {
+  if (target.dataset.learn) {
+    learnNow().then(narrate);
+  } else if (target.dataset.read) {
+    FN_OPEN = target.dataset.read;
+    renderFnView();
+  } else if (target.dataset.switch) {
+    switchTo(target.dataset.switch.split(" "), Boolean(target.dataset.on)).then(narrate);
+  } else if (target.dataset.history) { HISTORY = !HISTORY; render(); } else if (target.dataset.operationOpen) {
     DRAWER = target.dataset.operationOpen;
     const task = STATE.scenarios.find(t => t.id === STATE.selected && t.operations.includes(DRAWER)) || STATE.scenarios.find(t => t.operations.includes(DRAWER));
     select(task.id);
@@ -968,9 +978,7 @@ document.addEventListener("click", (event) => {
   else if (target.dataset.select) {
     select(target.dataset.select).then(() => narrate(`${scenarioOf(STATE.selected).title}: pick a request.`));
   } else if (target.dataset.review) {
-    const decision = target.dataset.review;
-    const note = (STATE.pending.find((p) => p.proposal_id === target.dataset.proposal) || {}).note;
-    review(target.dataset.proposal, decision).then(() => narrate(reviewCaption(decision, note)));
+    review(target.dataset.proposal, target.dataset.review);
   }
   else if (target.dataset.action) lifecycle(target.dataset.action);
   else if (target.dataset.offline) {
@@ -989,11 +997,13 @@ $("events-details").addEventListener("toggle", renderLog);
 $("tech").addEventListener("click", () => setTech(!TECH));
 $("drawer-close").addEventListener("click", () => { DRAWER = ""; render(); });
 $("overlay-close").addEventListener("click", () => setSource(""));
+$("fnview-close").addEventListener("click", () => { FN_OPEN = ""; renderFnView(); });
 $("overlay").addEventListener("click", (event) => {
   if (event.target === $("overlay")) setSource("");
 });
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && SOURCE_OPEN) setSource("");
+  if (event.key === "Escape" && FN_OPEN && STORY_AT < 0) { FN_OPEN = ""; renderFnView(); }
 });
 
 $("play").addEventListener("click", () => playStory(0));

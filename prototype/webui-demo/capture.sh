@@ -35,24 +35,9 @@ post() { curl -sS -X POST -H 'Content-Type: application/json' -d "${2:-{\}}" \
 
 ask() { post send "{\"request_id\":\"$1\"}"; }
 
-# A supervisor corrects what diverges and accepts what already matches. The first
-# candidate for a scope always diverges, so a correction is always recorded.
-settle() {
-  local row
-  while :; do
-    row=$(curl -sS "$BASE/api/state" \
-      | jq -r '.pending[0] | select(.) |
-               "\(.proposal_id) \(if (.diff|length) > 0 then "correct" else "accept" end)"')
-    [ -z "$row" ] && break
-    # shellcheck disable=SC2086
-    set -- $row
-    post review "{\"proposal_id\":\"$1\",\"decision\":\"$2\"}"
-  done
-}
+learn() { post learn; }
 
-seal() { post compile; post verify; post promote; }
-
-turn() { ask "$1"; settle; }
+on() { post route "{\"enabled\":true${1:+,\"operation\":\"$1\"}}"; }
 
 post reset
 shot 'reset=1' 01-desk.png
@@ -60,30 +45,27 @@ shot 'reset=1' 01-desk.png
 ask q01
 shot '' 02-answered.png
 
-settle
-turn q02
+ask q02
 shot '' 03-evidence.png
 
-seal
+learn
 shot '' 04-cemented.png
 
-post route '{"enabled":true}'
+on document.extraction_plan
 ask q03
 shot '' 05-routed.png
 
-turn q05
-turn q06
-seal
+ask q05
+ask q06
+learn
+on
 shot '' 06-reuse.png
 
-turn q08
-turn q09
-seal
-turn q10
-turn q11
-seal
-turn q12
-post compile
+for id in q08 q09 q10 q11; do ask "$id"; done
+learn
+on
+ask q12
+learn
 shot '' 07-blocked.png
 
 post select '{"scenario":"file"}'

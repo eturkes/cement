@@ -3,14 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Cement · fixed answers from checked AI work</title>
+    <title>Cement · functions learned from repeated AI work</title>
     <link rel="stylesheet" href="/static/vendor/driver.js-1.10.2/driver.css" />
     <link rel="stylesheet" href="/static/app.css" />
   </head>
   <body>
     <header class="top">
       <a class="brand" href="/">cement<span>Concept demo</span></a>
-      <h1 class="hero">Let checked AI work become fixed answers.</h1>
+      <h1 class="hero">Turn repeated AI work into functions you switch on.</h1>
       <div class="actions">
         <button id="play" class="button primary">Play the story</button
         ><button id="reset" class="button">Reset</button>
@@ -18,9 +18,8 @@
     </header>
     <ol class="how" id="how">
       <li data-step="1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg><div><b>Ask</b><span>AI replies</span></div></li>
-      <li data-step="2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><div><b>Check</b><span>a person reviews</span></div></li>
-      <li data-step="3"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg><div><b>Save</b><span>repeats become fixed</span></div></li>
-      <li data-step="4"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h8a5 5 0 010 10H8A5 5 0 018 7zm8 2.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z"/></svg><div><b>Switch on</b><span>you decide</span></div></li>
+      <li data-step="2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v5M12 16v5M3 12h5M16 12h5M6.5 6.5l2.5 2.5M15 15l2.5 2.5M6.5 17.5L9 15M15 9l2.5-2.5"/></svg><div><b>Learn</b><span>an AI finds repeats</span></div></li>
+      <li data-step="3"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h8a5 5 0 010 10H8A5 5 0 018 7zm8 2.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z"/></svg><div><b>Switch on</b><span>you decide</span></div></li>
     </ol>
     <section class="narration" id="narration" aria-live="polite">
       <span class="eyebrow" id="narration-step"></span>
@@ -47,6 +46,7 @@
         </div>
         <div class="pane-body">
           <div id="mechanism"></div>
+          <div id="functions-list"></div>
           <button id="tech" class="button small" aria-pressed="false">Show technical details</button>
           <details id="operator-view" class="operator-view">
             <summary>Operator view</summary>
@@ -119,6 +119,15 @@
           <span id="overlay-sub"></span><button class="button" id="overlay-close">Close</button>
         </div>
         <div class="overlay-body" id="source"></div>
+      </div>
+    </div>
+    <div class="overlay" id="fnview" hidden>
+      <div class="overlay-card fn-view" role="dialog" aria-modal="true" aria-labelledby="fnview-title">
+        <div class="overlay-head">
+          <h2 id="fnview-title">The function</h2>
+          <span id="fnview-sub"></span><button class="button" id="fnview-close">Close</button>
+        </div>
+        <pre class="overlay-body fn-code" id="fnview-body"></pre>
       </div>
     </div>
     <script src="/static/vendor/driver.js-1.10.2/driver.js.iife.js"></script>

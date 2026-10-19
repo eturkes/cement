@@ -658,12 +658,9 @@ body:not(.tech) #operator-view {
 .method-badge { font-size: 11px; font-weight: 700; color: var(--quiet); }
 .method.ai { background: #fdf6ea; border-color: #ecd6b0; }
 .method.ai .method-badge { color: var(--amber); }
-.method.checked { background: #fafbf9; }
 .method.fixed { background: #edf5ef; border-color: #a9cbb5; }
 .method.fixed .method-badge { color: var(--green); }
 .method-row { display: grid; grid-template-columns: 1fr 1.3fr; gap: 6px; padding: 3px 0; border-top: 1px solid #0000000d; }
-.method-row.added, .method-row.changed { background: #e3f1e7; }
-.method-row.removed span { text-decoration: line-through; color: var(--quiet); }
 .scan { font-size: 11.5px; padding: 8px; margin: 0; line-height: 1.5; }
 .reply { margin-top: 6px; overflow-wrap: break-word; }
 .reply .fields { grid-template-columns: 1fr; gap: 0; }
@@ -700,10 +697,6 @@ body:not(.tech) #operator-view {
 .narration p { margin: 0; font-size: 16px; }
 .narration .eyebrow:empty { display: none; }
 .method-head { display: flex; gap: 8px; align-items: center; }
-.method-state { font-size: 11px; color: var(--quiet); }
-.dots-check { margin-left: auto; color: var(--green); letter-spacing: 3px; font-size: 15px; }
-.method.ai .dots-check { color: var(--amber); }
-.method-row i { font-style: normal; font-weight: 700; color: var(--green); margin-right: 4px; }
 @media (max-width: 1000px) {
   .hero { flex-basis: 100%; font-size: 20px; }
   .how { flex-wrap: wrap; padding: 10px 18px; }
@@ -711,7 +704,6 @@ body:not(.tech) #operator-view {
   .how li + li::before { display: none; }
   .narration { grid-template-columns: 1fr; }
 }
-.dots-check.never { font-size: 11px; letter-spacing: 0; color: var(--amber); font-weight: 700; }
 
 /* Story spotlight (vendored driver.js), restyled to the page's type + green. */
 .driver-popover.cement-pop { font-family: Space, sans-serif; border-radius: 10px; padding: 16px 18px; max-width: 320px; color: var(--ink); }
@@ -728,3 +720,15 @@ body:not(.tech) #operator-view {
 .tool-icon { font: italic 700 15px Space, serif; }
 .tool-ms { margin-left: auto; color: var(--quiet); }
 .tool-call p { margin: 6px 0 2px; font-size: 12.5px; color: var(--quiet); }
+
+/* Learned functions for the selected task: name, cases, Read, its own switch. */
+.fn-list { margin-top: 4px; }
+.fn-list h3 { font-size: 15px; margin: 0 0 8px; }
+.fn-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; color: var(--green); }
+.fn-row code { font: 13px Mono, monospace; color: var(--ink); }
+.fn-row .fn-note { font-size: 12.5px; color: var(--quiet); margin-right: auto; }
+.fn-row .fn-note.never { color: var(--amber); font-weight: 700; }
+.fn-row.muted { background: #fafbf9; }
+.fn-row.muted code { color: var(--quiet); }
+.fn-code { margin: 0; font-size: 13.5px; line-height: 1.7; background: #f6f8f5; white-space: pre; }
+.fn-view { width: min(760px, 100%); }

@@ -140,7 +140,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             "/api/compile": lambda body: session().compile(),
             "/api/verify": lambda body: session().verify(),
             "/api/promote": lambda body: session().promote(),
-            "/api/route": lambda body: session().route(bool(body["enabled"])),
+            "/api/route": lambda body: session().route(
+                bool(body["enabled"]), body.get("operation")
+            ),
+            "/api/learn": lambda body: session().learn(),
             "/api/offline": lambda body: session().evaluate_offline(
                 str(body["document_id"]),
                 str(body["operation"]) if body.get("operation") else None,

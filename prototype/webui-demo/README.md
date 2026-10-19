@@ -2,26 +2,29 @@
 
 This demo shows what Cement is for. Users at a hospital send scanned documents to a chat
 assistant. They bring five different jobs, and they word each job differently every time.
-A supervisor reviews those answers afterwards. Cement collects that confirmed work into
-one deterministic function per operation. An operator then routes those operations to their
-functions, and the answers stop depending on the model.
+The AI answers each request with a small script. From time to time, a learning pass reads
+the retained chats, finds the requests that recur, and merges their scripts into one
+deterministic function per job. A person reads a function and switches it on or off. While
+a function is on, matching requests no longer depend on the AI.
 
 This page is a demo, not a product. Cement ships as a library and a CLI. A production
 deployment puts Cement behind a chat product such as Open WebUI, where none of this
 reaches the person typing.
 
-The page opens with one headline and four icons: **Ask**, **Check**, **Save** and
-**Switch on**. The icons also show the step that the selected task has reached. A band
-under the icons tells you what just happened, and it holds the one next action.
+The page opens with one headline and three icons: **Ask**, **Learn** and **Switch on**.
+The icons also show the step that the selected task has reached. A band under the icons
+tells you what just happened, and it holds the next action.
 
-The left half is the chat that users see. Until Cement has a saved method for a request,
-each answer is an ordinary chatbot answer. When a saved method answers, a tool-call line
-such as `ƒ Used document.extraction_plan` shows above the reply. The right half shows what happened to the latest
-request in three boxes: the form, the method used on it, and the reply. An amber **AI** chip
-marks a method that the AI wrote. A green **Fixed** chip marks a saved method that ran
-without the AI. The dots count the checks by a person. A `+`, `✎` or `–` mark shows a row
-that the checker added, fixed or removed. A fixed answer is a method for one kind of form,
-so plain code can read a new patient's form with it.
+The left half is the chat that users see. Until a function covers a request, each answer is
+an ordinary chatbot answer. When a function answers, a tool-call line such as
+`ƒ Used document.extraction_plan` shows above the reply.
+
+The right half shows the latest request in three boxes: the form, the script used on it,
+and the reply. An amber **AI script** chip marks a script that the AI wrote. A green
+**Function** chip marks a learned function that ran without the AI. A function holds a
+script for each kind of form, so plain code can read a new patient's form with it. Below the
+boxes, **Functions** lists the functions of the selected task. Each function has a **Read**
+button and its own switch.
 
 **Show technical details** opens the per-message details, the scanned text and the
 **Operator view**, which holds the commands, the evidence and the function source.
@@ -56,9 +59,10 @@ Cement one exact input. Cement never sees the words. Cement stays rigid on purpo
 answers an operation and an exact input, and nothing else.
 
 Four operations are decided by the document layout. Their inputs repeat, so they reach
-the confirmation floor and they cement. `document.billing_codes` is decided by the words
-of one assessment. No second note repeats those words. Every scope therefore stays at one
-confirmation, the compiler blocks it, and the model keeps answering under supervision.
+the floor of two answers, and the learning pass turns them into functions.
+`document.billing_codes` is decided by the words of one assessment. No second note repeats
+those words. Every case therefore stays at one answer, the compiler blocks it, and the model
+keeps answering.
 That is the design, not a gap.
 
 One function serves several tasks. **File it into the record** promotes
@@ -66,15 +70,16 @@ One function serves several tasks. **File it into the record** promotes
 
 ## What to watch
 
-1. Select a task, then send one of its requests. The chat answers at once.
-2. Select **Check** in the band. A simulated checker fixes a wrong answer or confirms a
-   correct one. The reply in the chat stays unchanged.
-3. Send and check another form of the same kind. The dots fill.
-4. Select **Save**. This runs compile, verification and promotion as real Cement commands.
+1. Select a task, then send one of its requests. The chat answers at once, as an ordinary
+   chatbot.
+2. Send another form of the same kind. The AI writes a slightly different script.
+3. Select **Learn from chats**. The learning pass merges the scripts into one function.
+4. Select **Read** to see the function. It has one branch for each kind of form, and it
+   asks the AI for anything else.
 5. Select **Switch on**. The next form of that kind gets its answer without an AI call. The
-   reply is the same, and a tool-call line above it shows that Cement answered.
-6. Select **Code it for billing**. **Save** and **Switch on** are struck through, because no
-   two notes repeat the same words.
+   reply is the same, and a tool-call line above it shows that the function answered.
+6. Select **Code it for billing**. **Switch on** is struck through, because no two notes
+   repeat the same words.
 7. Select **Show technical details** for the commands, the evidence and the function source.
 
 ## Third-party code
@@ -87,7 +92,9 @@ no build step and no network access.
 ## Real and simulated
 
 The model is simulated. `StubProvider` in `demo.py` samples one answer variant and one
-latency between 1.1 and 3.4 seconds. It calls no model and uses no network. The page
+latency between 1.1 and 3.4 seconds. The learning pass is simulated too: it merges the
+scripts of each case into that case's reference answer, and it reviews each retained answer
+as `learning-pass`. Compile, verification and promotion after it are real. It calls no model and uses no network. The page
 labels that number `simulated`. The mapping from a request to an operation is simulated
 for the same reason. A deployment gives that reading to the model.
 
@@ -165,12 +172,12 @@ Each numbered frame must show its claim:
 
 | File | What it shows |
 |---|---|
-| `01-desk.png` | The headline, the four icons and five tasks before the first request. |
-| `02-answered.png` | The answer already with the user, and **Check** in the band. |
-| `03-evidence.png` | Two checks, with **Save** in the band. |
-| `04-cemented.png` | The fixed answer saved, with **Switch on** in the band. |
+| `01-desk.png` | The headline, the three icons and five tasks before the first request. |
+| `02-answered.png` | An ordinary chatbot answer, and **Learn from chats** in the band. |
+| `03-evidence.png` | A second progress note, with a slightly different AI script. |
+| `04-cemented.png` | A learned function that is off, with **Switch on** in the band. |
 | `05-routed.png` | A03 answered without the AI: the same reply under a tool-call line. |
-| `06-reuse.png` | One answer from a fixed answer and the AI together. |
+| `06-reuse.png` | One answer from a function and the AI together, under one tool-call line. |
 | `07-blocked.png` | Billing stays with the AI because assessment words do not repeat. |
 | `08-bundle.png` | The extraction plan drawer, with the answer from the exported bundle. |
 | `09-source.png` | The function read as source, with the four hops behind one entry. |
