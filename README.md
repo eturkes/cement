@@ -53,7 +53,8 @@ correctness.
   retires predecessors, activates candidates, and writes one immutable receipt plus ordered
   memberships in the same transaction.
 - A new confirmation that contradicts a promoted case is a revision: the live set fails verification
-  and answers nothing until a promotion replaces that case. A challenge suspends the contradicted
+  and answers nothing until a promotion replaces that case or the contradicting example is revoked
+  or superseded. A challenge suspends the contradicted
   artifact; an evidence revocation suspends every dependent build. A pinned version stops answering
   when one of its members is challenged, revoked, or suspended.
 - The switch of each operation selects what production serves: `off` (the default for a new
@@ -222,7 +223,7 @@ The command prints the same eight keys in every state:
 | `passed` | The verification verdict over the promoted set. |
 | `entries` | The number of entries in the verified set. |
 | `function_hash` | The digest of the verified set. It survives a failed verdict as a diagnostic. |
-| `checks` | The seven ordered checks, each with `key`, `passed`, and `detail`. |
+| `checks` | The ordered checks of the selected version, each with `key`, `passed`, and `detail`: the seven set checks under `follow`, the four pinned checks under `pinned`, none under `off`. |
 | `matched` | `true` for an answer, `false` for a verified absence, `null` for a failed verdict. |
 | `output` | The answer. It is `null` unless `matched` is `true`. |
 | `artifact_hash` | The digest of the answering artifact. It is `null` unless `matched` is `true`. |
@@ -232,7 +233,7 @@ Status 0 means `matched` is `true`. Status 6 covers both other states, and `matc
 verified absence reports `false`, and a failed verdict reports `null`. An unregistered operation is
 status 3. An empty promoted set is not an error: it verifies and reports a verified absence.
 
-One resolve runs the full seven-check verification, so it costs what `function verify` costs. Measured
+One resolve under `follow` runs the full seven-check verification, so it costs what `function verify` costs. Measured
 end to end through the shipped method, in exact mode before the seventh check existed: 5.7 ms for
 one entry, 613 ms for 1,000 entries, and 36,452 ms with 985,696 KiB peak resident memory at the
 50,000-entry maximum (`.agent/decisions/m3u2b-resolve-bench.json`). The cost grows with the size of
@@ -254,6 +255,11 @@ The command takes one operation name and one required `--submission`. `--submiss
 candidate in one JSON object. Pass `-` to read that object from standard input:
 
 ```bash
+cat > candidate.json <<'JSON'
+{"input": {"question": "Where is my invoice?"},
+ "output": {"kind": "reply", "text": "candidate"},
+ "source_id": "chat-7:message-3"}
+JSON
 uv run cement --db demo.db --partition acme proposal submit support.reply --submission - < candidate.json
 ```
 
@@ -262,8 +268,9 @@ refuses an argument list above 131,071 bytes, and only one flag can read standar
 also visible to observers on the same host, because it enters the argument list of the process.
 Prefer `-` for a candidate you must protect.
 
-The object takes three keys. `input` and `output` are required. `provenance` is optional and defaults to
-an empty object. Any other key is an error, and the message names every offending key. A repeated key is
+The object takes four keys. `input` and `output` are required. `provenance` is optional and defaults to
+an empty object. `source_id` is optional: it names the observation, and Cement refuses a second
+proposal with the same source id (exit 4). Any other key is an error, and the message names every offending key. A repeated key is
 also an error, so the command never silently keeps one of two values.
 
 Success prints one key, `proposal_id`, at status 0. The command echoes no part of the candidate.
@@ -283,13 +290,21 @@ shares that one review surface.
 Some operations receive inputs that share one structure and differ in their values: forms of one
 layout with different patients, for example. Exact keys would never repeat there. A projection program
 (`cement-projection-v1`) maps each raw input to the key of its case: the layout and its field names.
-The learning pass writes the program. Cement verifies it before it stores it:
+The learning pass writes the program. Cement verifies it before it stores it. This program
+recognizes one intake form layout of an operation `form.plan` whose input is `{"document": TEXT}`.
+`projection set` refuses a layout that no confirmed example shows, so the learning pass first
+confirms examples of each layout:
 
 ```bash
-uv run cement --db demo.db --partition acme projection test support.reply --program - < program.json
-uv run cement --db demo.db --partition acme projection set support.reply --program - \
+cat > program.json <<'JSON'
+{"abi": "cement-projection-v1", "text": "document", "keep": [],
+ "layouts": [{"name": "intake", "title": "PATIENT INTAKE FORM",
+              "entries": [{"label": "Name"}, {"label": "Date of birth"}]}]}
+JSON
+uv run cement --db demo.db --partition acme projection test form.plan --program - < program.json
+uv run cement --db demo.db --partition acme projection set form.plan --program - \
   --actor learning-pass < program.json
-uv run cement --db demo.db --partition acme projection show support.reply
+uv run cement --db demo.db --partition acme projection show form.plan
 ```
 
 `projection test` previews the program and writes nothing. `projection set` refuses a program that
@@ -311,11 +326,13 @@ Its read surface groups pending proposals and active examples by case key:
 
 ```bash
 uv run cement --db demo.db --partition acme learn cases support.reply
-uv run cement --db demo.db --partition acme learn cases support.reply --program - < program.json
+uv run cement --db demo.db --partition acme learn cases form.plan --program - < program.json
 ```
 
 Two commands change earlier confirmations. `example supersede` replaces earlier examples with a
-re-merged output that extends them. `example revoke` withdraws an example that is wrong, and it also
+re-merged output that extends them: one new example for each old one, with the same input. It
+writes nothing and exits 2 for an empty or repeated id, an unknown, revoked or already superseded
+example, an example of another operation, or an output equal to the old one. `example revoke` withdraws an example that is wrong, and it also
 stops every version built on that example from answering.
 
 ## Library API
@@ -429,7 +446,7 @@ writes. `resolve` also reports an `off` switch, which answers nothing. Review re
 through `proposal show` and `System.review`, which both return `accepted`, `corrected`, or `rejected`.
 
 A suspended artifact stops answering, and a contradicted one makes the live set fail verification
-until a promotion replaces it. A later operation revision retires the older builds, and Cement then
+until a promotion replaces it or the contradicting example is revoked or superseded. A later operation revision retires the older builds, and Cement then
 allows only rejection for a pending proposal from that older revision.
 
 `cement-json-v1` accepts null, booleans, strings, signed 64-bit integers, arrays, and string-keyed

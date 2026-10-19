@@ -18,8 +18,9 @@
   pass, never an instruction: a chat integration can deliver fabricated tool calls (the Open WebUI
   example states how).
 - The learning pass's judgment. It is an LLM run: its reviews, merges, and projection programs can be
-  wrong. Cement verifies a program's grammar and consistency, never its semantic correctness, and the
-  switch keeps a person between every learned version and production.
+  wrong. Cement verifies a program's grammar and consistency, never its semantic correctness. The
+  switch keeps a person's decision between learned versions and production: it starts `off`, `follow`
+  is a standing choice to serve each new version, and `pinned` keeps one version.
 - Stored input/output content when rendered by another system.
 - Frequency by itself, reviewer labels without deployment authentication, and any inferred scope.
 - Exported bundle files, including the hash embedded in them. The parser validates every bundle as
@@ -49,9 +50,10 @@
   `function_hash`. The embedded hash proves normalized self-consistency only. An independently obtained
   expected hash additionally pins caller-held identity. The hash is unkeyed, so neither mode proves
   origin or acts as a signature. An expected hash copied from the same untrusted bundle adds no trust.
-- A live export emits bundle bytes only after all seven set checks pass. A drifted set produces no bytes
-  and reports the complete failed check vector on stderr. A historical export emits bytes only after
-  full receipt reconstruction.
+- An export follows the switch. Under `follow` it emits bundle bytes only after all seven set checks
+  pass; under `pinned` only after the four pinned checks pass; under `off` it emits nothing. A
+  drifted set produces no bytes and reports the complete failed check vector on stderr. A historical
+  export emits bytes only after full receipt reconstruction.
 - `function export --out` writes atomically through a mode-0600 temporary file and refuses a
   non-regular destination. The destination is old or new, never partial, if no other process mutates
   it. The write performs no directory fsync, and a final target race remains possible.
@@ -71,7 +73,8 @@
   one prospective function hash under a write lock. The sixth check requires the latest persisted
   receipt to bind the live promoted snapshot. Individually valid artifacts therefore cannot pass as a
   set without a current checkpoint. The seventh check requires one program across the set.
-- A contradicting confirmation fails live verification until a promotion replaces the member. A
+- A contradicting confirmation fails live verification until a promotion replaces the member, or
+  until the contradicting example is revoked or superseded. A
   challenge suspends the member it contradicts, a revocation suspends every dependent build, and an
   integrity failure fails closed. A pinned version stops answering when one of its members is
   challenged, revoked, or suspended.

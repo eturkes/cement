@@ -17,8 +17,9 @@ exact deterministic lookups:
    output. It carries no request identifier, and neither does any proposal read or report value.
    The event payload of a proposal or a review action also carries no request identifier. The
    learning pass runs as an operator skill (`skills/cement-learn/`) and records its
-   reviews as the reviewer `learning-pass`. Cement records the reviewer name that it receives and
-   decides nothing from it.
+   reviews as the reviewer `learning-pass`. Cement authenticates no reviewer name: it records the
+   name and counts distinct names toward the policy's reviewer gate, and it decides nothing else
+   from it.
 4. Later confirmations can change the answer of a case. `supersede_examples` replaces earlier
    examples with a re-merged output, one new example for each old one, so one observation still earns
    one support credit. `revoke_example` withdraws an example that is wrong.
@@ -71,7 +72,7 @@ limits of 1 MiB, 100,000 items, and depth 64 still apply, so a rich set can fail
 A new confirmation that gives a promoted case a different output is a revision, not corruption. Review
 records an `artifact.contradicted` event and changes no artifact status. The live set then fails
 verification, so `follow` answers nothing for that operation until a promotion replaces the
-contradicted member. The promotion plan refuses (status 4) while a contradicted member has no verified
+contradicted member, or until the contradicting example is revoked or superseded. The promotion plan refuses (status 4) while a contradicted member has no verified
 replacement, and it names the remedies: supersede, revoke, or suspend. A pinned version keeps
 answering, because the switch pins what the person chose. `challenge` is an explicit judgment: it
 records a counterexample and suspends the member that it contradicts. A pinned version stops
@@ -221,8 +222,9 @@ as counts and digests. A membership row names its receipt, its ordinal, its arti
 Triggers reject every update and delete on both tables. A further trigger rejects a membership insert
 once the receipt row exists, so promotion must write the whole membership set before its receipt. A
 deferred composite foreign key binds each membership to its receipt and to exactly that receipt's
-`function_hash`. Version 3 also stores proposals with their scope and source id, the supersession
-links between examples, the projection programs and settings, and the switch settings, each append-only.
+`function_hash`. Version 3 also stores proposals with their scope and source id, and the supersession
+links between examples. The projection programs, the projection settings, and the switch settings are
+append-only.
 Initialization rejects a version-2 ledger and names the reset; this release ships no migration runner.
 
 Set promotion emits one `function.promoted` event with bounded ID projections. The membership table
