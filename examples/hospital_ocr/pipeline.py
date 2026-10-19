@@ -1,9 +1,7 @@
-"""Deterministic OCR-to-JSON core for the synthetic hospital corpus.
+"""Deterministic OCR parsing and plan application for the synthetic hospital corpus.
 
-The pipeline builds patient-independent signatures for exact document layouts and
-applies reviewed reference plans to full OCR text. In the complete example, cement
-can return a plan deterministically for a known signature, but it does not generalize
-across layouts or guarantee that a plan extracts every future document correctly.
+The adapter inspects layouts locally to propose plans. Cement receives raw documents;
+its verified projection, not this parser, chooses the exact case used for reuse.
 """
 
 from __future__ import annotations

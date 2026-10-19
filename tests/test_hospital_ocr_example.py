@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import re
+import runpy
 import sqlite3
 import subprocess
 import sys
@@ -14,6 +15,7 @@ import unittest
 from unittest import mock
 
 from cement_runtime import (
+    Candidate,
     CandidateRequest,
     FunctionDocument,
     FunctionMatch,
@@ -21,6 +23,7 @@ from cement_runtime import (
     System,
 )
 from cement_runtime.json_value import canonicalize
+from cement_runtime.projection import structure
 
 EXAMPLE_DIR = Path(__file__).resolve().parents[1] / "examples" / "hospital_ocr"
 sys.path.insert(0, str(EXAMPLE_DIR))
@@ -369,7 +372,7 @@ class PlanAdapterTests(unittest.TestCase):
         ):
             with self.subTest(filename=filename):
                 ocr_text = _document(filename)
-                signature = pipeline.layout_signature(ocr_text)
+                signature = {"document": ocr_text}
                 proposed = proposer.propose(self.request(signature))
                 reference = pipeline.reference_plan(DOCUMENT_TYPES[filename])
                 self.assertIsNotNone(reference)
@@ -379,9 +382,7 @@ class PlanAdapterTests(unittest.TestCase):
                 )
 
     def test_propose_is_byte_deterministic_for_output_and_provenance(self) -> None:
-        signature = pipeline.layout_signature(
-            _document("layout_a_progress_note_01.txt")
-        )
+        signature = {"document": _document("layout_a_progress_note_01.txt")}
         proposer = plan_adapter.PlanProposer()
         first = proposer.propose(self.request(signature))
         second = proposer.propose(self.request(signature))
@@ -396,9 +397,7 @@ class PlanAdapterTests(unittest.TestCase):
         )
 
     def test_returned_known_plan_is_deep_copy_isolated(self) -> None:
-        signature = pipeline.layout_signature(
-            _document("layout_a_progress_note_01.txt")
-        )
+        signature = {"document": _document("layout_a_progress_note_01.txt")}
         document_type = "physician_progress_note"
         reference_before = _canonical_bytes(pipeline.REFERENCE_PLANS[document_type])
         proposer = plan_adapter.PlanProposer()
@@ -420,7 +419,7 @@ class PlanAdapterTests(unittest.TestCase):
             "Assessment:\nProvider: Dr. Elena Ramirez\n"
             "Viral upper respiratory infection.",
         )
-        signature = pipeline.layout_signature(drifted)
+        signature = {"document": drifted}
         candidate = plan_adapter.PlanProposer().propose(self.request(signature))
         canonicalize(candidate.output)
 
@@ -470,7 +469,7 @@ Follow-up: one month.
 Reviewer: Dr. Grace Hopper
 Status: Final
 """
-        signature = pipeline.layout_signature(ocr_text)
+        signature = {"document": ocr_text}
         candidate = plan_adapter.PlanProposer().propose(self.request(signature))
         canonicalize(candidate.output)
 
@@ -495,7 +494,7 @@ Patient Name: Ada Lovelace
 Patient-Name: Grace Hopper
 Patient_Name: Katherine Johnson
 """
-        signature = pipeline.layout_signature(ocr_text)
+        signature = {"document": ocr_text}
         candidate = plan_adapter.PlanProposer().propose(self.request(signature))
         canonicalize(candidate.output)
 
@@ -533,8 +532,10 @@ Patient_Name: Katherine Johnson
         )
 
         for identifier, signature in signatures:
-            with self.subTest(identifier=identifier), self.assertRaises(ValueError):
-                proposer.propose(self.request(signature))
+            with self.subTest(identifier=identifier), self.assertRaises(ValueError), mock.patch.object(
+                pipeline, "layout_signature", return_value=signature
+            ):
+                proposer.propose(self.request({"document": "raw text"}))
 
     def test_malformed_signatures_are_rejected_defensively(self) -> None:
         proposer = plan_adapter.PlanProposer()
@@ -543,13 +544,17 @@ Patient_Name: Katherine Johnson
 
         for signature in (
             {},
-            {"document_type": ""},
-            {"document_type": 1},
+            {"document": ""},
+            {"document": 1},
+            {"document": "A", "extra": "B"},
         ):
             with self.subTest(signature=signature), self.assertRaises(ValueError):
                 proposer.propose(self.request(signature))
 
         malformed_structures = (
+            {},
+            {"document_type": ""},
+            {"document_type": 1},
             {"document_type": "unknown_note"},
             {"document_type": "unknown_note", "structure": "not-a-list"},
             {"document_type": "unknown_note", "structure": ["not-an-object"]},
@@ -587,8 +592,10 @@ Patient_Name: Katherine Johnson
             },
         )
         for signature in malformed_structures:
-            with self.subTest(signature=signature), self.assertRaises(ValueError):
-                proposer.propose(self.request(signature))
+            with self.subTest(signature=signature), self.assertRaises(ValueError), mock.patch.object(
+                pipeline, "layout_signature", return_value=signature
+            ):
+                proposer.propose(self.request({"document": "raw text"}))
 
 
 SEED_DOCUMENTS = (
@@ -603,45 +610,22 @@ FUNCTION_HASH_MASK = re.compile(r"[0-9a-f]{64}")
 
 
 def _promoted_example_ledger(database: str) -> FunctionDocument:
-    """Promote layouts A and B, then seal them as one verified function.
-
-    Reuses the demo's own scope constants and checkpoint sequence, so this
-    fixture cannot drift from the walkthrough it stands in for. It narrates
-    nothing; `run_demo` owns narration.
-    """
+    """The demo's real learning pass publishes A/B; its switch stays off."""
 
     system = System(database, candidate_source=plan_adapter.PlanProposer())
-    system.register_operation(
-        run_demo.PARTITION,
-        run_demo.OPERATION,
-        policy=run_demo.DEMO_POLICY,
-    )
+    system.register_operation(run_demo.PARTITION, run_demo.OPERATION)
     for filename in SEED_DOCUMENTS:
-        signature = pipeline.layout_signature(_document(filename))
-        outcome = system.propose(run_demo.PARTITION, run_demo.OPERATION, signature)
-        system.review(
-            run_demo.PARTITION,
-            outcome,
-            reviewer="records-supervisor",
-            decision="accept",
-        )
-
-    build = system.compile(run_demo.PARTITION, run_demo.OPERATION)
+        system.propose(run_demo.PARTITION, run_demo.OPERATION,
+                       {"document": _document(filename)})
+    function, build = run_demo.learning_pass(system, run=1)
     assert len(build.created) == 2
-    for artifact_id in build.created:
-        report = system.verify(run_demo.PARTITION, artifact_id)
-        assert report.passed
-        system.promote(
-            run_demo.PARTITION,
-            artifact_id,
-            scope_hash=report.scope_hash,
-            promoted_by="informatics-lead",
-        )
-    return run_demo.checkpoint_function(system)
+    return function
 
 
 def _signature_digest(filename: str) -> str:
-    return canonicalize(pipeline.layout_signature(_document(filename))).digest
+    title, pairs = structure(_document(filename))
+    return canonicalize({"form": {"title": title, "structure": [list(pair) for pair in pairs]},
+                         "keep": {}}).digest
 
 
 def _mask_per_run_values(text: str) -> str:
@@ -723,8 +707,7 @@ class OfflineBundleTests(unittest.TestCase):
         self.assertEqual(extracted, EXPECTED_OUTPUTS[filename])
 
     def test_resolution_returns_the_library_miss_for_unexported_layout_c(self) -> None:
-        # Layout C reached one confirmation only, so it never entered the
-        # function; an absent scope answers a miss rather than a near match.
+        # This fixture publishes A/B only; the projection refuses layout C.
         with self.no_ledger():
             function_hash, match = self.resolve(_document("layout_c_lab_slip_01.txt"))
 
@@ -752,7 +735,7 @@ class OfflineBundleTests(unittest.TestCase):
         self.assertEqual(document.function_hash, self.function_hash)
         self.assertEqual(
             keywords["input_json"].digest,
-            canonicalize(pipeline.layout_signature(ocr_text)).digest,
+            canonicalize({"document": ocr_text}).digest,
         )
 
     def test_a_bundle_that_misses_the_held_identity_is_refused(self) -> None:
@@ -806,7 +789,7 @@ class ShippedCommandRoundTripTests(unittest.TestCase):
     def evaluate(
         self, bundle: str, filename: str, function_hash: str
     ) -> subprocess.CompletedProcess[str]:
-        signature = pipeline.layout_signature(_document(filename))
+        signature = {"document": _document(filename)}
         # No `--db` and no ledger in the environment. This is the operator
         # invocation shape, not a ledger-freedom proof: `eval` is dispatched
         # ahead of the `--db` gate, so the CLI-leaf ledger-freedom pin stays
@@ -906,9 +889,7 @@ class ShippedCommandRoundTripTests(unittest.TestCase):
 
 class DemoTranscriptTests(unittest.TestCase):
     def test_demo_refuses_to_run_where_python_removes_its_assertions(self) -> None:
-        # Every verdict in the demo is an `assert`, so `-O` and `-OO` erase all
-        # 35 of them while the final success line still prints. The claim would
-        # then be unbacked, so the demo must fail closed instead.
+        # Optimized Python erases the demo's verdicts; it must refuse the run.
         for flag in ("-O", "-OO"):
             with self.subTest(flag=flag):
                 result = subprocess.run(
@@ -922,8 +903,8 @@ class DemoTranscriptTests(unittest.TestCase):
                 self.assertNotIn("All checks passed.", result.stdout)
 
     def test_demo_output_matches_the_pinned_readme_transcript(self) -> None:
-        # Two values move per run: the layout-A artifact ID and the function
-        # hash. Everything else is byte-stable, so the README block is a gate.
+        # One compiled artifact ID and the final function hash move per run.
+        # Every other line stays byte-identical to the pinned transcript.
         stream = io.StringIO()
         with contextlib.redirect_stdout(stream):
             run_demo.main()
@@ -938,14 +919,12 @@ class DemoTranscriptTests(unittest.TestCase):
         self.assertEqual(_mask_per_run_values(output), _readme_transcript())
 
     def test_the_offline_phase_runs_on_the_verified_bytes_after_teardown(self) -> None:
-        # Nothing above forces `main()` to use the verified document, to call
-        # the helper at all, or to wait until the ledger is gone. Act 6 could
-        # sit inside the `with` block and every other assertion would hold.
-        directories: list[str] = []
-        verifications: list[object] = []
-        calls: list[tuple[str, bool]] = []
+        directories = []
+        exports = []
+        calls = []
+        matches = []
         real_directory = tempfile.TemporaryDirectory
-        real_verify = System._verify_function_snapshot
+        real_serving = System.serving
         real_resolve = run_demo.resolve_offline
 
         def recording_directory(*args, **kwargs):
@@ -953,40 +932,190 @@ class DemoTranscriptTests(unittest.TestCase):
             directories.append(handle.name)
             return handle
 
-        def recording_verify(system, *args, **kwargs):
-            result = real_verify(system, *args, **kwargs)
-            verifications.append(result)
+        def recording_serving(system, *args, **kwargs):
+            result = real_serving(system, *args, **kwargs)
+            if kwargs.get("expected_function_hash") is not None:
+                exports.append((result, any(os.path.exists(path) for path in directories)))
             return result
 
         def recording_resolve(bundle_text, *args, **kwargs):
-            calls.append(
-                (bundle_text, any(os.path.exists(path) for path in directories))
-            )
-            return real_resolve(bundle_text, *args, **kwargs)
+            calls.append((bundle_text, kwargs["expected_function_hash"],
+                          any(os.path.exists(path) for path in directories)))
+            result = real_resolve(bundle_text, *args, **kwargs)
+            matches.append((args[0], result[1]))
+            return result
 
         with contextlib.redirect_stdout(io.StringIO()), mock.patch.object(
             run_demo.tempfile, "TemporaryDirectory", recording_directory
         ), mock.patch.object(
-            System, "_verify_function_snapshot", recording_verify
-        ), mock.patch.object(
-            run_demo, "resolve_offline", recording_resolve
-        ):
+            System, "serving", recording_serving
+        ), mock.patch.object(run_demo, "resolve_offline", recording_resolve):
             run_demo.main()
 
         self.assertEqual(len(directories), 1)
         self.assertFalse(os.path.exists(directories[0]))
-        self.assertEqual(len(verifications), 4)
-        documents = [record.document for record in verifications]
-        self.assertNotIn(None, documents)
-        # Act 1 checkpoints a one-entry set and Act 3 a two-entry set, so the
-        # first document differs from the last. Act 4 promotes nothing, which
-        # is why every verification from the second promotion on sees one set.
-        self.assertNotEqual(documents[0].text, documents[-1].text)
-        self.assertEqual({record.text for record in documents[2:]}, {documents[-1].text})
-        document = documents[-1]
-        self.assertEqual(
-            calls, [(document.text, False), (document.text, False)]
-        )
+        self.assertEqual(len(exports), 1)
+        ((state, verification), existed) = exports[0]
+        self.assertTrue(existed)
+        self.assertEqual(state.mode, "follow")
+        self.assertTrue(verification.passed)
+        self.assertIsNotNone(verification.document)
+        document = verification.document
+        self.assertEqual(len(document.input_hashes), 3)
+        self.assertEqual(calls, [(document.text, document.function_hash, False)] * 2)
+        self.assertEqual([match.matched for _, match in matches], [True, False])
+        self.assertEqual(pipeline.apply_plan(matches[0][1].output, matches[0][0]),
+                         EXPECTED_OUTPUTS["layout_a_progress_note_03.txt"])
+        self.assertIsNone(matches[1][1].output)
+        self.assertIn("UNSEEN FOLLOW-UP NOTE", matches[1][0])
+
+
+class LearningWalkthroughTests(unittest.TestCase):
+    def test_adapter_receives_raw_document_not_a_precomputed_signature(self) -> None:
+        text = _document("layout_a_progress_note_01.txt")
+        candidate = plan_adapter.PlanProposer().propose(CandidateRequest(
+            partition=run_demo.PARTITION, operation=run_demo.OPERATION,
+            operation_revision=1, input={"document": text},
+        ))
+        self.assertEqual(pipeline.apply_plan(candidate.output, text),
+                         EXPECTED_OUTPUTS["layout_a_progress_note_01.txt"])
+
+    def test_learning_pass_groups_raw_inputs_and_leaves_switch_off(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            system = System(os.path.join(directory, "cement.db"),
+                            candidate_source=plan_adapter.PlanProposer())
+            system.register_operation(run_demo.PARTITION, run_demo.OPERATION)
+            filenames = (*SEED_DOCUMENTS, "layout_c_lab_slip_01.txt")
+            ids = [system.propose(run_demo.PARTITION, run_demo.OPERATION,
+                                  {"document": _document(name)}) for name in filenames]
+            self.assertEqual({system.proposal(run_demo.PARTITION, ident)["status"]
+                              for ident in ids}, {"pending"})
+            function, build = run_demo.learning_pass(system, run=1)
+            self.assertEqual(len(function.input_hashes), 2)
+            self.assertEqual(len(build.created), 2)
+            self.assertEqual([row["support"] for row in build.blocked], [1])
+            self.assertEqual({system.proposal(run_demo.PARTITION, ident)["reviewer"]
+                              for ident in ids}, {"learning-pass"})
+            self.assertEqual(system.switch(run_demo.PARTITION, run_demo.OPERATION).mode,
+                             "off")
+            self.assertEqual(function.value["projection"]["abi"], "cement-projection-v1")
+
+    def test_learning_pass_merges_proposals_and_supersedes_an_earlier_plan(self) -> None:
+        full = pipeline.reference_plan("physician_progress_note")
+        narrow = json.loads(json.dumps(full))
+        narrow["fields"] = [row for row in narrow["fields"] if row["name"] != "provider"]
+        with tempfile.TemporaryDirectory() as directory:
+            system = System(os.path.join(directory, "cement.db"))
+            system.register_operation(run_demo.PARTITION, run_demo.OPERATION)
+            initial = []
+            for filename in ("layout_a_progress_note_01.txt", "layout_a_progress_note_02.txt"):
+                ident = system.submit_proposal(run_demo.PARTITION, run_demo.OPERATION,
+                    {"document": _document(filename)}, candidate=Candidate(output=narrow, provenance={}))
+                initial.append(ident)
+            first, _ = run_demo.learning_pass(system, run=1)
+            # One old narrow output, one pending narrow output, and one complete
+            # output must all become the same merged plan without extra support.
+            for filename, output in (("layout_a_progress_note_03.txt", narrow),
+                                     ("layout_a_progress_note_01.txt", full)):
+                system.submit_proposal(run_demo.PARTITION, run_demo.OPERATION,
+                    {"document": _document(filename)}, candidate=Candidate(output=output, provenance={}))
+            second, _ = run_demo.learning_pass(system, run=2)
+            rows = system.examples(run_demo.PARTITION, run_demo.OPERATION)
+            active = [row for row in rows if row["superseded_by"] is None]
+            self.assertEqual(len(active), 4)
+            self.assertEqual(sum(row["supersedes_example_id"] is not None for row in active), 2)
+            self.assertEqual({row["reviewer"] for row in active}, {"learning-pass"})
+            self.assertEqual(len({_canonical_bytes(row["output"]) for row in active}), 1)
+            self.assertEqual(pipeline.apply_plan(active[0]["output"],
+                             _document("layout_a_progress_note_03.txt")),
+                             EXPECTED_OUTPUTS["layout_a_progress_note_03.txt"])
+            self.assertNotEqual(first.function_hash, second.function_hash)
+            self.assertEqual(system.switch(run_demo.PARTITION, run_demo.OPERATION).mode, "off")
+
+    def test_learning_pass_extends_the_program_from_unprojected_retained_documents(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            system = System(os.path.join(directory, "cement.db"),
+                            candidate_source=plan_adapter.PlanProposer())
+            system.register_operation(run_demo.PARTITION, run_demo.OPERATION)
+            for filename in SEED_DOCUMENTS[:2]:
+                system.propose(run_demo.PARTITION, run_demo.OPERATION, {"document": _document(filename)})
+            first, _ = run_demo.learning_pass(system, run=1)
+            for filename in SEED_DOCUMENTS[2:]:
+                system.propose(run_demo.PARTITION, run_demo.OPERATION, {"document": _document(filename)})
+            work = system.learning_cases(run_demo.PARTITION, run_demo.OPERATION)
+            self.assertEqual(len(work["unprojected"]["proposal_ids"]), 2)
+            second, _ = run_demo.learning_pass(system, run=2)
+            self.assertEqual((len(first.input_hashes), len(second.input_hashes)), (1, 2))
+            self.assertEqual(len(second.value["projection"]["layouts"]), 2)
+
+    def test_main_runs_learning_switch_and_rollback_on_raw_documents(self) -> None:
+        records = []
+        names = ("propose", "learning_cases", "review", "test_projection", "set_projection", "compile",
+                 "verify_drafts", "promote_function", "set_switch", "resolve",
+                 "function_versions", "diff_versions", "serving")
+
+        def recorder(name, real):
+            def call(system, *args, **kwargs):
+                result = real(system, *args, **kwargs)
+                records.append((name, args, kwargs, result))
+                return result
+            return call
+
+        with contextlib.ExitStack() as stack:
+            for name in names:
+                stack.enter_context(mock.patch.object(System, name, recorder(name, getattr(System, name))))
+            stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
+            run_demo.main()
+
+        def calls(name):
+            return [row for row in records if row[0] == name]
+
+        proposals = calls("propose")
+        self.assertEqual(len(proposals), 7)
+        self.assertTrue(all(set(row[1][2]) == {"document"} for row in proposals))
+        self.assertEqual({row[2]["reviewer"] for row in calls("review")}, {"learning-pass"})
+        self.assertEqual(len(calls("review")), 6)
+        self.assertGreaterEqual(len(calls("learning_cases")), 4)
+        self.assertEqual(len(calls("test_projection")), 2)
+        self.assertEqual(len(calls("set_projection")), 2)
+        self.assertEqual([len(row[3].created) for row in calls("compile")], [2, 1])
+        self.assertEqual([len(row[3].entries) for row in calls("verify_drafts")], [2, 1])
+        self.assertEqual(len(calls("promote_function")), 2)
+        self.assertEqual({row[2]["promoted_by"] for row in calls("promote_function")}, {"learning-pass"})
+        switches = calls("set_switch")
+        self.assertEqual({row[2]["actor"] for row in switches}, {"person"})
+        self.assertEqual([row[2]["mode"] for row in switches], ["follow", "pinned", "follow"])
+        resolutions = calls("resolve")
+        self.assertEqual([row[3].match is not None and row[3].match.matched
+                          for row in resolutions], [False, True, False, False, True])
+        # The new patient's input never became a retained proposal.
+        self.assertNotIn(resolutions[1][1][2], [row[1][2] for row in proposals])
+        (diff,) = [row[3] for row in calls("diff_versions")]
+        self.assertEqual((len(diff.added), diff.removed, diff.changed), (1, (), ()))
+        self.assertEqual(switches[1][2]["function_hash"], diff.from_function_hash)
+        versions = calls("function_versions")[-1][3]
+        self.assertEqual(len(versions.versions), 2)
+        self.assertEqual(sum(version.selected for version in versions.versions), 1)
+        serving = calls("serving")[-1][3]
+        self.assertEqual(serving[0].mode, "follow")
+        self.assertEqual(serving[1].function_hash, diff.to_function_hash)
+
+
+class TranscriptUpdaterTests(unittest.TestCase):
+    def test_updater_changes_only_transcript_and_is_idempotent(self) -> None:
+        script = EXAMPLE_DIR.parents[1] / ".agent/decisions/m3u8-transcript.py"
+        regenerate = runpy.run_path(str(script))["regenerate"]
+        original = "Before.\n\n```text\nold output\n```\n\nAfter.\n"
+        output = "artifact art_" + "a" * 32 + "\nhash " + "b" * 64 + "\n"
+        expected = "Before.\n\n```text\nartifact art_<hex>\nhash <function-hash>\n```\n\nAfter.\n"
+        changed = regenerate(original, output)
+        self.assertEqual(changed, expected)
+        self.assertEqual(regenerate(changed, output), changed)
+        for invalid in (output + "art_" + "c" * 32, output.replace("b" * 64, "missing")):
+            with self.subTest(output=invalid), self.assertRaises(ValueError):
+                regenerate(original, invalid)
+        with self.assertRaises(ValueError):
+            regenerate(original + "```text\nsecond\n```\n", output)
 
 
 if __name__ == "__main__":

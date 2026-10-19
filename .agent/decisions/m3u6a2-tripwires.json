@@ -29,7 +29,7 @@
       "test": "test_d22c_the_opening_text_handle_request_fence_is_protected_and"
     }
   ],
-  "head": "ea2c9363c840a50e7ad0c1804cd9af31911d7703",
+  "head": "f33aa7b54196186bf44e11a97fee0443f6ae8068",
   "pins": [
     {
       "lines": 76,
@@ -276,17 +276,10 @@
     {
       "document": "examples/hospital_ocr/README.md",
       "grounds": "already rewritten by M3.6a1's D22-D23 transcript regeneration; the surviving hit is the demo's own prose and names no deleted surface",
-      "hit_lines": 1,
-      "hits": [
-        {
-          "line": 246,
-          "tokens": [
-            "request"
-          ]
-        }
-      ],
+      "hit_lines": 0,
+      "hits": [],
       "owner": "M3.6a1",
-      "total_lines": 248
+      "total_lines": 153
     },
     {
       "document": "examples/open_webui/README.md",
@@ -332,7 +325,7 @@
     "pins": 15,
     "pins_working_tree": 12,
     "prose_documents_owned": 4,
-    "prose_hit_lines": 14
+    "prose_hit_lines": 13
   },
   "unit": "M3.6a2",
   "vocabulary": "\\bhandle\\b|request_status|retry_failed|invalidated_generators|resolved_by_artifact|\\brequests?\\b|\\blease\\b|in_progress|fallback_failed|reconciliation_required|[Aa]mbigu\\w*"

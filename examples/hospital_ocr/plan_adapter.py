@@ -17,13 +17,18 @@ from cement_runtime import Candidate, CandidateRequest
 
 
 class PlanProposer:
-    """Propose a deterministic extraction plan for a layout signature."""
+    """Propose a deterministic extraction plan from a raw document."""
 
     def __init__(self, source_id: str = "hospital-ocr-plan-stub") -> None:
         self._source_id = source_id
 
     def propose(self, request: CandidateRequest) -> Candidate:
-        signature = request.input
+        raw = request.input
+        if type(raw) is not dict:
+            raise TypeError("document input must be a JSON object")
+        if set(raw) != {"document"} or type(raw["document"]) is not str:
+            raise ValueError("document input must contain only a document string")
+        signature = pipeline.layout_signature(raw["document"])
         if type(signature) is not dict:
             raise TypeError("layout signature must be a JSON object")
 
@@ -139,13 +144,13 @@ def _field_name(value: str) -> str:
 def _self_check() -> None:
     proposer = PlanProposer()
     document = Path(__file__).with_name("documents") / "layout_a_progress_note_01.txt"
-    signature = pipeline.layout_signature(pipeline.ocr(document))
+    raw = {"document": pipeline.ocr(document)}
     known = proposer.propose(
         CandidateRequest(
             partition="example-hospital",
             operation="document.extraction_plan",
             operation_revision=1,
-            input=signature,
+            input=raw,
         )
     )
     reference = pipeline.reference_plan("physician_progress_note")
@@ -158,13 +163,7 @@ def _self_check() -> None:
             partition="example-hospital",
             operation="document.extraction_plan",
             operation_revision=1,
-            input={
-                "document_type": "unknown_note",
-                "structure": [
-                    {"kind": "section", "key": "Summary"},
-                    {"kind": "label", "key": "Signer"},
-                ],
-            },
+            input={"document": "UNKNOWN NOTE\n\nSummary:\nRecovery is complete.\n\nSigner: Doctor"},
         )
     )
     assert unknown.output == {

@@ -1,19 +1,11 @@
-"""Guided, deterministic lifecycle demo for the hospital OCR example.
+"""Raw documents → scripted learning pass → versioned, switched extraction plans.
 
-The in-process plan proposer is deliberately not an LLM; it stands in for a
-bespoke extraction-plan call while keeping this demo offline and repeatable.
-Cement can return a reviewed plan deterministically for a known layout
-signature, but the adapter and reviewer remain responsible for whether that
-plan extracts future documents correctly.
-
-Each artifact promotion is sealed into the verified function set immediately, so
-the next document of a known layout resolves from that set. The closing act
-answers one document from the exported bytes alone, after the ledger is deleted.
+The provider and learning pass are offline stand-ins for LLM calls. The ledger,
+projection checks, compilation, verification, promotion and switch are real.
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import tempfile
@@ -26,6 +18,7 @@ from cement_runtime import (
     Candidate,
     CandidateRequest,
     CompilePolicy,
+    CompileResult,
     FunctionDocument,
     FunctionMatch,
     System,
@@ -33,15 +26,12 @@ from cement_runtime import (
     parse_function,
 )
 from cement_runtime.json_value import canonicalize
+from cement_runtime.projection import structure
 
 PARTITION = "example-hospital"
 OPERATION = "document.extraction_plan"
 DOCUMENTS = Path(__file__).with_name("documents")
-DEMO_POLICY = CompilePolicy(
-    min_confirmations=2,
-    min_reviewers=1,
-    min_span_seconds=0,
-)
+DEMO_POLICY = CompilePolicy()
 
 
 class CountingSource:
@@ -56,33 +46,59 @@ class CountingSource:
         return self._inner.propose(request)
 
 
-def _document(name: str) -> tuple[str, pipeline.JSONValue]:
-    ocr_text = pipeline.ocr(DOCUMENTS / name)
-    return ocr_text, pipeline.layout_signature(ocr_text)
+def _document(name: str) -> dict[str, str]:
+    return {"document": pipeline.ocr(DOCUMENTS / name)}
 
 
-def _signature_bytes(signature: pipeline.JSONValue) -> bytes:
-    return json.dumps(
-        signature,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
+def _program(inputs: list[pipeline.JSONValue]) -> pipeline.JSONValue:
+    layouts = {}
+    for raw in inputs:
+        parsed = structure(raw["document"])
+        if parsed is None:
+            raise ValueError("the scripted pass requires the demo's document grammar")
+        title, pairs = parsed
+        layouts[(title, pairs)] = {
+            "name": title.lower(),
+            "title": title,
+            "entries": [{kind: key} for kind, key in pairs],
+        }
+    return {
+        "abi": "cement-projection-v1",
+        "text": "document",
+        "keep": [],
+        "layouts": [layouts[key] for key in sorted(layouts)],
+    }
+
+
+def _merge_plans(outputs: list[pipeline.JSONValue]) -> pipeline.JSONValue:
+    """Union compatible plan rows; a disagreement needs real LLM judgment."""
+
+    merged = json.loads(canonicalize(outputs[0]).text)
+    fields = {field["name"]: field for field in merged["fields"]}
+    for output in outputs[1:]:
+        if (output["document_type"], output["layout"]) != (
+            merged["document_type"],
+            merged["layout"],
+        ):
+            raise ValueError("the scripted pass cannot merge different plan kinds")
+        for field in output["fields"]:
+            name = field["name"]
+            if name in fields and fields[name] != field:
+                raise ValueError("the scripted pass cannot resolve conflicting plan rows")
+            fields[name] = field
+    merged["fields"] = list(fields.values())
+    return merged
 
 
 def checkpoint_function(system: System) -> FunctionDocument:
-    """Seal every promoted entry of this operation as one verified function.
-
-    Returns the portable document whose `.text` is the exportable bundle and
-    whose `.function_hash` is the identity an operator carries away.
-    """
+    """Publish the verified cases as one version without changing the switch."""
 
     manifest = system.inspect_function_promotion(PARTITION, OPERATION)
     system.promote_function(
         PARTITION,
         OPERATION,
         expected_function_hash=manifest.function_hash,
-        promoted_by="informatics-lead",
+        promoted_by="learning-pass",
     )
     verification = system.verify_function(
         PARTITION,
@@ -94,46 +110,76 @@ def checkpoint_function(system: System) -> FunctionDocument:
     return verification.document
 
 
+def learning_pass(system: System, *, run: int) -> tuple[FunctionDocument, CompileResult]:
+    """Imitate cement-learn on this bounded corpus, never on arbitrary model output.
+
+    The scripted semantic decision is specific to these plans: each output reads
+    values from a document. The runtime checks the projection, not that decision.
+    """
+
+    work = system.learning_cases(PARTITION, OPERATION)
+    examples = {row["id"]: row for row in system.examples(PARTITION, OPERATION)}
+    proposal_ids = list(work["unprojected"]["proposal_ids"])
+    example_ids = list(work["unprojected"]["example_ids"])
+    for case in work["cases"]:
+        proposal_ids.extend(case["pending_proposal_ids"])
+        example_ids.extend(case["active_example_ids"])
+    inputs = [system.proposal(PARTITION, ident)["input"] for ident in proposal_ids]
+    inputs.extend(examples[ident]["input"] for ident in example_ids)
+    program = _program(inputs)
+    grouped = system.learning_cases(PARTITION, OPERATION, program=program)
+    assert not any(grouped["unprojected"].values())
+    note = f"demo run {run}; scripted stand-in, no LLM"
+    for case in grouped["cases"]:
+        merged = _merge_plans([row["output"] for row in case["outputs"]])
+        for row in case["outputs"]:
+            changed = row["output"] != merged
+            for ident in row["proposal_ids"]:
+                correction = {"corrected_output": merged} if changed else {}
+                system.review(
+                    PARTITION,
+                    ident,
+                    reviewer="learning-pass",
+                    decision="correct" if changed else "accept",
+                    note=note,
+                    **correction,
+                )
+            if changed and row["example_ids"]:
+                system.supersede_examples(
+                    PARTITION,
+                    OPERATION,
+                    example_ids=row["example_ids"],
+                    output=merged,
+                    reviewer="learning-pass",
+                    note=note,
+                )
+    preview = system.test_projection(PARTITION, OPERATION, program)
+    assert preview["projected"] > 0
+    assert not any(preview[key] for key in ("unprojected", "unwitnessed_layouts", "merged_outputs"))
+    system.set_projection(PARTITION, OPERATION, program, actor="learning-pass")
+    build = system.compile(PARTITION, OPERATION, compiled_by="learning-pass")
+    verified = system.verify_drafts(PARTITION, OPERATION, verified_by="learning-pass")
+    assert verified.passed
+    return checkpoint_function(system), build
+
+
 def resolve_offline(
     bundle_text: str,
     ocr_text: str,
     *,
     expected_function_hash: str,
 ) -> tuple[str, FunctionMatch]:
-    """Answer one document from exported bytes alone, with no ledger reachable.
+    """Use the shipped parser and evaluator on raw input, with the held hash required."""
 
-    `expected_function_hash` is the identity the operator carried away from the
-    verified set. It is required, and `parse_function` raises `IntegrityError`
-    when the bundle does not match it, so the binding survives `python -O` while
-    a bare `assert` would not. The hash is returned beside the match for callers
-    that report it.
-    """
-
-    function = parse_function(
-        bundle_text,
-        expected_function_hash=expected_function_hash,
-    )
-    signature = pipeline.layout_signature(ocr_text)
-    match = evaluate(function, input_json=canonicalize(signature))
+    function = parse_function(bundle_text, expected_function_hash=expected_function_hash)
+    match = evaluate(function, input_json=canonicalize({"document": ocr_text}))
     return function.function_hash, match
 
 
 def _print_event_trace(system: System) -> None:
     print("\n=== Audit event trace ===")
     for index, event in enumerate(system.events(PARTITION), start=1):
-        event_type = event.get("type")
-        if type(event_type) is not str:
-            event_type = event.get("kind")
-        if type(event_type) is not str:
-            event_type = "<missing type>"
-
-        detail = ""
-        for key in ("proposal_id", "artifact_id"):
-            value = event.get(key)
-            if type(value) is str:
-                detail = f"  {key}={value}"
-                break
-        print(f"{index:02d}. {event_type}{detail}")
+        print(f"{index:02d}. {event['kind']}")
 
 
 def main() -> None:
@@ -142,21 +188,13 @@ def main() -> None:
             "This demo verifies its results with assert statements. "
             "Python removes them under -O and -OO. Run this demo again without -O or -OO."
         )
-    print("Hospital OCR layout-learning demo (offline; no LLM or network).")
+    print("Hospital OCR learning demo (offline; no LLM or network).")
+    print("The plan adapter and learning pass are scripted stand-ins for LLM calls.")
+    print("Cement receives raw documents. The projection maps each recognized layout to one case.")
+    print("Default policy: 2 confirmations, 1 reviewer, no minimum time span.")
+    print("Assumption: documents with one layout need one extraction plan.")
     print(
-        "Cement receives patient-independent layout signatures and returns "
-        "reviewed extraction plans; the deterministic pipeline applies each "
-        "plan to patient OCR."
-    )
-    print(
-        "Demo policy: 2 confirmations, 1 reviewer, no minimum time span. "
-        "Production defaults are stricter: 3 confirmations, 2 reviewers, "
-        "and a 7-day span."
-    )
-    print(
-        "Boundary: cement guarantees deterministic plan return for a known "
-        "layout signature, not correct extraction from every future document; "
-        "that remains the adapter/reviewer's responsibility."
+        "Cement checks structure and consistency, not whether that assumption or plan is correct."
     )
 
     with tempfile.TemporaryDirectory() as temporary_directory:
@@ -165,183 +203,125 @@ def main() -> None:
         system = System(database, candidate_source=source)
         system.register_operation(PARTITION, OPERATION, policy=DEMO_POLICY)
 
-        print("\n=== Act 1: layout A recurs, is reviewed, and is promoted ===")
-        _, a_signature_01 = _document("layout_a_progress_note_01.txt")
-        _, a_signature_02 = _document("layout_a_progress_note_02.txt")
-        a_text_03, a_signature_03 = _document("layout_a_progress_note_03.txt")
-        assert _signature_bytes(a_signature_01) == _signature_bytes(a_signature_02)
-        assert _signature_bytes(a_signature_02) == _signature_bytes(a_signature_03)
-        print("Three patients share one byte-identical, patient-free layout signature.")
-
-        proposal_a_01 = system.propose(PARTITION, OPERATION, a_signature_01)
-        print("A01: adapter proposed a plan; records-supervisor review is required.")
-        system.review(
-            PARTITION,
-            proposal_a_01,
-            reviewer="records-supervisor",
-            decision="accept",
+        print("\n=== Act 1: retain the model's answers to raw documents ===")
+        names = (
+            "layout_a_progress_note_01.txt",
+            "layout_a_progress_note_02.txt",
+            "layout_b_intake_form_01.txt",
+            "layout_b_intake_form_02.txt",
+            "layout_c_lab_slip_01.txt",
         )
-        print("A01: supervisor accepted the proposed layout-A plan.")
+        proposals = [system.propose(PARTITION, OPERATION, _document(name)) for name in names]
+        assert source.calls == 5
+        assert all(system.proposal(PARTITION, ident)["status"] == "pending" for ident in proposals)
+        assert not system.examples(PARTITION, OPERATION)
+        print("A01, A02, B01, B02 and C01: the model answered; five proposals remain pending.")
+        print("No person reviews individual answers. Cement has no learned function yet.")
 
-        proposal_a_02 = system.propose(PARTITION, OPERATION, a_signature_02)
-        print("A02: the same layout recurred; its plan again requires supervision.")
-        system.review(
-            PARTITION,
-            proposal_a_02,
-            reviewer="records-supervisor",
-            decision="accept",
-        )
-        print("A02: second confirmation reached the relaxed demo threshold.")
-
-        build_a = system.compile(PARTITION, OPERATION)
-        assert len(build_a.created) == 1
-        artifact_a = build_a.created[0]
-        report_a = system.verify(PARTITION, artifact_a)
-        assert report_a.passed
-        system.promote(
-            PARTITION,
-            artifact_a,
-            scope_hash=report_a.scope_hash,
-            promoted_by="informatics-lead",
+        print("\n=== Act 2: learn the recurring cases and publish version 1 ===")
+        first, build = learning_pass(system, run=1)
+        assert len(first.input_hashes) == 2
+        assert len(build.created) == 2
+        assert len(build.blocked) == 1
+        assert build.blocked[0]["support"] == 1
+        print(
+            "The scripted pass reads retained answers, groups their layouts and merges their plans."
         )
         print(
-            f"Layout A: compiled, verified ({report_a.tests} tests), and promoted as {artifact_a}."
+            "Reviewer: learning-pass. The pass sets the projection, "
+            "compiles, verifies and promotes."
         )
-        function = checkpoint_function(system)
-        system.set_switch(PARTITION, OPERATION, mode="follow", actor="informatics-lead")
-        print(
-            f"Function set: {len(function.input_hashes)} verified entry promoted; "
-            "layout A now answers from the set."
+        print(f"One compiled case: {build.created[0]}.")
+        print("Version 1: two cases, for layouts A and B. Layout C has only one confirmation.")
+        print("Gate reasons: " + "; ".join(build.blocked[0]["reasons"]))
+
+        print("\n=== Act 3: a person switches the function on ===")
+        fresh = _document("layout_a_progress_note_03.txt")
+        assert fresh not in [_document(name) for name in names]
+        off = system.resolve(PARTITION, OPERATION, fresh)
+        assert system.switch(PARTITION, OPERATION).mode == "off"
+        assert off.match is None or not off.match.matched
+        print("The switch is still off. Even a learned layout goes to the model.")
+        system.set_switch(PARTITION, OPERATION, mode="follow", actor="person")
+        before = source.calls
+        resolution = system.resolve(PARTITION, OPERATION, fresh)
+        assert resolution.verification.passed
+        assert resolution.match is not None and resolution.match.matched
+        assert source.calls == before
+        extracted = pipeline.apply_plan(resolution.match.output, fresh["document"])
+        assert extracted["mrn"] == "MG-100913"
+        print("Switch: follow. A03 has new patient values; the projection selects layout A's plan.")
+        print("A03: adapter calls stayed flat.")
+        print(f"A03 patient JSON: {json.dumps(extracted, sort_keys=True)}")
+
+        print("\n=== Act 4: another lab slip lets the next pass add a case ===")
+        c_second = _document("layout_c_lab_slip_02.txt")
+        c_miss = system.resolve(PARTITION, OPERATION, c_second)
+        assert c_miss.match is not None and not c_miss.match.matched
+        c_proposal = system.propose(PARTITION, OPERATION, c_second)
+        c_answer = system.proposal(PARTITION, c_proposal)["proposed_output"]
+        assert pipeline.apply_plan(c_answer, c_second["document"])["mrn"] == "MG-200731"
+        print("C02 misses version 1. The model answers and its plan joins the retained proposals.")
+        second, build = learning_pass(system, run=2)
+        assert len(second.input_hashes) == 3
+        assert len(build.created) == 1 and not build.blocked
+        diff = system.diff_versions(
+            PARTITION, OPERATION, from_hash=first.function_hash, to_hash=second.function_hash
         )
+        assert len(diff.added) == 1 and not diff.removed and not diff.changed
+        assert not diff.projection_changed
+        versions = system.function_versions(PARTITION, OPERATION)
+        assert len(versions.versions) == 2
+        assert versions.versions[0].selected
+        print("Version 2: three cases. Difference from version 1: 1 added, 0 removed, 0 changed.")
+        print("The switch follows version 2 without another person reviewing the answers.")
 
-        print("\n=== Act 2: known layout A resolves without the adapter ===")
-        calls_before = source.calls
-        resolution_a = system.resolve(PARTITION, OPERATION, a_signature_03)
-        assert resolution_a.verification.passed
-        assert resolution_a.match is not None
-        assert resolution_a.match.matched
-        assert source.calls == calls_before
-        extracted_a = pipeline.apply_plan(resolution_a.match.output, a_text_03)
-        assert extracted_a["mrn"] == "MG-100913"
-        print("A03: the verified set returned the confirmed plan; adapter calls stayed flat.")
-        print(f"A03 patient JSON: {json.dumps(extracted_a, sort_keys=True)}")
-
-        print("\n=== Act 3: genuinely new layout B follows the same lifecycle ===")
-        b_text_01, b_signature_01 = _document("layout_b_intake_form_01.txt")
-        _, b_signature_02 = _document("layout_b_intake_form_02.txt")
-        assert _signature_bytes(b_signature_01) == _signature_bytes(b_signature_02)
-        assert _signature_bytes(b_signature_01) != _signature_bytes(a_signature_01)
-
-        proposal_b_01 = system.propose(PARTITION, OPERATION, b_signature_01)
-        system.review(
-            PARTITION,
-            proposal_b_01,
-            reviewer="records-supervisor",
-            decision="accept",
+        print("\n=== Act 5: a person rolls back, then follows the newest version ===")
+        system.set_switch(
+            PARTITION, OPERATION, mode="pinned", function_hash=first.function_hash, actor="person"
         )
-        print("B01: unseen intake-form layout used the same supervised fallback.")
+        c_first = _document("layout_c_lab_slip_01.txt")
+        rollback = system.resolve(PARTITION, OPERATION, c_first)
+        assert rollback.match is not None and not rollback.match.matched
+        fallback = system.propose(PARTITION, OPERATION, c_first)
+        fallback_plan = system.proposal(PARTITION, fallback)["proposed_output"]
+        assert pipeline.apply_plan(fallback_plan, c_first["document"])["mrn"] == "MG-200164"
+        print("Switch: pinned to version 1. Layout C misses; the model answers.")
+        system.set_switch(PARTITION, OPERATION, mode="follow", actor="person")
+        before = source.calls
+        restored = system.resolve(PARTITION, OPERATION, c_first)
+        assert restored.match is not None and restored.match.matched
+        assert source.calls == before
+        assert pipeline.apply_plan(restored.match.output, c_first["document"])["mrn"] == "MG-200164"
+        print("Switch: follow. Version 2 answers layout C; adapter calls stay flat.")
 
-        proposal_b_02 = system.propose(PARTITION, OPERATION, b_signature_02)
-        system.review(
-            PARTITION,
-            proposal_b_02,
-            reviewer="records-supervisor",
-            decision="accept",
+        state, served = system.serving(
+            PARTITION, OPERATION, expected_function_hash=second.function_hash
         )
-        print("B02: second confirmation made layout B eligible to compile.")
-
-        build_b = system.compile(PARTITION, OPERATION)
-        assert len(build_b.created) == 1
-        assert not build_b.blocked
-        artifact_b = build_b.created[0]
-        report_b = system.verify(PARTITION, artifact_b)
-        assert report_b.passed
-        system.promote(
-            PARTITION,
-            artifact_b,
-            scope_hash=report_b.scope_hash,
-            promoted_by="informatics-lead",
-        )
-        function = checkpoint_function(system)
-        print(
-            f"Function set: {len(function.input_hashes)} verified entries, one per promoted layout."
-        )
-
-        calls_before = source.calls
-        resolution_b = system.resolve(PARTITION, OPERATION, b_signature_01)
-        assert resolution_b.verification.passed
-        assert resolution_b.match is not None
-        assert resolution_b.match.matched
-        assert source.calls == calls_before
-        extracted_b = pipeline.apply_plan(resolution_b.match.output, b_text_01)
-        assert extracted_b["insurance_id"] == "HZN-774201"
-        print("Layout B: promoted and then resolved with no adapter invocation.")
-        print(f"B01 patient JSON: {json.dumps(extracted_b, sort_keys=True)}")
-
-        print("\n=== Act 4: layout C remains gated after one confirmation ===")
-        c_text_01, c_signature_01 = _document("layout_c_lab_slip_01.txt")
-        c_input_hash = hashlib.sha256(_signature_bytes(c_signature_01)).hexdigest()
-        assert _signature_bytes(c_signature_01) != _signature_bytes(a_signature_01)
-        assert _signature_bytes(c_signature_01) != _signature_bytes(b_signature_01)
-
-        proposal_c_01 = system.propose(PARTITION, OPERATION, c_signature_01)
-        system.review(
-            PARTITION,
-            proposal_c_01,
-            reviewer="records-supervisor",
-            decision="accept",
-        )
-
-        build_c = system.compile(PARTITION, OPERATION)
-        assert not build_c.created
-        assert build_c.blocked
-        gated = next(
-            (record for record in build_c.blocked if record.get("input_hash") == c_input_hash),
-            None,
-        )
-        assert gated is not None
-        assert gated.get("support") == 1
-        reasons = gated.get("reasons")
-        assert type(reasons) is list
-        assert any(type(reason) is str and "below required" in reason for reason in reasons)
-        print("Layout C: reviewed once but not promoted; policy still gates it.")
-        print("Gate reasons: " + "; ".join(str(reason) for reason in reasons))
-
-        print("\n=== Act 5: the verified set exports as portable bytes ===")
+        assert state.mode == "follow"
+        assert served is not None and served.passed and served.document is not None
+        function = served.document
         bundle_text = function.text
-        print(
-            f"Exported set: {len(function.input_hashes)} verified entries, promoted "
-            "before Acts 2 and 3 resolved against them."
-        )
+        print("\nExport the version that the switch selects before deleting the ledger.")
         print(f"Verified function hash: {function.function_hash}")
-        print(f"Exported bundle: {len(bundle_text.encode('utf-8'))} bytes carrying no ledger.")
-
+        print(
+            f"Exported bundle: {len(bundle_text.encode('utf-8'))} bytes, including the projection."
+        )
         _print_event_trace(system)
 
     assert not os.path.exists(temporary_directory)
-
-    print("\n=== Act 6: the exported function answers with no ledger ===")
+    print("\n=== Act 6: version 2 answers raw input without a ledger ===")
     print("The temporary ledger and its audit trail are gone; only the bundle remains.")
-    offline_hash, offline_a = resolve_offline(
-        bundle_text, a_text_03, expected_function_hash=function.function_hash
+    offline_hash, offline = resolve_offline(
+        bundle_text, fresh["document"], expected_function_hash=function.function_hash
     )
-    assert offline_hash == function.function_hash
-    assert offline_a.matched
-    offline_extracted = pipeline.apply_plan(offline_a.output, a_text_03)
-    assert offline_extracted == extracted_a
-    print("A03 offline: the bundle returned the same plan under the same verified hash.")
-    print(f"A03 offline patient JSON: {json.dumps(offline_extracted, sort_keys=True)}")
-    _, offline_c = resolve_offline(
-        bundle_text, c_text_01, expected_function_hash=function.function_hash
-    )
-    assert not offline_c.matched
-    assert offline_c.output is None
-    print("C01 offline: layout C never entered the function, so the bundle reports a miss.")
-
-    print(
-        "\nProduction policy defaults remain stricter; this demo relaxes them only "
-        "for a fast, self-contained run."
-    )
+    assert offline_hash == function.function_hash and offline.matched
+    assert pipeline.apply_plan(offline.output, fresh["document"]) == extracted
+    print("A03 offline: the bundle returns the same plan and patient JSON.")
+    unknown = fresh["document"].replace("PHYSICIAN PROGRESS NOTE", "UNSEEN FOLLOW-UP NOTE")
+    _, miss = resolve_offline(bundle_text, unknown, expected_function_hash=function.function_hash)
+    assert not miss.matched and miss.output is None
+    print("Unknown layout offline: the projection reports a miss, not a guessed plan.")
     print("All checks passed.")
 
 

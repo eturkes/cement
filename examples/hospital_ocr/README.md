@@ -1,248 +1,153 @@
 # Hospital OCR layout learning
 
-Hospital document layouts often lead to a new throwaway LLM extraction script for each run. This offline example turns that per-layout work into a durable pipeline. It derives a patient-independent layout signature. A supervisor reviews the extraction plan proposed for that signature. Cement then returns the promoted plan deterministically whenever the same layout recurs. The demo seals each promoted layout into one portable function as it is promoted. It then answers a document after the ledger is gone. The demo uses no LLM or network.
+Hospital workers often ask an LLM to extract fields from forms. The model writes a plan for each document, even when it has seen the same layout before. Cement retains these answers. A learning pass merges the plans for recurring layouts into a deterministic function. A person decides whether to switch that function on.
 
-## Boundary
-
-Cement does not learn a parser or generalize across layouts. It resolves one integrity-valid promoted artifact for an exact `(partition, operation, operation revision, canonical input)` scope. Here the canonical input is a layout signature, not the patient document. A01, A02, and A03 contain different patients and values but produce one byte-identical signature, so Cement reuses the promoted plan across patients. The demo is more than a lookup of byte-identical patient OCR.
-
-After promotion, a known patient-independent signature returns its confirmed extraction plan without calling the proposal adapter or an LLM. A genuinely new or changed layout produces a different canonical input and therefore a new scope. It follows the gated fallback path instead of silently receiving a plan for another layout. There is no cross-layout generalization.
-
-The example parser recognizes only its explicit block grammar and fails closed otherwise. A known signature never certifies extraction correctness.
-
-Cement guarantees deterministic plan return only inside that exact valid scope. It does not guarantee that the plan extracts every future document correctly, or that a supervisor accepted a semantically correct plan. Confirmation counts, reviewer counts, observation spans, replay verification, and explicit promotion are operational gates. Plan quality remains the adapter and reviewer's responsibility.
-
-## How the example maps to Cement
-
-### Pipeline
-
-```
-ocr(path) -> layout_signature(ocr_text) -> System.resolve(...)
-  promoted exact signature -> confirmed plan
-  miss -> System.propose(...) -> PlanProposer.propose(...) -> supervisor review
-confirmed plan + ocr_text -> apply_plan(...) -> patient JSON
-
-promoted set -> checkpoint_function(...) -> exported bundle
-exported bundle + ocr_text -> resolve_offline(...) -> confirmed plan or miss
-```
-
-`pipeline.py` supplies the deterministic document path:
-
-1. `ocr(path)` reads simulated OCR text and normalizes line endings and blank lines.
-2. `layout_signature(ocr_text)` records the document type plus one ordered list of label and section keys. It uses block position, not the presence of filled values. Patient values and section body text never enter the signature, including prose with colons.
-3. `System.resolve(...)` returns the promoted exact-scope plan. On a miss, `System.propose(...)` asks `PlanProposer.propose(...)` for a supervised candidate.
-4. `apply_plan(plan, ocr_text)` applies label and section locators and returns extracted strings.
-5. `checkpoint_function(system)` seals every promoted layout into one verified function and returns the exportable bundle. The demo calls it after each artifact promotion, so the next document of a known layout resolves from the set.
-6. `resolve_offline(bundle_text, ocr_text, expected_function_hash=...)` parses that bundle, checks it against the hash the operator holds, and resolves one layout without a ledger.
-
-`plan_adapter.py` defines `PlanProposer`, a `cement_runtime.CandidateSource`-compatible deterministic stand-in for a production provider adapter. It deliberately does not call an LLM. `run_demo.py` drives proposal, review, compilation, verification, artifact promotion, set promotion, exact resolution, extraction, and audit output. It then deletes the ledger and answers one more document from the exported bytes.
-
-### Scope and policy
-
-- Partition: `example-hospital` - learning remains isolated to this hospital.
-- Operation: `document.extraction_plan` - all layouts use one operation; each distinct signature is a separate canonical input and exact scope.
-- Demo compile policy: `CompilePolicy(min_confirmations=2, min_reviewers=1, min_span_seconds=0)`.
-- Reviewer: `records-supervisor`.
-- Promoter: `informatics-lead`.
-- Corpus: seven files - layout A has three progress notes, layout B has two intake forms, and layout C has two lab slips.
-
-Production defaults are stricter: three confirmations, two reviewers, and a seven-day observation span.
-
-### Real layout signature
-
-Generated by `layout_signature(ocr(layout_a_progress_note_01.txt))`:
-
-```json
-{
-  "document_type": "physician_progress_note",
-  "structure": [
-    {
-      "kind": "label",
-      "key": "Patient"
-    },
-    {
-      "kind": "label",
-      "key": "MRN"
-    },
-    {
-      "kind": "label",
-      "key": "Date"
-    },
-    {
-      "kind": "label",
-      "key": "Provider"
-    },
-    {
-      "kind": "section",
-      "key": "Subjective"
-    },
-    {
-      "kind": "section",
-      "key": "Objective"
-    },
-    {
-      "kind": "section",
-      "key": "Assessment"
-    },
-    {
-      "kind": "section",
-      "key": "Plan"
-    }
-  ]
-}
-```
-
-### Real extraction plan
-
-Generated by `reference_plan("physician_progress_note")`:
-
-```json
-{
-  "document_type": "physician_progress_note",
-  "layout": "A",
-  "fields": [
-    {
-      "name": "patient_name",
-      "locator": {
-        "kind": "label",
-        "label": "Patient"
-      },
-      "value_type": "string"
-    },
-    {
-      "name": "mrn",
-      "locator": {
-        "kind": "label",
-        "label": "MRN"
-      },
-      "value_type": "string"
-    },
-    {
-      "name": "encounter_date",
-      "locator": {
-        "kind": "label",
-        "label": "Date"
-      },
-      "value_type": "string"
-    },
-    {
-      "name": "provider",
-      "locator": {
-        "kind": "label",
-        "label": "Provider"
-      },
-      "value_type": "string"
-    },
-    {
-      "name": "assessment",
-      "locator": {
-        "kind": "section",
-        "heading": "Assessment"
-      },
-      "value_type": "text"
-    }
-  ]
-}
-```
-
-Both objects obey `cement-json-v1`: null, booleans, strings, signed 64-bit integers, arrays, and string-keyed objects only. Decimal and exponent numbers are excluded.
+This offline example follows seven synthetic documents across three layouts. The plan adapter and the learning pass are scripted stand-ins for LLM calls. The Cement library performs the real projection checks, compilation, verification, promotion, switching and resolution. The demo uses no network.
 
 ## Run
 
-Requirements match the repository: Python 3.11+, SQLite 3.37+, and the `uv` development workflow. From the repository root, after `uv sync`:
+Use Python 3.11 or later, SQLite 3.37 or later, and `uv`. From the repository root, run:
 
 ```bash
+uv sync
 uv run python examples/hospital_ocr/run_demo.py
 ```
 
-The driver uses the Python standard library plus `cement_runtime`, creates a temporary SQLite ledger, performs no network access, and exits zero with `All checks passed.`
+The demo creates a temporary ledger and deletes it before the last act. It exits with `All checks passed.` when its checks pass. Run it without `-O` or `-OO`; those Python options remove the checks.
+
+## Six acts
+
+1. **Retain answers.** The adapter receives raw documents as `{"document": text}`. It proposes plans for A01, A02, B01, B02 and C01. These answers remain pending proposals. The model has already answered; no person reviews individual answers.
+2. **Learn.** The scripted pass reads `learning_cases`. It decides that these outputs are plans that read document values, not answers that depend on those values. It builds a projection from the observed layouts, groups the proposals by case, and merges each case's plans. It reviews as `learning-pass`, sets the projection, compiles, verifies and promotes version 1. Layouts A and B each have two confirmations. Layout C has only one and stays with the model.
+3. **Switch on.** The switch is off by default, including after promotion. A person sets it to `follow`. A03 has new patient values, but the projection recognizes its layout. Cement returns the plan without another adapter call. The pipeline applies that plan to A03.
+4. **Add a case.** C02 misses version 1, so the model answers. The next learning pass confirms its plan and publishes version 2. The version difference reports one added case, with no removed or changed cases. The switch follows version 2.
+5. **Roll back.** A person pins version 1. A layout-C document misses again, so the model answers. The person returns to `follow`, and version 2 answers layout C without an adapter call.
+6. **Use the bundle alone.** The demo exports the version that the switch selects. After it deletes the ledger, the bundle answers a raw document. An unknown layout returns a miss.
+
+## How the parts fit
+
+```
+raw document -> System.resolve
+  hit  -> extraction plan -> apply_plan -> patient fields
+  miss -> model's plan -> answer now + retain a pending proposal
+
+retained proposals -> learning_cases -> grouped plans + projection
+  -> review -> set_projection -> compile -> verify_drafts
+  -> inspect_function_promotion -> promote_function -> new version
+
+person -> off | follow | pinned
+selected version -> bundle + raw document -> resolve_offline -> plan or miss
+```
+
+- `pipeline.py` reads simulated OCR text and applies label and section locators. Its `layout_signature` helper serves the adapter only. The caller passes raw documents to Cement, not signatures.
+- `plan_adapter.py` supplies `PlanProposer`, a deterministic stand-in for the model. Its reference plans extract values as strings. Decimal quantities, such as potassium, stay strings because `cement-json-v1` excludes decimal numbers.
+- `run_demo.py` supplies the scripted learning pass and the six acts. The pass unions compatible plan rows. It corrects proposals and supersedes earlier examples when a merge extends their plan. A disagreement between rows stops this scripted pass; a real pass needs model judgment.
+- `checkpoint_function` promotes the verified set as one version without changing the switch. `function_versions` lists the versions. `diff_versions` compares their cases.
+- `resolve_offline` calls the shipped `parse_function` and `evaluate` APIs. It requires the function hash that the caller kept from export.
+
+The operation is `document.extraction_plan` in partition `example-hospital`. The compile policy uses the production defaults: two confirmations, one reviewer and no minimum observation span. The only reviewer and promoter in this demo is `learning-pass`. The person's only control is the per-operation switch.
+
+The corpus contains three progress notes (layout A), two intake forms (layout B) and two lab slips (layout C). A03 stays out of learning, so its hit demonstrates reuse across patient values rather than a replay of retained input.
+
+## Boundary
+
+The projection is a `cement-projection-v1` program. It names the document field and lists each observed title and ordered sequence of labels and sections. Patient values do not enter its key. A case stays exact on that key. The projection recognizes the same layout with new values; it does not infer an unseen layout.
+
+The learning pass assumes that documents with one layout need one plan. Cement checks the program's grammar and consistency against confirmed inputs. It does not establish that the assumption is sound or that a plan extracts every future document correctly. A changed title, missing label or extra label returns a miss. The model handles inputs that the function does not cover.
+
+Raw documents and model answers enter the ledger. This example uses synthetic patient data. Removing values from a projection key does not remove them from the retained observations.
+
+The exported bundle includes the projection and the exact cases. It needs no ledger to answer. Its function hash binds the bytes to the version that the caller selected. Keep that hash through a separate, reliable channel when you move a bundle between systems.
 
 ## Expected output
 
-Act 1 shows two reviewed confirmations for layout A, then deterministic compilation, verification, and explicit promotion of the artifact and of the verified set. Act 2 sends a third patient's document through the same patient-free signature. Cement returns the promoted plan while adapter calls stay flat. Then `apply_plan` emits patient JSON. Act 3 shows that genuinely new layout B does not inherit layout A's plan. Layout B follows its own supervised lifecycle before it resolves without the adapter. Act 4 leaves layout C at one confirmation and reports the policy gate instead of promoting it. Act 5 exports the verified set and prints its hash and byte count. The trace then records the complete control-plane sequence. Act 6 runs after the ledger is deleted. It answers layout A from the exported bundle alone and reports layout C as a miss.
+Exactly two printed values change per run: one artifact id and the final function hash. The transcript masks them as `art_<hex>` and `<function-hash>`. Evidence ids change the bundle's hash between clean runs, but its byte length stays the same. Every other output line is deterministic.
 
-Two values change per run. The demo generates the layout-A artifact ID, and it computes a new function hash each time, because each entry seals its own run-specific evidence. The block masks the 32-hex artifact suffix as `art_<hex>` and the 64-hex digest as `<function-hash>`. Every other line is byte-stable. `tests/test_hospital_ocr_example.py` compares the masked demo output against this block.
+Regenerate this block from the real demo with:
+
+```bash
+uv run python .agent/decisions/m3u8-transcript.py
+uv run python .agent/decisions/m3u8-transcript.py --check
+```
+
+The updater changes only this transcript block. The tests pin the output, each mask's occurrence count, the shipped API calls and the ledger teardown order.
 
 ```text
-Hospital OCR layout-learning demo (offline; no LLM or network).
-Cement receives patient-independent layout signatures and returns reviewed extraction plans; the deterministic pipeline applies each plan to patient OCR.
-Demo policy: 2 confirmations, 1 reviewer, no minimum time span. Production defaults are stricter: 3 confirmations, 2 reviewers, and a 7-day span.
-Boundary: cement guarantees deterministic plan return for a known layout signature, not correct extraction from every future document; that remains the adapter/reviewer's responsibility.
+Hospital OCR learning demo (offline; no LLM or network).
+The plan adapter and learning pass are scripted stand-ins for LLM calls.
+Cement receives raw documents. The projection maps each recognized layout to one case.
+Default policy: 2 confirmations, 1 reviewer, no minimum time span.
+Assumption: documents with one layout need one extraction plan.
+Cement checks structure and consistency, not whether that assumption or plan is correct.
 
-=== Act 1: layout A recurs, is reviewed, and is promoted ===
-Three patients share one byte-identical, patient-free layout signature.
-A01: adapter proposed a plan; records-supervisor review is required.
-A01: supervisor accepted the proposed layout-A plan.
-A02: the same layout recurred; its plan again requires supervision.
-A02: second confirmation reached the relaxed demo threshold.
-Layout A: compiled, verified (8 tests), and promoted as art_<hex>.
-Function set: 1 verified entry promoted; layout A now answers from the set.
+=== Act 1: retain the model's answers to raw documents ===
+A01, A02, B01, B02 and C01: the model answered; five proposals remain pending.
+No person reviews individual answers. Cement has no learned function yet.
 
-=== Act 2: known layout A resolves without the adapter ===
-A03: the verified set returned the confirmed plan; adapter calls stayed flat.
-A03 patient JSON: {"assessment": "Tension-type headaches, improving.", "encounter_date": "2026-02-21", "mrn": "MG-100913", "patient_name": "Sofia Patel", "provider": "Dr. Amina Shah"}
-
-=== Act 3: genuinely new layout B follows the same lifecycle ===
-B01: unseen intake-form layout used the same supervised fallback.
-B02: second confirmation made layout B eligible to compile.
-Function set: 2 verified entries, one per promoted layout.
-Layout B: promoted and then resolved with no adapter invocation.
-B01 patient JSON: {"allergies": "Penicillin", "current_medications": "Lisinopril 10 mg once daily\nMagnesium supplement once daily", "date_of_birth": "1988-07-19", "insurance_id": "HZN-774201", "patient_name": "Amelia Brooks", "primary_complaint": "Persistent headaches after long workdays"}
-
-=== Act 4: layout C remains gated after one confirmation ===
-Layout C: reviewed once but not promoted; policy still gates it.
+=== Act 2: learn the recurring cases and publish version 1 ===
+The scripted pass reads retained answers, groups their layouts and merges their plans.
+Reviewer: learning-pass. The pass sets the projection, compiles, verifies and promotes.
+One compiled case: art_<hex>.
+Version 1: two cases, for layouts A and B. Layout C has only one confirmation.
 Gate reasons: support 1 is below required 2
 
-=== Act 5: the verified set exports as portable bytes ===
-Exported set: 2 verified entries, promoted before Acts 2 and 3 resolved against them.
+=== Act 3: a person switches the function on ===
+The switch is still off. Even a learned layout goes to the model.
+Switch: follow. A03 has new patient values; the projection selects layout A's plan.
+A03: adapter calls stayed flat.
+A03 patient JSON: {"assessment": "Tension-type headaches, improving.", "encounter_date": "2026-02-21", "mrn": "MG-100913", "patient_name": "Sofia Patel", "provider": "Dr. Amina Shah"}
+
+=== Act 4: another lab slip lets the next pass add a case ===
+C02 misses version 1. The model answers and its plan joins the retained proposals.
+Version 2: three cases. Difference from version 1: 1 added, 0 removed, 0 changed.
+The switch follows version 2 without another person reviewing the answers.
+
+=== Act 5: a person rolls back, then follows the newest version ===
+Switch: pinned to version 1. Layout C misses; the model answers.
+Switch: follow. Version 2 answers layout C; adapter calls stay flat.
+
+Export the version that the switch selects before deleting the ledger.
 Verified function hash: <function-hash>
-Exported bundle: 3385 bytes carrying no ledger.
+Exported bundle: 5474 bytes, including the projection.
 
 === Audit event trace ===
 01. operation.registered
 02. proposal.created
-03. proposal.accepted
+03. proposal.created
 04. proposal.created
-05. proposal.accepted
-06. artifact.compiled
-07. artifact.verified
-08. artifact.promoted
-09. function.promoted
-10. function.switched
-11. proposal.created
-12. proposal.accepted
-13. proposal.created
-14. proposal.accepted
-15. artifact.compiled
+05. proposal.created
+06. proposal.created
+07. proposal.accepted
+08. proposal.accepted
+09. proposal.accepted
+10. proposal.accepted
+11. proposal.accepted
+12. projection.set
+13. artifact.compiled
+14. artifact.compiled
+15. artifact.verified
 16. artifact.verified
-17. artifact.promoted
-18. function.promoted
+17. function.promoted
+18. function.switched
 19. proposal.created
 20. proposal.accepted
+21. artifact.compiled
+22. artifact.verified
+23. function.promoted
+24. function.switched
+25. proposal.created
+26. function.switched
 
-=== Act 6: the exported function answers with no ledger ===
+=== Act 6: version 2 answers raw input without a ledger ===
 The temporary ledger and its audit trail are gone; only the bundle remains.
-A03 offline: the bundle returned the same plan under the same verified hash.
-A03 offline patient JSON: {"assessment": "Tension-type headaches, improving.", "encounter_date": "2026-02-21", "mrn": "MG-100913", "patient_name": "Sofia Patel", "provider": "Dr. Amina Shah"}
-C01 offline: layout C never entered the function, so the bundle reports a miss.
-
-Production policy defaults remain stricter; this demo relaxes them only for a fast, self-contained run.
+A03 offline: the bundle returns the same plan and patient JSON.
+Unknown layout offline: the projection reports a miss, not a guessed plan.
 All checks passed.
 ```
 
-## Teaching points
-
-- Canonicalize before learning. The exact recurring input is an ordered layout structure with no patient values. Structural position determines the signature, not the presence of a filled field. Distinct patients can therefore share one scope safely.
-- Keep decimal quantities as strings. `cement-json-v1` rejects decimal and exponent numbers. Layout C marks `potassium` and `creatinine` as `decimal_string` and extracts values such as `"4.2"` and `"0.9"`.
-- Treat layout drift as an explicit edge case. A changed layout is a new canonical input, enters supervised fallback, and solidifies through the same lifecycle. Act 4 exposes the recurrence gate as `support 1 is below required 2` rather than applying an old template silently.
-- Isolate learning by partition. `example-hospital` scopes this evidence and its promoted artifacts to one hospital.
-- Keep demonstration policy visibly relaxed. Production defaults require more confirmations, more reviewers, and a real observation span.
-- Export the verified function to leave the ledger behind. Act 5 exports the promoted set as one self-verifying bundle. Act 6 resolves a document from that bundle with no database, adapter, or LLM. The bundle carries a new hash on every run, because each entry seals its own run-specific evidence.
-
 ## Pointers
 
+- [Learning pass skill](../../skills/cement-learn/SKILL.md)
 - [Repository overview](../../README.md)
-- [Architecture](../../docs/architecture.md) - state model, exact-scope guarantees, and trust boundary
-- [Command candidate source](../command_source/README.md) - the optional adapter runner, its request, output, and failure contract
-
-Read `run_demo.py` for the lifecycle driver, `pipeline.py` for signature and extraction mechanics, and `plan_adapter.py` for the deterministic candidate source. `checkpoint_function` and `resolve_offline` in `run_demo.py` are the two helpers the offline phase uses.
+- [Architecture](../../docs/architecture.md)
+- [Command candidate source](../command_source/README.md)
