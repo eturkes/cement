@@ -15,6 +15,23 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## M5.1 close (IMPLEMENT, unit) — target `1289797` (squash of `archive/m5u1-land`) (review read `5f4c2b4` on the pre-stack lineage), records in the next commit
+
+Check set fixed before the diff was read, one `reviewer` per lens: correctness (reviewer-7: m45-contract §3 switch + versions + pinned checks P-a..P-d + the read census), cleanup (reviewer-8), altitude (reviewer-9). Raw tables: `.scratch/review/m5u1/`.
+
+| id | lens | verdict | ruling (MAIN-verified) |
+|---|---|---|---|
+| C1 | correctness | finding (major) → fixed | a pin over more than 32,766 members exceeded SQLite's bound-parameter ceiling; pinned checks now join `function_memberships` (W13 pins 32,767 members). |
+| C2 / R1 | versions | finding (major) → fixed | `function versions` lacked the projection hash and an eligibility answer; `--check` adds `servable` (whether each version would serve now) beside `selected` (W7 ×2; R3's selected/servable split). |
+| C3 / R2 | diff | finding (major) → fixed | `function diff` named fields, not the changed case keys + values; it now names keys, outputs and projection changes (W8). |
+| C4 | battery | finding (major) → fixed | rejection + snapshot branches unpinned: W1 off reads two rows alone, W5 revision never unpins, W5c a retired suspended member fails the pin, W10b one snapshot; closure probe `.agent/decisions/m5u1-mutants.py` 5/5 killed. |
+| cleanup C1, C2 | cleanup | finding (minor) → fixed | receipt readers shared (`_function_receipt_from_row` path), pinned serving reads members through SQL joins, not a Python round-trip. |
+| other rows | all lenses | pass | — |
+
+Red-first: `tests/test_switch_battery.py` at 0d62318 (tag archive/m5u1-red = d63aa2c + the battery) → Ran 16, failures=1 errors=19, every test red (W1-W13); review-fix pins W7 W8 W10 W13 red at 5f4c2b4 (archive/m5u1-impl lineage, errors=4). Stack burden (general-purpose-5, 21 ids across 6 modules + the tripwire datum): AST census over `3dccdc6..12905d6` = 14 changed test bodies, `assert*` calls never fewer, none deleted; the read-capability census now resolves a literal SQL forwarded through a helper parameter (a non-literal still fails it).
+
+Gate at the squash: `.agent/gate` on `1289797` rc 0 (clean tree, `heavy`): unittest 607.6 s, Ran 1083, outer skipped none, nested D28 = L30, D28 18 revisions / 1 replayed.
+
 ## M3.7 close (IMPLEMENT, unit) — target `635a473` (squash of `archive/m3u7-land`; review read `985e071`), records in the next commit
 
 Check set fixed before the diff was read, one `reviewer` per lens: correctness C1-C5 + battery R1-R5 (reviewer-22), cleanup L1-L4 (reviewer-23), altitude AL1-AL4 (reviewer-24). Raw tables: `.scratch/review/m3u7/`.

@@ -137,9 +137,9 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   - Accept: fingerprint + `SCHEMA_VERSION` move together, suite green with the reset documented.
 - [x] 635a473 M3.7 command-runtime relocation under byte equality + blocked reverse imports; owns p54.
   - The wheel already carries no `examples/`/`tests/`.
-- [ ] M5.1 switch + versions: per operation `off` | `follow` | `pinned`; rollback = pin; `resolve` + `function export` serve the selected version; `function versions` + Read diff.
-  - Resume point: IMPLEMENT resumes here — unlanded stack (machine-local worktrees under `.scratch/worktrees/<unit>-land`, each one commit over the layer below): `impl/m5u1-land` → `impl/m4u1-land` → `impl/m4u2-land` → `impl/m5u2-land` → `impl/m5u3-land` → `impl/m3u8-land` → `wt/general-purpose-2` (prototype). Land in that order: rebase onto main, full gate under `heavy`, squash + records.
+- [x] 1289797 M5.1 switch + versions: per operation `off` | `follow` | `pinned`; rollback = pin; `resolve` + `function export` serve the selected version; `function versions` + Read diff.
 - [ ] M4.1 projection IR `cement-projection-v1`: a pure, total, terminating interpreter; `tester` differential oracle.
+  - Resume point: IMPLEMENT resumes here — unlanded stack (machine-local; the stack repair's `wt/gp5-<unit>` branches carry each unit repaired over the layer below): `impl/m4u1-land` → `impl/m4u2-land` → `impl/m5u2-land` → `impl/m5u3-land` → `impl/m3u8-land` → `wt/general-purpose-2` (prototype). Land in that order: rebase onto main, full gate under `heavy`, squash + records.
 - [ ] M4.2 projection lifecycle: raw input → projected key; verification against every confirmed raw input + boundary probes, fail-closed; compile by key; the bundle carries the projection; `resolve` + `function eval` on raw input.
 - [ ] M5.2 learning pass: defaults 2/1/0, `learning-pass` reviewer, a CLI read surface over retained answers by case, the skill (merge scripts, write the projection, compile, verify, promote).
 - [ ] M5.3 Open WebUI example: Cement functions as a tool the chat model calls + a filter that retains answers.
