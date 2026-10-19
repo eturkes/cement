@@ -247,6 +247,22 @@ inputs (an invalid program is refused at validation, never executed):
 6. Work: a counter of characters scanned + lines + entries compared, exposed to tests; bound =
    `4 * len(text) + 2 * lines + entries(program)` checked by I7.
 
+API (module `cement_runtime.projection`, stdlib only, importing `cement_runtime.json_value` and
+`cement_runtime.errors` alone):
+- `PROJECTION_ABI = "cement-projection-v1"`.
+- `parse_program(value: object) -> ProjectionProgram` — validates the program object (not text);
+  any rule violation → `ValidationError` naming the rule. `ProjectionProgram` = frozen dataclass:
+  `text: str`, `keep: tuple[str, ...]`, `layouts: tuple[Layout, ...]`, `canonical: CanonicalJSON`
+  (the program's canonical form), `program_hash: str` (= `canonical.digest`).
+  `Layout` = frozen: `name: str`, `title: str`, `entries: tuple[tuple[str, str], ...]` (normalized
+  pairs).
+- `project(program: ProjectionProgram, value: JSONValue) -> Projection` — total; never raises for a
+  `value` that `canonicalize` accepts. `Projection` = frozen: `matched: bool`, `key: CanonicalJSON |
+  None` (set iff matched), `reason: Literal["input", "text", "layout", "key"] | None` (set iff not
+  matched), `work: int` (the §4 step 6 counter).
+- `structure(text: str) -> tuple[str, tuple[tuple[str, str], ...]] | None` — steps 2-4 alone (title
+  + structure pairs, `None` where the grammar refuses), exposed for the verification probes (§5).
+
 Predicates:
 - I1 differential (tester): over the seven fixture documents the keys' `form.structure` equals the
   shipped `layout_signature(...)["structure"]` as pairs, and `form.title` equals the documents'
