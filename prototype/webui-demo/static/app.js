@@ -845,9 +845,9 @@ const STORY = [
     { el: "#side-hidden", title: "Behind the scenes", text: () => "What Cement does. Users never see it.", side: "left" } ] },
   { run: async () => { await select("file"); await send("q01"); }, beats: [
     { el: lastBubble, title: "An ordinary answer", text: () => "No change from an ordinary chatbot answer. Cement has nothing reusable for this yet.", side: "right" },
-    { el: "#mechanism .method", title: "Its method", text: () => `How the AI read the form. It ${firstNote()}.`, side: "bottom" } ] },
+    { el: "#mechanism .method", title: "A hidden mistake", text: () => `The AI’s method ${firstNote()}. Saved like this, every later form would repeat it.`, side: "bottom" } ] },
   { run: settle, beats: [
-    { el: "#mechanism .method", title: "A person checks", text: () => "Marked rows are the fix. The reply stays as sent.", side: "bottom" } ] },
+    { el: "#mechanism .method", title: "A person checks", text: () => "The marked row is the fix. Only a checked method can be saved.", side: "bottom" } ] },
   { run: () => turn("q02"), beats: [
     { el: "#mechanism .method", title: "Checked twice", text: () => "A second progress note, checked too. Two checks: ready to save.", side: "bottom" } ] },
   { run: makeAutomatic, beats: [
