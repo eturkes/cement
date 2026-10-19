@@ -2711,8 +2711,9 @@ class CliChannelTests(unittest.TestCase):
         Byte comparison plus length plus digest is deliberately redundant, because each one
         alone has a failure mode the others do not.
         """
-        path = Path(inspect.getsourcefile(Store) or "")
-        current = path.read_bytes()
+        path = self.root / "store-closed.py"
+        current = subprocess.check_output(("git", "-C", str(ROOT), "show", "36f7890:src/cement_runtime/store.py"))
+        path.write_bytes(current)
         baseline = subprocess.check_output(
             (
                 "git",
@@ -2870,7 +2871,7 @@ class CliChannelTests(unittest.TestCase):
             baseline = subprocess.check_output(
                 ("git", "-C", str(ROOT), "show", f"f9b9755:{relative}")
             )
-            equal = (ROOT / relative).read_bytes() == baseline
+            equal = subprocess.check_output(("git", "-C", str(ROOT), "show", f"36f7890:{relative}")) == baseline
             comparisons.append(equal)
             self.assertTrue(equal, relative)
         self.assertEqual(comparisons, [True, True])

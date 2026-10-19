@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import re
 from bisect import bisect_left
 from collections.abc import Iterable
 from dataclasses import dataclass
-import re
 from typing import Any
 
 from .errors import IntegrityError, ValidationError
@@ -14,9 +14,9 @@ from .json_value import (
     DEFAULT_MAX_BYTES,
     DEFAULT_MAX_DEPTH,
     DEFAULT_MAX_ITEMS,
+    MAX_INTEGER,
     CanonicalJSON,
     JSONValue,
-    MAX_INTEGER,
     canonicalize,
     parse_json,
 )
@@ -127,10 +127,7 @@ def _normalize(value: Any) -> _NormalizedFunction:
     partition = _name(scope["partition"], "function partition")
     operation = _name(scope["operation"], "function operation")
     operation_revision = scope["operation_revision"]
-    if (
-        type(operation_revision) is not int
-        or not 1 <= operation_revision <= MAX_INTEGER
-    ):
+    if type(operation_revision) is not int or not 1 <= operation_revision <= MAX_INTEGER:
         raise ValidationError(
             "function operation revision must be a positive signed 64-bit integer"
         )
@@ -158,22 +155,14 @@ def _normalize(value: Any) -> _NormalizedFunction:
             },
             f"function entry {index}",
         )
-        artifact_hash = _digest(
-            entry["artifact_hash"], f"function entry {index} artifact_hash"
-        )
+        artifact_hash = _digest(entry["artifact_hash"], f"function entry {index} artifact_hash")
         evidence_snapshot_hash = _digest(
             entry["evidence_snapshot_hash"],
             f"function entry {index} evidence_snapshot_hash",
         )
-        input_hash = _digest(
-            entry["input_hash"], f"function entry {index} input_hash"
-        )
-        output_hash = _digest(
-            entry["output_hash"], f"function entry {index} output_hash"
-        )
-        entry_seal = _digest(
-            entry["entry_seal"], f"function entry {index} entry_seal"
-        )
+        input_hash = _digest(entry["input_hash"], f"function entry {index} input_hash")
+        output_hash = _digest(entry["output_hash"], f"function entry {index} output_hash")
+        entry_seal = _digest(entry["entry_seal"], f"function entry {index} entry_seal")
         report = _exact_keys(
             entry["report"],
             {"details_hash", "test_set_hash"},

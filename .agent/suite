@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+"""suite — `unittest discover -s tests -t .`, optionally minus D28 as a NAMED split run.
+
+D28 is the only gate grading history (`.claude/rules/history-gates.md`); a run without it says so
+on stderr and names the omitted id, so a split result never reads as the full gate.
+
+Usage: uv run python .agent/suite [--omit-d28] [--durations N]
+"""
+
+from __future__ import annotations
+
+import sys
+import unittest
+from collections.abc import Iterator
+
+D28 = (
+    "tests.test_migration_battery.MigrationBatteryTests."
+    "test_d28_gate_1_stays_green_at_every_commit_never_only_at_the_last"
+)
+
+
+def _flatten(suite: unittest.TestSuite) -> Iterator[unittest.TestCase]:
+    for item in suite:
+        if isinstance(item, unittest.TestSuite):
+            yield from _flatten(item)
+        else:
+            yield item
+
+
+def main(argv: list[str]) -> int:
+    omit = "--omit-d28" in argv
+    durations = int(argv[argv.index("--durations") + 1]) if "--durations" in argv else None
+    tests = list(_flatten(unittest.defaultTestLoader.discover("tests", top_level_dir=".")))
+    kept = [test for test in tests if not (omit and test.id() == D28)]
+    if omit:
+        if len(tests) - len(kept) != 1:
+            print(f"suite: expected to omit exactly one test ({D28}), omitted "
+                  f"{len(tests) - len(kept)}", file=sys.stderr)
+            return 2
+        print(f"suite: SPLIT RUN — omits {D28}; history ungraded by this run", file=sys.stderr)
+    runner = (unittest.TextTestRunner(durations=durations) if durations is not None
+              else unittest.TextTestRunner())
+    result = runner.run(unittest.TestSuite(kept))
+    return 0 if result.wasSuccessful() else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

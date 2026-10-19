@@ -7,12 +7,12 @@ throughput. The database file is the local trust boundary.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
-from contextlib import contextmanager
 import hashlib
 import os
-from pathlib import Path
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
+from pathlib import Path
 
 from .errors import CementError, IntegrityError, StateError, ValidationError
 
@@ -411,7 +411,7 @@ def _schema_objects(connection: sqlite3.Connection) -> dict[tuple[str, str], str
 
 
 def _expected_schema() -> dict[tuple[str, str], str]:
-    global _EXPECTED_SCHEMA
+    global _EXPECTED_SCHEMA  # noqa: PLW0603 — computed once, lazily, from the schema DDL itself
     if _EXPECTED_SCHEMA is None:
         connection = sqlite3.connect(":memory:", isolation_level=None)
         try:
@@ -422,7 +422,7 @@ def _expected_schema() -> dict[tuple[str, str], str]:
     return _EXPECTED_SCHEMA
 
 
-class _ReadOnlyViolation(CementError):
+class _ReadOnlyViolation(CementError):  # noqa: N818 — a private signal, never raised to callers
     """A write reached the read-only ledger capability."""
 
 
@@ -569,7 +569,9 @@ class Store:
             descriptor = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         except FileExistsError:
             if self.path.is_symlink() or not self.path.is_file():
-                raise ValidationError("database path must identify a non-symlink regular file")
+                raise ValidationError(
+                    "database path must identify a non-symlink regular file"
+                ) from None
         except (OSError, ValueError, UnicodeError) as exc:
             raise ValidationError("database path could not be created safely") from exc
         else:

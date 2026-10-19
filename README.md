@@ -252,6 +252,7 @@ shares that one review surface.
 ```python
 from cement_runtime import Candidate, CandidateRequest, CompilePolicy, System
 
+
 class ProviderAdapter:
     def propose(self, candidate_request: CandidateRequest) -> Candidate:
         # Call an LLM here; provenance should identify model/prompt/tool revisions.
@@ -259,6 +260,7 @@ class ProviderAdapter:
             output={"kind": "reply", "text": "candidate"},
             provenance={"model": "provider/model", "prompt_revision": "sha256:..."},
         )
+
 
 system = System("cement.db", candidate_source=ProviderAdapter())
 system.register_operation("tenant-42", "support.reply", policy=CompilePolicy())

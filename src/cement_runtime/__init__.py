@@ -64,6 +64,12 @@ from .source import CandidateSource, CommandCandidateSource
 from .system import System
 
 __all__ = [
+    "FUNCTION_ABI",
+    "FUNCTION_ENTRY_SEAL_ABI",
+    "FUNCTION_MAX_BYTES",
+    "FUNCTION_MAX_DEPTH",
+    "FUNCTION_MAX_ENTRIES",
+    "FUNCTION_MAX_ITEMS",
     "Candidate",
     "CandidateRequest",
     "CandidateSource",
@@ -77,12 +83,6 @@ __all__ = [
     "DraftEntry",
     "DraftVerification",
     "FallbackFailed",
-    "FUNCTION_ABI",
-    "FUNCTION_ENTRY_SEAL_ABI",
-    "FUNCTION_MAX_BYTES",
-    "FUNCTION_MAX_DEPTH",
-    "FUNCTION_MAX_ENTRIES",
-    "FUNCTION_MAX_ITEMS",
     "FunctionAnchorReport",
     "FunctionCheck",
     "FunctionDocument",

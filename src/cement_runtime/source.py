@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import base64
-from collections.abc import Mapping, Sequence
 import json
 import math
 import os
-from pathlib import Path
 import signal
 import subprocess
 import sys
 import threading
 import unicodedata
+from collections.abc import Mapping, Sequence
+from pathlib import Path
 from typing import Any, Protocol
 
 from .errors import CandidateSourceError, ValidationError
@@ -137,9 +137,7 @@ class CommandCandidateSource:
         timeout = self._timeout
         if supervised:
             encoded = base64.urlsafe_b64encode(
-                json.dumps(
-                    self._argv, ensure_ascii=False, separators=(",", ":")
-                ).encode("utf-8")
+                json.dumps(self._argv, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
             ).decode("ascii")
             command = (
                 sys.executable,
@@ -154,7 +152,7 @@ class CommandCandidateSource:
             command = self._argv
 
         try:
-            process = subprocess.Popen(
+            process = subprocess.Popen(  # noqa: S603 — argv list from the operator's own adapter config, no shell
                 command,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
@@ -184,7 +182,7 @@ class CommandCandidateSource:
                     pass
 
         def write_request() -> None:
-            assert process.stdin is not None
+            assert process.stdin is not None  # noqa: S101 — narrowing only: Popen(..., PIPE)
             try:
                 process.stdin.write(request_bytes)
                 process.stdin.flush()
@@ -215,7 +213,7 @@ class CommandCandidateSource:
         setup_error: Exception | None = None
         cleanup_failed = False
         try:
-            assert process.stdout is not None and process.stderr is not None
+            assert process.stdout is not None and process.stderr is not None  # noqa: S101 — narrowing only
             threads = (
                 threading.Thread(target=write_request, daemon=True),
                 threading.Thread(
@@ -250,11 +248,15 @@ class CommandCandidateSource:
                     cleanup_failed = True
             for thread in started:
                 thread.join(timeout=2.0)
-            cleanup_failed = cleanup_failed or len(started) != len(threads) or any(
-                thread.is_alive() for thread in started
+            cleanup_failed = (
+                cleanup_failed
+                or len(started) != len(threads)
+                or any(thread.is_alive() for thread in started)
             )
         if setup_error is not None:
-            raise CandidateSourceError("candidate command supervision could not be started") from setup_error
+            raise CandidateSourceError(
+                "candidate command supervision could not be started"
+            ) from setup_error
         if cleanup_failed:
             raise CandidateSourceError("candidate command descendant cleanup failed")
         if timed_out:
@@ -274,7 +276,9 @@ class CommandCandidateSource:
             raise CandidateSourceError(f"candidate command exited with status {process.returncode}")
 
         try:
-            response = parse_json(bytes(raw).decode("utf-8"), max_bytes=self._max_output_bytes).value
+            response = parse_json(
+                bytes(raw).decode("utf-8"), max_bytes=self._max_output_bytes
+            ).value
         except (UnicodeDecodeError, ValidationError) as exc:
             raise CandidateSourceError("candidate command returned invalid JSON") from exc
         if type(response) is not dict or set(response) != {"output", "provenance"}:

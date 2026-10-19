@@ -6,6 +6,14 @@ paths:
   - ".agent/decisions/m3-deferred-validate.py"
   - "tests/test_migration_battery.py"
   - "tests/test_lifecycle_removal_battery.py"
+  - ".agent/gitleaks"
+  - ".gitleaksignore"
+  - ".agent/skip-census"
+  - ".agent/register-audit"
+  - ".agent/mutate"
+  - ".agent/suite"
+  - "pyproject.toml"
+  - ".github/workflows/gate.yml"
 ---
 
 # Gate-check firing records
@@ -20,3 +28,9 @@ Each purpose-built check below ships the seed that reds it; law → `.claude/rul
 - D28 (`tests/test_migration_battery.py`): a seed costs one full suite per revision, so the shipped floor carries the anti-collapse half — `assertTrue(revisions)` + `Ran >= 949`; the census's own `>= 17/13/12` (the write floor moved 15 → 13 with the lifecycle removal).
 - D28 pairing (`instrument_pruned()`, `tests/test_lifecycle_removal_battery.py` L23 ×2, L26, L29, L30), two seeds: `CEMENT_D28_INNER_REPLAY=1` in the primary tree → 5 frames `FAILED (failures=5)`, `set=True contradicts … present=True`; the instrument deleted from a checkout with the variable UNSET → the same 5, `set=False … present=False`. Announced + pruned → `OK (skipped=1)`; neither → `OK`, full strength.
 - `SWAPPED_ROOTS` purge (`MigrationBatteryTests.setUpClass`): `uv run python -m unittest tests.test_hospital_ocr_example tests.test_migration_battery.MigrationBatteryTests.test_d19_...` → red before the purge (`FAILED (errors=1)`, 0.8 s), green after, each module still green alone.
+- Static checks (`pyproject.toml` `[tool.ruff]` + `[tool.mypy]`, gate steps `format`/`lint`/`types`): one seed each, appended to `src/cement_runtime/errors.py` and restored byte-identical — `x  =  1` → `format` rc 1; `import os` → `lint` rc 1 (F401); `ok = 1  # noqa: F401` → `lint` rc 1 (RUF100, unused suppression); `def _seed() -> int: return "x"` → `types` rc 1.
+- `uv audit` (gate step `audit`): a scratch project with dev dep `jinja2==2.10`, `uv lock` + `uv audit --locked` → rc 1, 12 vulnerabilities; the shipped lock → rc 0 (34 packages, 0 vulnerabilities).
+- `.agent/gitleaks` (gate step `secrets`, pinned 8.30.1 binary by sha256 into gitignored `.tools/`): a scratch repo committing a random `ghp_…` token, `.agent/gitleaks git … <repo>` → rc 1; the shipped history → rc 0 with the 6 reviewed fingerprints in `.gitleaksignore`. A new hit reds; triage = fix, or one exact fingerprint after review — never a path or rule allowlist.
+- `.agent/skip-census` (gate step `skips`, p66 + p85): a copy of `tests/` plus a fourth `self.skipTest("seed")` → rc 1 naming `SeededSkip.test_seeded_fourth_skip`; the shipped tree → rc 0, 3 members (2 `platform`, 1 `replay-pruned`).
+- `.agent/register-audit --gate` (gate step `register`, p12 + p40): `Run the command simply …` → rc 1 `FILLER … simply`; a 30-word sentence + a punctuation-free bullet + `Cement's` → rc 0, prints `[30]` (length is printed for judgment, never graded).
+- `.agent/mutate` (p74, credit tool, not a gate step): see `.agent/decisions/m3u10-gate-tooling.md` `## p74` — the pin's survivor count and the survivor count after deleting the pin's assertion (seed branch), both runs recorded there.

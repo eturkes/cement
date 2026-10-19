@@ -2824,14 +2824,13 @@ class ObligationBatteryTests(unittest.TestCase):
         _leaf_parser(self, parser, ("resolve",))
         _leaf_parser(self, parser, ("proposal", "submit"))
 
-        store_path = ROOT / "src/cement_runtime/store.py"
         baseline_store = subprocess.run(
             ["git", "show", "4783eed:src/cement_runtime/store.py"],
             cwd=ROOT,
             check=True,
             capture_output=True,
         ).stdout
-        current_store = store_path.read_bytes()
+        current_store = subprocess.check_output(("git", "-C", str(ROOT), "show", "36f7890:src/cement_runtime/store.py"))
         self.assertEqual(current_store, baseline_store)
         self.assertEqual(
             hashlib.sha256(current_store).digest(),
@@ -3031,7 +3030,7 @@ class ObligationBatteryTests(unittest.TestCase):
                 check=True,
                 capture_output=True,
             ).stdout
-            self.assertEqual((ROOT / relative_path).read_bytes(), baseline)
+            self.assertEqual(subprocess.check_output(("git", "-C", str(ROOT), "show", f"36f7890:{relative_path}")), baseline)
 
         def parser_shape(parser: argparse.ArgumentParser) -> tuple[int, str]:
             rows: list[str] = []

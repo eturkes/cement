@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
-# gate — the repo's check chain (`.claude/rules/ops.md` Env), each step's wall-clock + the suite's
-# 10 slowest tests; rc 0 only when every step passes.
-#   .agent/gate                  full gate: unittest discover (D28 included) + uv build + spec-lint
-#   .agent/gate <tests.module>…  fast gate: those modules + spec-lint; iteration only, never a closing claim
+# gate — the repo's check chain (`.claude/rules/ops.md` Env), each step's rc + wall-clock + the
+# suite's 10 slowest tests; rc 0 only when every step passes.
+#   .agent/gate                  full gate: static checks + scanners + unittest discover (D28
+#                                included) + uv build + spec-lint
+#   .agent/gate <tests.module>…  fast gate: static checks + those modules + spec-lint; iteration only
+#   .agent/gate --omit-d28       full gate with the suite minus D28, NAMED as a split run
+#                                (`.claude/rules/history-gates.md`); CI's non-3.13 legs
 set -u
 cd "$(dirname "$0")/.." || exit 2
 names=() rcs=() secs=()
@@ -17,7 +20,22 @@ step() { # step <name> <cmd…>
 # `--durations` arrived in Python 3.12; pyproject admits 3.11.
 durations=() note="slowest tests unavailable: unittest --durations needs Python >= 3.12"
 uv run python -c 'import sys; sys.exit(sys.version_info < (3, 12))' && durations=(--durations 10) note=
-if [ $# -eq 0 ]; then
+step format uv run ruff format --check
+step lint uv run ruff check
+step types uv run mypy
+if [ "${1:-}" = "--omit-d28" ]; then
+  shift
+  step audit uv audit --locked --preview-features audit-command
+  step secrets .agent/gitleaks
+  step skips uv run python .agent/skip-census
+  step register uv run python .agent/register-audit --gate
+  step unittest uv run python .agent/suite --omit-d28 "${durations[@]}"
+  step build uv build
+elif [ $# -eq 0 ]; then
+  step audit uv audit --locked --preview-features audit-command
+  step secrets .agent/gitleaks
+  step skips uv run python .agent/skip-census
+  step register uv run python .agent/register-audit --gate
   step unittest uv run python -m unittest discover -s tests -t . "${durations[@]}"
   step build uv build
 else

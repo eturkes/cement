@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+"""register-audit — ASD-STE100 register over the human-facing prose surfaces (p12 + p40).
+
+Gate verdict = filler alone (`CLAUDE.md` `Authoring` `Human-facing`: simply, robust, seamlessly,
+leverage + their forms); rc 1 on any hit. Sentence length is judged, never capped (owner ruling,
+`.claude/rules/human-facing.md`), so it is printed for the judgment pass and never graded; passive,
+modal, contraction and dash counts print beside it as leads.
+
+Usage:
+  .agent/register-audit --gate [files…]   summary + filler hits; rc 1 on a hit (the gate step)
+  .agent/register-audit [files…]          every sentence with its word count, for judgment
+Files default to the tracked surfaces: README.md, docs/*.md, examples/*/README.md.
+"""
+
+from __future__ import annotations
+
+import pathlib
+import re
+import subprocess
+import sys
+
+FENCE = re.compile(r"^\s*(```|~~~)")
+INLINE_CODE = re.compile(r"`[^`]*`")
+LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)")
+FILLER = re.compile(
+    r"\b(simply|robust|robustly|robustness|seamless|seamlessly|leverage|leverages|leveraging"
+    r"|utilize|utilizes|utilizing)\b",
+    re.IGNORECASE,
+)
+PASSIVE = re.compile(
+    r"\b(is|are|was|were|be|been|being)\s+(?:not\s+|only\s+|also\s+|already\s+|still\s+)?"
+    r"([a-z]+(?:ed|en)|built|held|kept|made|run|done|bound|drawn|taken|sent|left|set|read)\b"
+)
+MODAL = re.compile(r"\b(may|might|could|should|would|can)\b", re.IGNORECASE)
+# Contractions by form, so a possessive `Cement's` never counts: `'s` only after a pronoun.
+CONTRACTION = re.compile(
+    r"\b(?:\w+n['’]t|(?:it|that|there|here|what|who|let|he|she)['’]s|\w+['’](?:re|ve|ll|d|m))\b",
+    re.IGNORECASE,
+)
+DASH = re.compile(r"[—–]")
+BLOCK_START = re.compile(r"^([-*+]|\d+\.)\s")
+ABBREVIATION = re.compile(r"\b(e\.g|i\.e|etc|vs|cf|Dr|Mr|Ms|No|approx)\.$")
+
+
+def surfaces() -> list[pathlib.Path]:
+    listed = subprocess.run(
+        ["git", "ls-files", "--", "README.md", "docs/*.md", "examples/*/README.md"],
+        capture_output=True, text=True, check=True,
+    ).stdout.split()
+    return [pathlib.Path(name) for name in listed]
+
+
+def blocks(text: str) -> list[tuple[int, str]]:
+    """(first line, text) per paragraph, bullet and table cell; code fences + headings dropped.
+
+    A blank line, a heading or a new bullet ends a block, so a block without terminal
+    punctuation never joins its neighbour.
+    """
+    out: list[tuple[int, str]] = []
+    open_block = False
+    fenced = False
+    for number, raw in enumerate(text.splitlines(), start=1):
+        if FENCE.match(raw):
+            fenced = not fenced
+            open_block = False
+            continue
+        line = raw.strip()
+        if fenced or not line or line.startswith("#") or set(line) <= set("|-: "):
+            open_block = False
+            continue
+        if line.startswith("|"):
+            out.extend((number, cell.strip()) for cell in line.strip("|").split("|") if cell.strip())
+            open_block = False
+            continue
+        if open_block and not BLOCK_START.match(line):
+            head, body = out[-1]
+            out[-1] = (head, f"{body} {line}")
+        else:
+            out.append((number, line))
+        open_block = True
+    return out
+
+
+def sentences(text: str) -> list[str]:
+    body = INLINE_CODE.sub("CODE", LINK.sub(r"\1", text))
+    body = BLOCK_START.sub("", body)
+    parts: list[str] = []
+    buffer = ""
+    for token in re.split(r"(?<=[.?!])\s+", body):
+        buffer = f"{buffer} {token}" if buffer else token
+        if ABBREVIATION.search(buffer) or re.search(r"\b\d+\.$", buffer):
+            continue
+        parts.append(buffer)
+        buffer = ""
+    if buffer:
+        parts.append(buffer)
+    return [part.strip() for part in parts if part.strip()]
+
+
+def words(sentence: str) -> int:
+    return sum(1 for token in sentence.split() if re.search(r"\w", token))
+
+
+def main(argv: list[str]) -> int:
+    gate = "--gate" in argv
+    paths = [pathlib.Path(arg) for arg in argv[1:] if arg != "--gate"] or surfaces()
+    if not paths:
+        print("register-audit: no surfaces", file=sys.stderr)
+        return 2
+    filler_total = 0
+    for path in paths:
+        units = blocks(path.read_text(encoding="utf-8"))
+        prose = [(number, s) for number, text in units for s in sentences(text)]
+        joined = "\n".join(INLINE_CODE.sub("CODE", text) for _, text in units)
+        filler = [(n, m.group(0)) for n, text in units for m in FILLER.finditer(INLINE_CODE.sub("CODE", text))]
+        filler_total += len(filler)
+        longest = max((words(s) for _, s in prose), default=0)
+        print(
+            f"== {path}: {len(prose)} sentences, longest {longest} words, filler {len(filler)}, "
+            f"passive {len(PASSIVE.findall(joined))}, modal {len(MODAL.findall(joined))}, "
+            f"contraction {len(CONTRACTION.findall(joined))}, dash {len(DASH.findall(joined))}"
+        )
+        for number, word in filler:
+            print(f"  FILLER {path}:{number}: {word}")
+        if not gate:
+            for number, sentence in prose:
+                print(f"  {path}:{number} [{words(sentence)}] {sentence}")
+    if filler_total:
+        print(f"register-audit: FAIL ({filler_total} filler hits)")
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

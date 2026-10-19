@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+"""skip-census — the suite's skip set must EQUAL the allowlist below (p66 + p85).
+
+unittest scores a skip as success, so a fourth skip enters a green `OK` unseen. This census
+parses every `tests/*.py` (AST, so a docstring that names `skipTest` is no hit) and finds each
+skip site: `skipTest` calls, `raise SkipTest`, and `skip`/`skipIf`/`skipUnless`/
+`expectedFailure` decorators or calls. Each hit = (file, test id, kind, condition); the set must
+equal ALLOWED exactly, each member carrying its reason class. It prints every hit with its
+class, every UNLISTED hit and every allowlisted member it no longer finds, and exits 1 on either.
+It lives in `.agent/`, outside the `tests/` tree it scans, so it never counts itself.
+
+Usage: .agent/skip-census [tests-dir]   (rc 0 = equal, 1 = drift, 2 = unreadable)
+"""
+
+from __future__ import annotations
+
+import ast
+import pathlib
+import sys
+
+# `ast.unparse` spelling (single quotes), which is what the census compares.
+PLATFORM_GUARD = "sys.platform.startswith('linux') and pathlib.Path('/proc').is_dir()"
+# (file, test id, kind, condition) -> reason class. A new member = an owner-approved gate change
+# with its `.agent/deferred.md` row (`CLAUDE.md` `Engineering` Verification integrity).
+ALLOWED = {
+    (
+        "tests/test_source.py",
+        "CommandCandidateSourceTests.test_detached_descendants_are_killed_and_reaped",
+        "skipUnless",
+        PLATFORM_GUARD,
+    ): "platform",
+    (
+        "tests/test_source.py",
+        "CommandCandidateSourceTests.test_outer_watchdog_kills_adapter_if_supervisor_dies",
+        "skipUnless",
+        PLATFORM_GUARD,
+    ): "platform",
+    (
+        "tests/test_lifecycle_removal_battery.py",
+        "LifecycleRemovalBattery.test_l30_m3_6a1_s_d16_tests_test_migration_battery_py_993_is_re",
+        "skipTest",
+        "instrument_pruned()",
+    ): "replay-pruned",
+}
+DECORATORS = {"skip", "skipIf", "skipUnless", "expectedFailure"}
+
+
+def _name(node: ast.expr) -> str | None:
+    if isinstance(node, ast.Call):
+        node = node.func
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    if isinstance(node, ast.Name):
+        return node.id
+    return None
+
+
+def _owner(stack: list[ast.AST]) -> str:
+    names = [node.name for node in stack if isinstance(node, (ast.ClassDef, ast.FunctionDef))]
+    return ".".join(names) or "<module>"
+
+
+def _guard(stack: list[ast.AST], node: ast.AST) -> str:
+    """The condition a skip call sits under: the nearest enclosing `if` test, else `always`."""
+    for parent in reversed(stack):
+        if isinstance(parent, ast.If):
+            inside = any(node is item for stmt in parent.body for item in ast.walk(stmt))
+            return ast.unparse(parent.test) if inside else f"not ({ast.unparse(parent.test)})"
+    return "always"
+
+
+def hits(path: pathlib.Path, relative: str) -> list[tuple[str, str, str, str]]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=relative)
+    found: list[tuple[str, str, str, str]] = []
+    decorators = {
+        id(decorator)
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+        for decorator in node.decorator_list
+    }
+
+    def visit(node: ast.AST, stack: list[ast.AST]) -> None:
+        if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            for decorator in node.decorator_list:
+                kind = _name(decorator)
+                if kind in DECORATORS:
+                    condition = (
+                        ast.unparse(decorator.args[0])
+                        if isinstance(decorator, ast.Call) and decorator.args
+                        and kind in {"skipIf", "skipUnless"}
+                        else "always"
+                    )
+                    found.append((relative, _owner([*stack, node]), kind, condition))
+        elif (
+            isinstance(node, ast.Call)
+            and id(node) not in decorators
+            and _name(node) in {"skipTest", *DECORATORS}
+        ):
+            found.append((relative, _owner(stack), str(_name(node)), _guard(stack, node)))
+        elif isinstance(node, ast.Raise) and node.exc is not None and _name(node.exc) == "SkipTest":
+            found.append((relative, _owner(stack), "SkipTest", _guard(stack, node)))
+        for child in ast.iter_child_nodes(node):
+            visit(child, [*stack, node])
+
+    visit(tree, [])
+    return found
+
+
+def main(argv: list[str]) -> int:
+    root = pathlib.Path(argv[1] if len(argv) > 1 else "tests")
+    paths = sorted(root.glob("*.py"))
+    if not paths:
+        print(f"skip-census: no tests/*.py under {root}", file=sys.stderr)
+        return 2
+    found = [hit for path in paths for hit in hits(path, f"tests/{path.name}")]
+    print(f"skip-census: {len(paths)} modules, {len(found)} skip sites, {len(ALLOWED)} allowed")
+    for hit in found:
+        print(f"  {ALLOWED.get(hit, 'UNLISTED'):<13} {hit[0]}::{hit[1]} {hit[2]}({hit[3]})")
+    unlisted = [hit for hit in found if hit not in ALLOWED]
+    missing = [member for member in ALLOWED if member not in found]
+    for member in missing:
+        print(f"  MISSING       {member[0]}::{member[1]} {member[2]}({member[3]})")
+    if unlisted or missing or len(found) != len(set(found)):
+        print(f"skip-census: FAIL (unlisted {len(unlisted)}, missing {len(missing)})")
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

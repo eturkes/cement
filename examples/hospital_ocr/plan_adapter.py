@@ -8,12 +8,12 @@ guarantee that the plan extracts every future document correctly.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import re
-
-from cement_runtime import Candidate, CandidateRequest
+from pathlib import Path
 
 import pipeline
+
+from cement_runtime import Candidate, CandidateRequest
 
 
 class PlanProposer:
@@ -39,22 +39,14 @@ class PlanProposer:
         locator_counts: dict[tuple[str, str], int] = {}
         used_field_names: set[str] = set()
         for entry in structure:
-            if type(entry) is not dict or any(
-                type(entry_key) is not str for entry_key in entry
-            ):
-                raise ValueError(
-                    "layout signature structure entries must be string-keyed objects"
-                )
+            if type(entry) is not dict or any(type(entry_key) is not str for entry_key in entry):
+                raise ValueError("layout signature structure entries must be string-keyed objects")
             kind = entry.get("kind")
             if type(kind) is not str or not kind.strip():
-                raise ValueError(
-                    "layout signature structure entry kind must be a non-empty string"
-                )
+                raise ValueError("layout signature structure entry kind must be a non-empty string")
             key = entry.get("key")
             if type(key) is not str or not key.strip():
-                raise ValueError(
-                    "layout signature structure entry key must be a non-empty string"
-                )
+                raise ValueError("layout signature structure entry key must be a non-empty string")
 
             locator: pipeline.JSONValue
             if kind == "label":
@@ -64,9 +56,7 @@ class PlanProposer:
                 locator = {"kind": "section", "heading": key}
                 value_type = "text"
             else:
-                raise ValueError(
-                    f"layout signature structure entry has unsupported kind {kind!r}"
-                )
+                raise ValueError(f"layout signature structure entry has unsupported kind {kind!r}")
 
             locator_key = (kind, key)
             locator_counts[locator_key] = locator_counts.get(locator_key, 0) + 1
@@ -85,9 +75,7 @@ class PlanProposer:
             fields.append(field)
 
         reference = pipeline.reference_plan(document_type)
-        if reference is not None and _reference_plan_resolves_structure(
-            reference, locator_counts
-        ):
+        if reference is not None and _reference_plan_resolves_structure(reference, locator_counts):
             output = json.loads(json.dumps(reference))
             strategy = "reference_plan"
         else:
@@ -140,6 +128,7 @@ def _reference_plan_resolves_structure(
         if locator_counts.get((kind, key), 0) != 1:
             return False
     return True
+
 
 def _field_name(value: str) -> str:
     """Return a stable snake_case field name for a visible OCR key."""

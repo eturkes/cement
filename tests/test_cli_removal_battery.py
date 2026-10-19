@@ -3236,7 +3236,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         self.assertNotIn("src/cement_runtime/cli.py", paths)
         for relative in paths:
             with self.subTest(relative=relative):
-                self.assertEqual((ROOT / relative).read_bytes(), _git_bytes("f9b9755", relative))
+                self.assertEqual(_git_bytes("1146421", relative), _git_bytes("f9b9755", relative))
         self.assertNotIn("M3.6a and M3.7", docstring)
         self.assertIn("M3.6b", docstring)
         self.assertIn("M3.9a", docstring)

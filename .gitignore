@@ -20,3 +20,6 @@ dist/
 # Personal project notes (not shared)
 CLAUDE.local.md
 .claude/worktrees/
+
+# Pinned gate tools the gate downloads itself (`.agent/gitleaks`)
+.tools/

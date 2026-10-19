@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Literal, Mapping, TypeAlias, cast
+from typing import Literal, TypeAlias, cast
 
 from .errors import ValidationError
 from .function import FunctionDocument, FunctionMatch
@@ -25,7 +26,9 @@ class CompilePolicy:
         if not 2 <= self.min_confirmations <= 1_000_000:
             raise ValidationError("min_confirmations must be between 2 and 1,000,000")
         if not 1 <= self.min_reviewers <= self.min_confirmations:
-            raise ValidationError("min_reviewers must be positive and no greater than confirmations")
+            raise ValidationError(
+                "min_reviewers must be positive and no greater than confirmations"
+            )
         if not 0 <= self.min_span_seconds <= 10 * 365 * 24 * 60 * 60:
             raise ValidationError("min_span_seconds must be between zero and ten years")
 
@@ -37,7 +40,7 @@ class CompilePolicy:
         }
 
     @classmethod
-    def from_json(cls, value: Mapping[str, JSONValue]) -> "CompilePolicy":
+    def from_json(cls, value: Mapping[str, JSONValue]) -> CompilePolicy:
         expected = {"min_confirmations", "min_reviewers", "min_span_seconds"}
         if set(value) != expected or any(type(value[key]) is not int for key in expected):
             raise ValidationError("invalid compile policy document")
@@ -113,12 +116,7 @@ class ReconciliationRequired:
 
 
 Outcome: TypeAlias = (
-    Resolved
-    | ReviewRequired
-    | InProgress
-    | FallbackFailed
-    | Rejected
-    | ReconciliationRequired
+    Resolved | ReviewRequired | InProgress | FallbackFailed | Rejected | ReconciliationRequired
 )
 
 

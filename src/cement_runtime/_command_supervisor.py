@@ -133,7 +133,7 @@ def main() -> int:
         if len(request) > 2_097_152:
             return _START_FAILURE
         _become_subreaper()
-        process = subprocess.Popen(
+        process = subprocess.Popen(  # noqa: S603 — argv list from the operator's own adapter config, no shell
             command,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -141,7 +141,7 @@ def main() -> int:
             shell=False,
             close_fds=True,
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 — adapter boundary: every adapter failure is contained totally (runtime.md)
         return _START_FAILURE
 
     raw = bytearray()
@@ -152,8 +152,9 @@ def main() -> int:
     setup_failed = False
     cleaned = False
     try:
-        assert process.stdin is not None and process.stdout is not None
-        assert process.stderr is not None
+        # Narrowing only: Popen(..., PIPE) sets every stream, so `-O` changes no behavior.
+        assert process.stdin is not None and process.stdout is not None  # noqa: S101
+        assert process.stderr is not None  # noqa: S101
         threads = (
             threading.Thread(target=_write, args=(process.stdin, request), daemon=True),
             threading.Thread(
@@ -180,7 +181,7 @@ def main() -> int:
                 break
             if exceeded.wait(timeout=min(0.05, remaining)):
                 break
-    except Exception:
+    except Exception:  # noqa: BLE001 — adapter boundary: every adapter failure is contained totally (runtime.md)
         setup_failed = True
     finally:
         cleanup_deadline = time.monotonic() + 5.0
@@ -202,7 +203,7 @@ def main() -> int:
                 pass
         try:
             cleaned = _terminate_all(cleanup_deadline)
-        except Exception:
+        except Exception:  # noqa: BLE001 — adapter boundary: every adapter failure is contained totally (runtime.md)
             cleaned = False
         for thread in started:
             thread.join(timeout=max(0.0, cleanup_deadline - time.monotonic()))

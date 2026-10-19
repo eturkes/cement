@@ -3,5 +3,4 @@
 
 from cement_runtime.example_adapter import main
 
-
 main()

@@ -1,0 +1,209 @@
+#!/usr/bin/env python3
+"""mutate — credit one preservation pin with the stack's mutation tool (p74; cosmic-ray 8.7.0).
+
+`CLAUDE.md` `Engineering` Verification integrity: a pin that already passes counts once the
+mutation tool, default operators, shows it killing mutants over the files it imports or calls.
+Scope = every `src/cement_runtime/*.py` line the pin EXECUTES while it runs, traced after its
+module is loaded (a mutant on a line the pin never runs is unkillable by it and says nothing about
+it; module-level constants run at import time sit outside the scope). Mutants of
+code the pin reaches only through a subprocess are out of scope, and the report says so.
+
+Runs from a clean detached checkout of `--rev` (default HEAD), never the working tree: cosmic-ray
+rewrites module files in place. Bytecode stays off (`PYTHONDONTWRITEBYTECODE=1`, fresh tree) so
+a same-second, same-size edit never runs stale code (`.claude/rules/assurance.md`). Work splits
+across `--workers` clones by a stable hash of (module, operator, occurrence).
+
+Usage: uv run python .agent/mutate <test id> [--rev REV] [--workers N] [--timeout SECONDS]
+  test id = a dotted unittest id, e.g. tests.test_function.FunctionTests.test_x
+Prints scope, killed, survived (each survivor: file:line operator occurrence), incompetent and
+skipped counts; rc 0 when the run completes, 2 when the baseline is red or setup fails.
+"""
+
+from __future__ import annotations
+
+import argparse
+import concurrent.futures
+import hashlib
+import json
+import os
+import pathlib
+import subprocess
+import sys
+import tempfile
+import time
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+TRACER = r"""
+import json, pathlib, sys, threading, unittest
+src = str(pathlib.Path("src/cement_runtime").resolve()) + "/"
+lines = {}
+def tracer(frame, event, arg):
+    name = frame.f_code.co_filename
+    if not name.startswith(src):
+        return None
+    if event in ("call", "line"):
+        lines.setdefault(name[len(src):], set()).add(frame.f_lineno)
+    return tracer
+import cement_runtime
+assert cement_runtime.__file__.startswith(src), cement_runtime.__file__
+suite = unittest.defaultTestLoader.loadTestsFromName(sys.argv[1])
+threading.settrace(tracer); sys.settrace(tracer)
+result = unittest.TextTestRunner(stream=sys.stderr).run(suite)
+sys.settrace(None)
+json.dump({"ok": result.wasSuccessful() and result.testsRun > 0, "ran": result.testsRun,
+           "lines": {key: sorted(value) for key, value in lines.items()}}, sys.stdout)
+"""
+
+
+def _git(*args: str, cwd: pathlib.Path = ROOT) -> str:
+    return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True).stdout
+
+
+def _environment(tree: pathlib.Path) -> dict[str, str]:
+    environment = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
+    environment["PYTHONPATH"] = os.pathsep.join([str(tree), str(tree / "src")])
+    return environment
+
+
+def _shard(spec: tuple[str, str, int], workers: int) -> int:
+    digest = hashlib.sha256(json.dumps(spec).encode()).digest()
+    return int.from_bytes(digest[:4], "big") % workers
+
+
+def _run_shard(tree: pathlib.Path, config: str, executed: dict[str, set[int]], index: int,
+               workers: int) -> list[dict[str, object]]:
+    import cosmic_ray.plugins
+    from cosmic_ray.mutating import mutate_code
+    from cosmic_ray.work_db import WorkDB, use_db
+    from cosmic_ray.work_item import WorkerOutcome, WorkResult
+
+    (tree / "mutate.toml").write_text(config, encoding="utf-8")
+    session = tree / "mutate.sqlite"
+    subprocess.run([sys.executable, "-m", "cosmic_ray.cli", "init", "mutate.toml", str(session)],
+                   cwd=tree, env=_environment(tree), check=True, capture_output=True)
+    invalid: list[dict[str, object]] = []
+    sources: dict[str, str] = {}
+    with use_db(str(session), WorkDB.Mode.open) as db:
+        for item in list(db.pending_work_items):
+            mutation = item.mutations[0]
+            module = pathlib.Path(mutation.module_path).name
+            spec = (module, mutation.operator_name, mutation.occurrence)
+            keep = (mutation.start_pos[0] in executed.get(module, set())
+                    and _shard(spec, workers) == index)
+            if keep:
+                # cosmic-ray 8.7 also rewrites tokens that are not operators (the bare `*` of a
+                # keyword-only parameter list); a mutant that does not compile is incompetent,
+                # and a test "killing" it would be a phantom kill.
+                path = tree / mutation.module_path
+                source = sources.setdefault(str(path), path.read_text(encoding="utf-8"))
+                operator = cosmic_ray.plugins.get_operator(mutation.operator_name)(
+                    **mutation.operator_args
+                )
+                try:
+                    # cosmic-ray 8.7's exception replacer raises on some `except` shapes (parso
+                    # `PythonNode` without `.value`); a mutant it cannot build is incompetent too.
+                    mutated = mutate_code(source, operator, mutation.occurrence)
+                    compile(mutated or "", str(path), "exec")
+                except Exception:  # noqa: BLE001 — any failure to build the mutant = incompetent
+                    keep = False
+                    invalid.append({"module": module, "line": mutation.start_pos[0],
+                                    "operator": mutation.operator_name,
+                                    "occurrence": mutation.occurrence, "worker": "invalid",
+                                    "test": None})
+            if not keep:
+                db.set_result(item.job_id, WorkResult(worker_outcome=WorkerOutcome.SKIPPED))
+    subprocess.run([sys.executable, "-m", "cosmic_ray.cli", "exec", "mutate.toml", str(session)],
+                   cwd=tree, env=_environment(tree), check=True, capture_output=True)
+    rows: list[dict[str, object]] = list(invalid)
+    with use_db(str(session), WorkDB.Mode.open) as db:
+        for item, result in db.completed_work_items:
+            if result.worker_outcome == WorkerOutcome.SKIPPED:
+                continue
+            mutation = item.mutations[0]
+            rows.append({
+                "module": pathlib.Path(mutation.module_path).name,
+                "line": mutation.start_pos[0],
+                "operator": mutation.operator_name,
+                "occurrence": mutation.occurrence,
+                "worker": result.worker_outcome.value,
+                "test": result.test_outcome.value if result.test_outcome else None,
+            })
+    return rows
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("test_id")
+    parser.add_argument("--rev", default="HEAD")
+    parser.add_argument("--workers", type=int, default=2)
+    parser.add_argument("--timeout", type=float)
+    args = parser.parse_args()
+    revision = _git("rev-parse", "--verify", f"{args.rev}^{{commit}}").strip()
+    with tempfile.TemporaryDirectory(prefix="cement-mutate-") as directory:
+        trees = [pathlib.Path(directory) / f"tree-{index}" for index in range(args.workers)]
+        try:
+            for tree in trees:
+                _git("worktree", "add", "--detach", str(tree), revision)
+            started = time.monotonic()
+            traced = subprocess.run([sys.executable, "-c", TRACER, args.test_id], cwd=trees[0],
+                                    env=_environment(trees[0]), capture_output=True, text=True)
+            baseline = time.monotonic() - started
+            try:
+                report = json.loads(traced.stdout)
+            except ValueError:
+                print(traced.stdout[-2000:], traced.stderr[-4000:], sep="\n", file=sys.stderr)
+                return 2
+            if not report["ok"]:
+                print(f"mutate: baseline red for {args.test_id}; a red pin earns no credit",
+                      file=sys.stderr)
+                print(traced.stderr[-4000:], file=sys.stderr)
+                return 2
+            executed = {name: set(lines) for name, lines in report["lines"].items()}
+            modules = sorted(f"src/cement_runtime/{name}" for name in executed)
+            timeout = args.timeout or max(10.0, baseline * 4)
+            config = "\n".join([
+                "[cosmic-ray]",
+                f"module-path = {json.dumps(modules)}",
+                f"timeout = {timeout:.1f}",
+                "excluded-modules = []",
+                f"test-command = {json.dumps(f'{sys.executable} -m unittest {args.test_id}')}",
+                "[cosmic-ray.distributor]",
+                'name = "local"',
+                "",
+            ])
+            print(f"mutate: {args.test_id} @ {revision[:12]}, baseline {baseline:.1f}s "
+                  f"(ran {report['ran']}), timeout {timeout:.1f}s, workers {args.workers}")
+            for name in sorted(executed):
+                print(f"  scope src/cement_runtime/{name}: {len(executed[name])} executed lines")
+            with concurrent.futures.ThreadPoolExecutor(args.workers) as pool:
+                shards = list(pool.map(
+                    lambda index: _run_shard(trees[index], config, executed, index, args.workers),
+                    range(args.workers),
+                ))
+        finally:
+            for tree in trees:
+                subprocess.run(["git", "worktree", "remove", "--force", str(tree)], cwd=ROOT,
+                               capture_output=True)
+    rows = sorted((row for shard in shards for row in shard),
+                  key=lambda row: (row["module"], row["line"], row["operator"], row["occurrence"]))
+    tally = {"killed": 0, "survived": 0, "incompetent": 0, "invalid": 0, "no-test": 0, "error": 0}
+    survivors = []
+    for row in rows:
+        if row["worker"] == "normal" and row["test"] in tally:
+            tally[str(row["test"])] += 1
+            if row["test"] == "survived":
+                survivors.append(row)
+        elif row["worker"] in {"no-test", "invalid"}:
+            tally[str(row["worker"])] += 1
+        else:
+            tally["error"] += 1
+    print("mutate: " + ", ".join(f"{key} {value}" for key, value in tally.items())
+          + f" (of {len(rows)} in-scope mutants)")
+    for row in survivors:
+        print(f"  SURVIVED src/cement_runtime/{row['module']}:{row['line']} "
+              f"{row['operator']} #{row['occurrence']}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

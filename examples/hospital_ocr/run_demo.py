@@ -16,8 +16,11 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from pathlib import Path
 import tempfile
+from pathlib import Path
+
+import pipeline
+from plan_adapter import PlanProposer
 
 from cement_runtime import (
     Candidate,
@@ -30,10 +33,6 @@ from cement_runtime import (
     parse_function,
 )
 from cement_runtime.json_value import canonicalize
-
-import pipeline
-from plan_adapter import PlanProposer
-
 
 PARTITION = "example-hospital"
 OPERATION = "document.extraction_plan"
@@ -206,8 +205,7 @@ def main() -> None:
             promoted_by="informatics-lead",
         )
         print(
-            f"Layout A: compiled, verified ({report_a.tests} tests), and promoted "
-            f"as {artifact_a}."
+            f"Layout A: compiled, verified ({report_a.tests} tests), and promoted as {artifact_a}."
         )
         function = checkpoint_function(system)
         print(
@@ -265,8 +263,7 @@ def main() -> None:
         )
         function = checkpoint_function(system)
         print(
-            f"Function set: {len(function.input_hashes)} verified entries, one per "
-            "promoted layout."
+            f"Function set: {len(function.input_hashes)} verified entries, one per promoted layout."
         )
 
         calls_before = source.calls
@@ -298,21 +295,14 @@ def main() -> None:
         assert not build_c.created
         assert build_c.blocked
         gated = next(
-            (
-                record
-                for record in build_c.blocked
-                if record.get("input_hash") == c_input_hash
-            ),
+            (record for record in build_c.blocked if record.get("input_hash") == c_input_hash),
             None,
         )
         assert gated is not None
         assert gated.get("support") == 1
         reasons = gated.get("reasons")
         assert type(reasons) is list
-        assert any(
-            type(reason) is str and "below required" in reason
-            for reason in reasons
-        )
+        assert any(type(reason) is str and "below required" in reason for reason in reasons)
         print("Layout C: reviewed once but not promoted; policy still gates it.")
         print("Gate reasons: " + "; ".join(str(reason) for reason in reasons))
 
@@ -323,10 +313,7 @@ def main() -> None:
             "before Acts 2 and 3 resolved against them."
         )
         print(f"Verified function hash: {function.function_hash}")
-        print(
-            f"Exported bundle: {len(bundle_text.encode('utf-8'))} bytes carrying "
-            "no ledger."
-        )
+        print(f"Exported bundle: {len(bundle_text.encode('utf-8'))} bytes carrying no ledger.")
 
         _print_event_trace(system)
 

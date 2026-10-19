@@ -8,11 +8,11 @@ across layouts or guarantee that a plan extracts every future document correctly
 
 from __future__ import annotations
 
-from pathlib import Path
 import re
+from pathlib import Path
 from typing import TypeAlias
 
-JSONValue: TypeAlias = None | bool | int | str | list["JSONValue"] | dict[str, "JSONValue"]
+JSONValue: TypeAlias = bool | int | str | list["JSONValue"] | dict[str, "JSONValue"] | None
 _ParsedEntry: TypeAlias = tuple[str, str, str]
 
 REFERENCE_PLANS: dict[str, JSONValue] = {
@@ -121,6 +121,7 @@ REFERENCE_PLANS: dict[str, JSONValue] = {
     },
 }
 
+
 def _normalize_ocr_text(text: str) -> str:
     """Normalize line endings and blank lines without changing internal spaces."""
 
@@ -212,10 +213,7 @@ def layout_signature(ocr_text: str) -> JSONValue:
     document_type, entries = _parse_layout(ocr_text)
     return {
         "document_type": document_type,
-        "structure": [
-            {"kind": kind, "key": key}
-            for kind, key, _ in entries
-        ],
+        "structure": [{"kind": kind, "key": key} for kind, key, _ in entries],
     }
 
 
@@ -226,11 +224,7 @@ def reference_plan(document_type: str) -> JSONValue | None:
 
 
 def _label_value(entries: list[_ParsedEntry], label: str) -> str:
-    matches = [
-        value
-        for kind, key, value in entries
-        if kind == "label" and key == label
-    ]
+    matches = [value for kind, key, value in entries if kind == "label" and key == label]
     if not matches:
         raise ValueError(f"label not found in OCR text: {label!r}")
     if len(matches) > 1:
@@ -239,11 +233,7 @@ def _label_value(entries: list[_ParsedEntry], label: str) -> str:
 
 
 def _section_value(entries: list[_ParsedEntry], heading: str) -> str:
-    matches = [
-        value
-        for kind, key, value in entries
-        if kind == "section" and key == heading
-    ]
+    matches = [value for kind, key, value in entries if kind == "section" and key == heading]
     if not matches:
         raise ValueError(f"section not found in OCR text: {heading!r}")
     if len(matches) > 1:
@@ -288,7 +278,6 @@ def apply_plan(plan: JSONValue, ocr_text: str) -> dict[str, JSONValue]:
         else:
             raise ValueError(f"field {name!r} has unsupported locator kind {kind!r}")
     return result
-
 
 
 def _self_check() -> None:

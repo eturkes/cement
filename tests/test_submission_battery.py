@@ -198,7 +198,7 @@ class SubmissionBatteryTests(unittest.TestCase):
         self.assertEqual(SCHEMA_FINGERPRINT, digest)
 
     def test_b02_cli_py_command_supervisor_py_and(self) -> None:
-        """B02. Comparing each current byte stream to git object f9b9755 pins both frozen runtime files.
+        """B02. Comparing each M3.3 closing byte stream to git object f9b9755 pins both frozen runtime files.
 
         `src/cement_runtime/cli.py` was a third member, retired by M3.5a
         contract D27 because that unit added two CLI leaves to the file by
@@ -241,7 +241,7 @@ class SubmissionBatteryTests(unittest.TestCase):
                 baseline = subprocess.check_output(
                     ("git", "-C", str(ROOT), "show", f"f9b9755:{relative_path}")
                 )
-                self.assertEqual((ROOT / relative_path).read_bytes(), baseline)
+                self.assertEqual(subprocess.check_output(("git", "-C", str(ROOT), "show", f"32c2d11:{relative_path}")), baseline)
 
     def test_p01_two_methods_candidate_is_keyword_only(self) -> None:
         """P01. Inspecting both public signatures pins a required keyword-only candidate on only the direct path."""

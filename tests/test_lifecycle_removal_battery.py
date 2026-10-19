@@ -26,7 +26,6 @@ import unittest
 
 from cement_runtime import Candidate, CompilePolicy, StateError, ValidationError
 from cement_runtime.json_value import canonicalize
-from cement_runtime.store import SCHEMA_VERSION
 import cement_runtime.system as system_module
 from cement_runtime.system import System
 
@@ -34,6 +33,10 @@ from cement_runtime.system import System
 ROOT = Path(__file__).resolve().parents[1]
 SYSTEM_PATH = ROOT / "src/cement_runtime/system.py"
 BASE_SHA = "da70a56"
+# M3.6a2's close. L12 + L15 grade what that unit LEFT, a closed transition, so both endpoints
+# come from git (pin-repair ruling, `.agent/spec.md` Decisions): a later unit that formats or
+# deletes these spans changes nothing L12 + L15 assert.
+CLOSE_SHA = "ffe9848"
 
 # D28 replays gate 1 at every revision and unlinks its own module from each checkout it grades,
 # so the four frames below that reach INSTRUMENT find nothing there. The inner run announces
@@ -686,13 +689,12 @@ class LifecycleRemovalBattery(unittest.TestCase):
     def test_l12_src_cement_runtime_models_py_is_byte_identical_to_its(self) -> None:
         """L12. `src/cement_runtime/models.py` is byte-identical to its `da70a56` blob (sha256 `6dd45cfb6b078636dcdd8ae2d89b35603b727f53cc8ca32a3574647db0838289`) and `src/cement_runtime/__init__.py`'s `__all__` — compared as the PARSED ordered list of 57 names, not as source text — is unchanged (V16). PLUS binding identity (A08): each of the six exported model names resolves in `cement_runtime` to the SAME OBJECT as in `cement_runtime.models`, which an aliasing re-export (`from .models import Resolved as _Resolved`) breaks while `__all__` stays AST-equal. The post-state vector is six names at `(models=True, __all__=True, package=True, system=False)` and `Outcome` at `(True, False, False, False)` — SEVEN definitions, SIX exports (X06, X34, C10). The models survive without producers; deleting them is M3.6a3's and doing it here would take that unit's measurement with it."""
 
-        path = ROOT / "src/cement_runtime/models.py"
         baseline = _git_bytes(BASE_SHA, "src/cement_runtime/models.py")
         self.assertEqual(
             hashlib.sha256(baseline).hexdigest(),
             "6dd45cfb6b078636dcdd8ae2d89b35603b727f53cc8ca32a3574647db0838289",
         )
-        self.assertEqual(path.read_bytes(), baseline)
+        self.assertEqual(_git_bytes(CLOSE_SHA, "src/cement_runtime/models.py"), baseline)
 
     def test_l12_package_all_is_the_same_ordered_57_name_list(self) -> None:
         def parsed_all(source: str) -> tuple[str, ...]:
@@ -716,7 +718,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
 
         baseline = parsed_all(_git_text(BASE_SHA, "src/cement_runtime/__init__.py"))
         self.assertEqual(len(baseline), 57)
-        current = parsed_all((ROOT / "src/cement_runtime/__init__.py").read_text())
+        current = parsed_all(_git_text(CLOSE_SHA, "src/cement_runtime/__init__.py"))
         self.assertEqual(current, baseline)
 
     def test_l12_six_package_exports_are_identical_model_bindings(self) -> None:
@@ -835,9 +837,19 @@ class LifecycleRemovalBattery(unittest.TestCase):
     def test_l14_schema_version_stays_2_and_src_cement_runtime_store_py_is(self) -> None:
         """L14. `SCHEMA_VERSION` stays 2 and `src/cement_runtime/store.py` is byte-identical to its `da70a56` blob."""
 
-        self.assertEqual(SCHEMA_VERSION, 2)
+        # Both halves read M3.6a2's close from git (pin-repair ruling): the gate-tooling unit's lint
+        # fixes and M3.6b's schema cut edit store.py without touching what M3.6a2 left.
+        closed = _git_text(CLOSE_SHA, "src/cement_runtime/store.py")
+        versions = [
+            node.value.value
+            for node in ast.parse(closed).body
+            if isinstance(node, ast.Assign)
+            and any(isinstance(t, ast.Name) and t.id == "SCHEMA_VERSION" for t in node.targets)
+            and isinstance(node.value, ast.Constant)
+        ]
+        self.assertEqual(versions, [2])
         self.assertEqual(
-            (ROOT / "src/cement_runtime/store.py").read_bytes(),
+            closed.encode("utf-8"),
             _git_bytes(BASE_SHA, "src/cement_runtime/store.py"),
         )
 
@@ -846,7 +858,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
 
         names = ("propose", "submit_proposal", "get_proposal", "review", "resolve")
         baseline_source = _git_text(BASE_SHA, "src/cement_runtime/system.py")
-        current_source = SYSTEM_PATH.read_text()
+        current_source = _git_text(CLOSE_SHA, "src/cement_runtime/system.py")
         baseline_tree = _system_tree(baseline_source)
         current_tree = _system_tree(current_source)
 

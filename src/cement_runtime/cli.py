@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import argparse
-from collections.abc import Iterator
 import contextlib
-from dataclasses import asdict, dataclass, field, is_dataclass
 import json
 import os
 import pathlib
 import stat
 import sys
+from collections.abc import Iterator
+from dataclasses import asdict, dataclass, field, is_dataclass
 from typing import Any, Never, cast
 
 from .errors import (
@@ -38,7 +38,7 @@ class _UsageError(Exception):
     pass
 
 
-class _Unverified(Exception):
+class _Unverified(Exception):  # noqa: N818 — a verdict carrier mapped to exit 6, not an error
     """A negative verification verdict carrying its finished stderr payload.
 
     Deliberately not a `CementError`: `main`'s residual clause catches that base
@@ -117,9 +117,7 @@ def _parser() -> argparse.ArgumentParser:
         "--expected-function-hash", help="require the promoted set to hash to this digest"
     )
 
-    proposal = commands.add_parser(
-        "proposal", help="submit/inspect/review supervised proposals"
-    )
+    proposal = commands.add_parser("proposal", help="submit/inspect/review supervised proposals")
     proposal_commands = proposal.add_subparsers(dest="proposal_command", required=True)
     proposal_submit = proposal_commands.add_parser("submit", allow_abbrev=False)
     proposal_submit.add_argument("operation")
@@ -132,14 +130,18 @@ def _parser() -> argparse.ArgumentParser:
     proposal_show.add_argument("proposal_id")
     proposal_list = proposal_commands.add_parser("list")
     proposal_list.add_argument(
-        "--status", choices=("all", "pending", "accepted", "corrected", "rejected"), default="pending"
+        "--status",
+        choices=("all", "pending", "accepted", "corrected", "rejected"),
+        default="pending",
     )
     proposal_list.add_argument("--after-sequence", type=int, default=0)
     proposal_list.add_argument("--limit", type=int, default=100)
     proposal_review = proposal_commands.add_parser("review")
     proposal_review.add_argument("proposal_id")
     proposal_review.add_argument("--reviewer", required=True)
-    proposal_review.add_argument("--decision", choices=("accept", "correct", "reject"), required=True)
+    proposal_review.add_argument(
+        "--decision", choices=("accept", "correct", "reject"), required=True
+    )
     proposal_review.add_argument("--output", help="corrected JSON; required for correct")
     proposal_review.add_argument("--note", default="")
 
@@ -156,7 +158,9 @@ def _parser() -> argparse.ArgumentParser:
     promote.add_argument("--scope-hash", required=True)
     promote.add_argument("--actor", required=True)
 
-    challenge = commands.add_parser("challenge", help="confirm or counterexample an active artifact")
+    challenge = commands.add_parser(
+        "challenge", help="confirm or counterexample an active artifact"
+    )
     challenge.add_argument("operation")
     challenge.add_argument("--input", required=True)
     challenge.add_argument("--expected", required=True)
@@ -303,12 +307,10 @@ def _submission_stdin() -> str:
         except OSError as exc:
             raise ValidationError("submission stdin could not be read") from exc
         if len(source) > SUBMISSION_MAX_BYTES:
-            raise ValidationError(
-                f"submission stdin exceeds {SUBMISSION_MAX_BYTES} characters"
-            )
+            raise ValidationError(f"submission stdin exceeds {SUBMISSION_MAX_BYTES} characters")
         return source
     try:
-        raw = binary.read(SUBMISSION_MAX_BYTES + 1)
+        raw: bytes = binary.read(SUBMISSION_MAX_BYTES + 1)
     except OSError as exc:
         raise ValidationError("submission stdin could not be read") from exc
     if len(raw) > SUBMISSION_MAX_BYTES:
@@ -451,9 +453,7 @@ def _export_target(value: str) -> pathlib.Path:
         # caller asserted. `os.open` refuses that spelling and so does the
         # bundle reader, so refuse it here rather than diverge.
         if value.endswith(("/", os.sep)):
-            raise ValidationError(
-                "export output path must not end with a directory separator"
-            )
+            raise ValidationError("export output path must not end with a directory separator")
         _reject_export_target(target)
         if not target.parent.is_dir():
             raise ValidationError("export output directory does not exist")
@@ -603,19 +603,19 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
             expected_function_hash=args.expected_function_hash,
         )
         verification = resolution.verification
-        match = resolution.match
+        answer = resolution.match
         # One fixed key set across all three states, so a verified miss and a
         # failed verdict stay distinguishable under their shared exit 6. The
         # nested FunctionDocument never reaches stdout.
-        matched = None if match is None else match.matched
+        matched = None if answer is None else answer.matched
         return _Outcome(
             {
-                "artifact_hash": None if match is None else match.artifact_hash,
+                "artifact_hash": None if answer is None else answer.artifact_hash,
                 "checks": [asdict(check) for check in verification.checks],
                 "entries": verification.entries,
                 "function_hash": verification.function_hash,
                 "matched": matched,
-                "output": None if match is None else match.output,
+                "output": None if answer is None else answer.output,
                 "passed": verification.passed,
             },
             status=0 if matched is True else 6,
@@ -689,13 +689,13 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
                 after_sequence=args.after_sequence,
                 limit=args.limit,
             )
-        suspended = system.revoke_example(
+        suspended_ids = system.revoke_example(
             args.partition,
             args.example_id,
             revoked_by=args.actor,
             reason=args.reason,
         )
-        return {"example_id": args.example_id, "suspended_artifact_ids": suspended}
+        return {"example_id": args.example_id, "suspended_artifact_ids": suspended_ids}
     if args.command == "artifact":
         if args.artifact_command == "list":
             return system.artifacts(

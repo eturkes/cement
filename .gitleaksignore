@@ -1,0 +1,9 @@
+# Reviewed gitleaks false positives, one exact finding fingerprint each (commit:file:rule:line).
+# Prose lines about duplicate object keys and decimal exponents match generic-api-key.
+3a533890f67d887ae99c1639d63aedbdd603d83e:.agent/decisions/m3-map-a-llm-runtime.md:generic-api-key:194
+3b7769b56d64f9222eb886610de24cb4268d0abd:docs/adapter-protocol.md:generic-api-key:32
+69568098363f99065ab148d96abd5442e058488d:.agent/decisions/m2u5-claims.md:generic-api-key:140
+a71754450f8b3a38edebb6c4d21c172cd65753b5:.agent/decisions/m2u4c-surface.md:generic-api-key:91
+c69cc2422fb3f8803c1e6737f1d6b65c517cd773:docs/adapter-protocol.md:generic-api-key:32
+# A probe driver's test sentinel string, no credential.
+62711c9181ce5009cd99e2051f2315f0c99a448c:.agent/decisions/m3u3-probe-driver.py:generic-api-key:558

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
-from dataclasses import dataclass
 import hashlib
 import os
 import re
@@ -11,6 +9,8 @@ import sqlite3
 import time
 import unicodedata
 import uuid
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any, Literal, cast
 
 from .artifacts import (
@@ -105,7 +105,6 @@ _FUNCTION_MANIFEST_MAX_BYTES = 2 * FUNCTION_MAX_BYTES
 _FUNCTION_MANIFEST_MAX_DEPTH = FUNCTION_MAX_DEPTH + 2
 _FUNCTION_MANIFEST_MAX_ITEMS = 2 * FUNCTION_MAX_ITEMS
 _ID_LIST_ABI = "cement-id-list-v1"
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -289,15 +288,9 @@ def _function_receipt_from_row(
             "stored function receipt promoted_by",
             maximum=256,
         )
-        policy_hash = _digest(
-            row["policy_hash"], "stored function receipt policy_hash"
-        )
-        function_hash = _digest(
-            row["function_hash"], "stored function receipt function_hash"
-        )
-        membership_hash = _digest(
-            row["membership_hash"], "stored function receipt membership_hash"
-        )
+        policy_hash = _digest(row["policy_hash"], "stored function receipt policy_hash")
+        function_hash = _digest(row["function_hash"], "stored function receipt function_hash")
+        membership_hash = _digest(row["membership_hash"], "stored function receipt membership_hash")
         candidate_artifact_ids_hash = _digest(
             row["candidate_artifact_ids_hash"],
             "stored function receipt candidate_artifact_ids_hash",
@@ -306,9 +299,7 @@ def _function_receipt_from_row(
             row["retired_artifact_ids_hash"],
             "stored function receipt retired_artifact_ids_hash",
         )
-        receipt_hash = _digest(
-            row["receipt_hash"], "stored function receipt receipt_hash"
-        )
+        receipt_hash = _digest(row["receipt_hash"], "stored function receipt receipt_hash")
     except (IndexError, KeyError, TypeError, ValidationError) as exc:
         raise IntegrityError("stored function receipt has invalid scalar fields") from exc
 
@@ -526,7 +517,7 @@ def _proposal_bindings(
             FROM proposals AS p
             LEFT JOIN requests AS r ON r.partition = p.partition AND r.id = p.request_id
             WHERE p.partition = ? AND p.id IN ({placeholders})
-            """,
+            """,  # noqa: S608 — only code-chosen fragments; every value binds as `?`
             (partition, *selection.values),
         ).fetchall()
     elif type(selection) is _ProposalFeed:
@@ -589,9 +580,7 @@ def _proposal_bindings(
         ).fetchall()
         return _ProposalBindingSet(
             total=total,
-            rows=tuple(
-                _proposal_binding_from_row(row, partition=partition) for row in rows
-            ),
+            rows=tuple(_proposal_binding_from_row(row, partition=partition) for row in rows),
         )
     else:
         raise IntegrityError("proposal binding selection is invalid")
@@ -688,11 +677,7 @@ class System:
 
     def _now(self) -> int:
         now = self._clock_us()
-        if (
-            type(now) is not int
-            or now < 0
-            or now > _MAX_SQLITE_INTEGER
-        ):
+        if type(now) is not int or now < 0 or now > _MAX_SQLITE_INTEGER:
             raise StateError("clock must return a signed 64-bit microsecond timestamp")
         return now
 
@@ -723,7 +708,9 @@ class System:
             if existing is not None:
                 if existing["policy_hash"] == policy_json.digest:
                     return int(existing["revision"])
-                raise ConflictError("operation exists with a different policy; revise it explicitly")
+                raise ConflictError(
+                    "operation exists with a different policy; revise it explicitly"
+                )
             connection.execute(
                 """
                 INSERT INTO operations(
@@ -1011,7 +998,7 @@ class System:
                 )
             )
             generated = self._canonical_candidate(candidate)
-        except Exception:
+        except Exception:  # noqa: BLE001 — adapter boundary: every adapter failure is contained totally (runtime.md)
             generated = None
         # Raising outside the handler leaves __context__ itself empty, so no
         # adapter frame, class, or message survives into the caller's traceback.
@@ -1074,9 +1061,9 @@ class System:
             raise IntegrityError("proposal has an unknown status")
         if not valid:
             raise IntegrityError("proposal fields do not match its status")
-        if "bound_proposal_id" in row.keys() and (
-            row["bound_proposal_id"] != row["id"]
-            or row["bound_request_status"] != request_status
+        # `in row` tests a sqlite3.Row's VALUES; only `keys()` tests its column names.
+        if "bound_proposal_id" in row.keys() and (  # noqa: SIM118
+            row["bound_proposal_id"] != row["id"] or row["bound_request_status"] != request_status
         ):
             raise IntegrityError("proposal and request states are inconsistent")
 
@@ -1097,10 +1084,7 @@ class System:
             self._validate_proposal_shape(row)
             if row["status"] != "pending":
                 raise StateError(f"proposal is already {row['status']}")
-            if (
-                binding.request_status != "pending"
-                or row["bound_proposal_id"] != proposal_id
-            ):
+            if binding.request_status != "pending" or row["bound_proposal_id"] != proposal_id:
                 raise IntegrityError("pending proposal is not bound to a pending request")
             input_json, proposed, provenance = self._proposal_content(binding)
             return ProposalView(
@@ -1231,15 +1215,12 @@ class System:
                 "SELECT revision FROM operations WHERE partition = ? AND name = ?",
                 (partition, binding.operation),
             ).fetchone()
-            if (
-                decision != "reject"
-                and (
-                    current is None
-                    or int(current["revision"]) != binding.operation_revision
-                )
+            if decision != "reject" and (
+                current is None or int(current["revision"]) != binding.operation_revision
             ):
                 raise StateError(
-                    "proposal belongs to an obsolete operation revision; reject it or use a new request"
+                    "proposal belongs to an obsolete operation revision; "
+                    "reject it or use a new request"
                 )
             input_json, proposed, _ = self._proposal_content(binding)
             if decision == "reject":
@@ -1283,11 +1264,7 @@ class System:
                     output=None,
                 )
 
-            final = (
-                canonicalize(corrected_output)
-                if decision == "correct"
-                else proposed
-            )
+            final = canonicalize(corrected_output) if decision == "correct" else proposed
             example_id = _new_id("ex")
             proposal_status: Literal["accepted", "corrected"] = (
                 "corrected" if decision == "correct" else "accepted"
@@ -1731,13 +1708,9 @@ class System:
             try:
                 input_json = parse_json(str(row["input_json"]))
                 output_json = parse_json(str(row["output_json"]))
-                receipt = parse_json(
-                    str(row["receipt_json"]), max_bytes=_RECEIPT_MAX_BYTES
-                )
+                receipt = parse_json(str(row["receipt_json"]), max_bytes=_RECEIPT_MAX_BYTES)
             except ValidationError as exc:
-                integrity_failure(
-                    f"example {row['id']} contains invalid canonical JSON: {exc}"
-                )
+                integrity_failure(f"example {row['id']} contains invalid canonical JSON: {exc}")
                 continue
             if input_json.digest != row["input_hash"] or output_json.digest != row["output_hash"]:
                 integrity_failure(f"example {row['id']} content digest mismatch")
@@ -1792,9 +1765,7 @@ class System:
             policy_failures.append(
                 f"support {support} is below required {policy.min_confirmations}"
             )
-        effective_reviewer_count = (
-            len(reviewers) if reviewer_count is None else reviewer_count
-        )
+        effective_reviewer_count = len(reviewers) if reviewer_count is None else reviewer_count
         if effective_reviewer_count < policy.min_reviewers:
             policy_failures.append(
                 f"reviewers {effective_reviewer_count} is below required {policy.min_reviewers}"
@@ -1831,7 +1802,7 @@ class System:
             WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
               AND e.input_hash = ? AND e.input_json = ? AND x.example_id IS NULL
             ORDER BY {order}
-            """,
+            """,  # noqa: S608 — only code-chosen fragments; every value binds as `?`
             (partition, operation, revision, input_hash, input_text),
         )
 
@@ -1959,7 +1930,7 @@ class System:
         operation: str,
         operation_revision: int,
     ) -> sqlite3.Row | None:
-        return connection.execute(
+        row: sqlite3.Row | None = connection.execute(
             """
             SELECT * FROM function_receipts
             WHERE partition = ? AND operation = ? AND operation_revision = ?
@@ -1967,6 +1938,7 @@ class System:
             """,
             (partition, operation, operation_revision),
         ).fetchone()
+        return row
 
     def _reconstruct_function_receipt(
         self,
@@ -1999,9 +1971,7 @@ class System:
                     membership["function_hash"],
                     "stored membership function_hash",
                 )
-                input_hash = _digest(
-                    membership["input_hash"], "stored membership input_hash"
-                )
+                input_hash = _digest(membership["input_hash"], "stored membership input_hash")
                 _digest(membership["entry_seal"], "stored membership entry_seal")
             except (TypeError, ValidationError) as exc:
                 raise IntegrityError(
@@ -2039,9 +2009,7 @@ class System:
         if len(artifacts) != receipt.member_count:
             raise IntegrityError("function receipt references a missing artifact")
         if len(reports) != receipt.member_count:
-            raise IntegrityError(
-                "function receipt references a missing or foreign report"
-            )
+            raise IntegrityError("function receipt references a missing or foreign report")
 
         artifacts_by_id = {str(row["id"]): row for row in artifacts}
         reports_by_id = {str(row["id"]): row for row in reports}
@@ -2057,9 +2025,7 @@ class System:
                 or artifact_row["operation_revision"] != receipt.operation_revision
                 or artifact_row["policy_hash"] != receipt.policy_hash
             ):
-                raise IntegrityError(
-                    f"function receipt member {ordinal} scope binding mismatch"
-                )
+                raise IntegrityError(f"function receipt member {ordinal} scope binding mismatch")
             try:
                 artifact = self._artifact_from_row(artifact_row)
             except (IntegrityError, ValidationError) as exc:
@@ -2076,7 +2042,7 @@ class System:
                 )
                 if type(details.value) is not dict:
                     raise IntegrityError("bound report details are not an object")
-                details_value = cast(dict[str, JSONValue], details.value)
+                details_value = details.value
                 if details_value.get("scope_hash") != artifact_row["scope_hash"]:
                     raise IntegrityError("bound report scope mismatch")
                 for field in (
@@ -2092,22 +2058,16 @@ class System:
                     f"function receipt member {ordinal} report is invalid: {exc}"
                 ) from exc
             if membership["input_hash"] != artifact_row["input_hash"]:
-                raise IntegrityError(
-                    f"function receipt member {ordinal} input digest mismatch"
-                )
+                raise IntegrityError(f"function receipt member {ordinal} input digest mismatch")
             entry_seal = _function_entry_seal(artifact_row, report_row)
             if membership["entry_seal"] != entry_seal:
-                raise IntegrityError(
-                    f"function receipt member {ordinal} entry seal mismatch"
-                )
+                raise IntegrityError(f"function receipt member {ordinal} entry seal mismatch")
             entries.append(
                 FunctionEntry(
                     input=artifact.input.value,
                     output=artifact.output.value,
                     artifact_hash=str(artifact_row["artifact_hash"]),
-                    evidence_snapshot_hash=str(
-                        artifact_row["evidence_snapshot_hash"]
-                    ),
+                    evidence_snapshot_hash=str(artifact_row["evidence_snapshot_hash"]),
                     entry_seal=entry_seal,
                     report_details_hash=str(report_row["details_hash"]),
                     report_test_set_hash=str(report_row["test_set_hash"]),
@@ -2211,10 +2171,7 @@ class System:
             if registered is None:
                 raise NotFoundError("operation is not registered in this partition")
             stored_revision = registered["revision"]
-            if (
-                type(stored_revision) is not int
-                or not 1 <= stored_revision <= _MAX_SQLITE_INTEGER
-            ):
+            if type(stored_revision) is not int or not 1 <= stored_revision <= _MAX_SQLITE_INTEGER:
                 raise IntegrityError("stored operation revision is invalid")
             revision = int(stored_revision)
             receipt_row = self._latest_function_receipt_row(
@@ -2270,18 +2227,16 @@ class System:
             rows = connection.execute(
                 f"""
                 SELECT * FROM function_receipts
-                WHERE {' AND '.join(predicates)}
+                WHERE {" AND ".join(predicates)}
                 ORDER BY sequence DESC LIMIT ?
-                """,
+                """,  # noqa: S608 — only code-chosen fragments; every value binds as `?`
                 parameters,
             ).fetchall()
             page_rows = rows[:limit]
             receipts = tuple(_function_receipt_from_row(row) for row in page_rows)
             return FunctionReceiptPage(
                 receipts=receipts,
-                next_before_sequence=(
-                    receipts[-1].sequence if len(rows) > limit else None
-                ),
+                next_before_sequence=(receipts[-1].sequence if len(rows) > limit else None),
             )
 
     def _function_report_member(
@@ -2355,9 +2310,7 @@ class System:
             "artifact_hash": row["bound_report_artifact_hash"],
             "build_hash": row["bound_report_build_hash"],
             "policy_hash": row["bound_report_policy_hash"],
-            "evidence_snapshot_hash": row[
-                "bound_report_evidence_snapshot_hash"
-            ],
+            "evidence_snapshot_hash": row["bound_report_evidence_snapshot_hash"],
             "passed": row["bound_report_passed"],
             "details_json": row["bound_report_details_json"],
             "details_hash": row["bound_report_details_hash"],
@@ -2400,9 +2353,7 @@ class System:
                 f"function report member {expected_ordinal} report is invalid: {exc}"
             ) from exc
         if _function_entry_seal(row, report_row) != entry_seal:
-            raise IntegrityError(
-                f"function report member {expected_ordinal} entry seal mismatch"
-            )
+            raise IntegrityError(f"function report member {expected_ordinal} entry seal mismatch")
         return FunctionMember(
             ordinal=ordinal,
             artifact_id=artifact_id,
@@ -2538,10 +2489,7 @@ class System:
             ).fetchone()
             if operation_row is None:
                 raise NotFoundError("operation is not registered in this partition")
-            if (
-                operation_row["partition"] != partition
-                or operation_row["name"] != operation
-            ):
+            if operation_row["partition"] != partition or operation_row["name"] != operation:
                 raise IntegrityError("stored operation scope is invalid")
             revision = _stored_int(
                 operation_row["revision"],
@@ -2581,9 +2529,7 @@ class System:
                     (partition, operation, receipt_id),
                 ).fetchone()
                 if receipt_row is None:
-                    raise NotFoundError(
-                        "function receipt does not exist for this operation"
-                    )
+                    raise NotFoundError("function receipt does not exist for this operation")
 
             function_anchor: FunctionAnchorReport | None = None
             if receipt_row is not None:
@@ -2620,9 +2566,7 @@ class System:
                 ).fetchall()
                 expected_members = min(receipt.member_count, projection_limit)
                 if len(member_rows) != expected_members:
-                    raise IntegrityError(
-                        "function receipt projected membership count mismatch"
-                    )
+                    raise IntegrityError("function receipt projected membership count mismatch")
                 members = tuple(
                     self._function_report_member(
                         connection,
@@ -2634,9 +2578,7 @@ class System:
                 )
                 member_input_hashes = [member.input_hash for member in members]
                 if member_input_hashes != sorted(member_input_hashes):
-                    raise IntegrityError(
-                        "function report member order is not canonical"
-                    )
+                    raise IntegrityError("function report member order is not canonical")
                 function_anchor = FunctionAnchorReport(
                     receipt=receipt,
                     member_count=receipt.member_count,
@@ -2659,9 +2601,7 @@ class System:
                         active_reviewer_count=projection.reviewer_count,
                         active_span_seconds=projection.span_seconds,
                         reasons=(
-                            projection.reasons
-                            if isinstance(projection, _BlockedBuild)
-                            else ()
+                            projection.reasons if isinstance(projection, _BlockedBuild) else ()
                         ),
                     )
                     if isinstance(projection, _BlockedBuild):
@@ -2702,7 +2642,7 @@ class System:
                 "suspended",
                 "retired",
             )
-            artifact_counts = {status: 0 for status in artifact_status_order}
+            artifact_counts = dict.fromkeys(artifact_status_order, 0)
             for count_row in connection.execute(
                 """
                 SELECT status, COUNT(*) AS item_count
@@ -2714,13 +2654,9 @@ class System:
             ).fetchall():
                 status = count_row["status"]
                 if status == "building":
-                    raise IntegrityError(
-                        "operation contains a persisted building artifact"
-                    )
+                    raise IntegrityError("operation contains a persisted building artifact")
                 if type(status) is not str or status not in artifact_counts:
-                    raise IntegrityError(
-                        "operation contains an unknown artifact status"
-                    )
+                    raise IntegrityError("operation contains an unknown artifact status")
                 artifact_counts[status] = _stored_int(
                     count_row["item_count"],
                     f"{status} artifact count",
@@ -2740,9 +2676,7 @@ class System:
                     artifact_counts[status],
                     projection_limit,
                 ):
-                    raise IntegrityError(
-                        f"{status} artifact projection count mismatch"
-                    )
+                    raise IntegrityError(f"{status} artifact projection count mismatch")
                 artifacts = tuple(
                     self._operation_report_artifact(
                         connection,
@@ -2863,9 +2797,7 @@ class System:
                 (partition, receipt_id),
             ).fetchone()
             if receipt_row is None:
-                raise NotFoundError(
-                    "function receipt does not exist in this partition"
-                )
+                raise NotFoundError("function receipt does not exist in this partition")
             return self._reconstruct_function_receipt(connection, receipt_row)
 
     def verify_function(
@@ -2904,10 +2836,7 @@ class System:
             return FunctionCheck(
                 key=key,
                 passed=False,
-                detail=(
-                    f"{len(failures)} failure(s): "
-                    + "; ".join(failures[:3])
-                ),
+                detail=(f"{len(failures)} failure(s): " + "; ".join(failures[:3])),
             )
 
         with self.store.transaction(write=False) as connection:
@@ -2932,14 +2861,10 @@ class System:
                 policy = _policy_from_text(policy_json)
                 canonical_policy = canonicalize(policy.as_json(), max_bytes=16_384)
             except (IntegrityError, ValidationError) as exc:
-                operation_policy_failures.append(
-                    f"operation policy is invalid: {exc}"
-                )
+                operation_policy_failures.append(f"operation policy is invalid: {exc}")
             else:
                 if canonical_policy.text != policy_json:
-                    operation_policy_failures.append(
-                        "operation policy JSON is not canonical"
-                    )
+                    operation_policy_failures.append("operation policy JSON is not canonical")
                 if canonical_policy.digest != policy_hash:
                     operation_policy_failures.append(
                         "operation policy digest does not match policy_hash"
@@ -2957,9 +2882,7 @@ class System:
                 )
                 receipt_detail = skipped
                 if operation_policy_failures:
-                    receipt_detail = (
-                        "; ".join(operation_policy_failures) + "; " + skipped
-                    )
+                    receipt_detail = "; ".join(operation_policy_failures) + "; " + skipped
                 checks = (
                     FunctionCheck(
                         key="duplicate-input-digests",
@@ -3019,16 +2942,13 @@ class System:
                 if digest not in first_digest_source:
                     first_digest_source[digest] = artifact_id
                     continue
-                sources = duplicate_sources.setdefault(
-                    digest, [first_digest_source[digest]]
-                )
+                sources = duplicate_sources.setdefault(digest, [first_digest_source[digest]])
                 if len(sources) < 3:
                     sources.append(artifact_id)
             duplicates = sorted(duplicate_sources.items())
             if duplicates:
                 preview = "; ".join(
-                    f"{digest}:{','.join(source_ids)}"
-                    for digest, source_ids in duplicates[:3]
+                    f"{digest}:{','.join(source_ids)}" for digest, source_ids in duplicates[:3]
                 )
                 duplicate_check = FunctionCheck(
                     key="duplicate-input-digests",
@@ -3045,9 +2965,7 @@ class System:
             abi_failures: list[str] = []
             report_failures: list[str] = []
             receipt_failures = list(operation_policy_failures)
-            projection_failures = [
-                f"operation: {failure}" for failure in operation_policy_failures
-            ]
+            projection_failures = [f"operation: {failure}" for failure in operation_policy_failures]
             projected: list[tuple[str, str, str, FunctionEntry]] = []
             for row in rows:
                 artifact_id = str(row["id"])
@@ -3060,14 +2978,11 @@ class System:
                     raw_scope = raw_artifact.get("scope")
                     artifact_abi = raw_artifact.get("abi")
                     canonicalizer = (
-                        raw_scope.get("canonicalizer")
-                        if type(raw_scope) is dict
-                        else None
+                        raw_scope.get("canonicalizer") if type(raw_scope) is dict else None
                     )
                     if artifact_abi != ARTIFACT_ABI or canonicalizer != CANONICALIZER:
                         abi_failures.append(
-                            f"{artifact_id}: abi={artifact_abi!r}, "
-                            f"canonicalizer={canonicalizer!r}"
+                            f"{artifact_id}: abi={artifact_abi!r}, canonicalizer={canonicalizer!r}"
                         )
                 except (IntegrityError, ValidationError) as exc:
                     abi_failures.append(f"{artifact_id}: {exc}")
@@ -3081,9 +2996,7 @@ class System:
                 try:
                     if report is None or report["passed"] != 1:
                         raise IntegrityError("missing passing bound report")
-                    details = self._validate_report(
-                        connection, report, verify_test_set=True
-                    )
+                    details = self._validate_report(connection, report, verify_test_set=True)
                     if type(details.value) is not dict:
                         raise IntegrityError("report details are not an object")
                     if details.value.get("scope_hash") != row["scope_hash"]:
@@ -3115,13 +3028,9 @@ class System:
                         f"operation revision {stored_revision} does not match current {revision}"
                     )
                 if row["policy_hash"] != policy_hash:
-                    scope_failures.append(
-                        "policy hash does not match current operation"
-                    )
+                    scope_failures.append("policy hash does not match current operation")
                 if row["policy_json"] != policy_json:
-                    scope_failures.append(
-                        "policy JSON does not match current operation"
-                    )
+                    scope_failures.append("policy JSON does not match current operation")
                 try:
                     if artifact is None:
                         raise IntegrityError(artifact_error or "artifact is invalid")
@@ -3138,17 +3047,13 @@ class System:
                 elif report is None:
                     projection_failures.append(f"{artifact_id}: bound report is missing")
                 elif scope_failures:
-                    projection_failures.append(
-                        f"{artifact_id}: {'; '.join(scope_failures)}"
-                    )
+                    projection_failures.append(f"{artifact_id}: {'; '.join(scope_failures)}")
                 else:
                     entry = FunctionEntry(
                         input=artifact.input.value,
                         output=artifact.output.value,
                         artifact_hash=str(row["artifact_hash"]),
-                        evidence_snapshot_hash=str(
-                            row["evidence_snapshot_hash"]
-                        ),
+                        evidence_snapshot_hash=str(row["evidence_snapshot_hash"]),
                         entry_seal=_function_entry_seal(row, report),
                         report_details_hash=str(report["details_hash"]),
                         report_test_set_hash=str(report["test_set_hash"]),
@@ -3220,13 +3125,9 @@ class System:
                     if document.value.get("abi") != FUNCTION_ABI:
                         raise IntegrityError("function ABI changed during projection")
                     if document.value.get("canonicalizer") != CANONICALIZER:
-                        raise IntegrityError(
-                            "function canonicalizer changed during projection"
-                        )
+                        raise IntegrityError("function canonicalizer changed during projection")
                     if document.value.get("function_hash") != document.function_hash:
-                        raise IntegrityError(
-                            "function hash changed during projection"
-                        )
+                        raise IntegrityError("function hash changed during projection")
                     expected_scope: dict[str, JSONValue] = {
                         "operation": operation,
                         "operation_revision": revision,
@@ -3234,9 +3135,7 @@ class System:
                         "policy_hash": policy_hash,
                     }
                     if document.value.get("scope") != expected_scope:
-                        raise IntegrityError(
-                            "function scope does not equal the promoted snapshot"
-                        )
+                        raise IntegrityError("function scope does not equal the promoted snapshot")
                     actual_entries = document.value.get("entries")
                     if type(actual_entries) is not list:
                         raise IntegrityError("function entries are not an array")
@@ -3277,9 +3176,7 @@ class System:
                         ),
                     )
                     if validated.text != document.text:
-                        raise IntegrityError(
-                            "function normalization changed during self-check"
-                        )
+                        raise IntegrityError("function normalization changed during self-check")
                 except (IntegrityError, ValidationError) as exc:
                     hash_check = FunctionCheck(
                         key="function-hash-matches-snapshot",
@@ -3291,8 +3188,7 @@ class System:
                         key="function-hash-matches-snapshot",
                         passed=True,
                         detail=(
-                            f"{document.function_hash} binds "
-                            f"{entry_count} snapshot entry/entries"
+                            f"{document.function_hash} binds {entry_count} snapshot entry/entries"
                         ),
                     )
 
@@ -3410,9 +3306,7 @@ class System:
             input_json = str(group["input_json"])
             previous = canonical_inputs.get(input_hash)
             if previous is not None and previous != input_json:
-                raise IntegrityError(
-                    "one input digest maps to multiple canonical inputs"
-                )
+                raise IntegrityError("one input digest maps to multiple canonical inputs")
             canonical_inputs[input_hash] = input_json
 
         projections: dict[str, _CurrentBuild | _BlockedBuild] = {}
@@ -3421,18 +3315,16 @@ class System:
         selected_hashes: set[str] = set()
         for row in rows:
             input_hash = str(row["input_hash"])
-            input_json = canonical_inputs.get(input_hash)
-            if input_json is None:
-                raise IntegrityError(
-                    f"current-revision draft {row['id']} has no canonical input"
-                )
+            canonical_input = canonical_inputs.get(input_hash)
+            if canonical_input is None:
+                raise IntegrityError(f"current-revision draft {row['id']} has no canonical input")
             projection = projections.get(input_hash)
             if projection is None:
                 projection = self._project_current_build(
                     connection,
                     registered,
                     input_hash,
-                    input_json,
+                    canonical_input,
                 )
                 projections[input_hash] = projection
             eligible = (
@@ -3513,9 +3405,7 @@ class System:
         else:
             connection.execute("RELEASE verification_run")
         passed = not failures
-        scope_hash = (
-            artifact.scope_digest if artifact is not None else str(row["scope_hash"])
-        )
+        scope_hash = artifact.scope_digest if artifact is not None else str(row["scope_hash"])
         stored_test_count, test_set_hash = self._test_snapshot(connection, report_id)
         if stored_test_count != test_count:
             raise IntegrityError("verification test count changed while recording")
@@ -3699,6 +3589,7 @@ class System:
             test_count += 1
             if record_test is not None:
                 record_test(key, example_id, passed, detail)
+
         try:
             artifact = self._artifact_from_row(row)
         except (IntegrityError, ValidationError) as exc:
@@ -3742,8 +3633,7 @@ class System:
         )
         if assessment["integrity_failures"]:
             raise IntegrityError(str(assessment["integrity_failures"][0]))
-        for failure in assessment["policy_failures"]:
-            failures.append(str(failure))
+        failures.extend(str(failure) for failure in assessment["policy_failures"])
         snapshot = self._evidence_snapshot(
             self._active_evidence(
                 connection,
@@ -3810,7 +3700,9 @@ class System:
                 "boundary:partition",
                 execute(
                     artifact,
-                    partition="cement-boundary" if partition != "cement-boundary" else "cement-boundary-2",
+                    partition="cement-boundary"
+                    if partition != "cement-boundary"
+                    else "cement-boundary-2",
                     operation=operation,
                     operation_revision=revision,
                     input_json=input_json,
@@ -3821,7 +3713,9 @@ class System:
                 execute(
                     artifact,
                     partition=partition,
-                    operation="cement-boundary" if operation != "cement-boundary" else "cement-boundary-2",
+                    operation="cement-boundary"
+                    if operation != "cement-boundary"
+                    else "cement-boundary-2",
                     operation_revision=revision,
                     input_json=input_json,
                 ),
@@ -3869,10 +3763,7 @@ class System:
         if report is None or report["passed"] != 1:
             raise IntegrityError(f"{artifact_id} has no passing bound report")
         details = self._validate_report(connection, report, verify_test_set=True)
-        if (
-            type(details.value) is not dict
-            or details.value.get("scope_hash") != row["scope_hash"]
-        ):
+        if type(details.value) is not dict or details.value.get("scope_hash") != row["scope_hash"]:
             raise IntegrityError(f"{artifact_id} report scope binding mismatch")
         for field in (
             "artifact_hash",
@@ -3947,14 +3838,10 @@ class System:
                     f"promoted artifact {artifact_id} has stale operation revision"
                 )
             if row["policy_json"] != policy_json or row["policy_hash"] != policy_hash:
-                raise IntegrityError(
-                    f"promoted artifact {artifact_id} has stale operation policy"
-                )
+                raise IntegrityError(f"promoted artifact {artifact_id} has stale operation policy")
             input_hash = str(row["input_hash"])
             if input_hash in retained:
-                raise IntegrityError(
-                    f"multiple promoted artifacts claim input {input_hash}"
-                )
+                raise IntegrityError(f"multiple promoted artifacts claim input {input_hash}")
             report, function_entry = self._function_promotion_entry(
                 connection,
                 row,
@@ -3988,9 +3875,7 @@ class System:
             input_json = str(group["input_json"])
             previous = canonical_inputs.get(input_hash)
             if previous is not None and previous != input_json:
-                raise IntegrityError(
-                    "one input digest maps to multiple canonical inputs"
-                )
+                raise IntegrityError("one input digest maps to multiple canonical inputs")
             canonical_inputs[input_hash] = input_json
 
         candidates: dict[
@@ -4002,11 +3887,10 @@ class System:
         for row in verified_rows:
             artifact_id = str(row["id"])
             input_hash = str(row["input_hash"])
-            input_json = canonical_inputs.get(input_hash)
-            if input_json is None:
+            canonical_input = canonical_inputs.get(input_hash)
+            if canonical_input is None:
                 raise IntegrityError(
-                    f"current-revision verified artifact {artifact_id} "
-                    "has no canonical input"
+                    f"current-revision verified artifact {artifact_id} has no canonical input"
                 )
             projection = projections.get(input_hash)
             if projection is None:
@@ -4014,7 +3898,7 @@ class System:
                     connection,
                     registered,
                     input_hash,
-                    input_json,
+                    canonical_input,
                 )
                 projections[input_hash] = projection
             eligible = (
@@ -4036,13 +3920,8 @@ class System:
                     f"multiple verified candidates claim current input {input_hash}"
                 )
             predecessor = retained.get(input_hash)
-            if (
-                predecessor is not None
-                and row["input_json"] != predecessor[0]["input_json"]
-            ):
-                raise IntegrityError(
-                    "equal input digest maps to unequal canonical inputs"
-                )
+            if predecessor is not None and row["input_json"] != predecessor[0]["input_json"]:
+                raise IntegrityError("equal input digest maps to unequal canonical inputs")
             report, function_entry = self._function_promotion_entry(
                 connection,
                 row,
@@ -4178,9 +4057,7 @@ class System:
             receipt_id = _new_id("fpr")
 
             candidates = tuple(
-                entry
-                for entry in locked.entries
-                if entry.public.disposition == "candidate"
+                entry for entry in locked.entries if entry.public.disposition == "candidate"
             )
             retired_ids = tuple(
                 sorted(
@@ -4202,9 +4079,7 @@ class System:
                     (artifact_id,),
                 ).rowcount
                 if changed != 1:
-                    raise StateError(
-                        "function predecessor changed before locked retirement"
-                    )
+                    raise StateError("function predecessor changed before locked retirement")
 
             for entry in candidates:
                 row = entry.row
@@ -4240,16 +4115,10 @@ class System:
                     (promoted_by, now, promotion_hash, row["id"]),
                 ).rowcount
                 if changed != 1:
-                    raise StateError(
-                        "function candidate changed before locked activation"
-                    )
+                    raise StateError("function candidate changed before locked activation")
 
-            member_ids = tuple(
-                sorted(entry.public.artifact_id for entry in locked.entries)
-            )
-            candidate_ids = tuple(
-                sorted(entry.public.artifact_id for entry in candidates)
-            )
+            member_ids = tuple(sorted(entry.public.artifact_id for entry in locked.entries))
+            candidate_ids = tuple(sorted(entry.public.artifact_id for entry in candidates))
             membership_rows = tuple(
                 {
                     "receipt_id": receipt_id,
@@ -4415,7 +4284,9 @@ class System:
                     raise IntegrityError(f"verification report {field} binding mismatch")
             failures, _, artifact = self._run_verification(connection, row)
             if failures:
-                raise StateError("artifact changed or became stale after verification: " + failures[0])
+                raise StateError(
+                    "artifact changed or became stale after verification: " + failures[0]
+                )
             if artifact.scope_digest != scope_hash:
                 raise IntegrityError("artifact scope digest mismatch")
             previous = connection.execute(
@@ -4560,7 +4431,9 @@ class System:
                     )
                     quarantined.append(artifact_id)
         if quarantined:
-            raise StateError("challenge quarantined an integrity-invalid artifact; retry after review")
+            raise StateError(
+                "challenge quarantined an integrity-invalid artifact; retry after review"
+            )
 
         with self.store.transaction(write=True) as connection:
             registered = connection.execute(
@@ -4818,7 +4691,7 @@ class System:
                 LEFT JOIN example_revocations AS x ON x.example_id = e.id
                 WHERE e.partition = ? AND e.operation = ? AND e.sequence > ? {clause}
                 ORDER BY e.sequence LIMIT ?
-                """,
+                """,  # noqa: S608 — only code-chosen fragments; every value binds as `?`
                 (partition, operation, after_sequence, limit),
             ).fetchall()
             return [
@@ -4914,9 +4787,7 @@ class System:
 
         partition = _name(partition, "partition")
         report_id = _request_id(report_id)
-        after_test_key = _text(
-            after_test_key, "after_test_key", maximum=256, allow_empty=True
-        )
+        after_test_key = _text(after_test_key, "after_test_key", maximum=256, allow_empty=True)
         _bounded_int(test_limit, "test_limit", minimum=1, maximum=10_000)
         with self.store.transaction() as connection:
             row = connection.execute(

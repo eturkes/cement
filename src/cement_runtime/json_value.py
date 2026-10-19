@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 import json
+from dataclasses import dataclass
 from typing import Any, TypeAlias
 
 from .errors import ValidationError
 
-JSONScalar: TypeAlias = None | bool | int | str
+JSONScalar: TypeAlias = bool | int | str | None
 JSONValue: TypeAlias = JSONScalar | list["JSONValue"] | dict[str, "JSONValue"]
 
 CANONICALIZER = "cement-json-v1"
