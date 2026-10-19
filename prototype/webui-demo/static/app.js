@@ -785,9 +785,7 @@ function renderNarration() {
   $("narration-text").textContent = CAPTION;
   $("narration-step").textContent = story ? `${STORY_AT + 1} / ${STORY.length}` : "";
   $("narration").classList.toggle("story", story);
-  $("story-next").hidden = !story || STORY_AT >= STORY.length - 1;
   $("story-exit").hidden = !story;
-  $("story-next").disabled = BUSY;
 }
 
 function narrate(text) {
@@ -831,32 +829,97 @@ const turn = async (request) => { await send(request); await settle(); };
 const firstNote = () => (turnParts().find((p) => p.note) || {}).note || "made a mistake";
 const patientOf = () => (STATE.latest_turn ? documentOf(STATE.latest_turn.document_id).patient : "");
 
+/* Each step runs once, then shows its beats: a spotlight (driver.js) on one element with
+   a short title + line, so the audience knows where to look. Next lives in the popover. */
+const lastBubble = () => [...document.querySelectorAll("#chat .msg.assistant .bubble")].pop();
 const STORY = [
-  { say: () => "Users ask an AI to read hospital forms. Press Next." },
-  { run: async () => { await select("file"); await send("q01"); },
-    say: () => `A01: the AI answered at once — and ${firstNote()}.` },
-  { run: settle, say: () => "A person fixed it. The user’s reply is unchanged." },
-  { run: () => turn("q02"), say: () => "A02: same kind of form, checked again. ●●" },
-  { run: makeAutomatic, say: () => "Saved: how to read this form. No patient data." },
-  { run: () => route(true), say: () => "Switched on." },
-  { run: () => send("q03"), say: () => `A03: new patient, no AI. The saved method read ${patientOf()}’s form.` },
-  { run: async () => { await turn("q05"); await turn("q06"); await makeAutomatic(); },
-    say: () => "A new job reuses that method. Only its new part went to the AI." },
-  { run: async () => { await turn("q08"); await turn("q09"); await makeAutomatic(); await turn("q10"); await turn("q11"); await makeAutomatic(); },
-    say: () => "Two more jobs, saved the same way." },
-  { run: async () => { await turn("q12"); await lifecycle("compile"); },
-    say: () => "Billing: every note’s words differ, nothing repeats. It stays with the AI." },
-  { say: () => `Done. AI ${STATE.stats.provider_calls}, fixed ${STATE.stats.cement_answers}, same replies.` },
+  { beats: [
+    { el: "#how", title: "Four steps", text: () => "Ask, check, save, switch on.", side: "bottom" },
+    { el: "#side-user", title: "What users see", text: () => "A normal AI chat.", side: "right" },
+    { el: "#side-hidden", title: "Behind the scenes", text: () => "What Cement does. Users never see it.", side: "left" } ] },
+  { run: async () => { await select("file"); await send("q01"); }, beats: [
+    { el: lastBubble, title: "The AI answers", text: () => "A01 gets a reply at once.", side: "right" },
+    { el: "#mechanism .method", title: "Its method", text: () => `How the AI read the form. It ${firstNote()}.`, side: "bottom" } ] },
+  { run: settle, beats: [
+    { el: "#mechanism .method", title: "A person checks", text: () => "Marked rows are the fix. The reply stays as sent.", side: "bottom" } ] },
+  { run: () => turn("q02"), beats: [
+    { el: "#mechanism .method", title: "Checked twice", text: () => "A02 is the same kind of form. ●● = ready to save.", side: "bottom" } ] },
+  { run: makeAutomatic, beats: [
+    { el: '#how li[data-step="3"]', title: "Saved", text: () => "How to read this form. No patient data.", side: "bottom" } ] },
+  { run: () => route(true), beats: [
+    { el: '#how li[data-step="4"]', title: "Switched on", text: () => "Matching forms now skip the AI.", side: "bottom" } ] },
+  { run: () => send("q03"), beats: [
+    { el: lastBubble, title: "A new patient", text: () => `A03, ${patientOf()}. The reply looks the same.`, side: "right" },
+    { el: "#mechanism .method.fixed", title: "No AI", text: () => "The saved method read the form.", side: "bottom" } ] },
+  { run: async () => { await turn("q05"); await turn("q06"); await makeAutomatic(); }, beats: [
+    { el: "#mechanism .flow-methods", title: "Reuse", text: () => "A new job reuses the method. Only its new part went to the AI.", side: "bottom" } ] },
+  { run: async () => { await turn("q08"); await turn("q09"); await makeAutomatic(); await turn("q10"); await turn("q11"); await makeAutomatic(); }, beats: [
+    { el: "#tally", title: "Two more jobs", text: () => `Saved the same way. AI ${STATE.stats.provider_calls}, fixed ${STATE.stats.cement_answers}.`, side: "bottom" } ] },
+  { run: async () => { await turn("q12"); await lifecycle("compile"); }, beats: [
+    { el: "#mechanism .method.checked:last-child, #mechanism .method.ai:last-child", title: "Never repeats", text: () => "Every note’s words differ. Billing stays with the AI.", side: "bottom" },
+    { el: "#how", title: "No save", text: () => "Save and switch on are struck out for billing.", side: "bottom" } ] },
+  { beats: [
+    { el: "#tally", title: "Done", text: () => `AI ${STATE.stats.provider_calls}, fixed ${STATE.stats.cement_answers}. Same replies.`, side: "bottom" },
+    { el: "#tech", title: "For experts", text: () => "Real commands and evidence.", side: "top" } ] },
 ];
+
+let TOUR = null;
+let BEAT = 0;
+
+function tour() {
+  if (!TOUR) {
+    TOUR = window.driver.js.driver({
+      animate: !matchMedia("(prefers-reduced-motion: reduce)").matches,
+      overlayOpacity: 0.55,
+      stagePadding: 8,
+      stageRadius: 10,
+      overlayClickBehavior: "none",
+      popoverClass: "cement-pop",
+      onNextClick: nextBeat,
+      onCloseClick: leaveStory,
+    });
+  }
+  return TOUR;
+}
+
+function showBeat() {
+  const beats = STORY[STORY_AT].beats;
+  const beat = beats[BEAT];
+  const element = typeof beat.el === "function" ? beat.el() : document.querySelector(beat.el);
+  const last = STORY_AT === STORY.length - 1 && BEAT === beats.length - 1;
+  narrate(beat.text());
+  tour().highlight({
+    element: element || "#side-hidden",
+    popover: {
+      title: beat.title,
+      description: beat.text(),
+      side: beat.side,
+      /* highlight() mode shows only the buttons a step lists itself. */
+      showButtons: ["next", "close"],
+      showProgress: true,
+      progressText: `${STORY_AT + 1} / ${STORY.length}`,
+      nextBtnText: last ? "Done" : "Next",
+    },
+  });
+}
+
+function nextBeat() {
+  if (BUSY) return;
+  if (BEAT < STORY[STORY_AT].beats.length - 1) { BEAT += 1; showBeat(); }
+  else if (STORY_AT < STORY.length - 1) advanceStory(STORY_AT + 1);
+  else leaveStory();
+}
 
 async function advanceStory(index) {
   const run = RUN;
   const step = STORY[index];
   STORY_AT = index;
+  BEAT = 0;
+  if (TOUR && TOUR.isActive()) TOUR.destroy();
   narrate("…");
   if (step.run) await step.run();
   if (run !== RUN) return;
-  narrate(step.say());
+  showBeat();
   document.body.dataset.sceneDone = String(index);
 }
 
@@ -870,7 +933,9 @@ async function playStory(upTo = 0) {
 
 function leaveStory() {
   STORY_AT = -1;
+  if (TOUR && TOUR.isActive()) TOUR.destroy();
   renderNarration();
+  renderAction();
 }
 
 /* --- wiring --- */
@@ -926,7 +991,6 @@ document.addEventListener("keydown", (event) => {
 });
 
 $("play").addEventListener("click", () => playStory(0));
-$("story-next").addEventListener("click", () => { if (!BUSY) advanceStory(STORY_AT + 1); });
 $("story-exit").addEventListener("click", leaveStory);
 $("reset").addEventListener("click", async () => {
   RUN += 1;
@@ -936,7 +1000,7 @@ $("reset").addEventListener("click", async () => {
   SOURCE_OPEN = "";
   DRAWER = "";
   HISTORY = false;
-  STORY_AT = -1;
+  leaveStory();
   CAPTION = "Pick a task, then a request — or play the story.";
   await call("/api/reset", {});
 });

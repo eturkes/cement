@@ -52,6 +52,12 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
     (simulated checker: fixes a wrong answer, confirms a right one) + `Reject`, `Save`, `Switch
     on`; in the story `Next` / `Leave`. `Play the story` = 11 steps, one per `Next`, one-line
     captions read from live state (the AI's actual mistake, the patient); a manual click leaves it.
+  - Story spotlight (owner-ruled r10, driverjs.com as the reference): each story step runs, then
+    shows 1-3 beats = vendored driver.js `highlight()` on ONE element (strip, a chat bubble, a
+    method box, the tally, the technical-details switch) with a 2-3 word title + one line; Next
+    sits in the popover, × or `Leave the story` exits; animation off under reduced motion.
+    driver.js 1.10.2 MIT, `static/vendor/driver.js-1.10.2/` (iife build + css + license,
+    registry-integrity checked), no build step.
   - Right half = the latest request as three boxes `Form` (first scanned lines) → method →
     `Reply`. The method = what Cement saves, a way to handle a KIND of form in plain rows
     (`Patient name | "Patient:" line`), never a patient's values; chips amber `AI` (+ unchecked /
@@ -98,7 +104,8 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 - [x] 2547505 ITERATE round 5: UI dense → `board` picked over `guided` + `mirror` (`Decisions` board-layout ruling); merged, retired.
 - [x] d9fe5df ITERATE round 7: still dense + confusing → layperson framing (purpose sentence, four-step workflow, technical details behind one switch).
 - [x] 46c95e8 ITERATE round 8: still unclear what happens → mechanism boxes, `What just happened` captions, narrated story, readable replies; ba5230d `staff` → `users`.
-- [ ] ITERATE round 9: too wordy → icon workflow as progress, one-line band + one action, chips/dots/marks in the boxes; owner reviews it.
+- [x] 8722f0b ITERATE round 9: too wordy → icon workflow as progress, one-line band + one action, chips/dots/marks in the boxes.
+- [ ] ITERATE round 10: audience needs gaze guidance → driver.js spotlight beats on the story; owner reviews it.
   - Close (the owner's go) runs `Rules upkeep`; known backlog: origin stories + measured results in bare `ops.md` + `assurance.md`; area-bound law in bare `ops.md` (D28, D19, capture mechanics) → `paths:`.
 - [ ] M3.6a3 delete the 7 dead outcome types (`Outcome` + its 6 members).
   - Resume point: the suspended IMPLEMENT scope rejoins here once ITERATE closes on the owner's go.

@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Cement · fixed answers from checked AI work</title>
+    <link rel="stylesheet" href="/static/vendor/driver.js-1.10.2/driver.css" />
     <link rel="stylesheet" href="/static/app.css" />
   </head>
   <body>
@@ -26,8 +27,7 @@
       <p id="narration-text"></p>
       <div class="actions" id="band-actions"></div>
       <div class="actions">
-        <button id="story-next" class="button primary" hidden>Next</button
-        ><button id="story-exit" class="button" hidden>Leave</button>
+        <button id="story-exit" class="button" hidden>Leave the story</button>
       </div>
     </section>
     <main class="split">
@@ -121,6 +121,7 @@
         <div class="overlay-body" id="source"></div>
       </div>
     </div>
+    <script src="/static/vendor/driver.js-1.10.2/driver.js.iife.js"></script>
     <script src="/static/app.js"></script>
   </body>
 </html>

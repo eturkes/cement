@@ -30,7 +30,9 @@ so plain code can read a new patient's form with it.
 uv run python prototype/webui-demo/app.py
 ```
 
-Open <http://127.0.0.1:8765/>. Select **Play the story** for a guided tour. Select **Next** to go to each step.
+Open <http://127.0.0.1:8765/>. Select **Play the story** for a guided tour. Each step dims the page and lights up one
+part of it, with a short note beside it. Select **Next** in the note to go on. Select the
+**×** in the note or **Leave the story** to stop.
 Stop the server with Ctrl+C. The ledger is a temporary SQLite file, and it disappears with the
 process.
 
@@ -72,6 +74,13 @@ One function serves several tasks. **File it into the record** promotes
 6. Select **Code it for billing**. **Save** and **Switch on** are struck through, because no
    two notes repeat the same words.
 7. Select **Show technical details** for the commands, the evidence and the function source.
+
+## Third-party code
+
+The tour uses [driver.js](https://driverjs.com/) 1.10.2 under the MIT license. Its browser
+build, its style sheet and its license are copied into `static/vendor/driver.js-1.10.2/`
+from the npm package, which was checked against the registry integrity hash. The demo needs
+no build step and no network access.
 
 ## Real and simulated
 
