@@ -230,8 +230,10 @@ inputs (an invalid program is refused at validation, never executed):
 1. `input`: an object whose key set EQUALS `{text} ∪ keep`, with `input[text]` a string.
    Else `NoMatch("input")`.
 2. Normalize `input[text]`: CRLF then CR → LF; split on LF; strip trailing ASCII space + tab per
-   line; drop leading + trailing blank lines; collapse blank-line runs to one. A line holding any
-   forbidden character above → `NoMatch("text")`. Nothing else changes (no NFKC, casefold, Unicode
+   line; drop leading + trailing blank lines; collapse blank-line runs to one. A normalized line
+   holding any forbidden character above EXCEPT TAB → `NoMatch("text")` (ruling AM2: TAB is
+   ordinary text inside input lines — the grammar trims and partitions around it; literals still
+   refuse it). Nothing else changes (no NFKC, casefold, Unicode
    whitespace class — research Q7-Q8: UCD 14.0.0 → 16.0.0 across Python 3.11-3.14).
 3. Blocks = split on blank lines. Block 0 = title line + label lines. Block k ≥ 1 = a section
    (first line `H:` whose remainder is empty after ASCII trim, then ≥ 1 body lines, no body line
@@ -263,6 +265,13 @@ API (module `cement_runtime.projection`, stdlib only, importing `cement_runtime.
 - `structure(text: str) -> tuple[str, tuple[tuple[str, str], ...]] | None` — steps 2-4 alone (title
   + structure pairs, `None` where the grammar refuses), exposed for the verification probes (§5).
 
+Readings ruled after the diff-blind tester (`archive/m4u1-test`, AM1-AM6): AM1 a block k ≥ 1 led
+by an empty-remainder label IS a section (no label-block fallback; body required, colon-free);
+AM2 TAB legal in input lines (above); AM3 ASCII space/tab around a label/heading key is an
+equivalence; AM4 `work` = any honest counter of characters, lines and compared entries within
+the bound, never one algorithm's exact count; AM5 `structure` is grammar-only (no layout registry);
+AM6 3.12 + 3.14 byte identity = the CI legs.
+
 Predicates:
 - I1 differential (tester): over the seven fixture documents the keys' `form.structure` equals the
   shipped `layout_signature(...)["structure"]` as pairs, and `form.title` equals the documents'
@@ -273,7 +282,8 @@ Predicates:
   string NON-BLANK after ASCII trim (declared grammar quirk, mirroring the legacy parser: a block's first line
   with an empty remainder IS a section heading); a section body line replaced by any colon-free
   string that stays non-blank after the trailing ASCII trim.
-- I3 a change outside the normalization equivalence never keeps the key: delete, duplicate or
+- I3 a change outside the equivalences (normalization + the ASCII space/tab trim around label and
+  heading keys, ruling AM3) never keeps the key: delete, duplicate or
   reorder one structural line (title, label or heading); add an unknown label line; change one
   literal character of the title, a label key or a heading (case included). Trailing ASCII space +
   tab, CRLF/CR and blank-run edits ARE equivalences and keep the key (pinned as such).
