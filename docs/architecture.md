@@ -37,9 +37,10 @@ can pass:
    write lock. It then retires predecessors, activates candidates, and writes one immutable receipt
    plus ordered memberships in one transaction. Set promotion retains established entries during
    growth. It also permits a zero-candidate checkpoint over a nonempty retained set.
-10. `verify_function` returns six ordered checks over one read snapshot of the complete promoted set:
+10. `verify_function` returns seven ordered checks over one read snapshot of the complete promoted set:
     `duplicate-input-digests`, `abi-canonicalizer-uniform`, `sealed-passing-reports`,
-    `current-promotion-receipts`, `function-hash-matches-snapshot`, and `persisted-function-receipt`.
+    `current-promotion-receipts`, `function-hash-matches-snapshot`, `persisted-function-receipt`, and
+    `projection-uniform` (every member carries the set's one projection program, or none).
     The call is read-only. A caller can supply an expected function hash. That hash
     detects set growth or drift. An empty promoted set passes vacuously and builds a real empty
     function.
@@ -119,7 +120,7 @@ A scope is recurring when it has enough distinct, idempotent confirmations. It i
 confirmations span the configured observation interval without conflicting final outputs. It is
 verifiable when the exact finite match set replays against all active fixtures and fixed boundary
 tests. Those three definitions apply to one entry. The promoted set adds one more gate. A passing
-`verify_function` result binds the complete current snapshot to all six ordered checks. It also binds
+`verify_function` result binds the complete current snapshot to all seven ordered checks. It also binds
 that snapshot to the latest current-revision receipt.
 
 Every verification result and every report is one committed read snapshot. It is not a lease, a

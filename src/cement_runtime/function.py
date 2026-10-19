@@ -20,6 +20,7 @@ from .json_value import (
     canonicalize,
     parse_json,
 )
+from .projection import ProjectionProgram, parse_program, project
 
 FUNCTION_ABI = "cement-function-v3"
 # Bundles exported before the v3 ledger cut stay readable; they carry no projection.
@@ -73,6 +74,7 @@ class FunctionDocument:
     entries: tuple[_FunctionCase, ...]
     input_hashes: tuple[str, ...]
     projection_hash: str | None = None
+    projection: ProjectionProgram | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -90,6 +92,7 @@ class _NormalizedFunction:
     entries: tuple[_FunctionCase, ...]
     input_hashes: tuple[str, ...]
     projection_hash: str | None
+    projection: ProjectionProgram | None
 
 
 def _exact_keys(value: Any, expected: set[str], label: str) -> dict[str, Any]:
@@ -124,11 +127,16 @@ def _normalize(value: Any) -> _NormalizedFunction:
     if type(root["abi"]) is not str or root["abi"] not in {FUNCTION_ABI, FUNCTION_ABI_V2}:
         raise ValidationError("unsupported function ABI")
     projection_hash: str | None = None
-    # Exact mode: a projection (M4.2) is the only non-null shape this ABI admits.
+    program: ProjectionProgram | None = None
     if root["abi"] == FUNCTION_ABI and (
         root["projection"] is not None or root["projection_hash"] is not None
     ):
-        raise ValidationError("function projection is not supported in exact mode")
+        # A projected function: entries are keyed on `project(program, input)`, and the program
+        # travels in the bundle so a ledger-free evaluator projects exactly as the ledger did.
+        program = parse_program(root["projection"])
+        projection_hash = _digest(root["projection_hash"], "function projection_hash")
+        if program.program_hash != projection_hash:
+            raise IntegrityError("function projection does not hash to its projection_hash")
     if root["canonicalizer"] != CANONICALIZER:
         raise ValidationError("unsupported function canonicalizer")
 
@@ -239,7 +247,7 @@ def _normalize(value: Any) -> _NormalizedFunction:
         },
     }
     if root["abi"] == FUNCTION_ABI:
-        content["projection"] = None
+        content["projection"] = None if program is None else program.canonical.value
         content["projection_hash"] = projection_hash
     canonical = canonicalize(
         content,
@@ -252,6 +260,7 @@ def _normalize(value: Any) -> _NormalizedFunction:
         entries=tuple(item[2] for item in normalized),
         input_hashes=tuple(item[0] for item in normalized),
         projection_hash=projection_hash,
+        projection=program,
     )
 
 
@@ -276,6 +285,7 @@ def _document(normalized: _NormalizedFunction) -> FunctionDocument:
         entries=normalized.entries,
         input_hashes=normalized.input_hashes,
         projection_hash=normalized.projection_hash,
+        projection=normalized.projection,
     )
 
 
@@ -286,6 +296,7 @@ def build_function(
     operation_revision: int,
     policy_hash: str,
     entries: Iterable[FunctionEntry],
+    projection: ProjectionProgram | None = None,
 ) -> FunctionDocument:
     """Build one normalized exact function from caller-supplied cases."""
 
@@ -326,8 +337,8 @@ def build_function(
         "canonicalizer": CANONICALIZER,
         "entries": document_entries,
         "function_hash": "0" * 64,
-        "projection": None,
-        "projection_hash": None,
+        "projection": None if projection is None else projection.canonical.value,
+        "projection_hash": None if projection is None else projection.program_hash,
         "scope": {
             "operation": operation,
             "operation_revision": operation_revision,
@@ -392,13 +403,23 @@ def evaluate(
     *,
     input_json: CanonicalJSON,
 ) -> FunctionMatch:
-    """Return the exact canonical-input match or an inert miss."""
+    """Return the case match for one canonical input, or an inert miss.
 
-    index = bisect_left(bundle.input_hashes, input_json.digest)
-    if index == len(bundle.input_hashes) or bundle.input_hashes[index] != input_json.digest:
+    A projected function first maps the input to its case key; input the projection does not
+    recognize is a miss, never an error.
+    """
+
+    key = input_json
+    if bundle.projection is not None:
+        projected = project(bundle.projection, input_json.value)
+        if not projected.matched or projected.key is None:
+            return FunctionMatch(matched=False)
+        key = projected.key
+    index = bisect_left(bundle.input_hashes, key.digest)
+    if index == len(bundle.input_hashes) or bundle.input_hashes[index] != key.digest:
         return FunctionMatch(matched=False)
     entry = bundle.entries[index]
-    if entry.input.text != input_json.text:
+    if entry.input.text != key.text:
         return FunctionMatch(matched=False)
     return FunctionMatch(
         matched=True,

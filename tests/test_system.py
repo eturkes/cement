@@ -85,6 +85,7 @@ _FUNCTION_CHECK_KEYS = (
     "current-promotion-receipts",
     "function-hash-matches-snapshot",
     "persisted-function-receipt",
+    "projection-uniform",
 )
 
 
@@ -1256,7 +1257,7 @@ class SystemTests(unittest.TestCase):
     def _assert_function_checks(
         self,
         result: FunctionVerification,
-        expected: tuple[bool, bool, bool, bool, bool, bool],
+        expected: tuple[bool, ...],
     ) -> None:
         self.assertEqual(
             tuple((check.key, check.passed) for check in result.checks),
@@ -2279,6 +2280,7 @@ class SystemTests(unittest.TestCase):
                 "current-promotion-receipts",
                 "function-hash-matches-snapshot",
                 "persisted-function-receipt",
+                "projection-uniform",
             ),
         )
         self.assertTrue(all(isinstance(check, FunctionCheck) for check in result.checks))
@@ -2358,7 +2360,7 @@ class SystemTests(unittest.TestCase):
                     checks = self._function_checks(result)
                     self._assert_function_checks(
                         result,
-                        (True, True, True, False, False, entries == 0),
+                        (True, True, True, False, False, entries == 0, True),
                     )
                     self.assertFalse(result.passed)
                     self.assertEqual(result.entries, entries)
@@ -2507,7 +2509,7 @@ class SystemTests(unittest.TestCase):
         checks = self._function_checks(result)
         self.assertFalse(result.passed)
         self.assertEqual(result.entries, 2)
-        self._assert_function_checks(result, (False, True, True, True, False, False))
+        self._assert_function_checks(result, (False, True, True, True, False, False, True))
         self.assertFalse(checks["duplicate-input-digests"].passed)
         self.assertIn("duplicate digest", checks["duplicate-input-digests"].detail)
         self.assertIn(input_hash, checks["duplicate-input-digests"].detail)
@@ -2613,7 +2615,7 @@ class SystemTests(unittest.TestCase):
         )
 
         result = self.system.verify_function("tenant-a", "echo")
-        self._assert_function_checks(result, (False, True, True, True, False, False))
+        self._assert_function_checks(result, (False, True, True, True, False, False, True))
         self.assertEqual(
             self._function_checks(result)["duplicate-input-digests"].detail,
             expected_detail,
@@ -2665,7 +2667,7 @@ class SystemTests(unittest.TestCase):
             side_effect=IntegrityError("ordered failure"),
         ):
             result = self.system.verify_function("tenant-a", "echo")
-        self._assert_function_checks(result, (False, True, True, False, False, False))
+        self._assert_function_checks(result, (False, True, True, False, False, False, True))
         detail = self._function_checks(result)["current-promotion-receipts"].detail
         self.assertEqual(
             detail,
@@ -2720,7 +2722,7 @@ class SystemTests(unittest.TestCase):
             side_effect=IntegrityError("ordered failure"),
         ):
             result = self.system.verify_function("tenant-a", "echo")
-        self._assert_function_checks(result, (True, True, True, False, False, False))
+        self._assert_function_checks(result, (True, True, True, False, False, False, True))
         detail = self._function_checks(result)["current-promotion-receipts"].detail
         self.assertEqual(
             detail,
@@ -2776,7 +2778,7 @@ class SystemTests(unittest.TestCase):
                     result = self.system.verify_function("tenant-a", "echo")
                     checks = self._function_checks(result)
                     self._assert_function_checks(
-                        result, (True, False, False, False, False, False)
+                        result, (True, False, False, False, False, False, True)
                     )
                     self.assertFalse(result.passed)
                     self.assertEqual(result.entries, 3)
@@ -2849,7 +2851,7 @@ class SystemTests(unittest.TestCase):
                     connection.commit()
                     result = self.system.verify_function("tenant-a", "echo")
                     self._assert_function_checks(
-                        result, (True, False, True, False, False, False)
+                        result, (True, False, True, False, False, False, True)
                     )
                     abi_detail = self._function_checks(result)[
                         "abi-canonicalizer-uniform"
@@ -2907,7 +2909,7 @@ class SystemTests(unittest.TestCase):
 
         result = self.system.verify_function("tenant-a", "echo")
         checks = self._function_checks(result)
-        self._assert_function_checks(result, (True, True, False, True, True, False))
+        self._assert_function_checks(result, (True, True, False, True, True, False, True))
         self.assertFalse(result.passed)
         self.assertEqual(result.entries, 3)
         self.assertIn(
@@ -2934,7 +2936,7 @@ class SystemTests(unittest.TestCase):
         resolution = self.system.resolve("tenant-a", "echo", input_value)
         self._assert_function_checks(
             resolution.verification,
-            (True, True, False, True, True, False),
+            (True, True, False, True, True, False, True),
         )
         self.assertFalse(resolution.verification.passed)
         self.assertIsNone(resolution.match)
@@ -2971,7 +2973,7 @@ class SystemTests(unittest.TestCase):
 
         result = self.system.verify_function("tenant-a", "echo")
         checks = self._function_checks(result)
-        self._assert_function_checks(result, (True, True, True, False, True, True))
+        self._assert_function_checks(result, (True, True, True, False, True, True, True))
         self.assertFalse(result.passed)
         self.assertEqual(result.entries, 3)
         self.assertIn(
@@ -3016,7 +3018,7 @@ class SystemTests(unittest.TestCase):
 
         result = self.system.verify_function("tenant-a", "echo")
         checks = self._function_checks(result)
-        self._assert_function_checks(result, (True, True, True, False, False, False))
+        self._assert_function_checks(result, (True, True, True, False, False, False, True))
         self.assertFalse(result.passed)
         self.assertEqual(result.entries, 1)
         for key in (
@@ -3048,7 +3050,7 @@ class SystemTests(unittest.TestCase):
 
         result = self.system.verify_function("tenant-a", "echo")
         checks = self._function_checks(result)
-        self._assert_function_checks(result, (True, True, True, False, False, False))
+        self._assert_function_checks(result, (True, True, True, False, False, False, True))
         self.assertFalse(result.passed)
         self.assertEqual(result.entries, 1)
         receipt_detail = checks["current-promotion-receipts"].detail
@@ -3106,7 +3108,7 @@ class SystemTests(unittest.TestCase):
                 ):
                     result = self.system.verify_function("tenant-a", "echo")
                 self._assert_function_checks(
-                    result, (True, True, True, False, False, False)
+                    result, (True, True, True, False, False, False, True)
                 )
                 checks = self._function_checks(result)
                 self.assertIn(
@@ -3127,7 +3129,7 @@ class SystemTests(unittest.TestCase):
             side_effect=ValidationError("receipt validation probe"),
         ):
             result = self.system.verify_function("tenant-a", "echo")
-        self._assert_function_checks(result, (True, True, True, False, True, True))
+        self._assert_function_checks(result, (True, True, True, False, True, True, True))
         detail = self._function_checks(result)["current-promotion-receipts"].detail
         self.assertIn(artifact_id, detail)
         self.assertIn("receipt validation probe", detail)
@@ -3147,7 +3149,7 @@ class SystemTests(unittest.TestCase):
         checks = self._function_checks(changed)
         self._assert_function_checks(
             changed,
-            (True, True, True, True, False, True),
+            (True, True, True, True, False, True, True),
         )
         self.assertEqual(changed.entries, 2)
         self.assertTrue(
@@ -3223,7 +3225,7 @@ class SystemTests(unittest.TestCase):
                 ):
                     result = self.system.verify_function("tenant-a", "echo")
                 self._assert_function_checks(
-                    result, (True, True, True, True, False, False)
+                    result, (True, True, True, True, False, False, True)
                 )
                 self.assertEqual(
                     self._function_checks(result)[
@@ -3258,7 +3260,7 @@ class SystemTests(unittest.TestCase):
         with mock.patch("cement_runtime.system.build_function", side_effect=altered_build):
             altered_document = self.system.verify_function("tenant-a", "echo")
         self._assert_function_checks(
-            altered_document, (True, True, True, True, False, False)
+            altered_document, (True, True, True, True, False, False, True)
         )
         self.assertIn(
             f"{artifact_id} function entry changed during projection",
@@ -3272,7 +3274,7 @@ class SystemTests(unittest.TestCase):
             return_value=mock.Mock(text="changed normalization"),
         ):
             altered_text = self.system.verify_function("tenant-a", "echo")
-        self._assert_function_checks(altered_text, (True, True, True, True, False, False))
+        self._assert_function_checks(altered_text, (True, True, True, True, False, False, True))
         self.assertEqual(
             self._function_checks(altered_text)[
                 "function-hash-matches-snapshot"
@@ -3301,7 +3303,7 @@ class SystemTests(unittest.TestCase):
         artifact_order = [row[0] for row in sorted(rows, key=lambda row: row[2])]
         self.assertNotEqual(input_order, artifact_order)
         result = self.system.verify_function("tenant-a", "echo")
-        self._assert_function_checks(result, (True, True, True, True, True, True))
+        self._assert_function_checks(result, (True, True, True, True, True, True, True))
 
 
     def test_function_verification_matches_independent_scoped_membership(self) -> None:
@@ -3427,7 +3429,7 @@ class SystemTests(unittest.TestCase):
             },
         )
         result = self.system.verify_function("tenant-a", "echo")
-        self._assert_function_checks(result, (True, True, True, True, True, True))
+        self._assert_function_checks(result, (True, True, True, True, True, True, True))
         document = result.document
         self.assertIsNotNone(document)
         assert document is not None
@@ -3490,7 +3492,7 @@ class SystemTests(unittest.TestCase):
             )
 
         result = self.system.verify_function("tenant-a", "echo")
-        self._assert_function_checks(result, (True, True, True, True, True, True))
+        self._assert_function_checks(result, (True, True, True, True, True, True, True))
         self.assertEqual(result.function_hash, baseline.function_hash)
         document = result.document
         self.assertIsNotNone(document)
@@ -3531,7 +3533,7 @@ class SystemTests(unittest.TestCase):
         stale_receipt = self.system.verify_function("tenant-a", "report-identity")
         self._assert_function_checks(
             stale_receipt,
-            (True, True, True, True, True, False),
+            (True, True, True, True, True, False, True),
         )
         manifest = self.system.inspect_function_promotion(
             "tenant-a",
@@ -3575,7 +3577,7 @@ class SystemTests(unittest.TestCase):
         )
         self._bind_report(target, "report_foreign_bound")
         foreign = self.system.verify_function("tenant-a", "report-owner")
-        self._assert_function_checks(foreign, (True, True, False, False, False, False))
+        self._assert_function_checks(foreign, (True, True, False, False, False, False, True))
         checks = self._function_checks(foreign)
         self.assertIn(target, checks["sealed-passing-reports"].detail)
         self.assertIn(
@@ -3618,7 +3620,7 @@ class SystemTests(unittest.TestCase):
                     connection.commit()
                     result = self.system.verify_function("tenant-a", "echo")
                     self._assert_function_checks(
-                        result, (True, True, False, False, True, False)
+                        result, (True, True, False, False, True, False, True)
                     )
                     detail = self._function_checks(result)[
                         "sealed-passing-reports"
@@ -3641,7 +3643,7 @@ class SystemTests(unittest.TestCase):
 
         def assert_defect(result: FunctionVerification, detail: str) -> None:
             self._assert_function_checks(
-                result, (True, True, False, False, True, False)
+                result, (True, True, False, False, True, False, True)
             )
             report_detail = self._function_checks(result)[
                 "sealed-passing-reports"
@@ -3721,7 +3723,7 @@ class SystemTests(unittest.TestCase):
 
         result = self.system.verify_function("tenant-a", "echo")
         checks = self._function_checks(result)
-        self._assert_function_checks(result, (True, True, False, False, True, False))
+        self._assert_function_checks(result, (True, True, False, False, True, False, True))
         self.assertIn(
             "missing passing bound report", checks["sealed-passing-reports"].detail
         )
@@ -3761,7 +3763,7 @@ class SystemTests(unittest.TestCase):
                     connection.close()
                 result = self.system.verify_function("tenant-a", operation)
                 self._assert_function_checks(
-                    result, (True, True, False, False, False, False)
+                    result, (True, True, False, False, False, False, True)
                 )
                 checks = self._function_checks(result)
                 self.assertIn(
@@ -3789,7 +3791,7 @@ class SystemTests(unittest.TestCase):
         ):
             oversized = self.system.verify_function("tenant-a", "echo")
         self._assert_function_checks(
-            oversized, (False, False, False, False, False, False)
+            oversized, (False, False, False, False, False, False, False)
         )
         self.assertFalse(oversized.passed)
         self.assertEqual(oversized.entries, 2)
@@ -3813,7 +3815,7 @@ class SystemTests(unittest.TestCase):
                 with mock.patch(f"cement_runtime.function.{name}", value):
                     result = self.system.verify_function("tenant-a", "echo")
                 self._assert_function_checks(
-                    result, (True, True, True, True, False, False)
+                    result, (True, True, True, True, False, False, True)
                 )
                 self.assertFalse(result.passed)
                 self.assertEqual(result.entries, 2)
@@ -3842,7 +3844,7 @@ class SystemTests(unittest.TestCase):
         self.assertFalse(suspended)
         after_evidence = self.system.verify_function("tenant-a", "echo")
         self.assertTrue(after_evidence.passed)
-        self._assert_function_checks(after_evidence, (True, True, True, True, True, True))
+        self._assert_function_checks(after_evidence, (True, True, True, True, True, True, True))
         self.assertEqual(after_evidence.function_hash, before_evidence.function_hash)
         build = self.system.compile("tenant-a", "echo")
         self.assertEqual(len(build.created), 1)
@@ -3873,7 +3875,7 @@ class SystemTests(unittest.TestCase):
         uncheckpointed = self.system.verify_function("tenant-a", "echo")
         self._assert_function_checks(
             uncheckpointed,
-            (True, True, True, True, True, False),
+            (True, True, True, True, True, False, True),
         )
         manifest = self.system.inspect_function_promotion("tenant-a", "echo")
         self.system.promote_function(
@@ -6933,7 +6935,7 @@ class SystemTests(unittest.TestCase):
         current = self.system.verify_function("tenant-a", "echo")
         self._assert_function_checks(
             current,
-            (True, True, True, True, True, False),
+            (True, True, True, True, True, False, True),
         )
         manifest = self.system.inspect_function_promotion("tenant-a", "echo")
         self.assertEqual(len(manifest.entries), 3)
@@ -7142,7 +7144,7 @@ class SystemTests(unittest.TestCase):
         before = self._database_dump()
         with self.assertRaisesRegex(
             IntegrityError,
-            "one input digest maps to multiple canonical inputs",
+            "canonical input does not match its stored digest",
         ):
             self.system.inspect_function_promotion("tenant-a", "echo")
         self.assertEqual(self._database_dump(), before)
@@ -8556,7 +8558,7 @@ class SystemTests(unittest.TestCase):
         verified = self.system.verify_function("tenant-a", "echo")
         self._assert_function_checks(
             verified,
-            (True, True, True, True, True, True),
+            (True, True, True, True, True, True, True),
         )
         self.assertEqual(verified.entries, 1_001)
         self.assertIsNotNone(verified.document)
@@ -8567,7 +8569,7 @@ class SystemTests(unittest.TestCase):
             verified.document.input_hashes[-1],
             expected.input_hashes[-1],
         )
-        self.assertIn(promotion.receipt_id, verified.checks[-1].detail)
+        self.assertIn(promotion.receipt_id, self._function_checks(verified)["persisted-function-receipt"].detail)
 
     def test_function_promotion_enumerates_candidate_page_tail(self) -> None:
         rows, reports, projections, function_entries, expected = (
@@ -10546,9 +10548,9 @@ class SystemTests(unittest.TestCase):
         verified = self.system.verify_function("tenant-a", "echo")
         self._assert_function_checks(
             verified,
-            (True, True, True, True, True, True),
+            (True, True, True, True, True, True, True),
         )
-        self.assertIn(promotion.receipt_id, verified.checks[-1].detail)
+        self.assertIn(promotion.receipt_id, self._function_checks(verified)["persisted-function-receipt"].detail)
 
     def test_reconstruct_function_receipt_is_deterministic_across_independent_systems_and_reverse_scans(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
@@ -10666,7 +10668,7 @@ class SystemTests(unittest.TestCase):
             )
             self._assert_function_checks(
                 verified,
-                (True, True, True, True, True, True),
+                (True, True, True, True, True, True, True),
             )
 
             self.system.register_operation("tenant-a", "empty", policy=policy)
@@ -10683,7 +10685,7 @@ class SystemTests(unittest.TestCase):
             )
             self._assert_function_checks(
                 empty,
-                (True, True, True, True, True, True),
+                (True, True, True, True, True, True, True),
             )
             legacy = prove_read_only(
                 "legacy-no-receipt",
@@ -10691,9 +10693,9 @@ class SystemTests(unittest.TestCase):
             )
             self._assert_function_checks(
                 legacy,
-                (True, True, True, True, True, False),
+                (True, True, True, True, True, False, True),
             )
-            self.assertIn("no current-revision", legacy.checks[-1].detail)
+            self.assertIn("no current-revision", self._function_checks(legacy)["persisted-function-receipt"].detail)
 
             self._promote_function_entry(
                 {"x": 4},
@@ -10719,10 +10721,10 @@ class SystemTests(unittest.TestCase):
             aggregate = prove_read_only("aggregate", verify_aggregate)
             self._assert_function_checks(
                 aggregate,
-                (False, False, False, False, False, False),
+                (False, False, False, False, False, False, False),
             )
             self.assertEqual(aggregate.entries, 4)
-            self.assertIn("not evaluated", aggregate.checks[-1].detail)
+            self.assertIn("not evaluated", self._function_checks(aggregate)["persisted-function-receipt"].detail)
 
             def wrong_partition():
                 with self.assertRaisesRegex(NotFoundError, "does not exist"):
@@ -10760,9 +10762,9 @@ class SystemTests(unittest.TestCase):
             )
             self._assert_function_checks(
                 corrupt_latest,
-                (True, True, True, True, True, False),
+                (True, True, True, True, True, False, True),
             )
-            self.assertIn("receipt hash mismatch", corrupt_latest.checks[-1].detail)
+            self.assertIn("receipt hash mismatch", self._function_checks(corrupt_latest)["persisted-function-receipt"].detail)
 
             def corrupt_public():
                 with self.assertRaisesRegex(IntegrityError, "receipt hash mismatch"):
@@ -10852,9 +10854,9 @@ class SystemTests(unittest.TestCase):
         current = self.system.verify_function("tenant-a", "echo")
         self._assert_function_checks(
             current,
-            (True, True, True, True, True, True),
+            (True, True, True, True, True, True, True),
         )
-        self.assertIn(latest_promotion.receipt_id, current.checks[-1].detail)
+        self.assertIn(latest_promotion.receipt_id, self._function_checks(current)["persisted-function-receipt"].detail)
 
     def test_reconstruct_function_receipt_survives_operation_revision_retirement_and_p6_ignores_prior_revision(self) -> None:
         policy = CompilePolicy(2, 1, 0)
@@ -10888,10 +10890,10 @@ class SystemTests(unittest.TestCase):
         current = self.system.verify_function("tenant-a", "echo")
         self._assert_function_checks(
             current,
-            (True, True, True, True, True, True),
+            (True, True, True, True, True, True, True),
         )
         self.assertEqual(current.entries, 0)
-        self.assertIn("vacuously", current.checks[-1].detail)
+        self.assertIn("vacuously", self._function_checks(current)["persisted-function-receipt"].detail)
 
     def test_reconstruct_function_receipt_survives_revocation_of_every_member_evidence_row(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
@@ -10946,9 +10948,9 @@ class SystemTests(unittest.TestCase):
         result = self.system.verify_function("tenant-a", "echo")
         self._assert_function_checks(
             result,
-            (True, True, True, True, True, False),
+            (True, True, True, True, True, False, True),
         )
-        self.assertIn("no current-revision", result.checks[-1].detail)
+        self.assertIn("no current-revision", self._function_checks(result)["persisted-function-receipt"].detail)
 
     def test_verify_function_p6_rejects_corrupt_latest_when_older_receipt_is_valid(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
@@ -10983,9 +10985,9 @@ class SystemTests(unittest.TestCase):
         result = self.system.verify_function("tenant-a", "echo")
         self._assert_function_checks(
             result,
-            (True, True, True, True, True, False),
+            (True, True, True, True, True, False, True),
         )
-        self.assertIn("latest current-revision receipt is invalid", result.checks[-1].detail)
+        self.assertIn("latest current-revision receipt is invalid", self._function_checks(result)["persisted-function-receipt"].detail)
 
     def test_verify_function_p6_requires_exact_live_document_bytes_for_middle_member(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
@@ -11010,9 +11012,9 @@ class SystemTests(unittest.TestCase):
         result = self.system.verify_function("tenant-a", "echo")
         self._assert_function_checks(
             result,
-            (True, True, True, True, True, False),
+            (True, True, True, True, True, False, True),
         )
-        self.assertIn("does not bind", result.checks[-1].detail)
+        self.assertIn("does not bind", self._function_checks(result)["persisted-function-receipt"].detail)
 
     def test_verify_function_p6_rejects_middle_foreign_report_join_as_structured_failure(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
@@ -11051,9 +11053,9 @@ class SystemTests(unittest.TestCase):
         result = self.system.verify_function("tenant-a", "echo")
         self._assert_function_checks(
             result,
-            (True, True, True, True, True, False),
+            (True, True, True, True, True, False, True),
         )
-        self.assertIn("missing or foreign report", result.checks[-1].detail)
+        self.assertIn("missing or foreign report", self._function_checks(result)["persisted-function-receipt"].detail)
 
 
     def test_reconstruct_function_receipt_hash_binds_each_of_fourteen_fields_independently(self) -> None:
@@ -11173,7 +11175,7 @@ class SystemTests(unittest.TestCase):
         _, promotion = self._promote_three_as_function("receipt-count-relations")
         mutations = (
             ("candidate_count", 4),
-            ("retired_count", 4),
+            ("retired_count", system_module.FUNCTION_MAX_ENTRIES + 1),
         )
         for field, value in mutations:
             with self.subTest(field=field):
@@ -11911,7 +11913,7 @@ class SystemTests(unittest.TestCase):
         )
         self._assert_function_checks(
             partition_result,
-            (True, True, True, True, True, True),
+            (True, True, True, True, True, True, True),
         )
         self.assertEqual(partition_result.entries, 0)
 
@@ -11929,7 +11931,7 @@ class SystemTests(unittest.TestCase):
         )
         self._assert_function_checks(
             operation_result,
-            (True, True, True, True, True, True),
+            (True, True, True, True, True, True, True),
         )
         self.assertEqual(operation_result.entries, 0)
 
@@ -12035,7 +12037,7 @@ class SystemTests(unittest.TestCase):
             result = self.system.verify_function("tenant-a", "echo")
         self._assert_function_checks(
             result,
-            (True, True, True, True, True, True),
+            (True, True, True, True, True, True, True),
         )
         self.assertEqual(result.entries, 3)
         self.assertEqual(result.function_hash, promotion.function_hash)
@@ -12062,7 +12064,7 @@ class SystemTests(unittest.TestCase):
             result = self.system.verify_function("tenant-a", "echo")
         self._assert_function_checks(
             result,
-            (True, True, True, True, False, False),
+            (True, True, True, True, False, False, True),
         )
         self.assertIn(
             "function entry count does not equal the promoted snapshot",
@@ -12099,7 +12101,7 @@ class SystemTests(unittest.TestCase):
         result = self.system.verify_function("tenant-a", "echo")
         self._assert_function_checks(
             result,
-            (True, True, True, False, False, False),
+            (True, True, True, False, False, False, True),
         )
         checks = self._function_checks(result)
         for key in (
@@ -12453,7 +12455,7 @@ class SystemTests(unittest.TestCase):
                 ).rowcount
                 self.assertEqual(changed, 1)
             result = self.system.verify_function(partition, operation)
-            self._assert_function_checks(result, (True, True, True, True, True, True))
+            self._assert_function_checks(result, (True, True, True, True, True, True, True))
 
         with self.subTest(scope="partition-case"):
             operation = "case-partition"
@@ -12466,7 +12468,7 @@ class SystemTests(unittest.TestCase):
             )
             self.system.register_operation("tenant-scope", operation, policy=policy)
             result = self.system.verify_function("tenant-scope", operation)
-            self._assert_function_checks(result, (True, True, True, True, True, True))
+            self._assert_function_checks(result, (True, True, True, True, True, True, True))
 
         with self.subTest(scope="operation-case"):
             partition = "operation-scope"
@@ -12479,7 +12481,7 @@ class SystemTests(unittest.TestCase):
             )
             self.system.register_operation(partition, "echo-scope", policy=policy)
             result = self.system.verify_function(partition, "echo-scope")
-            self._assert_function_checks(result, (True, True, True, True, True, True))
+            self._assert_function_checks(result, (True, True, True, True, True, True, True))
 
     def test_reconstruct_function_receipt_quantifies_ordinal_contiguity_over_first_and_last_members(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
@@ -13081,9 +13083,9 @@ class SystemTests(unittest.TestCase):
             result = self.system.verify_function("tenant-a", "echo")
         self._assert_function_checks(
             result,
-            (True, True, True, True, True, False),
+            (True, True, True, True, True, False, True),
         )
-        self.assertIn("does not bind", result.checks[-1].detail)
+        self.assertIn("does not bind", self._function_checks(result)["persisted-function-receipt"].detail)
 
     def test_reconstruct_function_receipt_partition_lookup_is_case_and_like_exact(self) -> None:
         policy = CompilePolicy(2, 1, 0)
@@ -13125,9 +13127,9 @@ class SystemTests(unittest.TestCase):
             reconstructed.receipt.promoted_at_us,
         )
         result = self.system.verify_function("tenant-a", "echo")
-        self._assert_function_checks(result, (True, True, True, True, True, True))
+        self._assert_function_checks(result, (True, True, True, True, True, True, True))
         self.assertEqual(
-            result.checks[-1].detail,
+            self._function_checks(result)["persisted-function-receipt"].detail,
             (
                 f"receipt {promotion.receipt_id} at sequence "
                 f"{reconstructed.receipt.sequence} binds the promoted snapshot"

@@ -1751,11 +1751,15 @@ class ObligationBatteryTests(unittest.TestCase):
             0,
         )
         self.assertEqual(
-            sum(
-                isinstance(node, ast.Constant) and node.value == 65_536
-                for node in ast.walk(system_tree)
-            ),
-            1,
+            [
+                target.id for assignment in system_tree.body
+                if isinstance(assignment, ast.Assign)
+                and isinstance(assignment.value, ast.Constant)
+                and assignment.value.value == provenance_max
+                for target in assignment.targets
+                if isinstance(target, ast.Name) and target.id == "PROVENANCE_MAX_BYTES"
+            ],
+            ["PROVENANCE_MAX_BYTES"],
         )
         self.assertEqual(
             sum(

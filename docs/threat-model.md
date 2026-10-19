@@ -37,7 +37,7 @@
   `function_hash`. The embedded hash proves normalized self-consistency only. An independently obtained
   expected hash additionally pins caller-held identity. The hash is unkeyed, so neither mode proves
   origin or acts as a signature. An expected hash copied from the same untrusted bundle adds no trust.
-- A live export emits bundle bytes only after all six set checks pass. A drifted set produces no bytes
+- A live export emits bundle bytes only after all seven set checks pass. A drifted set produces no bytes
   and reports the complete failed check vector on stderr. A historical export emits bytes only after
   full receipt reconstruction.
 - `function export --out` writes atomically through a mode-0600 temporary file and refuses a
@@ -55,7 +55,7 @@
 - Proposed output is visible only through the review API. Accepted output can differ, and the final
   edited value is the fixture.
 - Evidence conflicts block compilation. Evidence snapshots and policy/artifact digests block stale
-  verification and promotion. Whole-set verification adds six ordered checks, and set promotion repeats
+  verification and promotion. Whole-set verification adds seven ordered checks, and set promotion repeats
   one prospective function hash under a write lock. The sixth check requires the latest persisted
   receipt to bind the live promoted snapshot. Individually valid artifacts therefore cannot pass as a
   set without a current checkpoint.

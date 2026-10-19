@@ -263,6 +263,20 @@ def _parser() -> argparse.ArgumentParser:
         "--expected-function-hash", help="require the bundle to hash to this digest"
     )
 
+    projection = commands.add_parser(
+        "projection", help="test, set or show the program that maps raw input to case keys"
+    )
+    projection_commands = projection.add_subparsers(dest="projection_command", required=True)
+    projection_test = projection_commands.add_parser("test", allow_abbrev=False)
+    projection_test.add_argument("operation")
+    projection_test.add_argument("--program", required=True, help="JSON text; '-' reads stdin")
+    projection_set = projection_commands.add_parser("set", allow_abbrev=False)
+    projection_set.add_argument("operation")
+    projection_set.add_argument("--program", required=True, help="JSON text; '-' reads stdin")
+    projection_set.add_argument("--actor", required=True)
+    projection_show = projection_commands.add_parser("show", allow_abbrev=False)
+    projection_show.add_argument("operation")
+
     events = commands.add_parser("events", help="read append-only audit projections")
     events.add_argument("--after", type=int, default=0)
     events.add_argument("--limit", type=int, default=1_000)
@@ -868,6 +882,14 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
             if target is None:
                 return _Outcome(raw=document.text)
             return _write_export(target, document)
+    if args.command == "projection":
+        if args.projection_command == "test":
+            return system.test_projection(args.partition, args.operation, _input(args.program))
+        if args.projection_command == "set":
+            return system.set_projection(
+                args.partition, args.operation, _input(args.program), actor=args.actor
+            )
+        return {"projection": system.projection(args.partition, args.operation)}
     if args.command == "events":
         return system.events(args.partition, after=args.after, limit=args.limit)
     raise AssertionError("argparse accepted an unknown command")

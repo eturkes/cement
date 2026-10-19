@@ -135,8 +135,9 @@ def build_digest(
     support: int,
     reviewer_count: int,
     span_seconds: int,
+    projection_digest: str | None = None,
 ) -> str:
-    return digest_parts(
+    parts = (
         "cement-build-v2",
         RUNTIME_ABI,
         CANONICALIZER,
@@ -146,4 +147,10 @@ def build_digest(
         str(support),
         str(reviewer_count),
         str(span_seconds),
+    )
+    # Exact-mode digests stay byte-identical; a projected build also binds its program.
+    return (
+        digest_parts(*parts)
+        if projection_digest is None
+        else digest_parts(*parts, projection_digest)
     )

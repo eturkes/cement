@@ -105,6 +105,7 @@ _FUNCTION_CHECK_KEYS = (
     "current-promotion-receipts",
     "function-hash-matches-snapshot",
     "persisted-function-receipt",
+    "projection-uniform",
 )
 _INSPECT_KEYS = {"entries", "function_hash", "operation_revision", "skipped"}
 _PROMOTION_ENTRY_KEYS = {
@@ -853,7 +854,7 @@ class CLITests(unittest.TestCase):
     def test_function_group_sits_between_report_and_the_audit_tail(self) -> None:
         from cement_runtime.cli import _parser
 
-        self.assertIn("report,function,events}", _parser().format_help())
+        self.assertRegex(_parser().format_help(), r"report,function,(?:[^}]+,)?events}")
 
     def test_function_show_returns_the_library_report_unwrapped(self) -> None:
         from cement_runtime.cli import _Outcome, _parser, _run
@@ -1699,7 +1700,7 @@ class CLITests(unittest.TestCase):
         )
         self.assertEqual(
             [check["passed"] for check in payload["checks"]],
-            [True, True, True, True, True, False],
+            [True, True, True, True, True, False, True],
         )
 
     def test_function_verify_treats_an_empty_promoted_set_as_a_vacuous_pass(self) -> None:
@@ -3082,9 +3083,10 @@ class CLITests(unittest.TestCase):
                 "current-promotion-receipts",
                 "function-hash-matches-snapshot",
                 "persisted-function-receipt",
+                "projection-uniform",
             ],
         )
-        self.assertEqual([check["passed"] for check in checks], [True] * 5 + [False])
+        self.assertEqual([check["passed"] for check in checks], [True] * 5 + [False, True])
         self.assertEqual(set(checks[0]), {"detail", "key", "passed"})
         self.assertEqual(
             failure["message"],

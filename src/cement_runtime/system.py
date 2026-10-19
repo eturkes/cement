@@ -85,6 +85,7 @@ from .models import (
     SwitchState,
     VerificationReport,
 )
+from .projection import ProjectionProgram, parse_program, project
 from .source import CandidateSource
 from .store import Store
 
@@ -92,6 +93,7 @@ _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}\Z")
 _REQUEST_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}\Z")
 _UNSET = object()
 _RECEIPT_MAX_BYTES = 3 * DEFAULT_MAX_BYTES
+_CASE_KEY_MEMO_MAX = 65_536
 _MAX_SQLITE_INTEGER = 2**63 - 1
 
 PROVENANCE_MAX_BYTES = 65_536
@@ -149,6 +151,7 @@ class _FunctionPromotionPlan:
     manifest: FunctionPromotionManifest
     policy_hash: str
     entries: tuple[_FunctionPromotionPlanEntry, ...]
+    dropped: tuple[str, ...] = ()
 
 
 def _name(value: str, label: str) -> str:
@@ -332,7 +335,9 @@ def _function_receipt_from_row(
         raise IntegrityError("stored function receipt operation revision is invalid")
     if not 1 <= member_count <= FUNCTION_MAX_ENTRIES:
         raise IntegrityError("stored function receipt member count is invalid")
-    if not 0 <= retired_count <= candidate_count <= member_count:
+    # A program change retires members that no candidate replaces (contract §5), so retirements
+    # are bounded by the largest set that can have existed, not by this receipt's candidates.
+    if not (0 <= candidate_count <= member_count and 0 <= retired_count <= FUNCTION_MAX_ENTRIES):
         raise IntegrityError("stored function receipt transition counts are invalid")
     if not 0 <= promoted_at_us <= _MAX_SQLITE_INTEGER:
         raise IntegrityError("stored function receipt timestamp is invalid")
@@ -391,6 +396,18 @@ def _event(
     if cursor.lastrowid is None:
         raise IntegrityError("audit event did not receive a sequence")
     return int(cursor.lastrowid)
+
+
+def _stored_program(row: sqlite3.Row) -> ProjectionProgram:
+    """Parse a stored projection program and recompute its hash (contract §1 S7)."""
+
+    try:
+        program = parse_program(parse_json(str(row["program_json"])).value)
+    except ValidationError as exc:
+        raise IntegrityError("stored projection program is invalid") from exc
+    if program.program_hash != row["program_hash"]:
+        raise IntegrityError("stored projection program does not hash to its key")
+    return program
 
 
 def _policy_from_text(text: str) -> CompilePolicy:
@@ -1236,7 +1253,7 @@ class System:
                 SELECT id FROM artifacts
                 WHERE partition = ? AND operation = ? AND operation_revision = ?
                   AND input_hash = ? AND input_json = ? AND output_json <> ?
-                  AND status = 'promoted'
+                  AND status = 'promoted' AND projection_hash IS NULL
                 """,
                 (
                     partition,
@@ -1250,7 +1267,25 @@ class System:
             # A newer different confirmation is a REVISION, never a contradiction (contract §3):
             # it leaves every artifact's status alone, so a pinned version survives it, while the
             # live set now fails verification on the contrary evidence and follow answers nothing.
-            contradicted = tuple(str(item["id"]) for item in conflicting_artifacts)
+            contradicted_ids = [str(item["id"]) for item in conflicting_artifacts]
+            # X7: a projected artifact matches the new confirmation through its program's key.
+            for artifact in connection.execute(
+                """
+                SELECT id, input_json, output_json, projection_hash FROM artifacts
+                WHERE partition = ? AND operation = ? AND operation_revision = ?
+                  AND status = 'promoted' AND projection_hash IS NOT NULL
+                """,
+                (partition, binding.operation, binding.operation_revision),
+            ):
+                program = self._program_by_hash(connection, str(artifact["projection_hash"]))
+                if (
+                    program is not None
+                    and self._case_key_text(program, input_json.text, input_json.digest)
+                    == artifact["input_json"]
+                    and artifact["output_json"] != final.text
+                ):
+                    contradicted_ids.append(str(artifact["id"]))
+            contradicted = tuple(contradicted_ids)
             if contradicted:
                 for artifact_id in contradicted:
                     _event(
@@ -1299,6 +1334,7 @@ class System:
         operation_row: sqlite3.Row,
         input_hash: str,
         input_json: str,
+        program: ProjectionProgram | None = None,
     ) -> _CurrentBuild | _BlockedBuild:
         partition = str(operation_row["partition"])
         operation = str(operation_row["name"])
@@ -1319,6 +1355,7 @@ class System:
             revision=revision,
             input_hash=input_hash,
             input_text=input_json,
+            program=program,
         )
         assessment = self._assess_examples(
             self._active_evidence(
@@ -1328,9 +1365,11 @@ class System:
                 revision=revision,
                 input_hash=input_hash,
                 input_text=input_json,
+                program=program,
             ),
             policy,
             reviewer_count=reviewer_count,
+            projected=program is not None,
         )
         if assessment["integrity_failures"]:
             raise IntegrityError(str(assessment["integrity_failures"][0]))
@@ -1371,6 +1410,7 @@ class System:
                 input_hash=input_hash,
                 input_text=input_json,
                 order_by_id=True,
+                program=program,
             ),
             partition=partition,
             operation=operation,
@@ -1394,6 +1434,7 @@ class System:
                 support=support,
                 reviewer_count=reviewer_count,
                 span_seconds=span_seconds,
+                projection_digest=None if program is None else program.program_hash,
             ),
         )
 
@@ -1402,39 +1443,84 @@ class System:
         connection: sqlite3.Connection,
         operation_row: sqlite3.Row,
     ) -> Iterator[tuple[str, str, _CurrentBuild | _BlockedBuild]]:
-        """Enumerate compile's exact current scopes without writing."""
+        """Enumerate compile's current case keys without writing.
+
+        Exact mode: one case per canonical input. Under the build-current projection program:
+        one case per projected key; examples the program refuses form one blocked
+        ``unprojected`` entry (input hash ``""``), so they never silently vanish.
+        """
 
         partition = str(operation_row["partition"])
         operation = str(operation_row["name"])
         revision = int(operation_row["revision"])
-        groups = connection.execute(
-            """
+        program = self._build_program(
+            connection, partition=partition, operation=operation, revision=revision
+        )
+        active = """
             SELECT e.input_hash, e.input_json
             FROM examples AS e
             LEFT JOIN example_revocations AS x ON x.example_id = e.id
             WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
               AND x.example_id IS NULL
-            GROUP BY e.input_hash, e.input_json
+              AND NOT EXISTS (SELECT 1 FROM examples AS s WHERE s.supersedes_example_id = e.id)
+            {group}
             ORDER BY e.input_hash, e.input_json
-            """,
-            (partition, operation, revision),
-        )
+        """
         canonical_inputs: dict[str, str] = {}
-        for group in groups:
-            input_hash = str(group["input_hash"])
-            input_text = str(group["input_json"])
+
+        def checked(input_hash: str, input_text: str) -> None:
             previous = canonical_inputs.get(input_hash)
             if previous is not None and previous != input_text:
                 raise IntegrityError("one input digest maps to multiple canonical inputs")
             canonical_inputs[input_hash] = input_text
-            yield (
-                input_hash,
-                input_text,
-                self._project_current_build(
-                    connection,
-                    operation_row,
+
+        if program is None:
+            # Exact mode streams one case per canonical input, checked and built as it arrives,
+            # so memory stays bounded by one row however many examples the revision holds.
+            for row in connection.execute(
+                active.format(group="GROUP BY e.input_hash, e.input_json"),
+                (partition, operation, revision),
+            ):
+                input_hash, input_text = str(row["input_hash"]), str(row["input_json"])
+                checked(input_hash, input_text)
+                yield (
                     input_hash,
                     input_text,
+                    self._project_current_build(connection, operation_row, input_hash, input_text),
+                )
+            return
+        # Under a program every example counts (an unprojected entry reports examples, not
+        # distinct inputs), and keys exist only after every raw input is projected.
+        rows = connection.execute(
+            active.format(group=""), (partition, operation, revision)
+        ).fetchall()
+        for row in rows:
+            checked(str(row["input_hash"]), str(row["input_json"]))
+        keys: dict[str, str] = {}
+        unprojected = 0
+        for row in rows:
+            key_text = self._case_key_text(program, str(row["input_json"]), str(row["input_hash"]))
+            if key_text is None:
+                unprojected += 1
+                continue
+            keys[parse_json(key_text).digest] = key_text
+        if unprojected:
+            yield (
+                "",
+                "",
+                _BlockedBuild(
+                    reasons=(f"unprojected: {unprojected} example(s) the projection refuses",),
+                    support=unprojected,
+                    reviewer_count=0,
+                    span_seconds=0,
+                ),
+            )
+        for key_hash, key_text in sorted(keys.items()):
+            yield (
+                key_hash,
+                key_text,
+                self._project_current_build(
+                    connection, operation_row, key_hash, key_text, program=program
                 ),
             )
 
@@ -1467,6 +1553,9 @@ class System:
             if registered is None:
                 raise NotFoundError("operation is not registered in this partition")
             revision = int(registered["revision"])
+            program = self._build_program(
+                connection, partition=partition, operation=operation, revision=revision
+            )
             for input_hash, input_text, projection in self._current_build_projections(
                 connection,
                 registered,
@@ -1497,9 +1586,12 @@ class System:
                     INSERT INTO artifacts(
                         id, partition, operation, operation_revision, input_json, input_hash,
                         output_json, output_hash, artifact_json, artifact_hash, scope_hash,
-                        build_hash, policy_json, policy_hash, evidence_snapshot_hash, status,
-                        support, reviewer_count, span_seconds, created_at_us
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'building', ?, ?, ?, ?)
+                        build_hash, policy_json, policy_hash, evidence_snapshot_hash,
+                        projection_hash, status, support, reviewer_count, span_seconds,
+                        created_at_us
+                    ) VALUES (
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'building', ?, ?, ?, ?
+                    )
                     """,
                     (
                         artifact_id,
@@ -1517,14 +1609,16 @@ class System:
                         projection.policy_json,
                         projection.policy_hash,
                         projection.evidence_snapshot_hash,
+                        None if program is None else program.program_hash,
                         projection.support,
                         projection.reviewer_count,
                         projection.span_seconds,
                         now,
                     ),
                 )
-                inserted = connection.execute(
-                    """
+                if program is None:
+                    inserted_count = connection.execute(
+                        """
                     INSERT INTO artifact_evidence(artifact_id, example_id)
                     SELECT ?, e.id FROM examples AS e
                     LEFT JOIN example_revocations AS x ON x.example_id = e.id
@@ -1532,16 +1626,37 @@ class System:
                       AND e.input_hash = ? AND e.input_json = ? AND x.example_id IS NULL
                     ORDER BY e.id
                     """,
-                    (
-                        artifact_id,
-                        partition,
-                        operation,
-                        revision,
-                        input_hash,
-                        input_text,
-                    ),
-                )
-                if inserted.rowcount != projection.support:
+                        (
+                            artifact_id,
+                            partition,
+                            operation,
+                            revision,
+                            input_hash,
+                            input_text,
+                        ),
+                    ).rowcount
+                else:
+                    # A projected case is not expressible as SQL over input_hash: its evidence
+                    # edges are the active examples whose projection equals the key.
+                    evidence_ids = [
+                        (artifact_id, str(row["id"]))
+                        for row in self._active_evidence(
+                            connection,
+                            partition=partition,
+                            operation=operation,
+                            revision=revision,
+                            input_hash=input_hash,
+                            input_text=input_text,
+                            order_by_id=True,
+                            program=program,
+                        )
+                    ]
+                    connection.executemany(
+                        "INSERT INTO artifact_evidence(artifact_id, example_id) VALUES (?, ?)",
+                        evidence_ids,
+                    )
+                    inserted_count = len(evidence_ids)
+                if inserted_count != projection.support:
                     raise IntegrityError(
                         "artifact evidence insertion count changed during compilation"
                     )
@@ -1578,7 +1693,10 @@ class System:
         policy: CompilePolicy,
         *,
         reviewer_count: int | None = None,
+        projected: bool = False,
     ) -> dict[str, Any]:
+        # `projected`: the case is a projection key, so its raw inputs differ by design and only
+        # their shared key (checked by the caller) binds them.
         integrity: list[str] = []
         reviewers: set[str] = set()
         support = 0
@@ -1647,7 +1765,7 @@ class System:
             else 0
         )
         policy_failures: list[str] = []
-        if input_conflict:
+        if input_conflict and not projected:
             integrity_failure("evidence hash collision bound multiple canonical inputs")
         if output_conflict:
             policy_failures.append("confirmed outputs conflict")
@@ -1673,8 +1791,8 @@ class System:
             "output_text": first_output,
         }
 
-    @staticmethod
     def _active_evidence(
+        self,
         connection: sqlite3.Connection,
         *,
         partition: str,
@@ -1683,21 +1801,39 @@ class System:
         input_hash: str,
         input_text: str,
         order_by_id: bool = False,
-    ) -> sqlite3.Cursor:
+        program: ProjectionProgram | None = None,
+    ) -> list[sqlite3.Row]:
+        """Active examples (confirmed, unrevoked, unsuperseded) of one case.
+
+        Exact mode keys the case on the canonical input itself; under ``program`` the case is
+        every active example of the revision whose ``project(program, input)`` equals the key.
+        """
+
         order = "e.id" if order_by_id else "e.confirmed_at_us, e.id"
-        return connection.execute(
-            f"""
-            SELECT e.* FROM examples AS e
+        active = """
+            FROM examples AS e
             LEFT JOIN example_revocations AS x ON x.example_id = e.id
             WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
-              AND e.input_hash = ? AND e.input_json = ? AND x.example_id IS NULL
-            ORDER BY {order}
-            """,  # noqa: S608 — only code-chosen fragments; every value binds as `?`
-            (partition, operation, revision, input_hash, input_text),
-        )
+              AND x.example_id IS NULL
+              AND NOT EXISTS (SELECT 1 FROM examples AS s WHERE s.supersedes_example_id = e.id)
+        """
+        if program is None:
+            return connection.execute(
+                f"SELECT e.* {active} AND e.input_hash = ? AND e.input_json = ? ORDER BY {order}",
+                (partition, operation, revision, input_hash, input_text),
+            ).fetchall()
+        return [
+            row
+            for row in connection.execute(
+                f"SELECT e.* {active} ORDER BY {order}",
+                (partition, operation, revision),
+            )
+            if self._case_key_text(program, str(row["input_json"]), str(row["input_hash"]))
+            == input_text
+        ]
 
-    @staticmethod
     def _active_reviewer_count(
+        self,
         connection: sqlite3.Connection,
         *,
         partition: str,
@@ -1705,17 +1841,70 @@ class System:
         revision: int,
         input_hash: str,
         input_text: str,
+        program: ProjectionProgram | None = None,
     ) -> int:
+        if program is None:
+            # Exact mode counts in SQL; only a projected case needs its rows in Python.
+            row = connection.execute(
+                """
+                SELECT COUNT(DISTINCT e.reviewer) FROM examples AS e
+                LEFT JOIN example_revocations AS x ON x.example_id = e.id
+                WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
+                  AND e.input_hash = ? AND e.input_json = ? AND x.example_id IS NULL
+                  AND NOT EXISTS (SELECT 1 FROM examples AS s WHERE s.supersedes_example_id = e.id)
+                """,
+                (partition, operation, revision, input_hash, input_text),
+            ).fetchone()
+            return int(row[0])
+        rows = self._active_evidence(
+            connection,
+            partition=partition,
+            operation=operation,
+            revision=revision,
+            input_hash=input_hash,
+            input_text=input_text,
+            program=program,
+        )
+        return len({str(row["reviewer"]) for row in rows})
+
+    def _case_key_text(
+        self, program: ProjectionProgram, input_text: str, input_hash: str
+    ) -> str | None:
+        """`project(program, input)`'s key text, or ``None`` for input the program refuses.
+
+        Content-addressed (program hash + input digest), so the memo can never go stale; it
+        evicts least-recently-used keys past `_CASE_KEY_MEMO_MAX`, so a long-lived ``System``
+        holds a bounded number while one pass over fewer inputs never projects one twice.
+        """
+
+        memo = self.__dict__.setdefault("_case_keys", {})
+        slot = (program.program_hash, input_hash)
+        if slot in memo:
+            memo[slot] = memo.pop(slot)  # dicts keep insertion order: move to the newest end
+        else:
+            if len(memo) >= _CASE_KEY_MEMO_MAX:
+                del memo[next(iter(memo))]
+            projected = project(program, parse_json(input_text).value)
+            memo[slot] = projected.key.text if projected.matched and projected.key else None
+        cached: str | None = memo[slot]
+        return cached
+
+    @staticmethod
+    def _build_program(
+        connection: sqlite3.Connection, *, partition: str, operation: str, revision: int
+    ) -> ProjectionProgram | None:
+        """The program NEW builds of this revision use: the newest setting, else exact mode."""
+
         row = connection.execute(
             """
-            SELECT COUNT(DISTINCT e.reviewer) FROM examples AS e
-            LEFT JOIN example_revocations AS x ON x.example_id = e.id
-            WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
-              AND e.input_hash = ? AND e.input_json = ? AND x.example_id IS NULL
+            SELECT g.program_json, g.program_hash FROM projection_settings AS s
+            JOIN projection_programs AS g ON g.program_hash = s.program_hash
+            WHERE s.partition = ? AND s.operation = ? AND s.operation_revision = ?
+            ORDER BY s.sequence DESC LIMIT 1
             """,
-            (partition, operation, revision, input_hash, input_text),
+            (partition, operation, revision),
         ).fetchone()
-        return int(row[0])
+        return None if row is None else _stored_program(row)
 
     @staticmethod
     def _evidence_snapshot(
@@ -1916,6 +2105,9 @@ class System:
                 or artifact_row["policy_hash"] != receipt.policy_hash
             ):
                 raise IntegrityError(f"function receipt member {ordinal} scope binding mismatch")
+            if artifact_row["projection_hash"] != receipt_row["projection_hash"]:
+                # One program per set (contract §5): the receipt's program alone serves it.
+                raise IntegrityError(f"function receipt member {ordinal} program binding mismatch")
             try:
                 artifact = self._artifact_from_row(artifact_row)
             except (IntegrityError, ValidationError) as exc:
@@ -1971,6 +2163,7 @@ class System:
                 operation_revision=receipt.operation_revision,
                 policy_hash=receipt.policy_hash,
                 entries=entries,
+                projection=self._program_by_hash(connection, receipt_row["projection_hash"]),
             )
             if document.function_hash != receipt.function_hash:
                 raise IntegrityError("rebuilt function hash does not match receipt")
@@ -2858,6 +3051,7 @@ class System:
                     passed=False,
                     detail=skipped,
                 ),
+                FunctionCheck(key="projection-uniform", passed=False, detail=skipped),
             )
             return FunctionVerification(
                 passed=False,
@@ -3038,7 +3232,25 @@ class System:
             receipt_failures,
             f"{entry_count} entries carry current valid promotion receipts",
         )
+        member_programs = {row["projection_hash"] for row in rows}
         del rows
+        program: ProjectionProgram | None = None
+        projection_detail = "exact mode: no member carries a projection"
+        projection_ok = len(member_programs) <= 1
+        if not projection_ok:
+            projection_detail = f"{len(member_programs)} programs across one set"
+        elif member_programs and next(iter(member_programs)) is not None:
+            try:
+                program = self._program_by_hash(connection, next(iter(member_programs)))
+                projection_detail = (
+                    f"every member projects with {program.program_hash if program else ''}"
+                )
+            except IntegrityError as exc:
+                projection_ok = False
+                projection_detail = str(exc)
+        projection_check = FunctionCheck(
+            key="projection-uniform", passed=projection_ok, detail=projection_detail
+        )
 
         document = None
         function_hash: str | None = None
@@ -3059,6 +3271,7 @@ class System:
                     operation_revision=revision,
                     policy_hash=policy_hash,
                     entries=(item[3] for item in projected),
+                    projection=program,
                 )
                 function_hash = document.function_hash
                 if document.value.get("abi") != FUNCTION_ABI:
@@ -3144,6 +3357,7 @@ class System:
             receipt_check,
             hash_check,
             persisted_receipt_check,
+            projection_check,
         )
         passed = all(check.passed for check in checks)
         return FunctionVerification(
@@ -3171,8 +3385,9 @@ class System:
         50,000 entries, ``.agent/decisions/m3u2b-resolve-bench.json``). ``pinned`` rebuilds the
         pinned receipt and checks that no explicit negative judgment (revoked evidence, a
         suspended member, a counterexample) has reached it since. Arguments are validated
-        first, so a rejected call reads no ledger. This call writes nothing and caches
-        nothing. A failed verdict returns ``match`` ``None`` and is never a miss.
+        first, so a rejected call reads no ledger. This call writes nothing and caches no
+        verification result (projection keys are memoized by content, never by verdict). A
+        failed verdict returns ``match`` ``None`` and is never a miss.
         """
 
         partition = _name(partition, "partition")
@@ -3228,6 +3443,291 @@ class System:
                 state=state,
                 expected_function_hash=expected_function_hash,
             )
+
+    # -- projection settings (M4.2) --------------------------------------------
+
+    def _projection_report(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        partition: str,
+        operation: str,
+        revision: int,
+        program: ProjectionProgram,
+    ) -> dict[str, JSONValue]:
+        """V2-V4 evidence for one program over the revision's active examples (read-only)."""
+
+        rows = connection.execute(
+            """
+            SELECT e.id, e.input_json, e.input_hash, e.output_hash FROM examples AS e
+            LEFT JOIN example_revocations AS x ON x.example_id = e.id
+            WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
+              AND x.example_id IS NULL
+              AND NOT EXISTS (SELECT 1 FROM examples AS s WHERE s.supersedes_example_id = e.id)
+            ORDER BY e.id
+            """,
+            (partition, operation, revision),
+        ).fetchall()
+        outputs: dict[str, set[str]] = {}
+        support: dict[str, int] = {}
+        unprojected: list[JSONValue] = []
+        witnessed: set[tuple[str, tuple[tuple[str, str], ...]]] = set()
+        for row in rows:
+            key_text = self._case_key_text(program, str(row["input_json"]), str(row["input_hash"]))
+            if key_text is None:
+                unprojected.append(str(row["id"]))
+                continue
+            key = parse_json(key_text)
+            form = cast(dict[str, JSONValue], cast(dict[str, JSONValue], key.value)["form"])
+            witnessed.add(
+                (
+                    str(form["title"]),
+                    tuple(
+                        (str(kind), str(name))
+                        for kind, name in cast(list[list[str]], form["structure"])
+                    ),
+                )
+            )
+            outputs.setdefault(key.digest, set()).add(str(row["output_hash"]))
+            support[key.digest] = support.get(key.digest, 0) + 1
+        unwitnessed: list[JSONValue] = [
+            layout.name
+            for layout in program.layouts
+            if (layout.title, layout.entries) not in witnessed
+        ]
+        return {
+            "program_hash": program.program_hash,
+            "projected": sum(support.values()),
+            "unprojected": unprojected,
+            "keys": [
+                {"key_hash": digest, "support": support[digest], "outputs": len(outputs[digest])}
+                for digest in sorted(support)
+            ],
+            "merged_outputs": cast(
+                list[JSONValue], sorted(d for d, o in outputs.items() if len(o) > 1)
+            ),
+            "unwitnessed_layouts": unwitnessed,
+        }
+
+    def test_projection(
+        self, partition: str, operation: str, program: object
+    ) -> dict[str, JSONValue]:
+        """Preview a program over the current revision; writes nothing.
+
+        Besides the V2-V4 evidence ``set_projection`` grades (active examples alone), the preview
+        lists each active example and pending proposal with its key or the reason it has none,
+        and per key its pending proposals and readiness under the operation's policy.
+        """
+
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        parsed = parse_program(program)
+        with self.store.transaction(write=False) as connection:
+            registered = connection.execute(
+                "SELECT * FROM operations WHERE partition = ? AND name = ?",
+                (partition, operation),
+            ).fetchone()
+            if registered is None:
+                raise NotFoundError("operation is not registered in this partition")
+            revision = _stored_int(registered["revision"], "operation revision", minimum=1)
+            policy = _policy_from_text(str(registered["policy_json"]))
+            report = self._projection_report(
+                connection,
+                partition=partition,
+                operation=operation,
+                revision=revision,
+                program=parsed,
+            )
+            items: list[JSONValue] = []
+            pending: dict[str, int] = {}
+            key_texts: dict[str, str] = {}
+            sources = (
+                (
+                    "example",
+                    """
+                    SELECT e.id, e.input_json FROM examples AS e
+                    LEFT JOIN example_revocations AS x ON x.example_id = e.id
+                    WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
+                      AND x.example_id IS NULL
+                      AND NOT EXISTS (
+                          SELECT 1 FROM examples AS s WHERE s.supersedes_example_id = e.id
+                      )
+                    ORDER BY e.sequence
+                    """,
+                ),
+                (
+                    "proposal",
+                    """
+                    SELECT id, input_json FROM proposals
+                    WHERE partition = ? AND operation = ? AND operation_revision = ?
+                      AND status = 'pending'
+                    ORDER BY status_sequence
+                    """,
+                ),
+            )
+            for kind, sql in sources:
+                for row in connection.execute(sql, (partition, operation, revision)):
+                    projected = project(parsed, parse_json(str(row["input_json"])).value)
+                    key_hash = projected.key.digest if projected.key is not None else None
+                    items.append(
+                        {
+                            "kind": kind,
+                            "id": str(row["id"]),
+                            "key_hash": key_hash,
+                            "reason": projected.reason,
+                        }
+                    )
+                    if kind == "proposal" and key_hash is not None:
+                        pending[key_hash] = pending.get(key_hash, 0) + 1
+                    elif projected.key is not None:
+                        key_texts[projected.key.digest] = projected.key.text
+            keys = cast(list[dict[str, JSONValue]], report["keys"])
+            for entry in keys:
+                digest = str(entry["key_hash"])
+                entry["pending"] = pending.pop(digest, 0)
+                # Ready = compile's own per-key gates (support, outputs, reviewers, span) pass.
+                assessment = self._assess_examples(
+                    self._active_evidence(
+                        connection,
+                        partition=partition,
+                        operation=operation,
+                        revision=revision,
+                        input_hash=digest,
+                        input_text=key_texts[digest],
+                        program=parsed,
+                    ),
+                    policy,
+                    projected=True,
+                )
+                entry["ready"] = not (
+                    assessment["policy_failures"] or assessment["integrity_failures"]
+                )
+            keys.extend(
+                {"key_hash": digest, "support": 0, "outputs": 0, "pending": count, "ready": False}
+                for digest, count in sorted(pending.items())
+            )
+            report["items"] = items
+            return report
+
+    @staticmethod
+    def _submission_revision_in(
+        connection: sqlite3.Connection, partition: str, operation: str
+    ) -> int:
+        row = connection.execute(
+            "SELECT revision FROM operations WHERE partition = ? AND name = ?",
+            (partition, operation),
+        ).fetchone()
+        if row is None:
+            raise NotFoundError("operation is not registered in this partition")
+        return _stored_int(row["revision"], "operation revision", minimum=1)
+
+    def projection(self, partition: str, operation: str) -> dict[str, JSONValue] | None:
+        """The program new builds of the current revision use, or ``None`` (exact mode)."""
+
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        with self.store.transaction(write=False) as connection:
+            revision = self._submission_revision_in(connection, partition, operation)
+            program = self._build_program(
+                connection, partition=partition, operation=operation, revision=revision
+            )
+            if program is None:
+                return None
+            return {
+                "operation_revision": revision,
+                "program": program.canonical.value,
+                "program_hash": program.program_hash,
+            }
+
+    def set_projection(
+        self, partition: str, operation: str, program: object, *, actor: str
+    ) -> dict[str, JSONValue]:
+        """Set the projection program new builds use; verify it in the same write transaction.
+
+        Refused (nothing written) unless: the program validates (V1); every layout is witnessed
+        by an active example (V2); no key merges examples with different outputs (V3); at least
+        one example projects (V4). A program identical to the current one is a no-op. On success
+        every draft or verified artifact of the revision built under another program retires
+        (reason ``projection superseded``); promoted artifacts stay, they belong to versions.
+        """
+
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        actor = _text(actor, "actor", maximum=256)
+        parsed = parse_program(program)
+        now = self._now()
+        with self.store.transaction(write=True) as connection:
+            revision = self._submission_revision_in(connection, partition, operation)
+            current = self._build_program(
+                connection, partition=partition, operation=operation, revision=revision
+            )
+            if current is not None and current.program_hash == parsed.program_hash:
+                return {"changed": False, "program_hash": parsed.program_hash, "retired": []}
+            report = self._projection_report(
+                connection,
+                partition=partition,
+                operation=operation,
+                revision=revision,
+                program=parsed,
+            )
+            if report["unwitnessed_layouts"]:
+                raise ValidationError(
+                    "projection layouts no confirmed example shows: "
+                    f"{report['unwitnessed_layouts']}"
+                )
+            if report["merged_outputs"]:
+                raise ValidationError("projection merges confirmed examples with different outputs")
+            if not report["projected"]:
+                raise ValidationError("no confirmed example of this revision projects")
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO projection_programs(program_hash, abi, program_json)
+                VALUES (?, ?, ?)
+                """,
+                (parsed.program_hash, "cement-projection-v1", parsed.canonical.text),
+            )
+            connection.execute(
+                """
+                INSERT INTO projection_settings(
+                    id, partition, operation, operation_revision, program_hash, set_by, set_at_us
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (_new_id("proj"), partition, operation, revision, parsed.program_hash, actor, now),
+            )
+            stale: list[JSONValue] = [
+                str(row["id"])
+                for row in connection.execute(
+                    """
+                    SELECT id FROM artifacts
+                    WHERE partition = ? AND operation = ? AND operation_revision = ?
+                      AND status IN ('draft', 'verified')
+                      AND (projection_hash IS NULL OR projection_hash <> ?)
+                    """,
+                    (partition, operation, revision, parsed.program_hash),
+                )
+            ]
+            connection.executemany(
+                """
+                UPDATE artifacts SET status = 'retired', status_reason = 'projection superseded'
+                WHERE id = ?
+                """,
+                [(artifact_id,) for artifact_id in stale],
+            )
+            _event(
+                connection,
+                partition=partition,
+                kind="projection.set",
+                subject_type="operation",
+                subject_id=f"{partition}/{operation}@{revision}",
+                payload={
+                    "previous_program_hash": None if current is None else current.program_hash,
+                    "program_hash": parsed.program_hash,
+                    "retired_artifact_ids": stale,
+                    "set_by": actor,
+                },
+                now_us=now,
+            )
+            return {"changed": True, "program_hash": parsed.program_hash, "retired": stale}
 
     # -- switch + versions ----------------------------------------------------
 
@@ -3443,8 +3943,46 @@ class System:
                 AND a.input_hash = c.input_hash AND a.output_hash <> c.output_hash
             LEFT JOIN example_revocations AS x ON x.example_id = c.id
             WHERE m.receipt_id = ? AND c.origin = 'challenge' AND x.example_id IS NULL
+              AND a.projection_hash IS NULL
             """
         )
+        if receipt_row is not None and receipt_row["projection_hash"] is not None:
+            # P-d under the RECEIPT's own program: a counterexample reaches a member's key
+            # through projection, never through the raw input digest.
+            program = self._program_by_hash(connection, str(receipt_row["projection_hash"]))
+            members = {
+                str(row["input_json"]): str(row["output_json"])
+                for row in connection.execute(
+                    """
+                    SELECT a.input_json, a.output_json FROM function_memberships AS m
+                    JOIN artifacts AS a ON a.id = m.artifact_id
+                    WHERE m.receipt_id = ?
+                    """,
+                    (receipt_id,),
+                )
+            }
+            for example in connection.execute(
+                """
+                SELECT c.input_json, c.input_hash, c.output_json FROM examples AS c
+                LEFT JOIN example_revocations AS x ON x.example_id = c.id
+                WHERE c.partition = ? AND c.operation = ? AND c.operation_revision = ?
+                  AND c.origin = 'challenge' AND x.example_id IS NULL
+                """,
+                (
+                    receipt_row["partition"],
+                    receipt_row["operation"],
+                    receipt_row["operation_revision"],
+                ),
+            ):
+                key = (
+                    None
+                    if program is None
+                    else self._case_key_text(
+                        program, str(example["input_json"]), str(example["input_hash"])
+                    )
+                )
+                if key in members and members[key] != example["output_json"]:
+                    counter += 1
         checks.append(
             FunctionCheck(
                 key="pinned-no-counterexample",
@@ -3644,44 +4182,21 @@ class System:
             (partition, operation, revision),
         ).fetchall()
 
-        canonical_inputs: dict[str, str] = {}
-        for group in connection.execute(
-            """
-            SELECT e.input_hash, e.input_json
-            FROM examples AS e
-            LEFT JOIN example_revocations AS x ON x.example_id = e.id
-            WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
-              AND x.example_id IS NULL
-            GROUP BY e.input_hash, e.input_json
-            ORDER BY e.input_hash, e.input_json
-            """,
-            (partition, operation, revision),
-        ):
-            input_hash = str(group["input_hash"])
-            input_json = str(group["input_json"])
-            previous = canonical_inputs.get(input_hash)
-            if previous is not None and previous != input_json:
-                raise IntegrityError("one input digest maps to multiple canonical inputs")
-            canonical_inputs[input_hash] = input_json
-
-        projections: dict[str, _CurrentBuild | _BlockedBuild] = {}
+        # The same enumerator compile uses, so eligibility is reconstruction in both modes (exact
+        # input, or projection key under the build-current program).
+        projections: dict[str, _CurrentBuild | _BlockedBuild] = {
+            key_hash: build
+            for key_hash, _, build in self._current_build_projections(connection, registered)
+            if key_hash
+        }
         selected: list[sqlite3.Row] = []
         skipped: list[dict[str, JSONValue]] = []
         selected_hashes: set[str] = set()
         for row in rows:
             input_hash = str(row["input_hash"])
-            canonical_input = canonical_inputs.get(input_hash)
-            if canonical_input is None:
-                raise IntegrityError(f"current-revision draft {row['id']} has no canonical input")
             projection = projections.get(input_hash)
             if projection is None:
-                projection = self._project_current_build(
-                    connection,
-                    registered,
-                    input_hash,
-                    canonical_input,
-                )
-                projections[input_hash] = projection
+                raise IntegrityError(f"current-revision draft {row['id']} has no canonical input")
             eligible = (
                 type(projection) is _CurrentBuild
                 and row["input_json"] == projection.input_json.text
@@ -3929,6 +4444,20 @@ class System:
             )
         return report
 
+    @staticmethod
+    def _program_by_hash(
+        connection: sqlite3.Connection, program_hash: str | None
+    ) -> ProjectionProgram | None:
+        if program_hash is None:
+            return None
+        stored = connection.execute(
+            "SELECT program_json, program_hash FROM projection_programs WHERE program_hash = ?",
+            (program_hash,),
+        ).fetchone()
+        if stored is None:
+            raise IntegrityError("projection program is missing")
+        return _stored_program(stored)
+
     def _run_verification(
         self,
         connection: sqlite3.Connection,
@@ -3967,6 +4496,9 @@ class System:
         if not current_ok:
             failures.append("operation revision or policy is stale")
         policy = _policy_from_text(str(row["policy_json"]))
+        program = self._program_by_hash(
+            connection, None if row["projection_hash"] is None else str(row["projection_hash"])
+        )
         assessment = self._assess_examples(
             self._active_evidence(
                 connection,
@@ -3975,8 +4507,10 @@ class System:
                 revision=revision,
                 input_hash=str(row["input_hash"]),
                 input_text=str(row["input_json"]),
+                program=program,
             ),
             policy,
+            projected=program is not None,
             reviewer_count=self._active_reviewer_count(
                 connection,
                 partition=partition,
@@ -3984,6 +4518,7 @@ class System:
                 revision=revision,
                 input_hash=str(row["input_hash"]),
                 input_text=str(row["input_json"]),
+                program=program,
             ),
         )
         if assessment["integrity_failures"]:
@@ -3998,6 +4533,7 @@ class System:
                 input_hash=str(row["input_hash"]),
                 input_text=str(row["input_json"]),
                 order_by_id=True,
+                program=program,
             ),
             partition=partition,
             operation=operation,
@@ -4023,7 +4559,37 @@ class System:
             input_hash=str(row["input_hash"]),
             input_text=str(row["input_json"]),
             order_by_id=True,
+            program=program,
         ):
+            key_ok = True
+            if program is not None:
+                # The example reaches this case only through its projection; replay that hop,
+                # then probe that deleting its LAST structural line (contract §5) leaves it. Body
+                # lines hold no `:` (the grammar), so that line is the last one carrying one.
+                key_ok = (
+                    self._case_key_text(
+                        program, str(example["input_json"]), str(example["input_hash"])
+                    )
+                    == input_json.text
+                )
+                raw = parse_json(str(example["input_json"])).value
+                probe_ok = False
+                if type(raw) is dict and type(raw.get(program.text)) is str:
+                    lines = str(raw[program.text]).replace("\r\n", "\n").split("\n")
+                    last = max(i for i, line in enumerate(lines) if ":" in line)
+                    probed = {**raw, program.text: "\n".join(lines[:last] + lines[last + 1 :])}
+                    projected = project(program, probed)
+                    probe_ok = not projected.matched or (
+                        projected.key is not None and projected.key.text != input_json.text
+                    )
+                test(
+                    f"structure:{example['id']}",
+                    str(example["id"]),
+                    probe_ok,
+                    "a structural edit leaves the case",
+                )
+                if not probe_ok:
+                    failures.append("a structural edit kept the projected key")
             execution = execute(
                 artifact,
                 partition=partition,
@@ -4032,7 +4598,8 @@ class System:
                 input_json=input_json,
             )
             ok = (
-                execution.matched
+                key_ok
+                and execution.matched
                 and canonicalize(execution.output).text == str(example["output_json"])
                 and str(example["output_json"]) == expected_output
             )
@@ -4186,6 +4753,13 @@ class System:
             str,
             tuple[sqlite3.Row, sqlite3.Row, FunctionEntry],
         ] = {}
+        build_program = self._build_program(
+            connection, partition=partition, operation=operation, revision=revision
+        )
+        build_program_hash = None if build_program is None else build_program.program_hash
+        # Members built under another program leave the set (contract §5: replaced, never
+        # mixed); a candidate on the same key replaces one, the rest retire as superseded.
+        superseded: dict[str, sqlite3.Row] = {}
         for row in promoted_rows:
             artifact_id = str(row["id"])
             if row["operation_revision"] != revision:
@@ -4195,8 +4769,11 @@ class System:
             if row["policy_json"] != policy_json or row["policy_hash"] != policy_hash:
                 raise IntegrityError(f"promoted artifact {artifact_id} has stale operation policy")
             input_hash = str(row["input_hash"])
-            if input_hash in retained:
+            if input_hash in retained or input_hash in superseded:
                 raise IntegrityError(f"multiple promoted artifacts claim input {input_hash}")
+            if row["projection_hash"] != build_program_hash:
+                superseded[input_hash] = row
+                continue
             report, function_entry = self._function_promotion_entry(
                 connection,
                 row,
@@ -4213,49 +4790,26 @@ class System:
             """,
             (partition, operation, revision),
         ).fetchall()
-        canonical_inputs: dict[str, str] = {}
-        for group in connection.execute(
-            """
-            SELECT e.input_hash, e.input_json
-            FROM examples AS e
-            LEFT JOIN example_revocations AS x ON x.example_id = e.id
-            WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
-              AND x.example_id IS NULL
-            GROUP BY e.input_hash, e.input_json
-            ORDER BY e.input_hash, e.input_json
-            """,
-            (partition, operation, revision),
-        ):
-            input_hash = str(group["input_hash"])
-            input_json = str(group["input_json"])
-            previous = canonical_inputs.get(input_hash)
-            if previous is not None and previous != input_json:
-                raise IntegrityError("one input digest maps to multiple canonical inputs")
-            canonical_inputs[input_hash] = input_json
-
+        # The same enumerator compile uses: eligibility is reconstruction under the
+        # build-current program, so a set never mixes programs (contract §5).
+        projections: dict[str, _CurrentBuild | _BlockedBuild] = {
+            key_hash: build
+            for key_hash, _, build in self._current_build_projections(connection, registered)
+            if key_hash
+        }
         candidates: dict[
             str,
             tuple[sqlite3.Row, sqlite3.Row, FunctionEntry],
         ] = {}
         skipped: list[dict[str, JSONValue]] = []
-        projections: dict[str, _CurrentBuild | _BlockedBuild] = {}
         for row in verified_rows:
             artifact_id = str(row["id"])
             input_hash = str(row["input_hash"])
-            canonical_input = canonical_inputs.get(input_hash)
-            if canonical_input is None:
+            projection = projections.get(input_hash)
+            if projection is None:
                 raise IntegrityError(
                     f"current-revision verified artifact {artifact_id} has no canonical input"
                 )
-            projection = projections.get(input_hash)
-            if projection is None:
-                projection = self._project_current_build(
-                    connection,
-                    registered,
-                    input_hash,
-                    canonical_input,
-                )
-                projections[input_hash] = projection
             eligible = (
                 type(projection) is _CurrentBuild
                 and row["input_json"] == projection.input_json.text
@@ -4284,6 +4838,17 @@ class System:
             )
             candidates[input_hash] = (row, report, function_entry)
 
+        dropped: list[str] = []
+        for input_hash, row in sorted(superseded.items()):
+            if input_hash not in candidates:
+                dropped.append(str(row["id"]))
+                skipped.append(
+                    {
+                        "artifact_id": str(row["id"]),
+                        "input_hash": input_hash,
+                        "reason": "projection-superseded",
+                    }
+                )
         for input_hash, (row, _, _) in sorted(retained.items()):
             if input_hash not in candidates and self._contradicted(connection, row):
                 raise StateError(
@@ -4298,6 +4863,11 @@ class System:
             row, report, function_entry = final[input_hash]
             candidate = input_hash in candidates
             predecessor = retained.get(input_hash)
+            replaced = (
+                str(predecessor[0]["id"])
+                if predecessor is not None
+                else (str(superseded[input_hash]["id"]) if input_hash in superseded else None)
+            )
             planned.append(
                 _FunctionPromotionPlanEntry(
                     row=row,
@@ -4310,11 +4880,7 @@ class System:
                         output_hash=str(row["output_hash"]),
                         entry_seal=function_entry.entry_seal,
                         disposition="candidate" if candidate else "retained",
-                        replaces_artifact_id=(
-                            str(predecessor[0]["id"])
-                            if candidate and predecessor is not None
-                            else None
-                        ),
+                        replaces_artifact_id=replaced if candidate else None,
                     ),
                 )
             )
@@ -4325,6 +4891,7 @@ class System:
             operation_revision=revision,
             policy_hash=policy_hash,
             entries=(entry.function_entry for entry in planned_entries),
+            projection=build_program,
         )
         public_entries = tuple(entry.public for entry in planned_entries)
         skipped_entries = tuple(skipped)
@@ -4368,6 +4935,7 @@ class System:
             ),
             policy_hash=policy_hash,
             entries=planned_entries,
+            dropped=tuple(dropped),
         )
 
     def inspect_function_promotion(
@@ -4428,6 +4996,7 @@ class System:
                         for entry in locked.entries
                         if entry.public.replaces_artifact_id is not None
                     }
+                    | set(locked.dropped)
                 )
             )
             for artifact_id in retired_ids:
@@ -4511,7 +5080,7 @@ class System:
                 "retired_count": len(retired_ids),
                 "promoted_by": promoted_by,
                 "promoted_at_us": now,
-                "projection_hash": None,
+                "projection_hash": locked.manifest.document.projection_hash,
             }
             receipt_hash = _function_receipt_hash(receipt_fields)
             connection.executemany(
@@ -4541,8 +5110,8 @@ class System:
                     function_hash, membership_hash, member_count,
                     candidate_artifact_ids_hash, candidate_count,
                     retired_artifact_ids_hash, retired_count, promoted_by,
-                    promoted_at_us, receipt_hash
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    promoted_at_us, receipt_hash, projection_hash
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     receipt_id,
@@ -4560,6 +5129,7 @@ class System:
                     promoted_by,
                     now,
                     receipt_hash,
+                    locked.manifest.document.projection_hash,
                 ),
             )
             member_projection = _id_list_projection(member_ids)
@@ -4621,6 +5191,10 @@ class System:
             ).fetchone()
             if row is None:
                 raise NotFoundError("artifact does not exist in this partition")
+            if row["projection_hash"] is not None:
+                # A projected entry joins a function only through set promotion, which keeps one
+                # program per set (contract §5); a lone entry has no program to carry.
+                raise StateError("a projected artifact is promoted with function promote")
             if row["status"] != "verified" or not row["verified_report_id"]:
                 raise StateError("artifact must have a current passing verification report")
             if row["scope_hash"] != scope_hash:
@@ -4727,6 +5301,58 @@ class System:
 
     # -- drift, revocation, inspection --------------------------------------
 
+    def _promoted_for_input(
+        self,
+        connection: sqlite3.Connection,
+        partition: str,
+        operation: str,
+        revision: int,
+        input_json: CanonicalJSON,
+    ) -> list[tuple[sqlite3.Row, CanonicalJSON]]:
+        """Promoted artifacts of the revision whose case this raw input reaches, with its key.
+
+        Exact artifacts match the input itself; a projected artifact matches the key its OWN
+        program maps the input to (X7), so a challenge on a raw form reaches the case it hits.
+        """
+
+        found = [
+            (row, input_json)
+            for row in connection.execute(
+                """
+                SELECT * FROM artifacts
+                WHERE partition = ? AND operation = ? AND operation_revision = ?
+                  AND input_hash = ? AND status = 'promoted' AND projection_hash IS NULL
+                """,
+                (partition, operation, revision, input_json.digest),
+            )
+        ]
+        for (program_hash,) in connection.execute(
+            """
+            SELECT DISTINCT projection_hash FROM artifacts
+            WHERE partition = ? AND operation = ? AND operation_revision = ?
+              AND status = 'promoted' AND projection_hash IS NOT NULL
+            ORDER BY projection_hash
+            """,
+            (partition, operation, revision),
+        ).fetchall():
+            program = self._program_by_hash(connection, str(program_hash))
+            projected = None if program is None else project(program, input_json.value)
+            if projected is None or not projected.matched or projected.key is None:
+                continue
+            key = projected.key
+            found.extend(
+                (row, key)
+                for row in connection.execute(
+                    """
+                    SELECT * FROM artifacts
+                    WHERE partition = ? AND operation = ? AND operation_revision = ?
+                      AND input_hash = ? AND status = 'promoted' AND projection_hash = ?
+                    """,
+                    (partition, operation, revision, key.digest, program_hash),
+                )
+            )
+        return found
+
     def challenge(
         self,
         partition: str,
@@ -4760,14 +5386,12 @@ class System:
             if registered is None:
                 raise NotFoundError("operation is not registered in this partition")
             revision = int(registered["revision"])
-            rows = connection.execute(
-                """
-                SELECT * FROM artifacts
-                WHERE partition = ? AND operation = ? AND operation_revision = ?
-                  AND input_hash = ? AND status = 'promoted'
-                """,
-                (partition, operation, revision, input_json.digest),
-            ).fetchall()
+            rows = [
+                row
+                for row, _ in self._promoted_for_input(
+                    connection, partition, operation, revision, input_json
+                )
+            ]
             for row in rows:
                 try:
                     self._artifact_from_row(row)
@@ -4806,16 +5430,9 @@ class System:
             if registered is None:
                 raise NotFoundError("operation is not registered in this partition")
             revision = int(registered["revision"])
-            rows = connection.execute(
-                """
-                SELECT * FROM artifacts
-                WHERE partition = ? AND operation = ? AND operation_revision = ?
-                  AND input_hash = ? AND status = 'promoted'
-                """,
-                (partition, operation, revision, input_json.digest),
-            ).fetchall()
+            keyed = self._promoted_for_input(connection, partition, operation, revision, input_json)
             matches: list[tuple[sqlite3.Row, CanonicalJSON]] = []
-            for row in rows:
+            for row, key in keyed:
                 artifact = self._artifact_from_row(row)
                 self._validate_promoted(connection, row)
                 execution = execute(
@@ -4823,7 +5440,7 @@ class System:
                     partition=partition,
                     operation=operation,
                     operation_revision=revision,
-                    input_json=input_json,
+                    input_json=key,
                 )
                 if execution.matched:
                     matches.append((row, canonicalize(execution.output)))
@@ -5408,8 +6025,7 @@ class System:
         if revoked is not None:
             raise IntegrityError("promoted artifact depends on revoked evidence")
 
-    @staticmethod
-    def _contradicted(connection: sqlite3.Connection, row: sqlite3.Row) -> bool:
+    def _contradicted(self, connection: sqlite3.Connection, row: sqlite3.Row) -> bool:
         """Whether an active example of the artifact's case confirms a different output.
 
         A legitimate ledger state since review stopped auto-suspending (contract §3): the live set
@@ -5417,30 +6033,51 @@ class System:
         challenges grade integrity alone and never report it as corruption.
         """
 
-        counterexample = connection.execute(
+        if row["projection_hash"] is None:
+            counterexample = connection.execute(
+                """
+                SELECT e.id FROM examples AS e
+                LEFT JOIN example_revocations AS x ON x.example_id = e.id
+                WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
+                  AND e.input_hash = ? AND e.input_json = ?
+                  AND e.output_json <> ? AND x.example_id IS NULL
+                LIMIT 1
+                """,
+                (
+                    row["partition"],
+                    row["operation"],
+                    row["operation_revision"],
+                    row["input_hash"],
+                    row["input_json"],
+                    row["output_json"],
+                ),
+            ).fetchone()
+            return counterexample is not None
+        # X7: under a program, contrary evidence is any active example of the revision whose
+        # PROJECTED key is this artifact's key with a different output; a raw input equal to the
+        # key text is NoMatch under its program, so raw equality alone never contradicts.
+        program = System._program_by_hash(connection, str(row["projection_hash"]))
+        assert program is not None  # noqa: S101 — narrowing only: the hash is non-null
+        for example in connection.execute(
             """
-            SELECT e.id FROM examples AS e
+            SELECT e.input_json, e.input_hash, e.output_json FROM examples AS e
             LEFT JOIN example_revocations AS x ON x.example_id = e.id
             WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
-              AND e.input_hash = ? AND e.input_json = ?
               AND e.output_json <> ? AND x.example_id IS NULL
-            LIMIT 1
+              AND NOT EXISTS (SELECT 1 FROM examples AS s WHERE s.supersedes_example_id = e.id)
             """,
-            (
-                row["partition"],
-                row["operation"],
-                row["operation_revision"],
-                row["input_hash"],
-                row["input_json"],
-                row["output_json"],
-            ),
-        ).fetchone()
-        return counterexample is not None
+            (row["partition"], row["operation"], row["operation_revision"], row["output_json"]),
+        ):
+            key = self._case_key_text(
+                program, str(example["input_json"]), str(example["input_hash"])
+            )
+            if key == row["input_json"]:
+                return True
+        return False
 
-    @staticmethod
-    def _validate_live_promoted(connection: sqlite3.Connection, row: sqlite3.Row) -> None:
+    def _validate_live_promoted(self, connection: sqlite3.Connection, row: sqlite3.Row) -> None:
         System._validate_promoted(connection, row)
-        if System._contradicted(connection, row):
+        if self._contradicted(connection, row):
             raise IntegrityError("promoted artifact conflicts with active evidence")
 
     @staticmethod
@@ -5468,6 +6105,9 @@ class System:
             support=int(row["support"]),
             reviewer_count=int(row["reviewer_count"]),
             span_seconds=int(row["span_seconds"]),
+            projection_digest=(
+                None if row["projection_hash"] is None else str(row["projection_hash"])
+            ),
         )
         if expected_build != row["build_hash"]:
             raise IntegrityError("artifact build digest mismatch")

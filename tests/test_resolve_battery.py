@@ -331,6 +331,7 @@ class ResolveBatteryTests(unittest.TestCase):
                 ("current-promotion-receipts", True),
                 ("function-hash-matches-snapshot", True),
                 ("persisted-function-receipt", True),
+                ("projection-uniform", True),
             ),
         )
         self.assertEqual(
@@ -373,7 +374,7 @@ class ResolveBatteryTests(unittest.TestCase):
         self.assertEqual(rejected.verification.entries, 3)
         self.assertEqual(
             tuple(check.passed for check in rejected.verification.checks),
-            (False, False, False, False, False, False),
+            (False, False, False, False, False, False, False),
         )
         self.assertIsNone(rejected.verification.document)
         self.assertIsNone(rejected.match)
@@ -978,7 +979,7 @@ class ResolveBatteryTests(unittest.TestCase):
 
         self.assertTrue(resolution.verification.passed)
         self.assertEqual(
-            tuple(check.key for check in resolution.verification.checks)[-1],
+            tuple(check.key for check in resolution.verification.checks)[-2],
             "persisted-function-receipt",
         )
         self.assertEqual(sixth_check_states, [True])

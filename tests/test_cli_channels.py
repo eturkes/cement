@@ -3137,9 +3137,9 @@ class CliChannelTests(unittest.TestCase):
         self.assertEqual(counts, {"fast": 0, "cheap": 0})
         self.assertEqual(affirmative_cached, [])
         self.assertTrue(
-            "full six-check verification" in scoped
+            "full seven-check verification" in scoped
             or "full verification" in scoped
-            or "six checks" in scoped
+            or "seven checks" in scoped
         )
         self.assertTrue(
             "caches no verification between calls" in scoped

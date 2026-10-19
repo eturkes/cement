@@ -40,7 +40,7 @@ propose / submit_proposal → LLM candidate, hidden from the consumer
   resolution, time, and receipt digest.
 - Compilation is deterministic and model-free. Conflicts block builds; no majority vote hides them.
 - Verification replays every active example in the exact scope plus partition, operation, revision,
-  and input boundary probes. Set verification adds six ordered checks over the complete promoted set.
+  and input boundary probes. Set verification adds seven ordered checks over the complete promoted set.
 - Promotion names the verified scope hash and atomically rechecks operation policy, artifact content,
   the complete evidence snapshot, and the sealed verification test set. Its receipt binds all of
   those values; retirement and suspension are one-way states. Set promotion repeats one function hash,
@@ -60,7 +60,7 @@ The promoted artifacts of one operation aggregate into a single portable object:
   expected hash also pins caller-held identity. Neither mode proves origin or supplies a signature.
 - Function identity is verified-content identity. The promoter and the promotion time never change the
   `function_hash`; the promotion receipt keeps that provenance separate.
-- `verify_function` is read-only. It returns six ordered checks over one snapshot of
+- `verify_function` is read-only. It returns seven ordered checks over one snapshot of
   the complete promoted set. The sixth check requires the latest persisted receipt to bind that
   snapshot, so individually valid artifacts cannot pass as a set without a current checkpoint.
 - An exported bundle evaluates with no ledger, no adapter, and no LLM. It stays deterministic after the
@@ -135,7 +135,7 @@ promotes them automatically.
 | `show` | Report the receipt anchor beside the current operation state. |
 | `receipts` | Page the receipt history in descending sequence order. |
 | `verify-drafts` | Verify every current-build draft in one locked transaction. |
-| `verify` | Run the six ordered checks over the current promoted set. |
+| `verify` | Run the seven ordered checks over the current promoted set. |
 | `inspect` | Preview the prospective set and return its function hash. |
 | `promote` | Promote the whole set atomically against a repeated hash. |
 | `export` | Emit bundle bytes for the live set or for a historical receipt. |
@@ -146,7 +146,7 @@ promotes them automatically.
 
 Pass `--expected-function-hash` to `function verify` to pin the verified snapshot. The check then fails
 on set growth and on any other drift. That result is one read snapshot, not a lease. A later export can
-still see a different set. [docs/architecture.md](docs/architecture.md) names the six checks in their
+still see a different set. [docs/architecture.md](docs/architecture.md) names the seven checks in their
 returned order.
 
 A newly registered operation starts with its switch `off`, so `resolve` answers nothing until a
@@ -200,7 +200,7 @@ The command prints the same eight keys in every state:
 | `passed` | The verification verdict over the promoted set. |
 | `entries` | The number of entries in the verified set. |
 | `function_hash` | The digest of the verified set. It survives a failed verdict as a diagnostic. |
-| `checks` | The six ordered checks, each with `key`, `passed`, and `detail`. |
+| `checks` | The seven ordered checks, each with `key`, `passed`, and `detail`. |
 | `matched` | `true` for an answer, `false` for a verified absence, `null` for a failed verdict. |
 | `output` | The answer. It is `null` unless `matched` is `true`. |
 | `artifact_hash` | The digest of the answering artifact. It is `null` unless `matched` is `true`. |
@@ -210,8 +210,8 @@ Status 0 means `matched` is `true`. Status 6 covers both other states, and `matc
 verified absence reports `false`, and a failed verdict reports `null`. An unregistered operation is
 status 3. An empty promoted set is not an error: it verifies and reports a verified absence.
 
-One resolve runs the full six-check verification, so it costs what `function verify` costs. Measured
-end to end through the shipped method: 5.7 ms for one entry, 613 ms for 1,000 entries, and 36,452 ms
+One resolve runs the full seven-check verification, so it costs what `function verify` costs. Measured
+end to end through the shipped method, in exact mode before the seventh check existed: 5.7 ms for one entry, 613 ms for 1,000 entries, and 36,452 ms
 with 985,696 KiB peak resident memory at the 50,000-entry maximum
 (`.agent/decisions/m3u2b-resolve-bench.json`). The cost grows with the size of the set, not with the
 size of the input. Cement caches no verification between calls.
@@ -390,7 +390,7 @@ is negative. The leaf names the object, and the object selects the payload chann
 | Leaf | Exit-6 answer | Payload |
 |---|---|---|
 | `function verify-drafts` | The batch completed and at least one report failed. | `stdout` |
-| `function verify` | At least one of the six set checks failed. | `stdout` |
+| `function verify` | At least one of the seven set checks failed. | `stdout` |
 | `function export` | The live set is unverified, so no bundle bytes exist. | `stderr` |
 | `function eval` | The bundle holds no exact case for the canonical input. | `stdout` |
 

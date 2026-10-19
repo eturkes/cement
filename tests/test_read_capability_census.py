@@ -34,39 +34,102 @@ def _writes(call: ast.Call) -> bool:
 
 
 def _sql_values(expression: ast.AST, *, scope: ast.AST) -> list[str] | None:
-    if isinstance(expression, ast.Constant) and isinstance(expression.value, str):
-        return [expression.value]
-    if isinstance(expression, ast.JoinedStr):
-        return ["".join(p.value for p in expression.values if isinstance(p, ast.Constant))]
-    if not isinstance(expression, ast.Name):
-        return None
     parents = {child: parent for parent in ast.walk(scope) for child in ast.iter_child_nodes(parent)}
-    owner = parents.get(expression)
-    while owner is not None and not isinstance(owner, ast.FunctionDef):
-        owner = parents.get(owner)
-    if owner is None or owner is scope:
-        return None
-    parameters = [*owner.args.posonlyargs, *owner.args.args]
-    positions = [i for i, arg in enumerate(parameters) if arg.arg == expression.id]
-    if len(positions) != 1 or any(
-        isinstance(n, ast.Name) and n.id == expression.id and not isinstance(n.ctx, ast.Load)
-        for n in ast.walk(owner)
-    ):
-        return None
-    uses = [n for n in ast.walk(scope) if isinstance(n, ast.Name) and n.id == owner.name]
-    values: list[str] = []
-    for use in uses:
-        call = parents.get(use)
-        if not isinstance(call, ast.Call) or call.func is not use:
+
+    def owner(node: ast.AST) -> ast.AST | None:
+        current = parents.get(node)
+        while current is not None and not isinstance(current, ast.FunctionDef):
+            current = parents.get(current)
+        return current
+
+    def assignment(name: ast.Name) -> ast.AST | None:
+        stores = [n for n in ast.walk(scope) if isinstance(n, ast.Name)
+                  and n.id == name.id and isinstance(n.ctx, ast.Store) and owner(n) is owner(name)]
+        if len(stores) != 1:
             return None
-        index = positions[0]
-        argument = call.args[index] if index < len(call.args) else next(
-            (k.value for k in call.keywords if k.arg == expression.id), None
-        )
-        if not isinstance(argument, ast.Constant) or not isinstance(argument.value, str):
+        statement = parents.get(stores[0])
+        if isinstance(statement, (ast.Assign, ast.AnnAssign)):
+            return statement.value
+        return None
+
+    def literal(node: ast.AST, seen: frozenset[ast.AST]) -> object:
+        if node in seen:
+            raise ValueError("cyclic constant")
+        if isinstance(node, ast.Name):
+            value = assignment(node)
+            if value is None:
+                raise ValueError("dynamic value")
+            return literal(value, seen | {node})
+        return ast.literal_eval(node)
+
+    def values(node: ast.AST, seen: frozenset[ast.AST]) -> list[str] | None:
+        if node in seen:
             return None
-        values.append(argument.value)
-    return values or None
+        seen = seen | {node}
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return [node.value]
+        if isinstance(node, ast.JoinedStr):
+            return ["".join(p.value for p in node.values if isinstance(p, ast.Constant))]
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "format":
+            templates = values(node.func.value, seen)
+            if templates is None or any(k.arg is None for k in node.keywords):
+                return None
+            try:
+                args = [literal(arg, frozenset()) for arg in node.args]
+                kwargs = {k.arg: literal(k.value, frozenset()) for k in node.keywords}
+                return [template.format(*args, **kwargs) for template in templates]
+            except (ValueError, TypeError, KeyError, IndexError, AttributeError):
+                return None
+        if not isinstance(node, ast.Name):
+            return None
+        assigned = assignment(node)
+        if assigned is not None:
+            return values(assigned, seen)
+        for loop in (n for n in ast.walk(scope) if isinstance(n, ast.For) and owner(n) is owner(node)):
+            if not isinstance(loop.target, (ast.Tuple, ast.List)):
+                continue
+            indexes = [i for i, target in enumerate(loop.target.elts)
+                       if isinstance(target, ast.Name) and target.id == node.id]
+            if len(indexes) != 1:
+                continue
+            stores = [n for n in ast.walk(scope) if isinstance(n, ast.Name)
+                      and n.id == node.id and isinstance(n.ctx, ast.Store) and owner(n) is owner(node)]
+            if stores != [loop.target.elts[indexes[0]]] or node not in set(ast.walk(loop)):
+                return None
+            try:
+                rows = literal(loop.iter, frozenset())
+                result = [row[indexes[0]] for row in rows]
+                if result and all(isinstance(value, str) for value in result):
+                    return result
+            except (ValueError, TypeError, IndexError):
+                pass
+            return None
+        function = owner(node)
+        if not isinstance(function, ast.FunctionDef) or function is scope:
+            return None
+        parameters = [*function.args.posonlyargs, *function.args.args]
+        positions = [i for i, arg in enumerate(parameters) if arg.arg == node.id]
+        if len(positions) != 1 or any(
+            isinstance(n, ast.Name) and n.id == node.id and not isinstance(n.ctx, ast.Load)
+            for n in ast.walk(function)
+        ):
+            return None
+        uses = [n for n in ast.walk(scope) if isinstance(n, ast.Name) and n.id == function.name]
+        result = []
+        for use in uses:
+            call = parents.get(use)
+            if not isinstance(call, ast.Call) or call.func is not use:
+                return None
+            index = positions[0]
+            argument = call.args[index] if index < len(call.args) else next(
+                (k.value for k in call.keywords if k.arg == node.id), None
+            )
+            if not isinstance(argument, ast.Constant) or not isinstance(argument.value, str):
+                return None
+            result.append(argument.value)
+        return result or None
+
+    return values(expression, frozenset())
 
 
 def _sql_literals(node: ast.AST) -> list[str]:
@@ -172,6 +235,17 @@ class ReadReachabilityTests(unittest.TestCase):
             self.assertEqual(_sql_literals(tree), [statement])
         dynamic = ast.parse("def outer(connection, sql):\n def query(text):\n  return connection.execute(text)\n query(sql)\n").body[0]
         self.assertEqual(_sql_literals(dynamic), ["<non-literal>"])
+        for statement in ("SELECT 1", "DELETE FROM operations"):
+            formatted = ast.parse(f"def outer(connection):\n sql = {statement!r} + ''\n connection.execute(sql)\n").body[0]
+            self.assertEqual(_sql_literals(formatted), ["<non-literal>"])
+            formatted = ast.parse(f"def outer(connection):\n sql = {statement!r}\n connection.execute(sql.format())\n").body[0]
+            self.assertEqual(_sql_literals(formatted), [statement])
+            loop = ast.parse(f"def outer(connection):\n sources = [('kind', {statement!r})]\n for kind, sql in sources:\n  connection.execute(sql)\n").body[0]
+            self.assertEqual(_sql_literals(loop), [statement])
+        reassigned = ast.parse("def outer(connection):\n sources = [('kind', 'SELECT 1')]\n for kind, sql in sources:\n  sql = 'DELETE FROM operations'\n  connection.execute(sql)\n").body[0]
+        self.assertEqual(_sql_literals(reassigned), ["<non-literal>"])
+
+
 
 
     def test_the_census_still_finds_the_surface_it_was_measured_against(self) -> None:

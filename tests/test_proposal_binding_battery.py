@@ -198,6 +198,21 @@ def _record_sql() -> typing.Iterator[
         yield records, connection_ids
 
 
+def _projection_reads(function: object) -> set[str]:
+    import textwrap
+
+    tree = ast.parse(textwrap.dedent(inspect.getsource(function)))
+    return {
+        _normalized_sql(node.args[0].value)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "execute" and node.args
+        and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str)
+        and ("FROM projection_settings" in node.args[0].value
+             or "projection_hash IS NOT NULL" in node.args[0].value)
+    }
+
+
 def _prose_without_fences(text: str) -> str:
     return re.sub(r"```.*?```", "", text, flags=re.DOTALL)
 
@@ -2650,7 +2665,10 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                     len(_request_statements(records)),
                     adapter_spy.call_count,
                 )
-                self.assertEqual(actual, counts)
+                added = _projection_reads(System._build_program) if path == "function_report" else set()
+                observed = [_normalized_sql(record[3]) for record in records if _normalized_sql(record[3]) in added]
+                self.assertEqual(sorted(observed), sorted(added))
+                self.assertEqual(actual, (counts[0] + len(added), counts[1] + len(added), *counts[2:]))
                 self.assertEqual(adapter_spy.call_count, 1)
                 self.assertEqual(
                     len(_request_statements(records)),
@@ -2692,13 +2710,16 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                             decision=decision,
                             **arguments,
                         )
+                added = _projection_reads(System.review) if decision != "reject" else set()
+                observed = [_normalized_sql(record[3]) for record in records if _normalized_sql(record[3]) in added]
+                self.assertEqual(sorted(observed), sorted(added))
                 self.assertEqual(
                     (
                         len(records),
                         len(_application_statements(records)),
                         len(_request_statements(records)),
                     ),
-                    counts,
+                    (counts[0] + len(added), counts[1] + len(added), counts[2]),
                 )
                 self.assertEqual(reader_spy.call_count, 1)
                 self.assertEqual(writer_spy.call_count, 1)

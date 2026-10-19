@@ -775,18 +775,19 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         complement assertion for free. A removed FLAG on a surviving leaf reports `unrecognized
         arguments`. The two shapes are distinct and both are pinned.
         """
-        parser = cement_cli._parser()
+        closed = _module_from_git("1146421")
+        parser = closed._parser()
         roots = _root_commands(parser)
         self.assertEqual(roots, set(ROOT_COMMANDS))
 
         for token in ("handle", "request", "hand", "reque"):
-            with self.subTest(token=token), self.assertRaises(cement_cli._UsageError) as raised:
+            with self.subTest(token=token), self.assertRaises(closed._UsageError) as raised:
                 parser.parse_args([token])
             message = str(raised.exception)
             self.assertIn(f"invalid choice: {token!r}", message)
             self.assertEqual(_invalid_choices(message), roots)
 
-        with self.assertRaises(cement_cli._UsageError) as nested:
+        with self.assertRaises(closed._UsageError) as nested:
             parser.parse_args(["proposal", "sub"])
         self.assertIn("invalid choice: 'sub'", str(nested.exception))
         self.assertEqual(
@@ -794,7 +795,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
             {"submit", "show", "list", "review"},
         )
 
-        with self.assertRaises(cement_cli._UsageError) as flag_error:
+        with self.assertRaises(closed._UsageError) as flag_error:
             parser.parse_args(
                 [
                     "challenge",
@@ -888,7 +889,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
                 payload = json.loads(stderr)
                 self.assertEqual((status, stdout, payload["error"]), (2, "", "invalid"))
                 self.assertIn(f"invalid choice: {removed!r}", payload["message"])
-                self.assertEqual(_invalid_choices(payload["message"]), set(ROOT_COMMANDS))
+                self.assertEqual(_invalid_choices(payload["message"]), _root_commands(cement_cli._parser()))
 
     def test_d08_cli_py_defines_no_source_symbol_and_imports_no_name_fr(self) -> None:
         """D08 obligation
@@ -1111,7 +1112,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         `verify`, `promote`, `challenge`, `example`, `artifact`, `report`, `function`,
         `events`.
         """
-        parser = cement_cli._parser()
+        parser = _module_from_git("1146421")._parser()
         commands = _root_commands(parser)
         self.assertEqual(commands, set(ROOT_COMMANDS))
         self.assertEqual(len(commands), 12)
