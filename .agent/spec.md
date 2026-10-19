@@ -9,11 +9,12 @@ Production artifact = a library + CLI control plane that an interface like Open 
 ## Artifacts
 
 Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
-- Prototype web UI demo `prototype/webui-demo/` — `uv run python prototype/webui-demo/app.py` → <http://127.0.0.1:8765/>.
+- Library `src/cement_runtime/` (`from cement_runtime import System`) + CLI `uv run cement --help` (README quick start = register → submit → review as `learning-pass` → compile → `function verify-drafts/inspect/promote` → `function switch` → `resolve`; `projection test/set/show`, `learn cases`, `function versions/diff/export/eval`).
+- Learning pass skill `skills/cement-learn/` (`SKILL.md` + `references/`), run by an operator with an Agent Skills runtime; it never switches a function on.
+- Examples: hospital OCR `uv run python examples/hospital_ocr/run_demo.py` (`All checks passed.`; transcript updater `.agent/decisions/m3u8-transcript.py`); Open WebUI `examples/open_webui/` (tool + filter; real 0.12.3 smoke `.agent/decisions/m5u3-smoke.py`); command candidate source `examples/command_source/`.
+- Prototype web UI demo, home = `prototype/webui-demo/` (owner-ruled, KEPT under PROTOTYPE law) — `uv run python prototype/webui-demo/app.py` → <http://127.0.0.1:8765/>.
   - Density grade: `node prototype/webui-demo/density.mjs '<url>'` at `?reset=1` + after `capture.sh` (both need `CHROMIUMFISH_DIR`, prototype README).
-- Library `src/cement_runtime/` (`from cement_runtime import System`) + CLI `uv run cement --help` (README quick start = the lifecycle: `operation register` → `proposal submit/review` → `compile` → `function verify-drafts/inspect/promote/verify/export/eval`, `resolve`).
-- Hospital OCR example — `uv run python examples/hospital_ocr/run_demo.py` (`All checks passed.`; README transcript pinned).
-- Gate — `.agent/gate` = `uv run python -m unittest discover -s tests -t .` (1036 tests; wall time = non-D28 tests + one replay per range revision without a green verdict, p78) + `uv build` + `.agent/spec-lint`, per-step wall-clock printed; fast gate = `.agent/gate <tests.module …>` (→ `.claude/rules/ops.md`). Instruments = `.agent/decisions/m<m>u<u>-*`.
+- Gate — `.agent/gate` = format, lint, types, audit, secrets, skips, register, unittest (`discover -s tests -t .`, 1233 tests; wall time = non-D28 tests + one replay per range revision without a green verdict, p78), build, spec-lint; per-step rc + wall-clock; `--omit-d28` = CI's split legs; fast gate = `.agent/gate <tests.module …>` (→ `.claude/rules/ops.md`). CI = `.github/workflows/gate.yml`; Dependabot = `.github/dependabot.yml`. Instruments = `.agent/decisions/m<m>u<u>-*`.
 
 ## Decisions
 
@@ -147,7 +148,6 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 - [x] 92a162e M3.9a docs claim ledger rewrite (`docs`): README paragraph 1 + `docs/` + CLI help follow `Intent`; README install/run/configure current for everything shipped.
 - [x] baf2743 M3.9b independent replay of the M3.9a rewrite (`docs`).
 - [ ] README + prototype disposition: `prototype/webui-demo` stays at `prototype/` (owner-ruled) → `Artifacts`.
-  - Resume point: IMPLEMENT resumes here — the disposition row, rules upkeep, then the phase-close review (tables seeded in `.scratch/review/phase/`, machine-local).
 - [ ] Phase-close review over the whole phase diff: every lens, one `reviewer` per lens + MAIN's security lens.
   - Runs LAST, after the close's rules upkeep (`CLAUDE.md` `Rules upkeep`), nothing mutating after it; each unit's closing diff draws its OWN pass first (`reviewer` count per `Session flow` Teammates where MAIN dispatches), every pass adjudicated into `.agent/review.md` ⇒ never the only pass.
 - Queue = `.agent/deferred.md` (`p<nn>`, one entry + acceptance each, unattached; p01-p61 keep full text + evidence + grounds in `.agent/archive/polish.md`, a born row's entry is its whole record; grader `uv run python .agent/decisions/m3-deferred-validate.py`); a bare `p<nn>` in a row = that unit owns the queue row.
