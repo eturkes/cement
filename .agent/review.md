@@ -15,6 +15,23 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## M3.8 close (IMPLEMENT, unit, tier `data`) — target `ef06a25` (squash of `archive/m3u8-land`; review read `7b71982`), records in the next commit
+
+Check set fixed before the diff was read, all lenses in one `reviewer` (data unit): D1 structural validator (the transcript updater), D2 live spot-check (the demo), D3 the lifecycle told, D4 masks, D5 test repairs, C1-C3 code lenses (reviewer-28). Raw table: `.scratch/review/m3u8/table.md`.
+
+| id | lens | verdict | ruling (MAIN-verified) |
+|---|---|---|---|
+| D1 | validator | pass | `.agent/decisions/m3u8-transcript.py` twice → byte-identical README; a planted drift → `--check` rc 1, no write. |
+| D2 | spot-check | pass | `uv run python examples/hospital_ocr/run_demo.py` ×2 → `All checks passed.`; printed acts match the transcript after masking. |
+| D3 | lifecycle | pass | raw requests → pending proposals → scripted learning pass (projection, compile, verify, promote) → switch off → follow → v2 → pin v1 → export + offline eval. |
+| D4 | masks | pass | every per-run value masked with a count pin. |
+| D5 | repairs | pass | 29 original ids kept + 6 new (35); 10 body repairs + 7 retargets keep their obligations; the six new pins red at 04646cb (failures=1 errors=5). |
+| C1-C3 | code lenses | pass + register | R1: the root README + architecture still told the old lifecycle → owned by M3.9a. |
+
+Red-first: `uv run python -m unittest tests.test_hospital_ocr_example.LearningWalkthroughTests tests.test_hospital_ocr_example.TranscriptUpdaterTests` at 04646cb (tag archive/m3u8-general-purpose-4) → 6 tests, errors=5 failures=1.
+
+Gate at the squash: `.agent/gate` on `ef06a25` rc 0 (clean tree, `heavy`): unittest 619.7 s, Ran 1233, outer skipped none, nested D28 = L30, D28 24 revisions / 1 replayed.
+
 ## M5.3 close (IMPLEMENT, unit) — target `097de5b` (squash of `archive/m5u3-land`; review read `c22ef68`, re-review `74a19df`), records in the next commit
 
 Check set fixed before the diff was read: correctness (reviewer-25: contract §7 E1-E4, X6 capture binding, the smoke record), cleanup (reviewer-26), altitude (reviewer-27), security S1-S6 (MAIN). One re-review round (reviewer-29, 6 rows). Raw tables: `.scratch/review/m5u3/`, `.scratch/review/m5u3-r2/`.
