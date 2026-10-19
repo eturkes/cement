@@ -862,7 +862,7 @@ const STORY = [
     { el: "#side-hidden", title: "Behind the scenes", text: () => "What Cement does. Users never see it.", side: "left" } ] },
   { run: async () => { await select("file"); await send("q01"); }, beats: [
     { el: lastBubble, title: "An ordinary answer", text: () => "No change from an ordinary chatbot answer. Cement has nothing reusable for this yet.", side: "right" },
-    { el: "#mechanism .method", title: "The AI’s script", text: () => "To answer, the AI wrote a small script for this form. This request needed no Provider row.", side: "bottom" } ] },
+    { el: "#mechanism .method", title: "The AI’s script", text: () => "To answer, the AI wrote a small script that reads this form.", side: "bottom" } ] },
   { run: () => send("q02"), beats: [
     { el: "#mechanism .method", title: "Provider needed", text: () => "Another progress note. This time the Provider field was needed, so the script also reads that line.", side: "bottom" } ] },
   { run: learnAll, beats: [
