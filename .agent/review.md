@@ -15,6 +15,23 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## M3.7 close (IMPLEMENT, unit) — target `635a473` (squash of `archive/m3u7-land`; review read `985e071`), records in the next commit
+
+Check set fixed before the diff was read, one `reviewer` per lens: correctness C1-C5 + battery R1-R5 (reviewer-22), cleanup L1-L4 (reviewer-23), altitude AL1-AL4 (reviewer-24). Raw tables: `.scratch/review/m3u7/`.
+
+| id | lens | verdict | ruling (MAIN-verified) |
+|---|---|---|---|
+| R5 / AL3 register | p54 | finding F1 (major) → fixed | the README's one block built a `CommandCandidateSource` + `System` and never ran the stub (audit hook: 0 adapter launches); R5 asserted class names only (reviewer-22 F1, reviewer-24 R1). The block now calls `source.propose(...)` and the README states the printed echo; R5 runs the block and asserts the stated output. New R5 against the `985e071` README → `ValueError` (no stated output). |
+| R3 | core keeps the protocol alone | finding F2 (major) → fixed | R3 rejected the literal name only: the base `source.py` restored with its class renamed `LegacyCommandSource` left all five tests green. R3 now pins the module's structure (docstring + 3 imports + the one `CandidateSource` class) and a second R3 frame pins `subprocess`/`signal` absent from every core module; the renamed restore → 2 failures. |
+| R1, R2, R4 | relocation | pass | 8 isolated undo controls (reviewer-22) each red: supervisor + stub bytes, class span, protocol span, export list, static + fresh-process reverse import. |
+| C1-C5 | correctness | pass | relocated class span byte-identical; supervisor launched by file name beside it; burden repairs (test_source, test_cli_channels, test_cli_channels_battery, test_cli_removal_battery, test_submission_battery, test_lifecycle_removal_battery, test_outcome_removal_battery) keep their obligations. Register G1: tripwire-locus drift predates M3.7 (p63). |
+| L1-L4 | cleanup | pass + register | Q1: `example_adapter.py:1` says "Installed protocol stub"; byte equality (R1) freezes it → ruled no change this unit. |
+| AL1, AL2, AL4 | altitude | pass | no shim or re-export; `__all__` 51 → 50 (exactly `CommandCandidateSource`); 35 CLI nodes / 28 leaves byte-identical; wheel = `cement_runtime` alone, sdist carries `examples/command_source/`. |
+
+Red-first: `tests/test_relocation_battery.py` at fa5ac87 (tag archive/m3u7-red = 93007ac + the battery) → R1 ×2, R2, R5 errors + R3 failure; R4 holds at base by construction (preservation: injecting `import command_source` into a core module reds it; `.agent/mutate` cannot reach import statements → uncredited, closure control recorded).
+
+Gate at the squash: `.agent/gate` on `635a473` rc 0 (clean tree, `heavy`): unittest 818.2 s, Ran 1067, outer skipped none, nested D28 = L30, D28 17 revisions / 2 replayed.
+
 ## M3.6b close (IMPLEMENT, unit) — target `93007ac` (squash; review read `fc752eb`, the same unit on the pre-squash M3.6a3 lineage), records in the next commit
 
 Check set fixed before the diff was read: the three code lenses of `CLAUDE.md` `Engineering`
