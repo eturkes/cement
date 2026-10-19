@@ -131,7 +131,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         path = self.path.split("?", 1)[0]
         actions = {
-            "/api/send": lambda body: session().send(str(body["request_id"])),
+            "/api/send": lambda body: session().send(
+                str(body["request_id"]), bool(body.get("fast"))
+            ),
             "/api/select": lambda body: session().select(str(body["scenario"])),
             "/api/review": lambda body: session().review(
                 str(body["proposal_id"]), str(body["decision"])

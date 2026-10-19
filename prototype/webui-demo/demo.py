@@ -1043,7 +1043,7 @@ class Session:
 
     # -- chat --
 
-    def send(self, request_id: str) -> None:
+    def send(self, request_id: str, fast: bool = False) -> None:
         """Send one request from the intake desk into the assistant.
 
         One turn can need several operations. Each part is tried against the promoted
@@ -1105,7 +1105,8 @@ class Session:
                 for part in unanswered
             ]
 
-        if self._closed.wait(delay):
+        # `fast` = a story replay (the tour's Back): same sampled latency on record, no sleep.
+        if self._closed.wait(0 if fast else delay):
             return
 
         with self._lock:

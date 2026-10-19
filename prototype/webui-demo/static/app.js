@@ -132,7 +132,9 @@ function stopPolling() {
   POLL = null;
 }
 
-const send = (id) => call("/api/send", { request_id: id });
+/* FAST = replaying the story for Back: the server skips the simulated model wait. */
+let FAST = false;
+const send = (id) => call("/api/send", { request_id: id, fast: FAST });
 const select = (id) => call("/api/select", { scenario: id });
 const review = (proposalId, decision) =>
   call("/api/review", { proposal_id: proposalId, decision });
@@ -895,6 +897,7 @@ function tour() {
       overlayClickBehavior: "none",
       popoverClass: "cement-pop",
       onNextClick: nextBeat,
+      onPrevClick: prevBeat,
       onCloseClick: leaveStory,
     });
   }
@@ -916,7 +919,9 @@ function showBeat() {
       description: beat.text(),
       side: beat.side,
       /* highlight() mode shows only the buttons a step lists itself. */
-      showButtons: ["next", "close"],
+      showButtons: ["previous", "next", "close"],
+      disableButtons: STORY_AT === 0 && BEAT === 0 ? ["previous"] : [],
+      prevBtnText: "Back",
       showProgress: true,
       progressText: `${STORY_AT + 1} / ${STORY.length}`,
       nextBtnText: last ? "Done" : "Next",
@@ -929,6 +934,34 @@ function nextBeat() {
   if (BEAT < STORY[STORY_AT].beats.length - 1) { BEAT += 1; showBeat(); }
   else if (STORY_AT < STORY.length - 1) advanceStory(STORY_AT + 1);
   else leaveStory();
+}
+
+/* Back inside a step = the previous beat. Across steps = reset + replay up to the previous
+   step (deterministic scripts + seeded latencies ⇒ the same state), then its last beat. */
+async function prevBeat() {
+  if (BUSY) return;
+  if (BEAT > 0) { BEAT -= 1; showBeat(); return; }
+  if (STORY_AT === 0) return;
+  const target = STORY_AT - 1;
+  if (TOUR && TOUR.isActive()) TOUR.destroy();
+  RUN += 1;
+  const run = RUN;
+  narrate("Going back…");
+  FAST = true;
+  try {
+    await call("/api/reset", {});
+    for (let index = 0; index <= target; index += 1) {
+      STORY_AT = index;
+      if (STORY[index].run) await STORY[index].run();
+      if (run !== RUN) return;
+    }
+  } finally {
+    FAST = false;
+  }
+  STORY_AT = target;
+  BEAT = STORY[target].beats.length - 1;
+  showBeat();
+  document.body.dataset.sceneDone = String(target);
 }
 
 async function advanceStory(index) {

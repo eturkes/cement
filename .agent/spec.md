@@ -60,7 +60,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   - Story = 10 steps (send, send, learn, read, switch on, tool call, reuse, more jobs, billing,
     done), each running then showing 1-3 spotlight beats (owner-ruled r10, driverjs.com as the
     reference): vendored driver.js `highlight()` on ONE element, never the header strip (r15), with a 2-3 word title + one line
-    read from live state; Next in the popover, × or `Leave the story` exits; animation off under
+    read from live state; Next + Back in the popover (Back across a step = reset + fast replay to the previous step — no model sleep, same seeded state — then its last beat), × or `Leave the story` exits; animation off under
     reduced motion; a manual click leaves it. driver.js 1.10.2 MIT,
     `static/vendor/driver.js-1.10.2/` (iife build + css + license, registry-integrity checked).
   - Right half = the latest request as three boxes `Form` (first scanned lines) → script →
