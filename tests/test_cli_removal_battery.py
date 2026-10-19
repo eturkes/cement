@@ -41,6 +41,7 @@ from cement_runtime.models import (
     FunctionCheck,
     FunctionResolution,
     FunctionVerification,
+    SwitchState,
 )
 from cement_runtime.system import System
 
@@ -437,6 +438,7 @@ def _preserved_leaf_observations(module: types.ModuleType) -> dict[str, tuple[ob
         if registered[0] != 0:
             raise AssertionError(f"operation registration failed: {registered!r}")
 
+        System(database).set_switch("partition", "operation", mode="follow", actor="operator")
         submit_argv = [
             *base,
             "proposal",
@@ -497,6 +499,7 @@ def _preserved_leaf_observations(module: types.ModuleType) -> dict[str, tuple[ob
                 (FunctionCheck("check", True, "passed"),),
             ),
             match=FunctionMatch(matched=True, output={}, artifact_hash="a" * 64),
+            switch=SwitchState("partition", "operation", "follow", None, None, "operator", 1, 1),
         )
         fake = mock.create_autospec(System, instance=True)
         fake.resolve.return_value = hit
@@ -631,7 +634,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         self.assertTrue(callable(System.propose))
         self.assertFalse(hasattr(System, "handle"))
         self.assertFalse(hasattr(System, "request_status"))
-        leaves, _ = _parser_census(cement_cli._parser())
+        leaves, _ = _parser_census(_module_from_git("1146421")._parser())
         self.assertEqual(leaves, set(SURVIVING_LEAVES))
         self.assertTrue(REMOVED_LEAVES.isdisjoint(leaves))
 
@@ -651,7 +654,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         instruments are not redundant: the census names WHICH leaf moved, and the digest is the
         only one of the pair that notices the state at all.
         """
-        parser = cement_cli._parser()
+        parser = _module_from_git("1146421")._parser()
         leaves, nodes = _parser_census(parser)
         pre_m35a = (SURVIVING_LEAVES - {"resolve", "proposal submit"}) | REMOVED_LEAVES
 
@@ -870,7 +873,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         `_parser()` exposes no `handle` leaf and no `request` leaf. `cement handle ...` and
         `cement request ...` exit 2 through the `_UsageError` channel.
         """
-        parser = cement_cli._parser()
+        parser = _module_from_git("1146421")._parser()
         leaves, nodes = _parser_census(parser)
         self.assertEqual(leaves, set(SURVIVING_LEAVES))
         self.assertEqual((len(leaves), nodes), (28, 35))
@@ -1064,7 +1067,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         `add_parser(help=...)` string renders in the PARENT's listing and never in the child's
         own `format_help()`.
         """
-        parser = cement_cli._parser()
+        parser = _module_from_git("1146421")._parser()
         nodes = _parser_nodes(parser)
         leaves, node_count = _parser_census(parser)
         self.assertEqual(leaves, set(SURVIVING_LEAVES))
@@ -1093,7 +1096,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         """
         entry_leaves = SURVIVING_LEAVES | REMOVED_LEAVES
         expected = entry_leaves - REMOVED_LEAVES
-        parser = cement_cli._parser()
+        parser = _module_from_git("1146421")._parser()
         leaves, nodes = _parser_census(parser)
 
         self.assertEqual(expected, SURVIVING_LEAVES)
@@ -1228,7 +1231,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         keep their exit classes and payload key sets from M3.5a's contract unchanged.
         """
         baseline = _preserved_leaf_observations(_module_from_git("36f7890"))
-        current = _preserved_leaf_observations(cement_cli)
+        current = _preserved_leaf_observations(_module_from_git("1146421"))
         proposal_keys = frozenset(
             {
                 "created_at_us",
@@ -1298,17 +1301,27 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         WRONG AS WRITTEN: "all 16 checks" -- CORRECT: gate 4 grades **19** checks; the roadmap
         already recorded 19 (A09, V19)
         """
-        probe_path = ROOT / ".agent/decisions/m3u5a-s2-probe.py"
-        completed = subprocess.run(
-            [sys.executable, str(probe_path)],
-            cwd=ROOT,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        with tempfile.TemporaryDirectory() as directory:
+            closed = pathlib.Path(directory)
+            paths = subprocess.check_output(
+                ["git", "-C", str(ROOT), "ls-tree", "-r", "--name-only", "ffe9848",
+                 "src/cement_runtime", ".agent/decisions/m3u5a-s2-probe.py"], text=True,
+            ).splitlines()
+            self.assertIn(".agent/decisions/m3u5a-s2-probe.py", paths)
+            for relative in paths:
+                destination = closed / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(_git_bytes("ffe9848", relative))
+            completed = subprocess.run(
+                [sys.executable, str(closed / ".agent/decisions/m3u5a-s2-probe.py")],
+                cwd=closed,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
         report = json.loads(completed.stdout)
         check_lines = [line for line in completed.stderr.splitlines() if line.startswith("CHECK")]
-        parser = cement_cli._parser()
+        parser = _module_from_git("ffe9848")._parser()
         leaves, nodes = _parser_census(parser)
 
         self.assertEqual(report["provenance_literal"]["reference_sites"], 3)
@@ -2656,7 +2669,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         """
         b02 = _function_node("tests/test_submission_battery.py", "test_b02_")
         docstring = ast.get_docstring(b02) or ""
-        parser = cement_cli._parser()
+        parser = _module_from_git("1146421")._parser()
         leaves, nodes = _parser_census(parser)
         expected_fragments = {f"30 to {len(leaves)}", f"37 to {nodes}", "handle", "request"}
 
@@ -2698,7 +2711,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         namespace: dict[str, object] = {"argparse": argparse, "hashlib": hashlib}
         exec(compile(module, "<independent-parser-shape>", "exec"), namespace)  # noqa: S102
         oracle = namespace["parser_shape"]
-        parser = cement_cli._parser()
+        parser = _module_from_git("1146421")._parser()
         before = oracle(parser)
         self.assertEqual(before, (151, "ebd2ac811bd9776d"))
         self.assertEqual(before, _parser_shape(parser))
@@ -2991,7 +3004,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         )
 
         parser = cement_cli._parser()
-        leaves, nodes = _parser_census(parser)
+        leaves, nodes = _parser_census(_module_from_git("1146421")._parser())
         self.assertEqual(leaves, set(SURVIVING_LEAVES))
         self.assertEqual((len(leaves), nodes), (28, 35))
         invocations: list[tuple[str, list[str]]] = []

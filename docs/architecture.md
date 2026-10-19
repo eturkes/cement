@@ -78,7 +78,8 @@ proposals.
 
 `cement resolve OPERATION --input VALUE` calls `System.resolve`, which runs `verify_function` and then
 evaluates the verified document under that one snapshot. The leaf writes nothing and opens one read
-transaction. It prints seven fixed keys in every state. `matched` carries the distinction that the
+transaction. It prints eight fixed keys in every state. `switch` names the mode that selected the
+version: an `off` switch verifies and answers nothing. `matched` carries the distinction that the
 shared status 6 cannot. `false` is a verified absence inside a verified set. `null` is a failed
 verdict that answers nothing. A caller must not collapse the two.
 

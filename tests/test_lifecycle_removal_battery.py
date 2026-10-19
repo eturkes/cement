@@ -285,7 +285,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
         import subprocess
 
         root = Path(__file__).parents[1]
-        current = ast.parse((root / "src/cement_runtime/system.py").read_text())
+        current = ast.parse(_git_text(CLOSE_SHA, "src/cement_runtime/system.py"))
         baseline = ast.parse(
             subprocess.run(
                 ["git", "show", "da70a56:src/cement_runtime/system.py"],
@@ -612,7 +612,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
             "ReviewRequired",
         }
         expected = tuple(alias for alias in baseline if alias[0] not in removed)
-        self.assertEqual(model_imports(_system_tree()), expected)
+        self.assertEqual(model_imports(_system_tree(_git_text(CLOSE_SHA, "src/cement_runtime/system.py"))), expected)
 
     def test_l11_the_emitted_event_kind_vocabulary_is_exactly_the_sixteen(self) -> None:
         """L11. the emitted event-kind vocabulary is EXACTLY the SIXTEEN surviving kinds — `artifact.challenged`, `artifact.compiled`, `artifact.counterexample`, `artifact.integrity_quarantined`, `artifact.promoted`, `artifact.suspended`, `artifact.verification_failed`, `artifact.verified`, `example.revoked`, `function.promoted`, `operation.registered`, `operation.revised`, `proposal.accepted`, `proposal.corrected`, `proposal.created`, `proposal.rejected` — and the `request.` prefix is gone from the namespace. Assert the whole SET, not the absence of the deleted kinds: an absence assertion passes while a further kind is invented, and the project's own rule is to pin the complete vector rather than a derivative of it. Corrected by C05; the count and three of the members moved. THE DERIVATION IS TOTAL, NOT BEST-EFFORT (A09, X05): every `_event` call's `kind` argument must match one of the three ruled AST forms and must expand non-empty, and an unsupported form FAILS the check rather than being skipped. Set equality alone stays green when a fourth form (`kind=event_kind`) ships a new runtime kind, because the recognized set is unchanged. THE VOCABULARY HAS THREE SPELLINGS AND A RULE READING ONE IS BLIND TO THE REST. Every event is written by the module-level `_event(connection, *, kind=..., ...)` helper (`system.py:380`), called NINETEEN times at `da70a56` — 16 `Constant`, 2 `IfExp`, 1 `JoinedStr`, falling to FOURTEEN post-state — and its `kind` argument takes three forms: a plain string constant; an `IfExp` whose two branches are both constants (`kind="artifact.verified" if passed else "artifact.verification_failed"` at `_verify_row:4065`, `kind="artifact.counterexample" if suspended else "artifact.challenged"` at `challenge:5129`); and one `JoinedStr`, `kind=f"proposal.{proposal_status}"` at `review:1881`, whose interpolation is annotated `Literal["accepted", "corrected"]` at `system.py:1770` and is resolved from THAT lexical function, never from a module-wide same-name search (X29). Derive the set from all three; a scan reading only the first reports 13 of the 16 and is what C05 corrects. C05's own supporting count of `20` was wrong and is corrected by C08: 19 static calls, the textual `_event(` count of 20 including the DEFINITION line. The 16-kind SET is unaffected because it was derived per call site, and the call count is REPORTED separately rather than used as a completeness control. Each of the three removed kinds loses its unique producer independently (X32). THREE KINDS LOSE THEIR ONLY PRODUCER HERE, not two. `request.resolved_by_artifact` (`handle:1208`), `request.fallback_failed` (`_fail_generation:1356`) AND `artifact.ambiguity_quarantined` (`handle:1143`) are each emitted at exactly one site, all three inside deleted spans. Ambiguity quarantine is therefore a behaviour this unit removes, which section 2's deletion set and the prose census both now record."""
@@ -636,7 +636,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
         }
         self.assertEqual(len(expected), 16)
 
-        current_rows, current_errors = _event_rows(_system_tree())
+        current_rows, current_errors = _event_rows(_system_tree(_git_text(CLOSE_SHA, "src/cement_runtime/system.py")))
         self.assertEqual(current_errors, [])
         current = {kind for _, kinds in current_rows for kind in kinds}
         self.assertEqual(current, expected)
@@ -1158,7 +1158,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
         expected = {name: values for name, values in baseline.items() if name not in deleted}
         self.assertEqual(len(expected), 12)
         self.assertTrue(all(values == ("self._now()",) for values in expected.values()))
-        self.assertEqual(call_sites(_system_tree()), expected)
+        self.assertEqual(call_sites(_system_tree(_git_text(CLOSE_SHA, "src/cement_runtime/system.py"))), expected)
 
     def test_l19_mechanical_readme_md_contains_zero_standalone_handle_words(self) -> None:
         """L19. MECHANICAL: `README.md` contains zero standalone `handle` words (baseline 8) and zero `request_status` substrings (baseline 4), counting code fences, links and inline code, all of which ship to readers (V23); zero Markdown tables whose `Status`-headed column carries any frozen lifecycle poll state (`resolved`, `review_required`, `in_progress`, `fallback_failed`, `rejected`, `reconciliation_required`) — that structural shape IS the poll-state table, so a renamed heading does not evade it; zero generation/request LEASE claims, while the two truthful `a verification snapshot is not a lease` statements SURVIVE, so the ban is context-classed rather than a global word ban that would delete correct prose to reach zero (X25); and the surviving Library API region still names `System.submit_proposal`, `System.propose`, `System.review` and `proposal_id` at least once each — L19 is CONJUNCTIVE, and deleting the lifecycle section is necessary, never sufficient (X09). RULED: that the replacement request-route prose teaches the proposal route correctly."""

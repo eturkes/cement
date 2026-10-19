@@ -279,7 +279,7 @@ def _review_write_labels(
                         "proposal.rejected",
                         "proposal.accepted",
                         "proposal.corrected",
-                        "artifact.counterexample",
+                        "artifact.contradicted",
                     }
                 ),
                 None,
@@ -373,7 +373,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
             database,
             """
             SELECT sequence FROM events
-            WHERE kind = 'artifact.counterexample' AND subject_id = ?
+            WHERE kind = 'artifact.contradicted' AND subject_id = ?
             """,
             (artifact_id,),
         )
@@ -389,7 +389,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         self.assertEqual(artifact["status"], expected_status)
         self.assertEqual(counterexamples, [])
         self.assertEqual(
-            json.loads(decision_event["payload_json"])["suspended_artifact_ids"],
+            json.loads(decision_event["payload_json"])["contradicted_artifact_ids"],
             [],
         )
 
@@ -1156,10 +1156,10 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                 )
 
     def test_b15_a08_write_order_the_exact_ordered_2(self) -> None:
-        """B15. A08 write order: the exact ordered write subsequence per decision, including quarantine
+        """B15. A08 write order: the exact ordered write subsequence per decision, including contradiction
 
         Reproduction: accept a conflicting late proposal against a promoted artifact
-        and pin quarantine before the private write and final proposal event.
+        and pin contradiction before the final proposal event.
         """
         system, _, proposal_id, artifact_id = self._promoted_conflict_fixture()
 
@@ -1177,8 +1177,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
             [
                 "proposal.state",
                 "example.insert",
-                "artifact.quarantine",
-                "event:artifact.counterexample",
+                "event:artifact.contradicted",
                 "event:proposal.accepted",
                 "proposal.status_sequence",
             ],
@@ -1372,7 +1371,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                 "SELECT status FROM artifacts WHERE id = ?",
                 (artifact_id,),
             )[0]["status"],
-            "suspended",
+            "promoted",
         )
 
     def test_b18_y7_quarantine_predicate_inventory_partition_operation_1(self) -> None:
@@ -1457,7 +1456,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         )
         self.assertNotIn("artifact.quarantine", _review_write_labels(records))
         self.assertNotIn(
-            "event:artifact.counterexample",
+            "event:artifact.contradicted",
             _review_write_labels(records),
         )
 
@@ -1534,7 +1533,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
             database,
             """
             SELECT sequence, subject_id FROM events
-            WHERE kind = 'artifact.counterexample'
+            WHERE kind = 'artifact.contradicted'
               AND json_extract(payload_json, '$.proposal_id') = ?
             ORDER BY sequence
             """,
@@ -1562,7 +1561,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
             )
         )
         self.assertEqual(
-            set(json.loads(decision_event["payload_json"])["suspended_artifact_ids"]),
+            set(json.loads(decision_event["payload_json"])["contradicted_artifact_ids"]),
             {artifact_id, clone_id},
         )
 
@@ -2328,7 +2327,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
             quarantine_database,
             """
             SELECT kind, subject_id, payload_json FROM events
-            WHERE kind = 'artifact.counterexample' AND subject_id = ?
+            WHERE kind = 'artifact.contradicted' AND subject_id = ?
             """,
             (artifact_id,),
         )[0]
@@ -2357,14 +2356,14 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                     "example_id",
                     "receipt_hash",
                     "reviewer",
-                    "suspended_artifact_ids",
+                    "contradicted_artifact_ids",
                 },
             )
             self.assertEqual(payload["example_id"], result.example_id)
             self.assertEqual(payload["reviewer"], "operator")
-            self.assertEqual(payload["suspended_artifact_ids"], [])
+            self.assertEqual(payload["contradicted_artifact_ids"], [])
         self.assertEqual(
-            payloads[("artifact.counterexample", artifact_id)],
+            payloads[("artifact.contradicted", artifact_id)],
             {
                 "example_id": quarantine_result.example_id,
                 "proposal_id": quarantine_proposal,

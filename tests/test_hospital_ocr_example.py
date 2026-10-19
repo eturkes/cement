@@ -839,6 +839,9 @@ class ShippedCommandRoundTripTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             database = os.path.join(directory, "cement.db")
             function = _promoted_example_ledger(database)
+            System(database).set_switch(
+                run_demo.PARTITION, run_demo.OPERATION, mode="follow", actor="informatics-lead"
+            )
             bundle = os.path.join(directory, "bundle.json")
 
             export = subprocess.run(
@@ -942,7 +945,7 @@ class DemoTranscriptTests(unittest.TestCase):
         verifications: list[object] = []
         calls: list[tuple[str, bool]] = []
         real_directory = tempfile.TemporaryDirectory
-        real_verify = System.verify_function
+        real_verify = System._verify_function_snapshot
         real_resolve = run_demo.resolve_offline
 
         def recording_directory(*args, **kwargs):
@@ -964,7 +967,7 @@ class DemoTranscriptTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()), mock.patch.object(
             run_demo.tempfile, "TemporaryDirectory", recording_directory
         ), mock.patch.object(
-            System, "verify_function", recording_verify
+            System, "_verify_function_snapshot", recording_verify
         ), mock.patch.object(
             run_demo, "resolve_offline", recording_resolve
         ):

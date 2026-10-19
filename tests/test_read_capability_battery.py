@@ -17,6 +17,7 @@ from cement_runtime import System
 from cement_runtime import cli as cement_cli
 from cement_runtime import store as store_module
 from cement_runtime.errors import IntegrityError, StateError
+from tests.test_read_capability_census import _sql_values
 
 
 class ReadCapabilityBatteryTests(unittest.TestCase):
@@ -767,16 +768,6 @@ class ReadCapabilityBatteryTests(unittest.TestCase):
         violations: list[str] = []
         reached_helpers: set[str] = set()
 
-        def sql_text(node: ast.expr) -> str | None:
-            if isinstance(node, ast.Constant) and isinstance(node.value, str):
-                return node.value
-            if isinstance(node, ast.JoinedStr):
-                return "".join(
-                    value.value if isinstance(value, ast.Constant) else "{expression}"
-                    for value in node.values
-                )
-            return None
-
         def scan(
             body: list[ast.stmt],
             connection_names: set[str],
@@ -793,17 +784,20 @@ class ReadCapabilityBatteryTests(unittest.TestCase):
                                 f"{' -> '.join(trail)}:{node.lineno} calls {node.func.attr}()"
                             )
                         if node.func.attr in {"execute", "executemany", "executescript"}:
-                            text = sql_text(node.args[0]) if node.args else None
-                            if text is None:
+                            texts = _sql_values(
+                                node.args[0], scope=ast.Module(body=body, type_ignores=[])
+                            ) if node.args else None
+                            if texts is None:
                                 violations.append(
                                     f"{' -> '.join(trail)}:{node.lineno} uses dynamic SQL"
                                 )
                             else:
-                                verb = text.lstrip().split(None, 1)[0].upper()
-                                if verb != "SELECT":
-                                    violations.append(
-                                        f"{' -> '.join(trail)}:{node.lineno} executes {verb}"
-                                    )
+                                for text in texts:
+                                    verb = text.lstrip().split(None, 1)[0].upper()
+                                    if verb != "SELECT":
+                                        violations.append(
+                                            f"{' -> '.join(trail)}:{node.lineno} executes {verb}"
+                                        )
                     if not (
                         isinstance(receiver, ast.Name)
                         and receiver.id == "self"
@@ -879,9 +873,15 @@ class ReadCapabilityBatteryTests(unittest.TestCase):
             [name for name, _ in read_sites].count("_submission_revision"), 1
         )
         self.assertEqual([name for name, _ in write_sites].count("_persist_proposal"), 1)
-        self.assertEqual(len(read_sites), 17)
-        self.assertEqual(len(write_sites), 13)
-        self.assertEqual(len(reached_helpers), 11)
+        expected_read_sites = {'reconstruct_function_receipt', 'artifact', 'get_proposal', 'function_versions', 'switch', '_submission_revision', 'operations', 'verify_function', 'proposal', 'function_report', 'report', 'proposals', 'diff_versions', 'inspect_function_promotion', 'latest_function_receipt', 'function_receipts', 'artifacts', 'events', 'reports', 'examples', 'serving'}
+        expected_write_sites = ['register_operation', 'revise_operation', '_persist_proposal', 'review', 'compile', 'set_switch', 'verify_drafts', 'verify', 'promote_function', 'promote', 'challenge', 'challenge', 'revoke_example', 'suspend_artifact']
+        expected_helpers = {'_current_build_projections', '_run_verification', '_reconstruct_function_receipt', '_verify_function_snapshot', '_function_promotion_plan', '_validate_promoted', '_pin_checks', '_project_current_build', '_validate_report', '_validate_live_promoted', '_persisted_function_receipt_check', '_function_promotion_entry', '_contradicted', '_operation_report_artifact', '_verify_pinned_snapshot', '_function_report_member'}
+        self.assertEqual(len(read_sites), len(expected_read_sites))
+        self.assertEqual(len(write_sites), len(expected_write_sites))
+        self.assertEqual(len(reached_helpers), len(expected_helpers))
+        self.assertEqual({name for name, _ in read_sites}, expected_read_sites)
+        self.assertEqual(sorted(name for name, _ in write_sites), sorted(expected_write_sites))
+        self.assertEqual(reached_helpers, expected_helpers)
         self.assertEqual(violations, [])
 
     def test_b21_validate_ledger_succeeds_inside_enforced_block(self):

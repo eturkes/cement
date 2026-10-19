@@ -61,6 +61,7 @@ from cement_runtime.json_value import (
     DEFAULT_MAX_ITEMS,
 )
 from cement_runtime.store import SCHEMA_VERSION, Store
+from cement_runtime.models import SwitchState
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "examples" / "command_source"))
@@ -233,7 +234,8 @@ def _resolution(state: str) -> FunctionResolution:
         match = None
     else:
         raise AssertionError(f"unknown resolution state {state!r}")
-    return FunctionResolution(verification=verification, match=match)
+    return FunctionResolution(verification=verification, match=match,
+                              switch=SwitchState(PARTITION, OPERATION, "follow", None, None, "operator", 1, 1))
 
 
 def _temporary_path(case: unittest.TestCase, name: str = "ledger.db") -> pathlib.Path:
@@ -254,6 +256,7 @@ def _new_system(
     )
     if register:
         system.register_operation(PARTITION, OPERATION, policy=CompilePolicy(2, 2, 0))
+        system.set_switch(PARTITION, OPERATION, mode="follow", actor="operator")
     return system, path
 
 
@@ -932,6 +935,7 @@ class ObligationBatteryTests(unittest.TestCase):
             "matched",
             "output",
             "passed",
+            "switch",
         ]
         observed_sets: list[set[str]] = []
         for state, expected_status in (("hit", 0), ("miss", 6), ("failed", 6)):
@@ -1110,6 +1114,7 @@ class ObligationBatteryTests(unittest.TestCase):
         inconsistent = FunctionResolution(
             verification=FunctionVerification(True, 0, None, None, ()),
             match=None,
+            switch=_resolution("miss").switch,
         )
         fake = mock.create_autospec(System, instance=True)
         fake.resolve.return_value = inconsistent
@@ -1188,6 +1193,7 @@ class ObligationBatteryTests(unittest.TestCase):
         planted = FunctionResolution(
             verification=dataclasses.replace(ordinary.verification, document=document),
             match=ordinary.match,
+            switch=ordinary.switch,
         )
         path = _temporary_path(self)
         path.touch()
@@ -1219,6 +1225,7 @@ class ObligationBatteryTests(unittest.TestCase):
                 "matched",
                 "output",
                 "passed",
+                "switch",
             },
         )
         self.assertNotIn("document", payload)
@@ -2632,7 +2639,9 @@ class ObligationBatteryTests(unittest.TestCase):
         holds at 30/37 (`A10`, `A16`).
         """
         # BASELINE c8b82cd: red — the two named leaves are absent.
-        current_parser = cement_cli._parser()
+        from tests.test_cli_removal_battery import _module_from_git
+
+        current_parser = _module_from_git("1146421")._parser()
         _leaf_parser(self, current_parser, ("resolve",))
         _leaf_parser(self, current_parser, ("proposal", "submit"))
 
@@ -3012,7 +3021,9 @@ class ObligationBatteryTests(unittest.TestCase):
             and node.target.id == "EXPECTED"
         )
         expected = ast.literal_eval(expected_assignment.value)
-        parser = cement_cli._parser()
+        from tests.test_cli_removal_battery import _module_from_git
+
+        parser = _module_from_git("1146421")._parser()
         self.assertEqual(
             parser_shape(parser),
             (expected["parser_shape"]["actions"], expected["parser_shape"]["digest"]),

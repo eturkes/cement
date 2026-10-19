@@ -128,7 +128,7 @@ promotes them automatically.
 
 ### The function group
 
-`cement function` has eight leaves:
+`cement function` has eleven leaves:
 
 | Leaf | Purpose |
 |---|---|
@@ -139,12 +139,20 @@ promotes them automatically.
 | `inspect` | Preview the prospective set and return its function hash. |
 | `promote` | Promote the whole set atomically against a repeated hash. |
 | `export` | Emit bundle bytes for the live set or for a historical receipt. |
+| `switch` | Turn the function off, make it follow the newest version, or pin one version. |
+| `versions` | List the promoted versions, newest first. `--check` also reports whether each one can serve now. |
+| `diff` | Compare two versions: the cases that the second one adds, removes, or changes. |
 | `eval` | Answer one canonical input from a bundle, with no ledger. |
 
 Pass `--expected-function-hash` to `function verify` to pin the verified snapshot. The check then fails
 on set growth and on any other drift. That result is one read snapshot, not a lease. A later export can
 still see a different set. [docs/architecture.md](docs/architecture.md) names the six checks in their
 returned order.
+
+A newly registered operation starts with its switch `off`, so `resolve` answers nothing until a
+person turns the function on. `function switch OPERATION --mode follow --actor NAME` serves the newest
+promoted version. `--mode pinned --function-hash HASH` serves one version, and a later promotion does
+not change it. To roll back, pin an earlier version that `function versions` lists.
 
 Verify the set and export it. Then answer inputs where no ledger exists:
 
@@ -185,7 +193,7 @@ uv run cement --db demo.db --partition acme resolve support.reply \
 `resolve` writes nothing. It opens one read transaction. It creates no row, no event, and no example.
 It also refuses a `--db` path that does not exist, and it creates no ledger file there.
 
-The command prints the same seven keys in every state:
+The command prints the same eight keys in every state:
 
 | Key | Meaning |
 |---|---|
@@ -196,6 +204,7 @@ The command prints the same seven keys in every state:
 | `matched` | `true` for an answer, `false` for a verified absence, `null` for a failed verdict. |
 | `output` | The answer. It is `null` unless `matched` is `true`. |
 | `artifact_hash` | The digest of the answering artifact. It is `null` unless `matched` is `true`. |
+| `switch` | The switch mode: `off`, `follow`, or `pinned`. An `off` switch verifies nothing, so every other key is `null` and `checks` is empty. |
 
 Status 0 means `matched` is `true`. Status 6 covers both other states, and `matched` separates them. A
 verified absence reports `false`, and a failed verdict reports `null`. An unregistered operation is

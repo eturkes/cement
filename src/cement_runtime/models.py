@@ -310,22 +310,77 @@ class FunctionVerification:
 
 
 @dataclass(frozen=True, slots=True)
-class FunctionResolution:
-    """One verification snapshot paired with the lookup taken inside it.
+class SwitchState:
+    """The per-operation switch a person sets: the ONE human gate on serving.
 
-    For every verification the unmodified ``System.verify_function`` produces,
-    ``match`` is ``None`` exactly when ``verification.passed`` is ``False``.
-    That domain qualifier is load-bearing, and it names the implementation
-    rather than the attribute: this class binds the two fields by no invariant,
-    so an override or a hand-built ``FunctionVerification`` can carry
-    ``passed=True`` with no document and still resolve to ``match`` ``None``.
-    A failed verdict carries
-    no answer at all. A verified ``matched=False`` is a proven absence inside a
-    function that verified. Consumers must not collapse the two.
+    ``off`` serves nothing; ``follow`` serves the newest promoted version of the current
+    operation revision; ``pinned`` serves exactly ``function_hash`` (receipt ``receipt_id``),
+    from any operation revision. With no setting ever written, the state is ``off`` and every
+    provenance field is ``None``.
     """
 
-    verification: FunctionVerification
+    partition: str
+    operation: str
+    mode: Literal["off", "follow", "pinned"]
+    function_hash: str | None
+    receipt_id: str | None
+    set_by: str | None
+    set_at_us: int | None
+    sequence: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class FunctionResolution:
+    """One switch reading plus, when the switch serves a version, its verification + lookup.
+
+    ``switch.mode == "off"`` runs no verification: ``verification`` and ``match`` are both
+    ``None``. Otherwise ``match`` is ``None`` exactly when ``verification.passed`` is ``False``
+    for every verification the unmodified ``System`` produces; that qualifier names the
+    implementation, not an invariant the class enforces. A failed verdict carries no answer.
+    A verified ``matched=False`` is a proven absence inside the served version. Consumers must
+    not collapse the three states.
+    """
+
+    verification: FunctionVerification | None
     match: FunctionMatch | None
+    switch: SwitchState
+
+
+@dataclass(frozen=True, slots=True)
+class FunctionVersion:
+    """One promotion receipt seen as a version a person can serve, pin or roll back to."""
+
+    receipt: FunctionReceipt
+    projection_hash: str | None
+    revision_current: bool
+    selected: bool
+    servable: bool | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class FunctionVersionPage:
+    versions: tuple[FunctionVersion, ...]
+    next_before_sequence: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class FunctionDiff:
+    """What changes between two versions, by case key (read-only)."""
+
+    from_function_hash: str
+    to_function_hash: str
+    from_revision: int
+    to_revision: int
+    from_policy_hash: str
+    to_policy_hash: str
+    from_projection_hash: str | None
+    to_projection_hash: str | None
+    projection_changed: bool
+    from_program: JSONValue
+    to_program: JSONValue
+    added: tuple[str, ...]
+    removed: tuple[str, ...]
+    changed: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)

@@ -208,6 +208,7 @@ def main() -> None:
             f"Layout A: compiled, verified ({report_a.tests} tests), and promoted as {artifact_a}."
         )
         function = checkpoint_function(system)
+        system.set_switch(PARTITION, OPERATION, mode="follow", actor="informatics-lead")
         print(
             f"Function set: {len(function.input_hashes)} verified entry promoted; "
             "layout A now answers from the set."

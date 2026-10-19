@@ -52,7 +52,7 @@ from cement_runtime.json_value import (
     DEFAULT_MAX_ITEMS,
     canonicalize,
 )
-from cement_runtime.models import FunctionCheck, FunctionResolution, FunctionVerification
+from cement_runtime.models import FunctionCheck, FunctionResolution, FunctionVerification, SwitchState
 from cement_runtime.store import SCHEMA_VERSION, Store
 
 
@@ -76,6 +76,7 @@ RESOLVE_KEYS = {
     "matched",
     "output",
     "passed",
+    "switch",
 }
 PROVENANCE_MAX_BYTES = getattr(system_module, "PROVENANCE_MAX_BYTES", 65_536)
 SOURCE_ID_MAX_BYTES = system_module.SOURCE_ID_MAX_BYTES
@@ -148,7 +149,8 @@ def _resolution(state: str) -> FunctionResolution:
         match = None
     else:  # pragma: no cover - test helper misuse
         raise AssertionError(f"unknown state: {state}")
-    return FunctionResolution(verification=verification, match=match)
+    return FunctionResolution(verification=verification, match=match,
+                              switch=SwitchState(PARTITION, OPERATION, "follow", None, None, "operator", 1, 1))
 
 
 def _parser_nodes(
@@ -267,6 +269,7 @@ class CliChannelTests(unittest.TestCase):
             expected_function_hash=manifest.function_hash,
             promoted_by="release-manager",
         )
+        system.set_switch(PARTITION, operation, mode="follow", actor="operator")
         return system, input_value
 
     def parser_node(self, *path: str) -> argparse.ArgumentParser | None:
@@ -532,6 +535,7 @@ class CliChannelTests(unittest.TestCase):
         grades neither - it forwards the value verbatim.
         """
         system = self.register()
+        System(self.database).set_switch(PARTITION, OPERATION, mode="follow", actor="operator")
         actual = system.resolve(PARTITION, OPERATION, 0).verification.function_hash
         self.assertIsNotNone(actual)
         malformed = self.run_cli(
@@ -629,13 +633,13 @@ class CliChannelTests(unittest.TestCase):
         self.assertEqual((clock.call_count, new_id.call_count), (0, 0))
 
     def test_v09_the_payload_key_set_is_exactly_seven_keys_and_identical_in(self) -> None:
-        """V09 [D07] the payload key set is exactly seven keys and identical in all three states
+        """V09 [D07] the payload key set is exactly eight keys and identical in all three states
 
         ACTION: ENCODE
 
         EXPECTED:
         Each object has exactly `{artifact_hash, checks, entries, function_hash, matched,
-        output, passed}` and emits those 7 names in that sorted order.
+        output, passed, switch}` and emits those 8 names in that sorted order.
 
         RULING:
         CONFIRMED. `_emit` sorts keys, so the closed set and the emitted order are one
@@ -654,7 +658,7 @@ class CliChannelTests(unittest.TestCase):
                 self.assertEqual(set(payload), RESOLVE_KEYS)
                 self.assertEqual(keys, tuple(sorted(RESOLVE_KEYS)))
         self.assertEqual(len(set(observed)), 1)
-        self.assertEqual(len(observed[0]), 7)
+        self.assertEqual(len(observed[0]), 8)
 
     def test_v10_checks_projects_the_ordered_key_passed_detail_vector_on_su(self) -> None:
         """V10 [D08] checks projects the ordered [{key, passed, detail}] vector on success too
@@ -704,7 +708,7 @@ class CliChannelTests(unittest.TestCase):
 
         RULING:
         CONFIRMED. This is the property a shared exit 6 exists to preserve. Both objects carry
-        the same seven keys, so `matched` alone separates a verified absence from a failed
+        the same eight keys, so `matched` alone separates a verified absence from a failed
         verdict, and asserting the two payloads are unequal blocks a regression that collapses
         them.
         """
@@ -809,7 +813,7 @@ class CliChannelTests(unittest.TestCase):
         ACTION: ENCODE
 
         EXPECTED:
-        All payloads contain exactly 7 top-level keys, contain 0 keys named `document`, and
+        All payloads contain exactly 8 top-level keys, contain 0 keys named `document`, and
         contain 0 occurrences of the planted document-only string.
 
         RULING:
@@ -827,7 +831,7 @@ class CliChannelTests(unittest.TestCase):
             checks=passing.verification.checks,
         )
         resolutions = {
-            "hit": FunctionResolution(planted_verification, passing.match),
+            "hit": FunctionResolution(planted_verification, passing.match, passing.switch),
             "miss": FunctionResolution(
                 FunctionVerification(
                     passed=True,
@@ -837,6 +841,7 @@ class CliChannelTests(unittest.TestCase):
                     checks=_checks(),
                 ),
                 FunctionMatch(matched=False),
+                passing.switch,
             ),
             "failed": _resolution("failed"),
         }
@@ -852,7 +857,7 @@ class CliChannelTests(unittest.TestCase):
             self.assertEqual(set(payload), RESOLVE_KEYS)
             self.assertNotIn("document", encoded)
             self.assertNotIn(planted, encoded)
-        self.assertEqual(observations, [(7, 0), (7, 0), (7, 0)])
+        self.assertEqual(observations, [(8, 0), (8, 0), (8, 0)])
 
     def test_v15_unregistered_operation_is_3_empty_promoted_set_and_retired(self) -> None:
         """V15 [D12] unregistered operation is 3; empty promoted set and retired-artifact revision are 6
@@ -878,6 +883,7 @@ class CliChannelTests(unittest.TestCase):
         )
 
         self.register("empty")
+        System(self.database).set_switch(PARTITION, "empty", mode="follow", actor="operator")
         empty = self.run_cli("resolve", "empty", "--input", "0")
         empty_payload = self.payload(empty)
         self.assertEqual(empty.status, 6)
@@ -1364,8 +1370,10 @@ class CliChannelTests(unittest.TestCase):
         The census MOVING is the obligation landing, not a regression; deriving it inside the
         test rather than transcribing it is why the number can be trusted.
         """
+        from tests.test_cli_removal_battery import _module_from_git
+
         baseline_leaves, baseline_nodes = _parser_nodes(_baseline_parser())
-        current_leaves, current_nodes = _parser_nodes(cement_cli._parser())
+        current_leaves, current_nodes = _parser_nodes(_module_from_git("1146421")._parser())
         baseline_paths = {" ".join(path) for path in baseline_leaves}
         current_paths = {" ".join(path) for path in current_leaves}
         # M3.5b D02/D17: the census returns to 28/35 over the INVERSE set, so a
@@ -1394,7 +1402,9 @@ class CliChannelTests(unittest.TestCase):
         count of 4 for the expected-hash option covers its pre-existing homes plus resolve, so
         the battery derives it from the census rather than asserting a bare 1.
         """
-        leaves, _ = _parser_nodes(cement_cli._parser())
+        from tests.test_cli_removal_battery import _module_from_git
+
+        leaves, _ = _parser_nodes(_module_from_git("1146421")._parser())
 
         def owners(option: str) -> set[tuple[str, ...]]:
             return {
@@ -1551,7 +1561,7 @@ class CliChannelTests(unittest.TestCase):
         )
         with mock.patch.object(
             system,
-            "verify_function",
+            "_verify_function_snapshot",
             return_value=passing_without_document,
         ):
             override = system.resolve(PARTITION, OPERATION, 0)
@@ -1760,6 +1770,7 @@ class CliChannelTests(unittest.TestCase):
         digest is the right instrument.
         """
         system = self.register()
+        System(self.database).set_switch(PARTITION, OPERATION, mode="follow", actor="operator")
         actual = system.resolve(PARTITION, OPERATION, 0).verification.function_hash
         self.assertIsNotNone(actual)
         wrong = "0" * 64 if actual != "0" * 64 else "1" * 64
@@ -2569,8 +2580,10 @@ class CliChannelTests(unittest.TestCase):
         directions catch a rename that leaves the count at 30. This is the assertion V27's
         count cannot make.
         """
+        from tests.test_cli_removal_battery import _module_from_git
+
         baseline, _ = _parser_nodes(_baseline_parser())
-        current, _ = _parser_nodes(cement_cli._parser())
+        current, _ = _parser_nodes(_module_from_git("1146421")._parser())
         baseline_paths = {" ".join(path) for path in baseline}
         current_paths = {" ".join(path) for path in current}
         # M3.5b D02/D12: both cardinalities are 28 over DIFFERENT sets, so the

@@ -240,6 +240,22 @@ def _parser() -> argparse.ArgumentParser:
     function_export.add_argument(
         "--out", help="write the bundle atomically to PATH instead of stdout"
     )
+    function_switch = function_commands.add_parser("switch", allow_abbrev=False)
+    function_switch.add_argument("operation")
+    function_switch.add_argument("--mode", required=True, choices=("off", "follow", "pinned"))
+    function_switch.add_argument("--function-hash", help="the version a pinned switch serves")
+    function_switch.add_argument("--actor", required=True)
+    function_versions = function_commands.add_parser("versions", allow_abbrev=False)
+    function_versions.add_argument("operation")
+    function_versions.add_argument("--before-sequence", type=int)
+    function_versions.add_argument("--limit", type=int, default=100)
+    function_versions.add_argument(
+        "--check", action="store_true", help="also report whether each version would serve now"
+    )
+    function_diff = function_commands.add_parser("diff", allow_abbrev=False)
+    function_diff.add_argument("operation")
+    function_diff.add_argument("--from", dest="from_hash", required=True)
+    function_diff.add_argument("--to", dest="to_hash", required=True)
     function_eval = function_commands.add_parser("eval")
     function_eval.add_argument("--bundle", required=True, help="path of an exported bundle file")
     function_eval.add_argument("--input", required=True, help="JSON text; '-' reads stdin")
@@ -587,19 +603,20 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
         )
         verification = resolution.verification
         answer = resolution.match
-        # One fixed key set across all three states, so a verified miss and a
-        # failed verdict stay distinguishable under their shared exit 6. The
-        # nested FunctionDocument never reaches stdout.
+        # One fixed key set across all four states (off, verified miss, failed verdict,
+        # answer), so they stay distinguishable under their shared exit 6. The nested
+        # FunctionDocument never reaches stdout.
         matched = None if answer is None else answer.matched
         return _Outcome(
             {
                 "artifact_hash": None if answer is None else answer.artifact_hash,
-                "checks": [asdict(check) for check in verification.checks],
-                "entries": verification.entries,
-                "function_hash": verification.function_hash,
+                "checks": [] if verification is None else [asdict(c) for c in verification.checks],
+                "entries": None if verification is None else verification.entries,
+                "function_hash": None if verification is None else verification.function_hash,
                 "matched": matched,
                 "output": None if answer is None else answer.output,
-                "passed": verification.passed,
+                "passed": None if verification is None else verification.passed,
+                "switch": resolution.switch.mode,
             },
             status=0 if matched is True else 6,
         )
@@ -750,6 +767,35 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
                 },
                 status=0 if verification.passed else 6,
             )
+        if args.function_command == "switch":
+            return asdict(
+                system.set_switch(
+                    args.partition,
+                    args.operation,
+                    mode=args.mode,
+                    actor=args.actor,
+                    function_hash=args.function_hash,
+                )
+            )
+        if args.function_command == "versions":
+            return asdict(
+                system.function_versions(
+                    args.partition,
+                    args.operation,
+                    before_sequence=args.before_sequence,
+                    limit=args.limit,
+                    check=args.check,
+                )
+            )
+        if args.function_command == "diff":
+            return asdict(
+                system.diff_versions(
+                    args.partition,
+                    args.operation,
+                    from_hash=args.from_hash,
+                    to_hash=args.to_hash,
+                )
+            )
         if args.function_command == "inspect":
             manifest = system.inspect_function_promotion(
                 args.partition,
@@ -790,7 +836,17 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
                     raise NotFoundError("function receipt does not exist for this operation")
                 document = reconstruction.document
             else:
-                verification = system.verify_function(args.partition, args.operation)
+                state, served = system.serving(args.partition, args.operation)
+                if served is None:
+                    raise _Unverified(
+                        {
+                            "error": "switched_off",
+                            "message": "the operation's function is switched off; no bundle "
+                            "exported (switch it on, or pass --receipt-id)",
+                            "switch": state.mode,
+                        }
+                    )
+                verification = served
                 if not verification.passed:
                     raise _Unverified(
                         {

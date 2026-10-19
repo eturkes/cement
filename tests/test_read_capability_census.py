@@ -33,6 +33,42 @@ def _writes(call: ast.Call) -> bool:
     return False
 
 
+def _sql_values(expression: ast.AST, *, scope: ast.AST) -> list[str] | None:
+    if isinstance(expression, ast.Constant) and isinstance(expression.value, str):
+        return [expression.value]
+    if isinstance(expression, ast.JoinedStr):
+        return ["".join(p.value for p in expression.values if isinstance(p, ast.Constant))]
+    if not isinstance(expression, ast.Name):
+        return None
+    parents = {child: parent for parent in ast.walk(scope) for child in ast.iter_child_nodes(parent)}
+    owner = parents.get(expression)
+    while owner is not None and not isinstance(owner, ast.FunctionDef):
+        owner = parents.get(owner)
+    if owner is None or owner is scope:
+        return None
+    parameters = [*owner.args.posonlyargs, *owner.args.args]
+    positions = [i for i, arg in enumerate(parameters) if arg.arg == expression.id]
+    if len(positions) != 1 or any(
+        isinstance(n, ast.Name) and n.id == expression.id and not isinstance(n.ctx, ast.Load)
+        for n in ast.walk(owner)
+    ):
+        return None
+    uses = [n for n in ast.walk(scope) if isinstance(n, ast.Name) and n.id == owner.name]
+    values: list[str] = []
+    for use in uses:
+        call = parents.get(use)
+        if not isinstance(call, ast.Call) or call.func is not use:
+            return None
+        index = positions[0]
+        argument = call.args[index] if index < len(call.args) else next(
+            (k.value for k in call.keywords if k.arg == expression.id), None
+        )
+        if not isinstance(argument, ast.Constant) or not isinstance(argument.value, str):
+            return None
+        values.append(argument.value)
+    return values or None
+
+
 def _sql_literals(node: ast.AST) -> list[str]:
     """Every SQL string handed to ``.execute``/``.executemany`` under ``node``."""
     found: list[str] = []
@@ -44,14 +80,8 @@ def _sql_literals(node: ast.AST) -> list[str]:
         if not child.args:
             found.append("<no-argument>")
             continue
-        first = child.args[0]
-        if isinstance(first, ast.Constant) and isinstance(first.value, str):
-            found.append(first.value)
-        elif isinstance(first, ast.JoinedStr):
-            parts = [p.value for p in first.values if isinstance(p, ast.Constant)]
-            found.append("".join(parts))
-        else:
-            found.append("<non-literal>")
+        values = _sql_values(child.args[0], scope=node)
+        found.extend(values if values is not None else ["<non-literal>"])
     return found
 
 
@@ -87,9 +117,29 @@ def census() -> dict[str, object]:
                 if isinstance(child, ast.Call) and isinstance(child.func, ast.Attribute):
                     if any(isinstance(a, ast.Name) and a.id == name for a in child.args):
                         helpers.add(child.func.attr)
-    # Transitive pass: every helper body must also be SELECT-only.
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef) and node.name in helpers:
+    # Transitive pass to a fixpoint: a helper that hands its own `connection` on makes that
+    # callee a helper too, so a read path split across several helpers stays covered.
+    functions = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)]
+    frontier = set(helpers)
+    while frontier:
+        found: set[str] = set()
+        for node in functions:
+            if node.name not in frontier:
+                continue
+            for child in ast.walk(node):
+                if not isinstance(child, ast.Call):
+                    continue
+                if not any(isinstance(a, ast.Name) and a.id == "connection" for a in child.args):
+                    continue
+                if isinstance(child.func, ast.Name):
+                    found.add(child.func.id)
+                elif isinstance(child.func, ast.Attribute):
+                    found.add(child.func.attr)
+        frontier = found - helpers
+        helpers |= found
+    # Every helper body must also be SELECT-only.
+    for node in functions:
+        if node.name in helpers:
             for statement in _sql_literals(node):
                 head = statement.strip().split(None, 1)
                 verb = head[0].upper() if head else ""
@@ -116,6 +166,13 @@ class ReadReachabilityTests(unittest.TestCase):
     def test_every_read_transaction_block_is_select_only(self) -> None:
         result = census()
         self.assertEqual(result["offenders"], [], "a read block reaches a mutating statement")
+        for statement in ("SELECT 1", "UPDATE operations SET revision = revision"):
+            source = f"def outer(connection):\n def query(sql):\n  return connection.execute(sql)\n query({statement!r})\n"
+            tree = ast.parse(source).body[0]
+            self.assertEqual(_sql_literals(tree), [statement])
+        dynamic = ast.parse("def outer(connection, sql):\n def query(text):\n  return connection.execute(text)\n query(sql)\n").body[0]
+        self.assertEqual(_sql_literals(dynamic), ["<non-literal>"])
+
 
     def test_the_census_still_finds_the_surface_it_was_measured_against(self) -> None:
         # A collapsed census would report zero offenders over zero sites.

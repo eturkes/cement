@@ -208,16 +208,17 @@ Exported bundle: 3385 bytes carrying no ledger.
 07. artifact.verified
 08. artifact.promoted
 09. function.promoted
-10. proposal.created
-11. proposal.accepted
-12. proposal.created
-13. proposal.accepted
-14. artifact.compiled
-15. artifact.verified
-16. artifact.promoted
-17. function.promoted
-18. proposal.created
-19. proposal.accepted
+10. function.switched
+11. proposal.created
+12. proposal.accepted
+13. proposal.created
+14. proposal.accepted
+15. artifact.compiled
+16. artifact.verified
+17. artifact.promoted
+18. function.promoted
+19. proposal.created
+20. proposal.accepted
 
 === Act 6: the exported function answers with no ledger ===
 The temporary ledger and its audit trail are gone; only the bundle remains.

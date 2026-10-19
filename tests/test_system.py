@@ -267,6 +267,7 @@ class SystemTests(unittest.TestCase):
 
     def test_supervised_miss_to_exact_artifact_hit(self) -> None:
         self.register(confirmations=2, reviewers=2, span=0)
+        self.system.set_switch("tenant-a", "echo", mode="follow", actor="operator")
         artifact_id, _, _ = self._promote_function_entry(
             {"x": 1},
             "exact-hit",
@@ -444,6 +445,7 @@ class SystemTests(unittest.TestCase):
 
     def test_counterexample_and_revocation_quarantine(self) -> None:
         self.register()
+        self.system.set_switch("tenant-a", "echo", mode="follow", actor="operator")
         artifact, _ = self.mature_and_promote()
         example_id, suspended = self.system.challenge(
             "tenant-a",
@@ -487,6 +489,7 @@ class SystemTests(unittest.TestCase):
 
     def test_late_review_counterexample_quarantines_promoted_scope(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
+        self.system.set_switch("tenant-a", "echo", mode="follow", actor="operator")
         late = self.system.propose("tenant-a", "echo", {"x": 1})
         self.confirm()
         self.confirm()
@@ -495,19 +498,27 @@ class SystemTests(unittest.TestCase):
         self.system.promote(
             "tenant-a", artifact, scope_hash=report.scope_hash, promoted_by="manager"
         )
-        self.system.review(
+        reviewed = self.system.review(
             "tenant-a",
             late,
             reviewer="auditor",
             decision="correct",
             corrected_output={"changed": True},
         )
-        self.assertEqual(self.system.artifact("tenant-a", artifact)["status"], "suspended")
+        self.assertEqual(self.system.artifact("tenant-a", artifact)["status"], "promoted")
         resolution = self.system.resolve("tenant-a", "echo", {"x": 1})
-        self.assertTrue(resolution.verification.passed)
-        self.assertIsNotNone(resolution.match)
-        assert resolution.match is not None
-        self.assertFalse(resolution.match.matched)
+        self.assertFalse(resolution.verification.passed)
+        self.assertIsNone(resolution.match)
+        contradictions = [event for event in self.system.events("tenant-a")
+                          if event["kind"] == "artifact.contradicted"]
+        self.assertEqual(len(contradictions), 1)
+        self.assertEqual(contradictions[0]["subject_id"], artifact)
+        self.assertEqual(contradictions[0]["payload"],
+                         {"example_id": reviewed.example_id, "proposal_id": late})
+        accepted = [event for event in self.system.events("tenant-a")
+                    if event["kind"] == "proposal.corrected" and event["subject_id"] == late]
+        self.assertEqual(len(accepted), 1)
+        self.assertEqual(accepted[0]["payload"]["contradicted_artifact_ids"], [artifact])
         self.system.propose("tenant-a", "echo", {"x": 1})
 
     def test_request_idempotency_and_partition_isolation(self) -> None:
@@ -682,6 +693,7 @@ class SystemTests(unittest.TestCase):
 
     def test_runtime_integrity_failure_quarantines_then_falls_back(self) -> None:
         self.register()
+        self.system.set_switch("tenant-a", "echo", mode="follow", actor="operator")
         artifact, _ = self.mature_and_promote()
         connection = sqlite3.connect(self.database)
         try:
@@ -729,6 +741,7 @@ class SystemTests(unittest.TestCase):
 
     def test_operation_revision_retires_old_artifacts(self) -> None:
         self.register()
+        self.system.set_switch("tenant-a", "echo", mode="follow", actor="operator")
         artifact, _ = self.mature_and_promote()
         revision = self.system.revise_operation(
             "tenant-a",
@@ -953,6 +966,7 @@ class SystemTests(unittest.TestCase):
 
     def test_terminal_build_does_not_block_safe_recompilation(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
+        self.system.set_switch("tenant-a", "echo", mode="follow", actor="operator")
         self.confirm()
         self.confirm()
         first = self.system.compile("tenant-a", "echo").created[0]
@@ -2858,6 +2872,7 @@ class SystemTests(unittest.TestCase):
 
     def test_function_verification_rehashes_sealed_reports_off_dispatch(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
+        self.system.set_switch("tenant-a", "echo", mode="follow", actor="operator")
         self._promote_three_function_entries("function-report")
         baseline = self.system.verify_function("tenant-a", "echo")
         connection = sqlite3.connect(self.database)

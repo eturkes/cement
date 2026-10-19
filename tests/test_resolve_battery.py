@@ -59,6 +59,7 @@ class ResolveBatteryTests(unittest.TestCase):
             operation,
             policy=CompilePolicy(2, 2, 0),
         )
+        system.set_switch(partition, operation, mode="follow", actor="operator")
         return system, database, source, clock
 
     def _confirm(
@@ -152,7 +153,7 @@ class ResolveBatteryTests(unittest.TestCase):
     def test_b02(self) -> None:
         """
         B02: FunctionResolution's shape is frozen: frozen=True, slots=True, NO kw_only so
-        positional construction works, exactly the two fields verification and match, and
+        positional construction works, exactly verification, match and switch, and
         resolved type hints
         """
 
@@ -165,20 +166,24 @@ class ResolveBatteryTests(unittest.TestCase):
             FunctionResolution,
             FunctionVerification,
         )
+        from cement_runtime.models import SwitchState
 
         verification = FunctionVerification(False, 0, None, None, ())
-        resolution = FunctionResolution(verification, None)
+        switch = SwitchState("tenant_a", "echo_1", "follow", None, None, "operator", 1, 1)
+        resolution = FunctionResolution(verification, None, switch)
+        self.assertIs(resolution.switch, switch)
         self.assertIs(resolution.verification, verification)
         self.assertIsNone(resolution.match)
         self.assertEqual(
             tuple(field.name for field in dataclasses.fields(FunctionResolution)),
-            ("verification", "match"),
+            ("verification", "match", "switch"),
         )
         self.assertEqual(
             typing.get_type_hints(FunctionResolution),
             {
-                "verification": FunctionVerification,
+                "verification": FunctionVerification | None,
                 "match": FunctionMatch | None,
+                "switch": SwitchState,
             },
         )
         self.assertEqual(
@@ -187,6 +192,7 @@ class ResolveBatteryTests(unittest.TestCase):
                 for parameter in inspect.signature(FunctionResolution).parameters.values()
             ),
             (
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
                 inspect.Parameter.POSITIONAL_OR_KEYWORD,
                 inspect.Parameter.POSITIONAL_OR_KEYWORD,
             ),
@@ -312,7 +318,7 @@ class ResolveBatteryTests(unittest.TestCase):
         system, _, _, _ = self._make_system()
         verification = system.verify_function("tenant_a", "echo_1")
 
-        with mock.patch.object(system, "verify_function", return_value=verification):
+        with mock.patch.object(system, "_verify_function_snapshot", return_value=verification):
             resolution = system.resolve("tenant_a", "echo_1", {"n": 12})
 
         self.assertIs(resolution.verification, verification)
@@ -487,7 +493,7 @@ class ResolveBatteryTests(unittest.TestCase):
         """
         B14: the `or document is None` clause is forced: a FABRICATED public
         FunctionVerification(passed=True, document=None) reaching resolve through an override of
-        public verify_function returns match None instead of raising AttributeError
+        _verify_function_snapshot returns match None instead of raising AttributeError
         """
 
         from cement_runtime import FunctionVerification
@@ -496,7 +502,7 @@ class ResolveBatteryTests(unittest.TestCase):
         fabricated = FunctionVerification(True, 0, None, None, ())
 
         with (
-            mock.patch.object(system, "verify_function", return_value=fabricated),
+            mock.patch.object(system, "_verify_function_snapshot", return_value=fabricated),
             mock.patch(
                 "cement_runtime.system.evaluate",
                 side_effect=AssertionError("document=None reached evaluate"),
@@ -617,7 +623,7 @@ class ResolveBatteryTests(unittest.TestCase):
     def test_b17(self) -> None:
         """
         B17: all validation precedes any ledger read: a call section 4 rejects makes ZERO
-        Store.transaction calls and ZERO verify_function calls, taken with spies
+        Store.transaction calls and ZERO serving calls, taken with spies
         """
 
         from cement_runtime import ValidationError
@@ -650,8 +656,8 @@ class ResolveBatteryTests(unittest.TestCase):
                 ) as transaction_spy,
                 mock.patch.object(
                     system,
-                    "verify_function",
-                    wraps=system.verify_function,
+                    "serving",
+                    wraps=system.serving,
                 ) as verify_spy,
                 self.assertRaises(ValidationError),
             ):
@@ -1279,7 +1285,7 @@ class ResolveBatteryTests(unittest.TestCase):
 
     def test_b33(self) -> None:
         """
-        B33: scope isolation survives the forward to verify_function: collider partitions and
+        B33: scope isolation survives the forward to serving: collider partitions and
         operations (tenant_a vs tenantXa, echo_1 vs echoX1, plus a case variant) never answer
         each other, and partition and operation are not swapped
         """
@@ -1312,6 +1318,7 @@ class ResolveBatteryTests(unittest.TestCase):
                 operation,
                 policy=CompilePolicy(2, 2, 0),
             )
+            system.set_switch(partition, operation, mode="follow", actor="operator")
         for index, (partition, operation) in enumerate(scopes):
             self._promote_values(
                 system,
@@ -1338,8 +1345,8 @@ class ResolveBatteryTests(unittest.TestCase):
 
         with mock.patch.object(
             system,
-            "verify_function",
-            wraps=system.verify_function,
+            "serving",
+            wraps=system.serving,
         ) as verify_spy:
             system.resolve("tenant_a", "echo_1", {"n": 12})
         verify_spy.assert_called_once_with(
@@ -1380,7 +1387,7 @@ class ResolveBatteryTests(unittest.TestCase):
             function_hash=verified.function_hash,
             checks=verified.checks,
         )
-        with mock.patch.object(System, "verify_function", return_value=fabricated):
+        with mock.patch.object(System, "_verify_function_snapshot", return_value=fabricated):
             resolution = system.resolve("tenant_a", "echo_1", {"n": 12})
 
         self.assertFalse(resolution.verification.passed)

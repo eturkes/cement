@@ -461,6 +461,7 @@ class CLITests(unittest.TestCase):
                 "release-manager",
             )
         )
+        self.payload(self.run_cli("function", "switch", "echo", "--mode", "follow", "--actor", "operator"))
         hit = self.payload(self.run_cli("resolve", "echo", "--input", '{"x":1}'))
         self.assertIs(hit["matched"], True)
         self.assertEqual(hit["output"], {"kind": "echo", "value": {"x": 1}})
@@ -3006,6 +3007,7 @@ class CLITests(unittest.TestCase):
 
     def test_function_export_writes_the_live_document_bytes_exactly(self) -> None:
         self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
         expected = self.live_document("echo").encode("utf-8")
         run = self.run_cli("function", "export", "echo")
         self.assertEqual(run.status, 0)
@@ -3022,6 +3024,7 @@ class CLITests(unittest.TestCase):
         from cement_runtime.json_value import canonicalize
 
         self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
         run = self.run_cli("function", "export", "echo")
         parsed = parse_function(run.stdout_text)
         verification = System(self.database).verify_function("tenant", "echo")
@@ -3034,6 +3037,7 @@ class CLITests(unittest.TestCase):
 
     def test_function_export_emits_non_ascii_literally(self) -> None:
         self.register("unicode")
+        System(self.database).set_switch("tenant", "unicode", mode="follow", actor="operator")
         self.confirm_text("unicode", "Grüße 日本語", "unicode-a")
         self.run_cli("compile", "unicode")
         self.promote_set("unicode")
@@ -3046,6 +3050,7 @@ class CLITests(unittest.TestCase):
 
     def test_function_export_of_an_empty_promoted_set_exports_its_document(self) -> None:
         self.register("empty")
+        System(self.database).set_switch("tenant", "empty", mode="follow", actor="operator")
         run = self.run_cli("function", "export", "empty")
         self.assertEqual(run.status, 0)
         self.assertEqual(run.stderr_text, "")
@@ -3057,6 +3062,7 @@ class CLITests(unittest.TestCase):
 
     def test_function_export_refuses_a_drifted_set_with_the_whole_check_vector(self) -> None:
         self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
         anchor = self.payload(self.run_cli("function", "show", "echo"))["function_anchor"]
         member = str(anchor["members"][0]["artifact_id"])
         self.run_cli("artifact", "suspend", member, "--actor", "operator", "--reason", "drift")
@@ -3098,7 +3104,7 @@ class CLITests(unittest.TestCase):
                 FunctionCheck(key="third", passed=False, detail="three failed"),
             ),
         )
-        with mock.patch.object(System, "verify_function", return_value=verdict):
+        with mock.patch.object(System, "serving", return_value=(mock.sentinel.switch, verdict)):
             run = self.run_cli("function", "export", "echo")
         self.assertEqual(run.status, 6)
         self.assertEqual(run.stdout_bytes, b"")
@@ -3142,12 +3148,12 @@ class CLITests(unittest.TestCase):
             with self.subTest(expected=expected):
                 replacement: typing.Any
                 if exception is None:
-                    replacement = mock.Mock(return_value=verdict)
+                    replacement = mock.Mock(return_value=(mock.sentinel.switch, verdict))
                 else:
                     replacement = mock.Mock(side_effect=exception)
                 # Patch the library boundary; patching `_run` would replace the
                 # branch under test.
-                with mock.patch.object(System, "verify_function", replacement):
+                with mock.patch.object(System, "serving", replacement):
                     run = self.run_cli("function", "export", "echo")
                 self.assertEqual(run.status, expected)
                 self.assertEqual(run.stdout_bytes, b"")
@@ -3177,7 +3183,7 @@ class CLITests(unittest.TestCase):
     def test_function_export_exports_one_historical_receipt(self) -> None:
         receipt = self.promoted_operation("echo", 2)
         reconstruction = System(self.database).reconstruct_function_receipt("tenant", receipt)
-        with mock.patch.object(System, "verify_function") as never:
+        with mock.patch.object(System, "serving") as never:
             run = self.run_cli("function", "export", "echo", "--receipt-id", receipt)
         self.assertEqual(never.call_count, 0)
         self.assertEqual(run.status, 0)
@@ -3271,7 +3277,7 @@ class CLITests(unittest.TestCase):
             function_hash="e" * 64,
             checks=(FunctionCheck(key="probe", passed=True, detail="held"),),
         )
-        with mock.patch.object(System, "verify_function", return_value=verdict):
+        with mock.patch.object(System, "serving", return_value=(mock.sentinel.switch, verdict)):
             run = self.run_cli("function", "export", "echo")
         self.assertEqual(run.status, 5)
         self.assertEqual(run.stdout_bytes, b"")
@@ -3285,9 +3291,10 @@ class CLITests(unittest.TestCase):
 
     def test_function_export_forwards_the_operator_scope_exactly(self) -> None:
         receipt = self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
         document = System(self.database).verify_function("tenant", "echo")
         with mock.patch.object(
-            System, "verify_function", autospec=True, return_value=document
+            System, "serving", autospec=True, return_value=(mock.sentinel.switch, document)
         ) as live:
             self.run_cli("function", "export", "echo")
         self.assertEqual(live.call_args.args[1:], ("tenant", "echo"))
@@ -3305,6 +3312,7 @@ class CLITests(unittest.TestCase):
 
     def test_function_export_sources_never_mix(self) -> None:
         receipt = self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
         historical = self.run_cli("function", "export", "echo", "--receipt-id", receipt)
         self.confirm("echo", 99, "echo-grown")
         self.run_cli("compile", "echo")
@@ -3320,6 +3328,7 @@ class CLITests(unittest.TestCase):
 
     def test_function_export_serves_a_receipt_from_a_superseded_revision(self) -> None:
         receipt = self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
         historical = self.run_cli("function", "export", "echo", "--receipt-id", receipt)
         self.assertEqual(historical.status, 0)
         revised = self.payload(
@@ -3392,7 +3401,7 @@ class CLITests(unittest.TestCase):
             function_hash=None,
             checks=tuple(FunctionCheck(key=key, passed=False, detail=detail) for key in keys),
         )
-        with mock.patch.object(System, "verify_function", return_value=verdict):
+        with mock.patch.object(System, "serving", return_value=(mock.sentinel.switch, verdict)):
             run = self.run_cli("function", "export", "echo")
         self.assertEqual(run.status, 6)
         self.assertEqual(run.stdout_bytes, b"")
@@ -3439,6 +3448,7 @@ class CLITests(unittest.TestCase):
 
     def test_function_export_out_writes_the_exact_bundle_and_reports_it(self) -> None:
         self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
         expected = self.live_document("echo").encode("utf-8")
         root = self.export_root()
         destination = root / "bundle.json"
@@ -3459,6 +3469,7 @@ class CLITests(unittest.TestCase):
 
     def test_function_export_out_replaces_an_existing_destination(self) -> None:
         self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
         expected = self.live_document("echo").encode("utf-8")
         root = self.export_root()
         destination = root / "bundle.json"
@@ -3473,6 +3484,7 @@ class CLITests(unittest.TestCase):
 
     def test_function_export_out_never_exposes_a_partial_destination(self) -> None:
         self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
         expected = self.live_document("echo").encode("utf-8")
         root = self.export_root()
         destination = root / "bundle.json"
@@ -3494,6 +3506,7 @@ class CLITests(unittest.TestCase):
 
     def test_function_export_out_never_writes_through_the_destination_name(self) -> None:
         self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
         expected = self.live_document("echo").encode("utf-8")
         root = self.export_root()
         # A name that reproduces its own temp: the prefix caps at 64 characters,
@@ -3528,19 +3541,20 @@ class CLITests(unittest.TestCase):
 
     def test_function_export_out_rechecks_the_destination_before_replacing(self) -> None:
         self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
         root = self.export_root()
         destination = root / "bundle.json"
         referent = root / "referent"
         referent.write_bytes(b"referent-bytes")
-        verify_function = System.verify_function
+        serving = System.serving
 
         def racing(self_: typing.Any, *arguments: typing.Any, **keywords: typing.Any) -> typing.Any:
             # The destination turns into a symlink after the structural check and
             # before the writer runs; only the recheck can still catch it.
             destination.symlink_to(referent)
-            return verify_function(self_, *arguments, **keywords)
+            return serving(self_, *arguments, **keywords)
 
-        with mock.patch.object(System, "verify_function", racing):
+        with mock.patch.object(System, "serving", racing):
             run = self.run_cli("function", "export", "echo", "--out", str(destination))
         self.assertEqual(run.status, 2)
         self.assertEqual(run.stdout_bytes, b"")
@@ -3557,6 +3571,7 @@ class CLITests(unittest.TestCase):
 
     def test_function_export_out_checks_the_destination_with_one_stat_each_time(self) -> None:
         self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
         root = self.export_root()
         destination = root / "bundle.json"
         observed: list[str] = []
@@ -3577,6 +3592,7 @@ class CLITests(unittest.TestCase):
 
     def test_function_export_out_rejects_unusable_destinations(self) -> None:
         self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
         root = self.export_root()
         regular = root / "regular"
         regular.write_bytes(b"regular")
@@ -3640,6 +3656,7 @@ class CLITests(unittest.TestCase):
 
     def test_function_export_out_bounds_the_target_name_at_the_filesystem_maximum(self) -> None:
         self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
         root = self.export_root()
         maximum = os.pathconf(str(root), "PC_NAME_MAX")
         accepted = root / ("A" * maximum)
@@ -3662,6 +3679,7 @@ class CLITests(unittest.TestCase):
 
     def test_function_export_out_keeps_mode_0600_under_a_permissive_umask(self) -> None:
         self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
         root = self.export_root()
         destination = root / "bundle.json"
         previous = os.umask(0o777)
@@ -3674,6 +3692,7 @@ class CLITests(unittest.TestCase):
 
     def test_function_export_out_translates_write_failures_and_keeps_the_old_bytes(self) -> None:
         self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
         root = self.export_root()
         destination = root / "bundle.json"
         destination.write_bytes(b"previous-bundle")
@@ -3711,6 +3730,7 @@ class CLITests(unittest.TestCase):
 
     def test_function_export_out_writes_non_ascii_as_exact_utf8(self) -> None:
         self.register("unicode")
+        System(self.database).set_switch("tenant", "unicode", mode="follow", actor="operator")
         self.confirm_text("unicode", "Grüße 日本語", "unicode-a")
         self.run_cli("compile", "unicode")
         self.promote_set("unicode")
@@ -3729,6 +3749,7 @@ class CLITests(unittest.TestCase):
 
     def test_function_export_out_writes_the_empty_promoted_document(self) -> None:
         self.register("empty")
+        System(self.database).set_switch("tenant", "empty", mode="follow", actor="operator")
         root = self.export_root()
         destination = root / "bundle.json"
         run = self.run_cli("function", "export", "empty", "--out", str(destination))
@@ -3744,6 +3765,7 @@ class CLITests(unittest.TestCase):
         from cement_runtime.json_value import canonicalize
 
         self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
         root = self.export_root()
         destination = root / "bundle.json"
         run = self.run_cli("function", "export", "echo", "--out", str(destination))
@@ -3755,6 +3777,7 @@ class CLITests(unittest.TestCase):
 
     def test_function_export_out_and_stdout_carry_identical_bytes(self) -> None:
         self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
         root = self.export_root()
         destination = root / "bundle.json"
         piped = self.run_cli("function", "export", "echo")
@@ -3766,6 +3789,7 @@ class CLITests(unittest.TestCase):
 
     def test_function_export_out_treats_a_bare_dash_as_a_filename(self) -> None:
         self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
         root = self.export_root()
         destination = root / "-"
         run = self.run_cli("function", "export", "echo", "--out", str(destination))
@@ -3777,6 +3801,7 @@ class CLITests(unittest.TestCase):
 
     def test_function_export_out_reports_the_resolved_destination(self) -> None:
         self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
         root = self.export_root()
         actual = root / "actual"
         actual.mkdir()
@@ -3794,6 +3819,7 @@ class CLITests(unittest.TestCase):
 
     def test_function_export_out_resolves_a_relative_destination_against_the_cwd(self) -> None:
         self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
         root = self.export_root()
         previous = pathlib.Path.cwd()
         os.chdir(root)
@@ -3808,6 +3834,7 @@ class CLITests(unittest.TestCase):
     def test_function_export_out_writes_nothing_when_the_source_fails(self) -> None:
         foreign = self.promoted_operation("beta", 2)
         self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
         root = self.export_root()
         destination = root / "bundle.json"
         corrupt = self.promoted_operation("gamma", 2)
@@ -3840,7 +3867,7 @@ class CLITests(unittest.TestCase):
             function_hash="e" * 64,
             checks=(FunctionCheck(key="probe", passed=True, detail="held"),),
         )
-        with mock.patch.object(System, "verify_function", return_value=verdict):
+        with mock.patch.object(System, "serving", return_value=(mock.sentinel.switch, verdict)):
             guarded = self.run_cli("function", "export", "echo", "--out", str(destination))
         self.assertEqual(guarded.status, 5)
         self.assertEqual(guarded.stdout_bytes, b"")
@@ -3951,12 +3978,12 @@ class CLITests(unittest.TestCase):
             with self.subTest(expected=expected):
                 replacement: typing.Any
                 if exception is None:
-                    replacement = mock.Mock(return_value=verdict)
+                    replacement = mock.Mock(return_value=(mock.sentinel.switch, verdict))
                 else:
                     replacement = mock.Mock(side_effect=exception)
                 # Patch the library boundary; patching `_run` would replace the
                 # branch under test.
-                with mock.patch.object(System, "verify_function", replacement):
+                with mock.patch.object(System, "serving", replacement):
                     run = self.run_cli("function", "export", "echo", "--out", str(destination))
                 self.assertEqual(run.status, expected)
                 self.assertEqual(run.stdout_bytes, b"")
@@ -3977,6 +4004,7 @@ class CLITests(unittest.TestCase):
 
     def exported_bundle(self, members: int = 3) -> tuple[pathlib.Path, str, str]:
         self.promoted_operation("echo", members)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
         destination = pathlib.Path(self.temporary.name) / "bundle.json"
         self.assertEqual(
             self.run_cli("function", "export", "echo", "--out", str(destination)).status, 0
@@ -4470,6 +4498,7 @@ class CLITests(unittest.TestCase):
         # The spine case for a freshly registered operation: verification passes
         # vacuously, so the export is a real document with no entries.
         self.register("echo")
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
         destination = pathlib.Path(self.temporary.name) / "empty.json"
         self.assertEqual(
             self.run_cli("function", "export", "echo", "--out", str(destination)).status, 0

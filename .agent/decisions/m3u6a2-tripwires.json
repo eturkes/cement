@@ -6,34 +6,34 @@
   "freezes": [
     {
       "lines": 34,
-      "locus": "tests/test_cli_removal_battery.py:1146",
+      "locus": "tests/test_cli_removal_battery.py:1149",
       "scope": "GIT-RANGE",
       "test": "test_d15a_the_six_runtime_modules_stay_byte_identical_to_their_3"
     },
     {
       "lines": 41,
-      "locus": "tests/test_cli_removal_battery.py:1181",
+      "locus": "tests/test_cli_removal_battery.py:1184",
       "scope": "GIT-RANGE",
       "test": "test_d15b_the_twelve_examples_files_stay_byte_identical_to_their"
     },
     {
       "lines": 108,
-      "locus": "tests/test_cli_removal_battery.py:2799",
+      "locus": "tests/test_cli_removal_battery.py:2812",
       "scope": "GIT-RANGE",
       "test": "test_d22b_direction_library_route_every_library_api_locus_is_byt"
     },
     {
       "lines": 60,
-      "locus": "tests/test_cli_removal_battery.py:2908",
+      "locus": "tests/test_cli_removal_battery.py:2921",
       "scope": "GIT-RANGE",
       "test": "test_d22c_the_opening_text_handle_request_fence_is_protected_and"
     }
   ],
-  "head": "1899134da293182c1aea3d7ba15d825c9926f328",
+  "head": "8ca66ee5e610a28c4ccfc8d1244ac93d32a965cb",
   "pins": [
     {
       "lines": 76,
-      "locus": "tests/test_cli_channels.py:2428",
+      "locus": "tests/test_cli_channels.py:2439",
       "scope": "WORKING-TREE",
       "test": "test_x20_new_command_help_and_publication_prohibit_retry_advice_and",
       "vocabulary": [
@@ -43,7 +43,7 @@
     },
     {
       "lines": 49,
-      "locus": "tests/test_cli_channels.py:2878",
+      "locus": "tests/test_cli_channels.py:2891",
       "scope": "WORKING-TREE",
       "test": "test_x29_the_publication_grep_scope_is_ambiguous_between_a_document",
       "vocabulary": [
@@ -54,7 +54,7 @@
     },
     {
       "lines": 81,
-      "locus": "tests/test_cli_channels.py:2928",
+      "locus": "tests/test_cli_channels.py:2941",
       "scope": "WORKING-TREE",
       "test": "test_x30_every_placeholder_in_each_shipped_shell_block_is_produced",
       "vocabulary": [
@@ -63,7 +63,7 @@
     },
     {
       "lines": 111,
-      "locus": "tests/test_cli_channels_battery.py:2410",
+      "locus": "tests/test_cli_channels_battery.py:2417",
       "scope": "WORKING-TREE",
       "test": "test_d23_there_is_no_idempotency_two_byte_identical_submissions_ret",
       "vocabulary": [
@@ -74,7 +74,7 @@
     },
     {
       "lines": 82,
-      "locus": "tests/test_cli_removal_battery.py:2716",
+      "locus": "tests/test_cli_removal_battery.py:2729",
       "scope": "WORKING-TREE",
       "test": "test_d22a_direction_cli_route_every_cli_route_locus_was_rewritte",
       "vocabulary": [
@@ -88,7 +88,7 @@
     },
     {
       "lines": 108,
-      "locus": "tests/test_cli_removal_battery.py:2799",
+      "locus": "tests/test_cli_removal_battery.py:2812",
       "scope": "GIT-RANGE",
       "test": "test_d22b_direction_library_route_every_library_api_locus_is_byt",
       "vocabulary": [
@@ -103,7 +103,7 @@
     },
     {
       "lines": 60,
-      "locus": "tests/test_cli_removal_battery.py:2908",
+      "locus": "tests/test_cli_removal_battery.py:2921",
       "scope": "GIT-RANGE",
       "test": "test_d22c_the_opening_text_handle_request_fence_is_protected_and",
       "vocabulary": [
@@ -127,7 +127,7 @@
     },
     {
       "lines": 34,
-      "locus": "tests/test_proposal_binding_battery.py:2018",
+      "locus": "tests/test_proposal_binding_battery.py:2016",
       "scope": "WORKING-TREE",
       "test": "test_b25_prose_alone_teaches_reviewresult_and_the",
       "vocabulary": [
@@ -136,7 +136,7 @@
     },
     {
       "lines": 52,
-      "locus": "tests/test_proposal_binding_battery.py:2053",
+      "locus": "tests/test_proposal_binding_battery.py:2051",
       "scope": "WORKING-TREE",
       "test": "test_b26_a15_prose_outside_code_fences_names",
       "vocabulary": [
@@ -145,7 +145,7 @@
     },
     {
       "lines": 33,
-      "locus": "tests/test_proposal_binding_battery.py:2106",
+      "locus": "tests/test_proposal_binding_battery.py:2104",
       "scope": "WORKING-TREE",
       "test": "test_b27_no_public_surface_retains_the_unqualified",
       "vocabulary": [
@@ -154,7 +154,7 @@
     },
     {
       "lines": 29,
-      "locus": "tests/test_submission_battery.py:1498",
+      "locus": "tests/test_submission_battery.py:1518",
       "scope": "GIT-RANGE",
       "test": "test_d25_shipped_prose_says_schema_v2_retains",
       "vocabulary": [
@@ -163,7 +163,7 @@
     },
     {
       "lines": 16,
-      "locus": "tests/test_submission_battery.py:1778",
+      "locus": "tests/test_submission_battery.py:1762",
       "scope": "WORKING-TREE",
       "test": "test_d33_no_shipped_surface_calls_submission_cheap",
       "vocabulary": [
@@ -172,7 +172,7 @@
     },
     {
       "lines": 30,
-      "locus": "tests/test_submission_battery.py:1795",
+      "locus": "tests/test_submission_battery.py:1779",
       "scope": "WORKING-TREE",
       "test": "test_d34_readme_and_the_three_normative_docs",
       "vocabulary": [
@@ -181,7 +181,7 @@
     },
     {
       "lines": 28,
-      "locus": "tests/test_submission_battery.py:2227",
+      "locus": "tests/test_submission_battery.py:2211",
       "scope": "WORKING-TREE",
       "test": "test_d41_readme_and_the_normative_docs_name",
       "vocabulary": [
@@ -202,26 +202,26 @@
           ]
         },
         {
-          "line": 145,
+          "line": 148,
           "tokens": [
             "lease"
           ]
         },
         {
-          "line": 334,
+          "line": 343,
           "tokens": [
             "request"
           ]
         },
         {
-          "line": 351,
+          "line": 360,
           "tokens": [
             "request"
           ]
         }
       ],
       "owner": "M3.6a2",
-      "total_lines": 441
+      "total_lines": 450
     },
     {
       "document": "docs/architecture.md",
@@ -241,14 +241,14 @@
           ]
         },
         {
-          "line": 124,
+          "line": 125,
           "tokens": [
             "lease"
           ]
         }
       ],
       "owner": "M3.6a2",
-      "total_lines": 210
+      "total_lines": 211
     },
     {
       "document": "examples/command_source/README.md",
@@ -256,14 +256,14 @@
       "hit_lines": 1,
       "hits": [
         {
-          "line": 82,
+          "line": 86,
           "tokens": [
             "request"
           ]
         }
       ],
       "owner": "M3.6a2",
-      "total_lines": 83
+      "total_lines": 87
     },
     {
       "document": "docs/threat-model.md",
@@ -279,14 +279,14 @@
       "hit_lines": 1,
       "hits": [
         {
-          "line": 245,
+          "line": 246,
           "tokens": [
             "request"
           ]
         }
       ],
       "owner": "M3.6a1",
-      "total_lines": 247
+      "total_lines": 248
     }
   ],
   "totals": {
