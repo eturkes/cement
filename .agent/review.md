@@ -15,6 +15,26 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## M5.3 close (IMPLEMENT, unit) — target `097de5b` (squash of `archive/m5u3-land`; review read `c22ef68`, re-review `74a19df`), records in the next commit
+
+Check set fixed before the diff was read: correctness (reviewer-25: contract §7 E1-E4, X6 capture binding, the smoke record), cleanup (reviewer-26), altitude (reviewer-27), security S1-S6 (MAIN). One re-review round (reviewer-29, 6 rows). Raw tables: `.scratch/review/m5u3/`, `.scratch/review/m5u3-r2/`.
+
+| id | lens | verdict | ruling (MAIN-verified) |
+|---|---|---|---|
+| F1 / S4 | capture | finding (major) → fixed | a malformed peer record (`operation: []`, unhashable) raised inside `_pairs` and dropped an unrelated valid pair; each call is validated alone. |
+| F2 / S4 | capture | finding (major) → fixed | absent ids compared equal (`None == None`) and selected a history message; the filter now requires the current message id, and a chat or question without an id retains nothing. |
+| F3 / S2 | capture | finding (major) → fixed | the reply was cut at 16,384 characters: a 20,000-character ASCII reply that fits lost its tail, and 16,384 astral characters (65,536 B) exceeded the 64 KiB provenance bound and lost the answer. The whole reply is kept when the provenance fits, else the longest fitting prefix, marked; the README states it. |
+| F4 | capture | finding (major) → fixed | an accepted record without `output` was retained as null; required keys are checked before pairing. |
+| F5 | battery | finding (major) → fixed | nine E4/X6 obligations survived the battery; `CaptureBindingBattery` pins source id + provenance per pair + failure containment; `.agent/decisions/m5u3-capture-mutants.py` 9/9 killed (exits 1 on a survivor). |
+| S5 | security | finding → fixed | the README never said retained answers are untrusted: `/api/chat/completed` lets a signed-in user resubmit fabricated tool calls; the README now names the three gates (learning pass, support floor, switch). |
+| AL4 (F1) | altitude | finding (major) → fixed | `examples/open_webui/README.md` missing from the L24 Markdown census `DOCS`; the tripwire pair regenerated (stack repair). |
+| S6 | security | register | notifications carry `CementError` text, which can name the admin-configured ledger path; deployment-local exposure, ruled no change. |
+| other rows | all lenses | pass | 8/8 + 4/4 cleanup pass; wheel excludes the example, sdist carries it. |
+
+Red-first: b4dd7b4 (branch fix/m5u3) at c22ef68's code → `uv run python -m unittest tests.test_open_webui_example` failures=5 errors=1 (F1-F4 tests); the binding + containment pins pass there (preservation; closure = the 9-mutant probe). Kernel capture smoke: real Open WebUI 0.12.3, 6/6 (`.agent/decisions/m5u3-smoke.md`).
+
+Gate at the squash: `.agent/gate` on `097de5b` rc 0 (clean tree, `heavy`): unittest 592.2 s, Ran 1227, outer skipped none, nested D28 = L30, D28 23 revisions / 1 replayed.
+
 ## M5.2 close (IMPLEMENT, unit) — target `6e9e715` (squash of `archive/m5u2-land`; review read `d4ed851`), records in the next commit
 
 Check set fixed before the diff was read: correctness (reviewer-4: contract §6 LP0-LP4, learning-cases fields + code lenses), cleanup (reviewer-5), altitude (reviewer-6). Raw tables: `.scratch/review/m5u2/`.
