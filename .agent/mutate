@@ -15,8 +15,9 @@ across `--workers` clones by a stable hash of (module, operator, occurrence).
 
 Usage: uv run python .agent/mutate <test id> [--rev REV] [--workers N] [--timeout SECONDS]
   test id = a dotted unittest id, e.g. tests.test_function.FunctionTests.test_x
-Prints scope, killed, survived (each survivor: file:line operator occurrence), incompetent and
-skipped counts; rc 0 when the run completes, 2 when the baseline is red or setup fails.
+Prints scope + the tally killed, survived (each survivor: file:line operator occurrence),
+incompetent, invalid, no-test, error; rc 0 when the run completes, 2 when the baseline is red or
+setup fails.
 """
 
 from __future__ import annotations
@@ -95,7 +96,9 @@ def _run_shard(tree: pathlib.Path, config: str, executed: dict[str, set[int]], i
                 # keyword-only parameter list); a mutant that does not compile is incompetent,
                 # and a test "killing" it would be a phantom kill.
                 path = tree / mutation.module_path
-                source = sources.setdefault(str(path), path.read_text(encoding="utf-8"))
+                if str(path) not in sources:
+                    sources[str(path)] = path.read_text(encoding="utf-8")
+                source = sources[str(path)]
                 operator = cosmic_ray.plugins.get_operator(mutation.operator_name)(
                     **mutation.operator_args
                 )

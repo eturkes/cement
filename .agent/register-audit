@@ -81,9 +81,13 @@ def blocks(text: str) -> list[tuple[int, str]]:
     return out
 
 
+def prose(text: str) -> str:
+    """The words a reader reads: link text kept, link targets + inline code blanked."""
+    return INLINE_CODE.sub("CODE", LINK.sub(r"\1", text))
+
+
 def sentences(text: str) -> list[str]:
-    body = INLINE_CODE.sub("CODE", LINK.sub(r"\1", text))
-    body = BLOCK_START.sub("", body)
+    body = BLOCK_START.sub("", prose(text))
     parts: list[str] = []
     buffer = ""
     for token in re.split(r"(?<=[.?!])\s+", body):
@@ -110,20 +114,20 @@ def main(argv: list[str]) -> int:
     filler_total = 0
     for path in paths:
         units = blocks(path.read_text(encoding="utf-8"))
-        prose = [(number, s) for number, text in units for s in sentences(text)]
-        joined = "\n".join(INLINE_CODE.sub("CODE", text) for _, text in units)
-        filler = [(n, m.group(0)) for n, text in units for m in FILLER.finditer(INLINE_CODE.sub("CODE", text))]
+        said = [(number, s) for number, text in units for s in sentences(text)]
+        joined = "\n".join(prose(text) for _, text in units)
+        filler = [(n, m.group(0)) for n, text in units for m in FILLER.finditer(prose(text))]
         filler_total += len(filler)
-        longest = max((words(s) for _, s in prose), default=0)
+        longest = max((words(s) for _, s in said), default=0)
         print(
-            f"== {path}: {len(prose)} sentences, longest {longest} words, filler {len(filler)}, "
+            f"== {path}: {len(said)} sentences, longest {longest} words, filler {len(filler)}, "
             f"passive {len(PASSIVE.findall(joined))}, modal {len(MODAL.findall(joined))}, "
             f"contraction {len(CONTRACTION.findall(joined))}, dash {len(DASH.findall(joined))}"
         )
         for number, word in filler:
             print(f"  FILLER {path}:{number}: {word}")
         if not gate:
-            for number, sentence in prose:
+            for number, sentence in said:
                 print(f"  {path}:{number} [{words(sentence)}] {sentence}")
     if filler_total:
         print(f"register-audit: FAIL ({filler_total} filler hits)")

@@ -2,9 +2,12 @@
 """skip-census — the suite's skip set must EQUAL the allowlist below (p66 + p85).
 
 unittest scores a skip as success, so a fourth skip enters a green `OK` unseen. This census
-parses every `tests/*.py` (AST, so a docstring that names `skipTest` is no hit) and finds each
-skip site: `skipTest` calls, `raise SkipTest`, and `skip`/`skipIf`/`skipUnless`/
-`expectedFailure` decorators or calls. Each hit = (file, test id, kind, condition); the set must
+parses every `.py` under `tests/`, nested packages included as discovery recurses (AST, so a
+docstring that names `skipTest` is no hit) and finds each skip site: `skipTest` calls,
+`raise SkipTest`, and `skip`/`skipIf`/`skipUnless`/`expectedFailure` decorators or calls — by
+attribute, by bare name, or through a rebinding (`from unittest import skip as later`,
+`later = unittest.skip`, re-imported under any name from another scanned module); a binding the
+AST cannot follow (`getattr` by string) stays outside it. Each hit = (file, test id, kind, condition); the set must
 equal ALLOWED exactly, each member carrying its reason class. It prints every hit with its
 class, every UNLISTED hit and every allowlisted member it no longer finds, and exits 1 on either.
 It lives in `.agent/`, outside the `tests/` tree it scans, so it never counts itself.
@@ -45,14 +48,41 @@ ALLOWED = {
 DECORATORS = {"skip", "skipIf", "skipUnless", "expectedFailure"}
 
 
+SKIP_NAMES = {"skipTest", "SkipTest", *DECORATORS}
+# Rebinding of a skip form, by local name → canonical kind; filled per run by `_aliases`.
+ALIASES: dict[str, str] = {}
+
+
 def _name(node: ast.expr) -> str | None:
     if isinstance(node, ast.Call):
         node = node.func
     if isinstance(node, ast.Attribute):
         return node.attr
     if isinstance(node, ast.Name):
-        return node.id
+        return ALIASES.get(node.id, node.id)
     return None
+
+
+def _aliases(trees: list[ast.Module]) -> None:
+    """Every name a module binds to a skip form, followed until no new binding appears."""
+    changed = True
+    while changed:
+        changed = False
+        for tree in trees:
+            for node in ast.walk(tree):
+                pairs: list[tuple[str, str | None]] = []
+                if isinstance(node, ast.ImportFrom):
+                    pairs = [
+                        (alias.asname or alias.name, ALIASES.get(alias.name, alias.name))
+                        for alias in node.names
+                    ]
+                elif isinstance(node, ast.Assign):
+                    kind = _name(node.value)
+                    pairs = [(t.id, kind) for t in node.targets if isinstance(t, ast.Name)]
+                for local, kind in pairs:
+                    if kind in SKIP_NAMES and local != kind and ALIASES.get(local) != kind:
+                        ALIASES[local] = kind
+                        changed = True
 
 
 def _owner(stack: list[ast.AST]) -> str:
@@ -69,8 +99,7 @@ def _guard(stack: list[ast.AST], node: ast.AST) -> str:
     return "always"
 
 
-def hits(path: pathlib.Path, relative: str) -> list[tuple[str, str, str, str]]:
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=relative)
+def hits(tree: ast.Module, relative: str) -> list[tuple[str, str, str, str]]:
     found: list[tuple[str, str, str, str]] = []
     decorators = {
         id(decorator)
@@ -94,7 +123,7 @@ def hits(path: pathlib.Path, relative: str) -> list[tuple[str, str, str, str]]:
         elif (
             isinstance(node, ast.Call)
             and id(node) not in decorators
-            and _name(node) in {"skipTest", *DECORATORS}
+            and _name(node) in SKIP_NAMES - {"SkipTest"}
         ):
             found.append((relative, _owner(stack), str(_name(node)), _guard(stack, node)))
         elif isinstance(node, ast.Raise) and node.exc is not None and _name(node.exc) == "SkipTest":
@@ -108,11 +137,17 @@ def hits(path: pathlib.Path, relative: str) -> list[tuple[str, str, str, str]]:
 
 def main(argv: list[str]) -> int:
     root = pathlib.Path(argv[1] if len(argv) > 1 else "tests")
-    paths = sorted(root.glob("*.py"))
+    paths = sorted(root.rglob("*.py"))
     if not paths:
-        print(f"skip-census: no tests/*.py under {root}", file=sys.stderr)
+        print(f"skip-census: no .py under {root}", file=sys.stderr)
         return 2
-    found = [hit for path in paths for hit in hits(path, f"tests/{path.name}")]
+    relative = [f"tests/{path.relative_to(root).as_posix()}" for path in paths]
+    trees = [
+        ast.parse(path.read_text(encoding="utf-8"), filename=name)
+        for path, name in zip(paths, relative, strict=True)
+    ]
+    _aliases(trees)
+    found = [hit for tree, name in zip(trees, relative, strict=True) for hit in hits(tree, name)]
     print(f"skip-census: {len(paths)} modules, {len(found)} skip sites, {len(ALLOWED)} allowed")
     for hit in found:
         print(f"  {ALLOWED.get(hit, 'UNLISTED'):<13} {hit[0]}::{hit[1]} {hit[2]}({hit[3]})")

@@ -15,6 +15,21 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## M3.10 gate tooling close (IMPLEMENT, unit) — target `629577d`, review fixes in the commit that lands this section
+
+Check set fixed before the diff was read: correctness C1-C8 + acceptance A1-A6 (reviewer-15), cleanup L1-L8 (reviewer-16), altitude AL1-AL6 (reviewer-17), security S1-S7 (MAIN: scanner config is security vocabulary, kept off the teammate route). Raw tables: `.scratch/review/m3u10/`.
+
+| id | lens | verdict | ruling (MAIN-verified) |
+|---|---|---|---|
+| C1-C4, C6-C8 | correctness | pass | src edits = typing/lint shape only; `compile`/`resolve`/`verify_function` AST-identical to `e22282f` (reviewer-16); 116 + 8 re-scoped tests OK. |
+| A2, C5 | skip census | finding F1 (major) → fixed | `from unittest import skip as not_ready` + `@not_ready` skipped a real test with census rc 0 (reviewer-15); a fourth skip in a nested `tests/nested/` package, which discovery runs, also rc 0 (reviewer-17 F1). Census now `rglob`s and follows rebinding (import-as, assignment, cross-module re-import). Old census rc 0 / new rc 1 on all three seeds; shipped tree rc 0. |
+| A3 | register audit | finding F2 (minor) → fixed | a link TARGET holding `simply` tripped the filler count (`[guide](https://example.com/simply-start)` rc 1); filler + counts now read `prose()` (link text kept, target + inline code blanked). Old rc 1 / new rc 0; `simply` in prose still rc 1. |
+| AL5 | rules | finding F3 (minor) → fixed | `human-facing.md` claimed the `register` step covers CLI help; it reads Markdown only. Rule corrected; the CLI help gap → p92. |
+| A1, A4-A6 | gate, mutate, CI, re-scopes | pass | one command, per-step rc + time, rc 0 only all-green; mutate tally excludes invalid/incompetent from kills; CI push + pull_request + schedule, Dependabot `uv` + `github-actions`. |
+| L1-L8 | cleanup | pass + register | R1 full/split dispatch repeats three step lines → ruled no change (explicit step lists read clearer than a selector; CI calls the gate, never restates it). R2 eager `read_text` inside `setdefault` → fixed (miss-only read). R3 mutate docstring named a `skipped` tally it never prints → fixed. |
+| AL1-AL4, AL6 | altitude | pass | public library + CLI surface byte-identical after sentinel normalization (57 exports, 35 help nodes, 7 invalid CLI cases); versions single-sourced in `pyproject.toml` + `uv.lock`. |
+| S1-S7 | security | pass + register | pinned binary sha256-refused on mismatch; `--log-opts=HEAD` + `fetch-depth: 0`; exact-fingerprint ignores; `uv audit` offline → rc 2 (fail closed); CI `contents: read`, SHA-pinned actions, `persist-credentials: false`, `pull_request` only; every `S` noqa reason true (S608 fragments = code-chosen literals). R1: a cached `.tools/` binary is not re-hashed on reuse (local-only exposure). |
+
 ## M4/M5 contract (IMPLEMENT, unit contract before code) — target `.agent/decisions/m45-contract.md` revision 3
 
 Check set fixed before the draft was read: the draft's own §8 questions C1-C8, plus the reviewer's
