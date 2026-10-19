@@ -15,6 +15,23 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## M5.2 close (IMPLEMENT, unit) — target `6e9e715` (squash of `archive/m5u2-land`; review read `d4ed851`), records in the next commit
+
+Check set fixed before the diff was read: correctness (reviewer-4: contract §6 LP0-LP4, learning-cases fields + code lenses), cleanup (reviewer-5), altitude (reviewer-6). Raw tables: `.scratch/review/m5u2/`.
+
+| id | lens | verdict | ruling (MAIN-verified) |
+|---|---|---|---|
+| F1 / ALT-1 | resume | finding (major) → fixed | an unfinished merge (two active outputs on one case, no pending proposal) reported `nothing_to_learn`; the work classifier now reads active case outputs (LP2f red at 123f360). |
+| F2 | resume | finding (major) → fixed | an interruption before `projection set` lost a ready projected case: the skill's resume rule reads `program.json` against `projection show` (LP0d skill pin red at feebf9f); the read surface is contract amendment A7. |
+| CL1 | cleanup | finding (minor) → fixed | `learning_cases` reuses the same-snapshot build projection (LP2g red at 3c60f8f: 3 != 1). |
+| CL2 | cleanup | finding (minor) → fixed | one executable workflow in `SKILL.md`, references for detail. |
+| R1 | altitude | finding (minor) → fixed | the projection reference confused schema field names with their values; reworded. |
+| other rows | all lenses | pass | — |
+
+Red-first (tag archive/m5u2-impl = 55c83fb, base 72e15b0): SupersessionBattery + ContradictedPromotionBattery at ddcd7d7; LearningCasesBattery LP2a-e + ScriptedPassBattery LP0/LP1 at d4a52c0 (no `learn` leaf); SkillBattery LP3 + PolicyDefaultsBattery LP4 at 287aa4f / 72e15b0 (defaults 3/2/7d). Command: detached worktree + battery copy, `PYTHONPATH=src uv run --no-project --python 3.13 python -m unittest tests.test_learning_pass_battery.<class>`.
+
+Gate at the squash: `.agent/gate` on `6e9e715` rc 0 (clean tree, `heavy`): unittest 639.9 s, Ran 1209, outer skipped none, nested D28 = L30, D28 22 revisions / 1 replayed.
+
 ## M4.2 close (IMPLEMENT, unit) — target `87d011f` (squash of `archive/m4u2-land`; round 1 read `93904e3`, re-review `e5b7f26`), records in the next commit
 
 Check set fixed before the diff was read: correctness (reviewer-10: contract §5 L1-L9, X7, C4, S7 + code lenses, 33 rows), cleanup (reviewer-11), altitude (reviewer-12); one re-review round (reviewer-21, 14 rows, acceptance checks alone). Raw tables: `.scratch/review/m4u2/`, `.scratch/review/m4u2-r2/`.

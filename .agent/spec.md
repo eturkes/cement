@@ -140,9 +140,9 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 - [x] 1289797 M5.1 switch + versions: per operation `off` | `follow` | `pinned`; rollback = pin; `resolve` + `function export` serve the selected version; `function versions` + Read diff.
 - [x] 535a0a9 M4.1 projection IR `cement-projection-v1`: a pure, total, terminating interpreter; `tester` differential oracle.
 - [x] 87d011f M4.2 projection lifecycle: raw input → projected key; verification against every confirmed raw input + boundary probes, fail-closed; compile by key; the bundle carries the projection; `resolve` + `function eval` on raw input.
-- [ ] M5.2 learning pass: defaults 2/1/0, `learning-pass` reviewer, a CLI read surface over retained answers by case, the skill (merge scripts, write the projection, compile, verify, promote).
-  - Resume point: IMPLEMENT resumes here — unlanded stack (machine-local; the stack repair's `wt/gp5-<unit>` branches carry each unit repaired over the layer below): `impl/m5u2-land` → `impl/m5u3-land` → `impl/m3u8-land` → `wt/general-purpose-2` (prototype). Land in that order: rebase onto main, full gate under `heavy`, squash + records.
+- [x] 6e9e715 M5.2 learning pass: defaults 2/1/0, `learning-pass` reviewer, a CLI read surface over retained answers by case, the skill (merge scripts, write the projection, compile, verify, promote).
 - [ ] M5.3 Open WebUI example: Cement functions as a tool the chat model calls + a filter that retains answers.
+  - Resume point: IMPLEMENT resumes here — unlanded stack (machine-local; the stack repair's `wt/gp5-<unit>` branches carry each unit repaired over the layer below): `impl/m5u3-land` → `impl/m3u8-land` → `wt/general-purpose-2` (prototype). Land in that order: rebase onto main, full gate under `heavy`, squash + records.
 - [ ] M3.8 demo + transcript regeneration via idempotent updater (`data`): the hospital example on projection + learning pass + switch.
 - [ ] Prototype on the real switch + versions (PROTOTYPE law).
 - [ ] M3.9a docs claim ledger rewrite (`docs`): README paragraph 1 + `docs/` + CLI help follow `Intent`; README install/run/configure current for everything shipped.
