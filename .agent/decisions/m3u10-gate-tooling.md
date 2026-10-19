@@ -67,8 +67,8 @@ Pin = `tests.test_json_value.CanonicalJSONTests.test_parser_rejects_ambiguous_or
 
 | revision | what it holds | killed | survived | invalid |
 |---|---|---|---|---|
-| `593df5a` (`wt/tooling`) | the pin as shipped | 131 | 126 | 1 |
-| `97d5d01` (`seed/p74`) | the pin with its `parse_json` assertion deleted | 124 | 133 | 1 |
+| `593df5a` (tag `archive/m3u10-trial`) | the pin as shipped | 131 | 126 | 1 |
+| `97d5d01` (tag `archive/m3u10-p74-seed`) | the pin with its `parse_json` assertion deleted | 124 | 133 | 1 |
 
 Deleting the pin's assertion raises the survivor count on the same run (126 → 133): p74's acceptance.
 `invalid` = a mutant cosmic-ray cannot build (its exception replacer raises on a parso `PythonNode`)

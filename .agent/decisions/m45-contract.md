@@ -1,7 +1,8 @@
 # M4/M5 contract — schema v3, switch + versions, projection, learning pass, Open WebUI example
 
 Status: REVISION 3 + implementation amendments (A1 receipt ABI name, A2 S7 read-side, A3
-p50/p51 surface, A4 source_id submission key, A5 contradiction = state, A6 `--program` channel) —
+p50/p51 surface, A4 source_id submission key, A5 contradiction = state, A6 `--program` channel,
+A7 build-current program read surface) —
 consultant-1 rows C1-C8 + X1-X7 + its re-review of revision 2 ruled
 (`.agent/review.md` M4/M5 contract section), owner rulings O1-O9 below. Every unit = tier `kernel` unless marked. Every predicate =
 a test or a gate check; a unit closes on its numbered gate list rerun from committed state (§9).
@@ -315,6 +316,10 @@ Predicates:
 - `System.test_projection(partition, operation, program) -> ProjectionReport` — read-only: per
   active example + pending proposal its key or NoMatch reason; per key support, distinct outputs,
   readiness; unwitnessed layouts. A preview only.
+- `System.projection(partition, operation) -> {operation_revision, program, program_hash} | None`
+  + CLI `projection show <op>` (A7) — read-only: the build-current program (`None` = exact mode).
+  The skill's resume rule reads it: an earlier pass's `program.json` that `projection show` does
+  not return = a pass stopped before `projection set`.
 - `System.set_projection(partition, operation, program, *, actor) -> ProjectionSetting` — ONE write
   transaction: validate (V1); V2 every layout witnessed by ≥ 1 active example of the current
   revision; V3 no key groups active examples with different outputs; V4 ≥ 1 active example
