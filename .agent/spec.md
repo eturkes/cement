@@ -143,9 +143,9 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 - [x] 6e9e715 M5.2 learning pass: defaults 2/1/0, `learning-pass` reviewer, a CLI read surface over retained answers by case, the skill (merge scripts, write the projection, compile, verify, promote).
 - [x] 097de5b M5.3 Open WebUI example: Cement functions as a tool the chat model calls + a filter that retains answers.
 - [x] ef06a25 M3.8 demo + transcript regeneration via idempotent updater (`data`): the hospital example on projection + learning pass + switch.
-- [ ] Prototype on the real switch + versions (PROTOTYPE law).
-  - Resume point: IMPLEMENT resumes here — the prototype commits sit on `impl/m3u9a` (machine-local) below M3.9a's rewrite; cherry-pick them onto `main` (PROTOTYPE law, no suite owed), then land M3.9a once its prose-pin repair (`wt/gp6`) is green.
+- [x] a97bbc3 Prototype on the real switch + versions (PROTOTYPE law).
 - [ ] M3.9a docs claim ledger rewrite (`docs`): README paragraph 1 + `docs/` + CLI help follow `Intent`; README install/run/configure current for everything shipped.
+  - Resume point: IMPLEMENT resumes here — `impl/m3u9a` (machine-local) holds the rewrite + claim ledger `.agent/decisions/m3u9a-claims.md`; its prose-pin repair runs on `wt/gp6`. Land: squash both, full gate, then M3.9b replays the ledger.
 - [ ] M3.9b independent replay of the M3.9a rewrite (`docs`).
 - [ ] README + prototype disposition: `prototype/webui-demo` stays at `prototype/` (owner-ruled) → `Artifacts`.
 - [ ] Phase-close review over the whole phase diff: every lens, one `reviewer` per lens + MAIN's security lens.
