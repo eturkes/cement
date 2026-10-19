@@ -13,7 +13,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   - Density grade: `node prototype/webui-demo/density.mjs '<url>'` at `?reset=1` + after `capture.sh` (both need `CHROMIUMFISH_DIR`, prototype README).
 - Library `src/cement_runtime/` (`from cement_runtime import System`) + CLI `uv run cement --help` (README quick start = the lifecycle: `operation register` → `proposal submit/review` → `compile` → `function verify-drafts/inspect/promote/verify/export/eval`, `resolve`).
 - Hospital OCR example — `uv run python examples/hospital_ocr/run_demo.py` (`All checks passed.`; README transcript pinned).
-- Gate — `.agent/gate` = `uv run python -m unittest discover -s tests -t .` (1031 tests; wall time splits by `test_d28`'s replay range) + `uv build` + `.agent/spec-lint`, per-step wall-clock printed; fast gate = `.agent/gate <tests.module …>` (→ `.claude/rules/ops.md`). Instruments = `.agent/decisions/m<m>u<u>-*`.
+- Gate — `.agent/gate` = `uv run python -m unittest discover -s tests -t .` (1036 tests; wall time = non-D28 tests + one replay per range revision without a green verdict, p78) + `uv build` + `.agent/spec-lint`, per-step wall-clock printed; fast gate = `.agent/gate <tests.module …>` (→ `.claude/rules/ops.md`). Instruments = `.agent/decisions/m<m>u<u>-*`.
 
 ## Decisions
 

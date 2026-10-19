@@ -1598,34 +1598,35 @@ class MigrationBatteryTests(unittest.TestCase):
         # replay itself removed. The inner run announces itself so those frames narrow to what
         # the checkout holds; `_environment` copies `os.environ`, so this reaches every one.
         os.environ["CEMENT_D28_INNER_REPLAY"] = "1"
+        # p78: a revision whose content already replayed GREEN under this interpreter + lock is
+        # served from that verdict; red is never recorded, so a red revision replays every run.
+        replayed = 0
         try:
             for revision in revisions:
-                with self.subTest(revision=revision), _detached_worktree(
-                    ROOT, revision
-                ) as tree:
-                    (tree / "tests" / pathlib.Path(__file__).name).unlink(missing_ok=True)
-                    result = _run(
-                        [
-                            sys.executable,
-                            "-m",
-                            "unittest",
-                            "discover",
-                            "-s",
-                            "tests",
-                            "-t",
-                            ".",
-                        ],
-                        cwd=tree,
-                        root=tree,
-                        timeout=600,
-                    )
+                with self.subTest(revision=revision):
+                    key = _d28_content_key(ROOT, revision)
+                    verdict = _d28_verdict(ROOT, key)
+                    if verdict is not None:
+                        self.assertGreaterEqual(verdict[0], 949)
+                        continue
+                    replayed += 1
+                    with _detached_worktree(ROOT, revision) as tree:
+                        (tree / "tests" / pathlib.Path(__file__).name).unlink(missing_ok=True)
+                        result = _run(
+                            [sys.executable, *D28_INNER], cwd=tree, root=tree, timeout=600
+                        )
+                    output = result.stdout + result.stderr
                     self.assertEqual(result.returncode, 0, _result(result))
-                    ran = _required_match(
-                        r"(?m)^Ran (\d+) tests? in ", result.stdout + result.stderr
-                    )
-                    self.assertGreaterEqual(int(ran.group(1)), 949)
+                    ran = int(_required_match(r"(?m)^Ran (\d+) tests? in ", output).group(1))
+                    self.assertGreaterEqual(ran, 949)
+                    _d28_record(ROOT, key, ran=ran, summary=output.rstrip().splitlines()[-1])
         finally:
             os.environ.pop("CEMENT_D28_INNER_REPLAY", None)
+            print(
+                f"\nD28: {len(revisions)} revisions, {replayed} replayed, "
+                f"{len(revisions) - replayed} from green verdicts",
+                file=sys.stderr,
+            )
 
     def test_d29_m3u6a1_premise_py_grades_its_two_premises_rather_than(self) -> None:
         """D29 — `m3u6a1-premise.py` grades its two premises rather than printing them: it
@@ -1801,6 +1802,189 @@ class MigrationBatteryTests(unittest.TestCase):
             with self.subTest(parameter=required):
                 self.assertIn(required, defaults)
                 self.assertIsNone(defaults[required])
+
+
+D28_VERDICT_FORMAT = "cement-d28-verdict-v1"
+# The inner run, verbatim: it is part of what a verdict proved, so it is part of the key.
+D28_INNER = ("-m", "unittest", "discover", "-s", "tests", "-t", ".")
+
+
+def _d28_store(root: pathlib.Path) -> pathlib.Path:
+    """Verdicts live in the common git dir: shared by every worktree, tracked by none."""
+
+    common = _run(
+        ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=root, root=root
+    )
+    if common.returncode != 0:
+        raise AssertionError(_result(common))
+    return pathlib.Path(common.stdout.strip()) / "cement-d28-verdicts"
+
+
+def _d28_content_key(root: pathlib.Path, revision: str) -> dict[str, str]:
+    import sqlite3
+
+    tree = _run(["git", "rev-parse", f"{revision}^{{tree}}"], cwd=root, root=root)
+    if tree.returncode != 0:
+        raise AssertionError(_result(tree))
+    return {
+        "tree": tree.stdout.strip(),
+        "inner": " ".join(D28_INNER),
+        "python": sys.version,
+        "implementation": sys.implementation.name,
+        "platform": sys.platform,
+        "sqlite": sqlite3.sqlite_version,
+        "lock": hashlib.sha256((root / "uv.lock").read_bytes()).hexdigest(),
+    }
+
+
+def _d28_verdict_path(root: pathlib.Path, key: dict[str, str]) -> pathlib.Path:
+    digest = hashlib.sha256(json.dumps(key, sort_keys=True).encode("utf-8")).hexdigest()
+    return _d28_store(root) / f"{digest}.json"
+
+
+def _d28_verdict(root: pathlib.Path, key: dict[str, str]) -> tuple[int, str] | None:
+    """The `(ran, summary)` of a green replay under exactly this key; anything else replays."""
+
+    try:
+        record = json.loads(_d28_verdict_path(root, key).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if (
+        not isinstance(record, dict)
+        or record.get("format") != D28_VERDICT_FORMAT
+        or record.get("key") != key
+        or type(record.get("ran")) is not int
+        or type(record.get("summary")) is not str
+    ):
+        return None
+    return record["ran"], record["summary"]
+
+
+def _d28_record(root: pathlib.Path, key: dict[str, str], *, ran: int, summary: str) -> None:
+    """Record one GREEN replay; D28 calls this only after both of its replay assertions."""
+
+    path = _d28_verdict_path(root, key)
+    path.parent.mkdir(exist_ok=True)
+    text = json.dumps(
+        {"format": D28_VERDICT_FORMAT, "key": key, "ran": ran, "summary": summary},
+        sort_keys=True,
+    )
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    temporary.write_text(text + "\n", encoding="utf-8")
+    os.replace(temporary, path)
+
+
+class D28VerdictCacheTests(unittest.TestCase):
+    """p78: D28 serves a revision from a GREEN verdict keyed on its content, else replays it.
+
+    A committed tree never changes, so a replay already proven green under the same interpreter
+    and lock proves nothing new. Red is never recorded, so a red revision replays on every run.
+    """
+
+    def setUp(self) -> None:
+        directory = tempfile.TemporaryDirectory(prefix="cement-d28-cache-")
+        self.addCleanup(directory.cleanup)
+        self.repo = pathlib.Path(directory.name) / "repo"
+        self.repo.mkdir()
+        for command in (
+            ["git", "init", "-q"],
+            ["git", "config", "user.email", "d28@example.invalid"],
+            ["git", "config", "user.name", "d28"],
+        ):
+            self.assertEqual(_run(command, cwd=self.repo, root=self.repo).returncode, 0)
+        (self.repo / "uv.lock").write_text("version = 1\n", encoding="utf-8")
+        self.first = self._commit("a.txt", "one\n")
+        self.second = self._commit("a.txt", "two\n")
+
+    def _commit(self, name: str, text: str) -> str:
+        (self.repo / name).write_text(text, encoding="utf-8")
+        for command in (["git", "add", "-A"], ["git", "commit", "-q", "-m", name]):
+            self.assertEqual(_run(command, cwd=self.repo, root=self.repo).returncode, 0)
+        head = _run(["git", "rev-parse", "HEAD"], cwd=self.repo, root=self.repo)
+        return head.stdout.strip()
+
+    def test_the_key_tracks_tree_interpreter_sqlite_and_lock(self) -> None:
+        key = _d28_content_key(self.repo, self.first)
+        self.assertEqual(key, _d28_content_key(self.repo, self.first))
+        self.assertNotEqual(key, _d28_content_key(self.repo, self.second))
+        tree = _run(
+            ["git", "rev-parse", f"{self.first}^{{tree}}"], cwd=self.repo, root=self.repo
+        )
+        self.assertEqual(key["tree"], tree.stdout.strip())
+        with mock.patch.object(sys, "version", sys.version + " (other build)"):
+            self.assertNotEqual(key, _d28_content_key(self.repo, self.first))
+        with mock.patch("sqlite3.sqlite_version", "0.0.0"):
+            self.assertNotEqual(key, _d28_content_key(self.repo, self.first))
+        (self.repo / "uv.lock").write_text("version = 2\n", encoding="utf-8")
+        self.assertNotEqual(key, _d28_content_key(self.repo, self.first))
+
+    def test_a_green_record_round_trips_and_nothing_else_is_served(self) -> None:
+        key = _d28_content_key(self.repo, self.first)
+        self.assertIsNone(_d28_verdict(self.repo, key))
+        _d28_record(self.repo, key, ran=1000, summary="OK (skipped=1)")
+        self.assertEqual(_d28_verdict(self.repo, key), (1000, "OK (skipped=1)"))
+        other = _d28_content_key(self.repo, self.second)
+        self.assertIsNone(_d28_verdict(self.repo, other))
+        store = _d28_store(self.repo)
+        self.assertEqual(sorted(path.suffix for path in store.iterdir()), [".json"])
+
+    def test_a_damaged_or_foreign_record_replays_instead_of_passing(self) -> None:
+        key = _d28_content_key(self.repo, self.first)
+        _d28_record(self.repo, key, ran=1000, summary="OK")
+        (path,) = _d28_store(self.repo).iterdir()
+        damaged = {
+            "corrupt": "{",
+            "format": json.dumps({**json.loads(path.read_text()), "format": "other"}),
+            "key": json.dumps({**json.loads(path.read_text()), "key": {**key, "tree": "0" * 40}}),
+            "ran": json.dumps({**json.loads(path.read_text()), "ran": "1000"}),
+        }
+        original = path.read_text(encoding="utf-8")
+        for name, text in damaged.items():
+            with self.subTest(damage=name):
+                path.write_text(text, encoding="utf-8")
+                self.assertIsNone(_d28_verdict(self.repo, key))
+        path.write_text(original, encoding="utf-8")
+        self.assertEqual(_d28_verdict(self.repo, key), (1000, "OK"))
+
+    def test_the_store_sits_in_the_common_git_dir_outside_every_tree(self) -> None:
+        store = _d28_store(self.repo)
+        common = _run(
+            ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            cwd=self.repo,
+            root=self.repo,
+        )
+        self.assertEqual(store.parent, pathlib.Path(common.stdout.strip()))
+        status = _run(["git", "status", "--porcelain"], cwd=self.repo, root=self.repo)
+        self.assertEqual(status.stdout, "")
+
+    def test_d28_records_only_after_both_of_its_assertions(self) -> None:
+        import inspect
+        import textwrap
+
+        source = textwrap.dedent(inspect.getsource(MigrationBatteryTests))
+        frame = next(
+            node
+            for node in ast.walk(ast.parse(source))
+            if isinstance(node, ast.FunctionDef)
+            and node.name == "test_d28_gate_1_stays_green_at_every_commit_never_only_at_the_last"
+        )
+        lines = {
+            name: [call.lineno for call in _calls(frame, name)]
+            for name in ("_d28_record", "_d28_verdict", "_detached_worktree")
+        }
+        asserts = sorted(
+            call.lineno
+            for call in ast.walk(frame)
+            if isinstance(call, ast.Call)
+            and isinstance(call.func, ast.Attribute)
+            and call.func.attr in {"assertEqual", "assertGreaterEqual"}
+        )
+        self.assertEqual(len(lines["_d28_record"]), 1)
+        self.assertEqual(len(lines["_d28_verdict"]), 1)
+        self.assertEqual(len(lines["_detached_worktree"]), 1)
+        replay_asserts = [line for line in asserts if line > lines["_detached_worktree"][0]]
+        self.assertGreaterEqual(len(replay_asserts), 2)
+        self.assertGreater(lines["_d28_record"][0], max(replay_asserts[:2]))
 
 
 if __name__ == "__main__":
