@@ -1524,6 +1524,31 @@ class System:
                 ),
             )
 
+    @staticmethod
+    def _live_build(connection: sqlite3.Connection, build_hash: str) -> sqlite3.Row | None:
+        """The artifact that already carries this build, so compile creates no second one."""
+
+        row: sqlite3.Row | None = connection.execute(
+            """
+            SELECT id, status FROM artifacts
+            WHERE build_hash = ? AND status IN ('building', 'draft', 'verified', 'promoted')
+            ORDER BY id LIMIT 1
+            """,
+            (build_hash,),
+        ).fetchone()
+        return row
+
+    def _build_projections(
+        self, connection: sqlite3.Connection, registered: sqlite3.Row
+    ) -> dict[str, _CurrentBuild | _BlockedBuild]:
+        """Build-current case key hash → its build (blocked or current); unprojected excluded."""
+
+        return {
+            key_hash: build
+            for key_hash, _, build in self._current_build_projections(connection, registered)
+            if key_hash
+        }
+
     def compile(
         self,
         partition: str,
@@ -1569,14 +1594,7 @@ class System:
                         }
                     )
                     continue
-                found = connection.execute(
-                    """
-                    SELECT id FROM artifacts
-                    WHERE build_hash = ? AND status IN ('building', 'draft', 'verified', 'promoted')
-                    ORDER BY id LIMIT 1
-                    """,
-                    (projection.build_hash,),
-                ).fetchone()
+                found = self._live_build(connection, projection.build_hash)
                 if found is not None:
                     existing.append(str(found["id"]))
                     continue
@@ -1624,6 +1642,9 @@ class System:
                     LEFT JOIN example_revocations AS x ON x.example_id = e.id
                     WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
                       AND e.input_hash = ? AND e.input_json = ? AND x.example_id IS NULL
+                      AND NOT EXISTS (
+                          SELECT 1 FROM examples AS s WHERE s.supersedes_example_id = e.id
+                      )
                     ORDER BY e.id
                     """,
                         (
@@ -4158,6 +4179,7 @@ class System:
         *,
         partition: str,
         operation: str,
+        projections: dict[str, _CurrentBuild | _BlockedBuild] | None = None,
     ) -> tuple[
         int,
         tuple[sqlite3.Row, ...],
@@ -4184,11 +4206,8 @@ class System:
 
         # The same enumerator compile uses, so eligibility is reconstruction in both modes (exact
         # input, or projection key under the build-current program).
-        projections: dict[str, _CurrentBuild | _BlockedBuild] = {
-            key_hash: build
-            for key_hash, _, build in self._current_build_projections(connection, registered)
-            if key_hash
-        }
+        if projections is None:
+            projections = self._build_projections(connection, registered)
         selected: list[sqlite3.Row] = []
         skipped: list[dict[str, JSONValue]] = []
         selected_hashes: set[str] = set()
@@ -4720,6 +4739,7 @@ class System:
         *,
         partition: str,
         operation: str,
+        projections: dict[str, _CurrentBuild | _BlockedBuild] | None = None,
     ) -> _FunctionPromotionPlan:
         registered = connection.execute(
             "SELECT * FROM operations WHERE partition = ? AND name = ?",
@@ -4792,11 +4812,8 @@ class System:
         ).fetchall()
         # The same enumerator compile uses: eligibility is reconstruction under the
         # build-current program, so a set never mixes programs (contract §5).
-        projections: dict[str, _CurrentBuild | _BlockedBuild] = {
-            key_hash: build
-            for key_hash, _, build in self._current_build_projections(connection, registered)
-            if key_hash
-        }
+        if projections is None:
+            projections = self._build_projections(connection, registered)
         candidates: dict[
             str,
             tuple[sqlite3.Row, sqlite3.Row, FunctionEntry],
@@ -5514,6 +5531,320 @@ class System:
             )
         return example_id, suspended
 
+    # -- learning pass (M5.2) ----------------------------------------------------
+
+    def learning_cases(
+        self, partition: str, operation: str, *, program: object = None
+    ) -> dict[str, JSONValue]:
+        """What the learning pass has to do for one operation; writes nothing.
+
+        Groups the current revision's pending proposals and active examples by case key: under
+        ``program`` (a candidate the pass is drafting), else the build-current program, else the
+        exact canonical input. ``work`` names the unfinished publication steps under the
+        build-current program, so an interrupted pass resumes there without adding support.
+        """
+
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        candidate = None if program is None else parse_program(program)
+        with self.store.transaction(write=False) as connection:
+            registered = connection.execute(
+                "SELECT * FROM operations WHERE partition = ? AND name = ?",
+                (partition, operation),
+            ).fetchone()
+            if registered is None:
+                raise NotFoundError("operation is not registered in this partition")
+            revision = _stored_int(registered["revision"], "operation revision", minimum=1)
+            build_program = self._build_program(
+                connection, partition=partition, operation=operation, revision=revision
+            )
+            grouping = candidate if candidate is not None else build_program
+            cases: dict[str, dict[str, Any]] = {}
+            unprojected: dict[str, list[JSONValue]] = {"example_ids": [], "proposal_ids": []}
+            stale: list[JSONValue] = []
+            unsourced: list[JSONValue] = []
+
+            def carry(
+                input_text: str, input_hash: str, output_text: str, kind: str, ident: str
+            ) -> None:
+                key_text = (
+                    input_text
+                    if grouping is None
+                    else self._case_key_text(grouping, input_text, input_hash)
+                )
+                if key_text is None:
+                    unprojected[f"{kind}_ids"].append(ident)
+                    return
+                entry = cases.setdefault(key_text, {"example": [], "proposal": [], "outputs": {}})
+                entry[kind].append(ident)
+                slot = entry["outputs"].setdefault(
+                    output_text, {"example_ids": [], "proposal_ids": []}
+                )
+                slot[f"{kind}_ids"].append(ident)
+
+            for row in connection.execute(
+                """
+                SELECT id, operation_revision, input_json, input_hash, proposed_output_json,
+                    source_id, provenance_json
+                FROM proposals
+                WHERE partition = ? AND operation = ? AND status = 'pending'
+                ORDER BY status_sequence
+                """,
+                (partition, operation),
+            ):
+                proposal_id = str(row["id"])
+                if row["operation_revision"] != revision:
+                    stale.append(proposal_id)
+                    continue
+                if row["source_id"] is None:
+                    unsourced.append(
+                        {
+                            "proposal_id": proposal_id,
+                            "provenance": parse_json(
+                                str(row["provenance_json"]), max_bytes=PROVENANCE_MAX_BYTES
+                            ).value,
+                        }
+                    )
+                carry(
+                    str(row["input_json"]),
+                    str(row["input_hash"]),
+                    str(row["proposed_output_json"]),
+                    "proposal",
+                    proposal_id,
+                )
+            for row in connection.execute(
+                """
+                SELECT e.id, e.input_json, e.input_hash, e.output_json FROM examples AS e
+                LEFT JOIN example_revocations AS x ON x.example_id = e.id
+                WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
+                  AND x.example_id IS NULL
+                  AND NOT EXISTS (SELECT 1 FROM examples AS s WHERE s.supersedes_example_id = e.id)
+                ORDER BY e.sequence
+                """,
+                (partition, operation, revision),
+            ):
+                carry(
+                    str(row["input_json"]),
+                    str(row["input_hash"]),
+                    str(row["output_json"]),
+                    "example",
+                    str(row["id"]),
+                )
+
+            # One reconstruction per case per snapshot: the build-current builds feed the case
+            # list (when they group it), the work queues and both publication plans.
+            current = self._build_projections(connection, registered)
+            listed: list[JSONValue] = []
+            for key_text, entry in cases.items():
+                key = parse_json(key_text)
+                known = current.get(key.digest) if candidate is None else None
+                build = known or self._project_current_build(
+                    connection, registered, key.digest, key.text, program=grouping
+                )
+                built = (
+                    self._live_build(connection, build.build_hash)
+                    if isinstance(build, _CurrentBuild)
+                    else None
+                )
+                listed.append(
+                    {
+                        "key": key.value,
+                        "key_hash": key.digest,
+                        "pending_proposal_ids": entry["proposal"],
+                        "active_example_ids": entry["example"],
+                        "outputs": [
+                            {"output": parse_json(text).value, **ids}
+                            for text, ids in sorted(entry["outputs"].items())
+                        ],
+                        "support": build.support,
+                        "ready": isinstance(build, _CurrentBuild),
+                        "blocked_reasons": (
+                            [] if isinstance(build, _CurrentBuild) else list(build.reasons)
+                        ),
+                        "artifact": (
+                            None
+                            if built is None
+                            else {"id": str(built["id"]), "status": str(built["status"])}
+                        ),
+                    }
+                )
+            listed.sort(key=lambda item: str(cast(dict[str, JSONValue], item)["key_hash"]))
+
+            compile_work: list[JSONValue] = []
+            merge_work: list[JSONValue] = []
+            for key_hash, build in current.items():
+                if isinstance(build, _CurrentBuild):
+                    if self._live_build(connection, build.build_hash) is None:
+                        compile_work.append(key_hash)
+                elif "confirmed outputs conflict" in build.reasons:
+                    # An interrupted merge leaves no pending proposal and nothing to compile; the
+                    # case's differing confirmations are the only sign the pass must resume.
+                    merge_work.append(key_hash)
+            _, drafts, _ = self._draft_verification_plan(
+                connection, partition=partition, operation=operation, projections=current
+            )
+            promote_work: list[JSONValue] = []
+            promote_blocked: str | None = None
+            prospective: str | None = None
+            try:
+                plan = self._function_promotion_plan(
+                    connection, partition=partition, operation=operation, projections=current
+                )
+            except StateError as exc:
+                promote_blocked = str(exc)
+            else:
+                prospective = plan.manifest.function_hash
+                promote_work = [
+                    entry.artifact_id
+                    for entry in plan.manifest.entries
+                    if entry.disposition == "candidate"
+                ]
+            live = self._latest_function_receipt_row(
+                connection, partition=partition, operation=operation, operation_revision=revision
+            )
+            work: dict[str, JSONValue] = {
+                "merge_key_hashes": merge_work,
+                "compile_key_hashes": compile_work,
+                "verify_artifact_ids": [str(row["id"]) for row in drafts],
+                "promote_artifact_ids": promote_work,
+                "promote_blocked": promote_blocked,
+                "prospective_function_hash": prospective,
+                "live_function_hash": None if live is None else str(live["function_hash"]),
+            }
+            pending = sum(len(entry["proposal"]) for entry in cases.values()) + len(
+                unprojected["proposal_ids"]
+            )
+            return {
+                "partition": partition,
+                "operation": operation,
+                "operation_revision": revision,
+                "grouped_by": (
+                    "candidate"
+                    if candidate is not None
+                    else "exact"
+                    if build_program is None
+                    else "build-current"
+                ),
+                "program_hash": None if grouping is None else grouping.program_hash,
+                "cases": listed,
+                "unprojected": cast(dict[str, JSONValue], unprojected),
+                "stale_pending_proposal_ids": stale,
+                "unsourced_pending": unsourced,
+                "work": work,
+                "nothing_to_learn": not (
+                    pending
+                    or stale
+                    or merge_work
+                    or compile_work
+                    or drafts
+                    or promote_work
+                    or promote_blocked is not None
+                ),
+            }
+
+    def supersede_examples(
+        self,
+        partition: str,
+        operation: str,
+        *,
+        example_ids: Sequence[str],
+        output: object,
+        reviewer: str,
+        note: str = "",
+    ) -> tuple[str, ...]:
+        """Replace earlier confirmations with a re-merged output, one new example per old one.
+
+        Each new example keeps its old example's input, revision and source observation and
+        names it in ``supersedes_example_id``; the old example stays valid for the versions
+        built on it but no longer counts for new builds, so one observation earns one support
+        credit however often the learning pass re-merges it. Refused, with nothing written,
+        for an empty or repeated id, an unknown, revoked or already-superseded example, one of
+        another operation, or an output equal to the old one.
+        """
+
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        reviewer = _text(reviewer, "reviewer", maximum=256)
+        note = _text(note, "note", maximum=2_048, allow_empty=True)
+        ids = tuple(_request_id(value) for value in example_ids)
+        if not ids or len(set(ids)) != len(ids):
+            raise ValidationError("example_ids must be a non-empty list of distinct ids")
+        final = canonicalize(output)
+        now = self._now()
+        created: list[str] = []
+        with self.store.transaction(write=True) as connection:
+            for old_id in ids:
+                old = connection.execute(
+                    "SELECT * FROM examples WHERE id = ? AND partition = ?", (old_id, partition)
+                ).fetchone()
+                if old is None:
+                    raise NotFoundError(f"example {old_id} does not exist in this partition")
+                if old["operation"] != operation:
+                    raise ValidationError(f"example {old_id} belongs to another operation")
+                if connection.execute(
+                    "SELECT 1 FROM example_revocations WHERE example_id = ?", (old_id,)
+                ).fetchone():
+                    raise StateError(f"example {old_id} is revoked")
+                if connection.execute(
+                    "SELECT 1 FROM examples WHERE supersedes_example_id = ?", (old_id,)
+                ).fetchone():
+                    raise StateError(f"example {old_id} is already superseded")
+                if old["output_json"] == final.text:
+                    raise ValidationError(f"example {old_id} already confirms this output")
+                example_id = _new_id("ex")
+                receipt = canonicalize(
+                    {
+                        "confirmed_at_us": now,
+                        "example_id": example_id,
+                        "format": "cement-supersession-v1",
+                        "input": parse_json(str(old["input_json"])).value,
+                        "note": note,
+                        "operation": operation,
+                        "operation_revision": int(old["operation_revision"]),
+                        "output": final.value,
+                        "partition": partition,
+                        "reviewer": reviewer,
+                        "supersedes_example_id": old_id,
+                    },
+                    max_bytes=_RECEIPT_MAX_BYTES,
+                )
+                connection.execute(
+                    """
+                    INSERT INTO examples(
+                        id, partition, operation, operation_revision, input_json, input_hash,
+                        output_json, output_hash, reviewer, origin, supersedes_example_id,
+                        source_id, receipt_json, receipt_hash, confirmed_at_us
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'superseded', ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        example_id,
+                        partition,
+                        operation,
+                        int(old["operation_revision"]),
+                        str(old["input_json"]),
+                        str(old["input_hash"]),
+                        final.text,
+                        final.digest,
+                        reviewer,
+                        old_id,
+                        old["source_id"],
+                        receipt.text,
+                        receipt.digest,
+                        now,
+                    ),
+                )
+                _event(
+                    connection,
+                    partition=partition,
+                    kind="example.superseded",
+                    subject_type="example",
+                    subject_id=old_id,
+                    payload={"example_id": example_id, "reviewer": reviewer},
+                    now_us=now,
+                )
+                created.append(example_id)
+        return tuple(created)
+
     def revoke_example(
         self,
         partition: str,
@@ -5668,7 +5999,9 @@ class System:
         with self.store.transaction() as connection:
             rows = connection.execute(
                 f"""
-                SELECT e.*, x.revoked_by, x.reason AS revocation_reason, x.revoked_at_us
+                SELECT e.*, x.revoked_by, x.reason AS revocation_reason, x.revoked_at_us,
+                    (SELECT s.id FROM examples AS s WHERE s.supersedes_example_id = e.id)
+                        AS superseded_by
                 FROM examples AS e
                 LEFT JOIN example_revocations AS x ON x.example_id = e.id
                 WHERE e.partition = ? AND e.operation = ? AND e.sequence > ? {clause}
@@ -5687,6 +6020,15 @@ class System:
                     "receipt_hash": str(row["receipt_hash"]),
                     "reviewer": str(row["reviewer"]),
                     "sequence": int(row["sequence"]),
+                    "source_id": None if row["source_id"] is None else str(row["source_id"]),
+                    "superseded_by": (
+                        None if row["superseded_by"] is None else str(row["superseded_by"])
+                    ),
+                    "supersedes_example_id": (
+                        None
+                        if row["supersedes_example_id"] is None
+                        else str(row["supersedes_example_id"])
+                    ),
                     "revocation": (
                         {
                             "at_us": int(row["revoked_at_us"]),
@@ -6041,6 +6383,7 @@ class System:
                 WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
                   AND e.input_hash = ? AND e.input_json = ?
                   AND e.output_json <> ? AND x.example_id IS NULL
+                  AND NOT EXISTS (SELECT 1 FROM examples AS s WHERE s.supersedes_example_id = e.id)
                 LIMIT 1
                 """,
                 (

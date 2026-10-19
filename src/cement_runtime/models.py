@@ -13,9 +13,11 @@ from .json_value import JSONValue
 
 @dataclass(frozen=True, slots=True)
 class CompilePolicy:
-    min_confirmations: int = 3
-    min_reviewers: int = 2
-    min_span_seconds: int = 7 * 24 * 60 * 60
+    # Owner ruling (IMPLEMENT orientation): the learning pass is the only reviewer and the
+    # person's switch the only human gate, so the floor is recurrence alone: seen twice.
+    min_confirmations: int = 2
+    min_reviewers: int = 1
+    min_span_seconds: int = 0
 
     def __post_init__(self) -> None:
         if any(

@@ -1762,11 +1762,13 @@ class ObligationBatteryTests(unittest.TestCase):
             ["PROVENANCE_MAX_BYTES"],
         )
         self.assertEqual(
-            sum(
-                isinstance(node, ast.Name) and node.id == "PROVENANCE_MAX_BYTES"
-                for node in ast.walk(system_tree)
-            ),
-            3,
+            {
+                function.name for function in ast.walk(system_tree)
+                if isinstance(function, ast.FunctionDef)
+                and any(isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)
+                        and node.id == "PROVENANCE_MAX_BYTES" for node in ast.walk(function))
+            },
+            {"_canonical_candidate", "_proposal_content", "learning_cases"},
         )
         cap_assignment = next(
             node

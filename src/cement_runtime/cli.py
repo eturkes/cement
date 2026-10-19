@@ -92,12 +92,13 @@ def _parser() -> argparse.ArgumentParser:
 
     operation = commands.add_parser("operation", help="manage versioned operation policy")
     operation_commands = operation.add_subparsers(dest="operation_command", required=True)
+    policy = CompilePolicy()
     for name in ("register", "revise"):
         action = operation_commands.add_parser(name)
         action.add_argument("operation")
-        action.add_argument("--min-confirmations", type=int, default=3)
-        action.add_argument("--min-reviewers", type=int, default=2)
-        action.add_argument("--min-span-seconds", type=int, default=7 * 24 * 60 * 60)
+        action.add_argument("--min-confirmations", type=int, default=policy.min_confirmations)
+        action.add_argument("--min-reviewers", type=int, default=policy.min_reviewers)
+        action.add_argument("--min-span-seconds", type=int, default=policy.min_span_seconds)
         if name == "revise":
             action.add_argument("--actor", required=True)
         else:
@@ -167,7 +168,7 @@ def _parser() -> argparse.ArgumentParser:
     challenge.add_argument("--reviewer", required=True)
     challenge.add_argument("--note", default="")
 
-    example = commands.add_parser("example", help="inspect/revoke confirmed fixtures")
+    example = commands.add_parser("example", help="inspect, revoke or supersede confirmed fixtures")
     example_commands = example.add_subparsers(dest="example_command", required=True)
     example_list = example_commands.add_parser("list")
     example_list.add_argument("operation")
@@ -178,6 +179,12 @@ def _parser() -> argparse.ArgumentParser:
     example_revoke.add_argument("example_id")
     example_revoke.add_argument("--actor", required=True)
     example_revoke.add_argument("--reason", required=True)
+    example_supersede = example_commands.add_parser("supersede", allow_abbrev=False)
+    example_supersede.add_argument("operation")
+    example_supersede.add_argument("example_ids", nargs="+")
+    example_supersede.add_argument("--output", required=True)
+    example_supersede.add_argument("--reviewer", required=True)
+    example_supersede.add_argument("--note", default="")
 
     artifact = commands.add_parser("artifact", help="inspect/quarantine deterministic builds")
     artifact_commands = artifact.add_subparsers(dest="artifact_command", required=True)
@@ -276,6 +283,14 @@ def _parser() -> argparse.ArgumentParser:
     projection_set.add_argument("--actor", required=True)
     projection_show = projection_commands.add_parser("show", allow_abbrev=False)
     projection_show.add_argument("operation")
+
+    learn = commands.add_parser("learn", help="read what the learning pass has to do")
+    learn_commands = learn.add_subparsers(dest="learn_command", required=True)
+    learn_cases = learn_commands.add_parser("cases", allow_abbrev=False)
+    learn_cases.add_argument("operation")
+    learn_cases.add_argument(
+        "--program", help="group by this candidate program (JSON text; '-' reads stdin)"
+    )
 
     events = commands.add_parser("events", help="read append-only audit projections")
     events.add_argument("--after", type=int, default=0)
@@ -704,6 +719,16 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
                 after_sequence=args.after_sequence,
                 limit=args.limit,
             )
+        if args.example_command == "supersede":
+            created = system.supersede_examples(
+                args.partition,
+                args.operation,
+                example_ids=args.example_ids,
+                output=_input(args.output),
+                reviewer=args.reviewer,
+                note=args.note,
+            )
+            return {"example_ids": list(created), "superseded_example_ids": args.example_ids}
         suspended_ids = system.revoke_example(
             args.partition,
             args.example_id,
@@ -890,6 +915,12 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
                 args.partition, args.operation, _input(args.program), actor=args.actor
             )
         return {"projection": system.projection(args.partition, args.operation)}
+    if args.command == "learn":
+        return system.learning_cases(
+            args.partition,
+            args.operation,
+            program=None if args.program is None else _input(args.program),
+        )
     if args.command == "events":
         return system.events(args.partition, after=args.after, limit=args.limit)
     raise AssertionError("argparse accepted an unknown command")

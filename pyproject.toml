@@ -17,7 +17,7 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 module-name = "cement_runtime"
-source-include = ["docs/**", "examples/**", "tests/**"]
+source-include = ["docs/**", "examples/**", "skills/**", "tests/**"]
 
 [dependency-groups]
 dev = [

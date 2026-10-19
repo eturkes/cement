@@ -1988,13 +1988,13 @@ class CliChannelTests(unittest.TestCase):
             {"DEFAULT_MAX_BYTES", "PROVENANCE_MAX_BYTES", "_SOURCE_ID_WIRE_BYTES", "_SUBMISSION_FRAMING"}
             <= cap_names
         )
-        system_uses = sum(
-            isinstance(node, ast.Name)
-            and isinstance(node.ctx, ast.Load)
-            and node.id == "PROVENANCE_MAX_BYTES"
-            for node in ast.walk(system_tree)
-        )
-        self.assertEqual(system_uses, 2)
+        system_uses = {
+                function.name for function in ast.walk(system_tree)
+                if isinstance(function, ast.FunctionDef)
+                and any(isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)
+                        and node.id == "PROVENANCE_MAX_BYTES" for node in ast.walk(function))
+            }
+        self.assertEqual(system_uses, {"_canonical_candidate", "_proposal_content", "learning_cases"})
 
     def test_x12_top_level_non_object_submission_rejection_has_no_contract(self) -> None:
         """X12 [D17] top-level non-object submission rejection has no contract-selected exact sentence

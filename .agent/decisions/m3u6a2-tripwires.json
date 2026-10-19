@@ -29,7 +29,7 @@
       "test": "test_d22c_the_opening_text_handle_request_fence_is_protected_and"
     }
   ],
-  "head": "e3759edfd653da199760ef0127a0df65d6c9ea9f",
+  "head": "42a1b9674b792148f790dc6e57e243c441497a06",
   "pins": [
     {
       "lines": 76,
@@ -63,7 +63,7 @@
     },
     {
       "lines": 111,
-      "locus": "tests/test_cli_channels_battery.py:2421",
+      "locus": "tests/test_cli_channels_battery.py:2423",
       "scope": "WORKING-TREE",
       "test": "test_d23_there_is_no_idempotency_two_byte_identical_submissions_ret",
       "vocabulary": [
