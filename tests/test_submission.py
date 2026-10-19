@@ -1,4 +1,4 @@
-"""M3.3 explicit proposal submission over a retained schema-v2 request row - the implementation suite.
+"""M3.3 explicit proposal submission over direct schema-v3 proposal columns - the implementation suite.
 
 Pins the headline predicates of `.agent/decisions/m3u3-contract.md`: the two
 paths' durable footprint, validation precedence on every adjacent edge, source
@@ -75,7 +75,7 @@ def _p06_handle_spans() -> tuple[str, str, str]:
 # the only one: SQLite owns the `sqlite_` prefix, and `events.sequence` is
 # AUTOINCREMENT, so `sqlite_sequence` legitimately moves on every success.
 SQLITE_OWNED = "sqlite_"
-DECLARED_APPLICATION_TABLES = 13
+DECLARED_APPLICATION_TABLES = 15
 
 
 def _application_tables(connection: sqlite3.Connection) -> list[str]:
@@ -122,6 +122,7 @@ class SubmissionTests(unittest.TestCase):
         with closing(sqlite3.connect(database)) as connection:
             tables = _application_tables(connection)
             self.assertEqual(len(tables), DECLARED_APPLICATION_TABLES)
+            self.assertEqual(connection.execute("SELECT name FROM sqlite_schema WHERE name = 'requests'").fetchall(), [])
             return {
                 table: connection.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
                 for table in tables
@@ -155,7 +156,7 @@ class SubmissionTests(unittest.TestCase):
         after = self._counts(database)
         self.assertEqual(
             {table: after[table] - before[table] for table in after if after[table] != before[table]},
-            {"requests": 1, "proposals": 1, "events": 1},
+            {"proposals": 1, "events": 1},
         )
 
     def test_submit_proposal_writes_a_pending_request_row_without_a_lease(self):
@@ -163,28 +164,28 @@ class SubmissionTests(unittest.TestCase):
         proposal_id = system.submit_proposal(
             "tenant_a", "echo_1", {"k": 1}, candidate=self._candidate()
         )
-        row = self._rows(database, "SELECT * FROM requests")[0]
+        row = self._rows(database, "SELECT * FROM proposals")[0]
         self.assertEqual(row["status"], "pending")
-        self.assertEqual(row["proposal_id"], proposal_id)
-        self.assertIsNone(row["lease_owner"])
-        self.assertIsNone(row["lease_until_us"])
-        self.assertEqual(row["attempts"], 1)
+        self.assertEqual(row["id"], proposal_id)
+        self.assertEqual(self._rows(database, "SELECT name FROM sqlite_schema WHERE name = 'requests'"), [])
+        self.assertIsNone(row["source_id"])
+        self.assertEqual(row["operation"], "echo_1")
         self.assertEqual(row["operation_revision"], 1)
-        self.assertIsNone(row["output_json"])
-        self.assertIsNone(row["error_code"])
+        self.assertIsNone(row["final_output_json"])
+        self.assertIsNone(row["reviewer"])
 
     def test_submit_proposal_event_carries_no_request_identity(self):
         system, database, _ = self._make_system()
         proposal_id = system.submit_proposal(
             "tenant_a", "echo_1", {"k": 1}, candidate=self._candidate()
         )
-        request_id = self._rows(database, "SELECT id FROM requests")[0]["id"]
+        self.assertEqual(self._rows(database, "SELECT name FROM sqlite_schema WHERE name = 'requests'"), [])
         event = self._rows(database, "SELECT * FROM events ORDER BY sequence DESC LIMIT 1")[0]
         self.assertEqual(event["kind"], "proposal.created")
         self.assertEqual(event["subject_type"], "proposal")
         self.assertEqual(event["subject_id"], proposal_id)
         self.assertEqual(event["payload_json"], "{}")
-        self.assertNotIn(request_id, event["payload_json"])
+        self.assertNotIn("request_id", event["payload_json"])
 
     def test_submit_proposal_never_invokes_a_configured_source(self):
         exploding = _Source(lambda request: (_ for _ in ()).throw(RuntimeError(SECRET)))
@@ -215,7 +216,7 @@ class SubmissionTests(unittest.TestCase):
         self.assertIs(type(proposal_id), str)
         self.assertEqual(
             {table: after[table] - before[table] for table in after if after[table] != before[table]},
-            {"requests": 1, "proposals": 1, "events": 1},
+            {"proposals": 1, "events": 1},
         )
 
     def test_propose_invokes_the_source_once_with_the_generated_request_id(self):
@@ -223,8 +224,10 @@ class SubmissionTests(unittest.TestCase):
         system.propose("tenant_a", "echo_1", {"k": 3})
         self.assertEqual(len(source.calls), 1)
         request = source.calls[0]
-        stored = self._rows(database, "SELECT id FROM requests")[0]["id"]
-        self.assertEqual(request.request_id, stored)
+        stored = self._rows(database, "SELECT * FROM proposals")[0]
+        self.assertEqual(tuple(request.__dataclass_fields__), ("partition", "operation", "operation_revision", "input"))
+        self.assertEqual((request.partition, request.operation, request.operation_revision),
+                         (stored["partition"], stored["operation"], stored["operation_revision"]))
         self.assertEqual(request.partition, "tenant_a")
         self.assertEqual(request.operation, "echo_1")
         self.assertEqual(request.operation_revision, 1)
@@ -266,7 +269,7 @@ class SubmissionTests(unittest.TestCase):
             with system.store.transaction(write=True):
                 self.assertTrue(in_transaction())
 
-    # -- no idempotency ----------------------------------------------------
+    # -- no idempotency without a source id --------------------------------
 
     def test_identical_content_submitted_twice_writes_two_of_everything(self):
         system, database, _ = self._make_system()
@@ -278,9 +281,9 @@ class SubmissionTests(unittest.TestCase):
         )
         self.assertNotEqual(first, second)
         counts = self._counts(database)
-        self.assertEqual(counts["requests"], 2)
+        self.assertEqual(self._rows(database, "SELECT name FROM sqlite_schema WHERE name = 'requests'"), [])
         self.assertEqual(counts["proposals"], 2)
-        self.assertEqual(len(self._rows(database, "SELECT DISTINCT id FROM requests")), 2)
+        self.assertEqual(len(self._rows(database, "SELECT DISTINCT id FROM proposals")), 2)
 
     # -- error classification ----------------------------------------------
 
@@ -344,7 +347,7 @@ class SubmissionTests(unittest.TestCase):
             str(caught.exception), "operation revision changed before proposal submission"
         )
         after = self._counts(database)
-        self.assertEqual(after["requests"], before["requests"])
+        self.assertEqual(self._rows(database, "SELECT name FROM sqlite_schema WHERE name = 'requests'"), [])
         self.assertEqual(after["proposals"], before["proposals"])
 
     def test_a_revised_operation_still_accepts_a_direct_submission(self):
@@ -362,8 +365,8 @@ class SubmissionTests(unittest.TestCase):
         proposal_id = system.submit_proposal(
             "tenant_a", "echo_1", {"k": 1}, candidate=self._candidate()
         )
-        row = self._rows(database, "SELECT * FROM requests")[0]
-        self.assertEqual(row["proposal_id"], proposal_id)
+        row = self._rows(database, "SELECT * FROM proposals")[0]
+        self.assertEqual(row["id"], proposal_id)
         self.assertEqual(row["operation_revision"], 2)
 
     # -- purity ------------------------------------------------------------
@@ -432,7 +435,7 @@ class SubmissionTests(unittest.TestCase):
         exists. `Store.transaction` commits, and a `commit()` that durably
         succeeds and only then raises maps to `StateError` like any other store
         failure - so the caller sees a raise, receives no proposal id, and the
-        three rows are committed anyway.
+        two rows are committed anyway.
 
         The control is the load-bearing half: the same injection WITHOUT the
         raise leaves an identical ledger delta. No observable in the ledger
@@ -481,7 +484,7 @@ class SubmissionTests(unittest.TestCase):
         self.assertEqual(str(raised), "database is busy or unavailable")
         self.assertIsNone(returned, "the caller must receive no proposal id")
         # Durability is read from a SEPARATE connection, never the injected one.
-        self.assertEqual(delta, {"requests": 1, "proposals": 1, "events": 1})
+        self.assertEqual(delta, {"proposals": 1, "events": 1})
 
         # The recovery route, exactly as published: enumerate by partition, then
         # resolve. Both are ordinary read APIs that need no id from the caller.
@@ -492,7 +495,7 @@ class SubmissionTests(unittest.TestCase):
         self.assertEqual(view.input, {"k": 1})
         self.assertEqual(view.proposed_output, {"v": 10})
         self.assertEqual(
-            self._rows(database, "SELECT proposal_id FROM requests")[0]["proposal_id"],
+            self._rows(database, "SELECT id FROM proposals")[0]["id"],
             orphan,
         )
 
@@ -507,16 +510,16 @@ class SubmissionTests(unittest.TestCase):
         self.assertEqual(control_delta, delta)
 
     def test_submission_reads_no_artifact_example_or_function_table(self):
-        """D17: neither path touches a table outside submission's own four.
+        """D17: neither path touches a table outside submission's own three.
 
         The instrument is a COMPLEMENT, not a hand-written forbidden list: it
         tokenizes each recorded statement into SQL identifiers, folds them to
         lower case, and asserts the set of application tables named is exactly
-        the permitted four. `if table in sql` over raw SQL was neither - it
+        the permitted three. `if table in sql` over raw SQL was neither - it
         missed `FROM ARTIFACTS` on case alone, and it could never see a table
         the list forgot to name.
 
-        This is a TRIPWIRE. A change that legitimately reads a fifth table must
+        This is a TRIPWIRE. A change that legitimately reads a fourth table must
         widen `permitted` deliberately, which is the acknowledgement D17 exists
         to force. It is not a cardinality gate: nothing here can be satisfied by
         hiding a read behind a wider query, because a wider query names more
@@ -585,7 +588,7 @@ class SubmissionTests(unittest.TestCase):
         self.assertTrue(direct and sourced, "the SQL spy failed to install")
         with closing(sqlite3.connect(database)) as connection:
             application = set(_application_tables(connection))
-        permitted = {"operations", "requests", "proposals", "events"}
+        permitted = {"operations", "proposals", "events"}
         self.assertLess(permitted, application, "the permitted set must be a strict subset")
         forbidden = application - permitted
         self.assertEqual(len(forbidden), DECLARED_APPLICATION_TABLES - len(permitted))
@@ -597,7 +600,7 @@ class SubmissionTests(unittest.TestCase):
                 self.assertEqual(
                     sorted(application & words),
                     sorted(permitted),
-                    f"{label} path named {sorted(forbidden & words)} outside its four tables",
+                    f"{label} path named {sorted(forbidden & words)} outside its three tables",
                 )
 
     # -- validation precedence, one probe per ADJACENT edge -----------------
@@ -724,18 +727,17 @@ class SubmissionTests(unittest.TestCase):
                 self.assertTrue(hasattr(System, name))
 
     def test_the_seam_is_the_sole_writer_in_both_call_closures(self):
-        """D06, structurally: `_persist_proposal` OWNS all three writes.
+        """D06, structurally: `_persist_proposal` OWNS both writes.
 
         The runtime spy below proves both public methods CALL the seam. That is
         satisfied by a split writer - keep `_persist_proposal` as a wrapper, move
-        the `requests` INSERT into a second private helper it calls, and every
+        the `proposals` INSERT into a second private helper it calls, and every
         behavioural pin still passes. Ownership is a property of the source, so
         it is measured on the source.
 
         The probe walks the `self.<method>` call closure of each public method
         and requires exactly ONE function in it to execute SQL writes. Scoping to
-        the closure is what keeps `handle`'s own request/proposal writes, which
-        M3.3 does not touch, out of the measurement.
+        the closure keeps unrelated writes outside the measurement.
         """
 
         source = pathlib.Path(cement_runtime.system.__file__).read_text(encoding="utf-8")
@@ -815,7 +817,7 @@ class SubmissionTests(unittest.TestCase):
         # Positive control plus the exact ownership claim: the seam writes each
         # row once and emits the event once. A count of 0 anywhere would make the
         # `writers` comparison above pass vacuously.
-        self.assertEqual(write_profile(methods["_persist_proposal"]), (["proposals", "requests"], 1))
+        self.assertEqual(write_profile(methods["_persist_proposal"]), (["proposals"], 1))
 
     def test_the_frozen_public_shape_of_both_submission_methods(self):
         """P01: signature AND annotations, neither of which behaviour can see.
@@ -833,12 +835,14 @@ class SubmissionTests(unittest.TestCase):
                     ("operation", inspect.Parameter.POSITIONAL_OR_KEYWORD, True),
                     ("input_value", inspect.Parameter.POSITIONAL_OR_KEYWORD, True),
                     ("candidate", inspect.Parameter.KEYWORD_ONLY, True),
+                    ("source_id", inspect.Parameter.KEYWORD_ONLY, False),
                 ),
                 {
                     "partition": str,
                     "operation": str,
                     "input_value": object,
                     "candidate": Candidate,
+                    "source_id": str | None,
                     "return": str,
                 },
             ),
@@ -889,8 +893,9 @@ class SubmissionTests(unittest.TestCase):
         real_seam = System._persist_proposal
 
         def spy(self, **kwargs):
-            seen.append(kwargs["request_id"])
-            return real_seam(self, **kwargs)
+            proposal_id = real_seam(self, **kwargs)
+            seen.append(proposal_id)
+            return proposal_id
 
         system, database, _ = self._make_system()
         with mock.patch.object(System, "_persist_proposal", spy):
@@ -900,7 +905,7 @@ class SubmissionTests(unittest.TestCase):
             system.propose("tenant_a", "echo_1", {"k": 2})
         self.assertEqual(len(seen), 2)
         self.assertEqual(sorted(seen), sorted(
-            row["id"] for row in self._rows(database, "SELECT id FROM requests")
+            row["id"] for row in self._rows(database, "SELECT id FROM proposals")
         ))
 
     # -- interop -------------------------------------------------------------
@@ -923,9 +928,9 @@ class SubmissionTests(unittest.TestCase):
             proposal_id,
             [entry["id"] for entry in system.proposals("tenant_a", status="accepted")],
         )
-        request = self._rows(database, "SELECT * FROM requests")[0]
-        self.assertEqual(request["status"], "resolved")
-        self.assertEqual(request["source_kind"], "confirmed")
+        proposal = self._rows(database, "SELECT * FROM proposals")[0]
+        self.assertEqual(proposal["status"], "accepted")
+        self.assertEqual(self._rows(database, "SELECT origin FROM examples")[0]["origin"], "accepted")
         self.assertEqual(self._counts(database)["examples"], 1)
 
 

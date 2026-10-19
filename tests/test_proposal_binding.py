@@ -30,17 +30,8 @@ from cement_runtime.models import (  # noqa: E402
 # thought of, while an equality against this set fails closed and covers every definition
 # added later. It is a TRIPWIRE a later unit updates deliberately in the same commit that
 # adds or removes a member -- never a gate to route around by hiding an access.
-PERMITTED_REQUEST_NAMERS = frozenset(
-    {
-        # M3.3 storage plumbing: the private row a proposal's scope still lives on.
-        "_persist_proposal",
-        # M3.4's adapter. Its two members are the sole request access for the proposal
-        # read, review and report paths, which this file's complement assertion proves.
-        # M3.6b rewrites these two; the census establishes the coupling, never the swap.
-        "_proposal_bindings",
-        "_write_proposal_request_status",
-    }
-)
+PERMITTED_REQUEST_NAMERS = frozenset()
+
 
 # Definitions that reached the request row before M3.4 and must not reach it after.
 FREED_BY_M3_4 = frozenset(
@@ -154,13 +145,7 @@ class RequestRowConfinementTests(unittest.TestCase):
     def test_exactly_the_permitted_definitions_name_the_request_row(self) -> None:
         self.assertEqual(
             PERMITTED_REQUEST_NAMERS,
-            frozenset(
-                {
-                    "_persist_proposal",
-                    "_proposal_bindings",
-                    "_write_proposal_request_status",
-                }
-            ),
+            frozenset(),
         )
         self.assertEqual(
             _definitions_naming_table(self.source, TABLE),
@@ -186,8 +171,6 @@ class RequestRowConfinementTests(unittest.TestCase):
                 "operation_revision",
                 "input_json",
                 "input_hash",
-                "request_id",
-                "request_status",
                 "row",
             ),
         )
@@ -329,8 +312,7 @@ class FrozenPublicShapeTests(unittest.TestCase):
                 self.assertNotIn("request_id", shape.__dataclass_fields__)
 
     def test_handle_lifecycle_shapes_keep_their_request_identity(self) -> None:
-        # D10's later unit = M3.6a3, which deletes the six handle-lifecycle values (an intended
-        # inversion of this pin); `CandidateRequest` keeps the field until M3.6b's cut.
+        # M3.6a3 deletes the six lifecycle values; M3.6b deletes the source request identity.
         for name in (
             "Resolved",
             "Rejected",
@@ -343,8 +325,9 @@ class FrozenPublicShapeTests(unittest.TestCase):
                 self.assertFalse(hasattr(models, name))
         for name in ("CandidateRequest",):
             with self.subTest(shape=name):
-                self.assertIn(
-                    "request_id", getattr(models, name).__dataclass_fields__
+                self.assertEqual(
+                    tuple(getattr(models, name).__dataclass_fields__),
+                    ("partition", "operation", "operation_revision", "input"),
                 )
 
     def test_review_returns_review_result_and_keeps_its_keyword_only_marker(self) -> None:

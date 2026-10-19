@@ -7,6 +7,7 @@ import io
 import json
 import pathlib
 import sqlite3
+import subprocess
 import tempfile
 import typing
 import unittest
@@ -907,13 +908,16 @@ class ReadCapabilityBatteryTests(unittest.TestCase):
             validate.assert_not_called()
 
     def test_b22_schema_version_is_two(self):
-        """B22: SCHEMA_VERSION stays 2."""
-        self.assertEqual(store_module.SCHEMA_VERSION, 2)
+        """B22: the live schema is v3."""
+        self.assertEqual(store_module.SCHEMA_VERSION, 3)
 
     def test_b22_schema_ddl_matches_entry_digest(self):
-        """B22: Store schema DDL stays byte-identical to unit entry."""
-        payload = store_module.SCHEMA.encode("utf-8")
+        """B22: M3.2a closing DDL equals its entry digest; the live fingerprint binds live DDL."""
+        closed = subprocess.check_output(("git", "-C", str(pathlib.Path(__file__).resolve().parents[1]), "show", "04b7f75:src/cement_runtime/store.py"), text=True)
+        schema = next(ast.literal_eval(node.value) for node in ast.parse(closed).body
+                      if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "SCHEMA" for target in node.targets))
+        payload = schema.encode("utf-8")
         expected = "5be3d79fe1e21aca524f3937c8ce78521bcc7203bfe20b7352ef4b6dff468a77"
         self.assertEqual(len(payload), 14_580)
         self.assertEqual(hashlib.sha256(payload).hexdigest(), expected)
-        self.assertEqual(store_module.SCHEMA_FINGERPRINT, expected)
+        self.assertEqual(store_module.SCHEMA_FINGERPRINT, hashlib.sha256(store_module.SCHEMA.encode("utf-8")).hexdigest())

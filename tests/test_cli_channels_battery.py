@@ -332,6 +332,7 @@ def _table_counts(path: pathlib.Path) -> dict[str, int]:
                 "WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
             )
         )
+        assert connection.execute("SELECT name FROM sqlite_schema WHERE name = 'requests'").fetchall() == []
         return {
             table: int(
                 connection.execute(f'SELECT count(*) FROM "{table}"').fetchone()[0]
@@ -804,16 +805,10 @@ class ObligationBatteryTests(unittest.TestCase):
     def test_d06_one_store_transaction_write_false_is_opened_per_invocation(
         self,
     ) -> None:
-        """D06 obligation
+        """D06. Existing-only construction validates through one read; resolve adds one read.
 
-        CONTRACT:
-        One `Store.transaction(write=False)` is opened per invocation and no ledger byte,
-        event, clock read or ID allocation occurs (`X19`).
-
-        AMENDED-BY A3, superseding the text above:
-        One `Store.transaction(write=False)` per invocation that REACHES THE LEDGER. A rejected
-        invocation opens zero. Observable: `{valid: 1, invalid: 0}`.
-        """
+        Exact vectors: valid hit/miss/failed verdict=[False,False], rejected input=[False].
+        Ledger bytes/events stay unchanged; clock and ID hooks remain untouched."""
         # BASELINE c8b82cd: red — resolve has no full-CLI read-only path.
         _leaf_parser(self, cement_cli._parser(), ("resolve",))
         system, path = _new_system(self)
@@ -853,7 +848,7 @@ class ObligationBatteryTests(unittest.TestCase):
                 status, _, stderr = _invoke([*base, input_text])
             with self.subTest(state=label):
                 self.assertEqual((status, stderr), (expected_status, ""))
-                self.assertEqual(transaction_calls, [False])
+                self.assertEqual(transaction_calls, [False, False])
                 self.assertEqual(_ledger_snapshot(path), before)
                 clock.assert_not_called()
                 identifier.assert_not_called()
@@ -886,7 +881,7 @@ class ObligationBatteryTests(unittest.TestCase):
         ):
             status, _, stderr = _invoke([*base, '{"n":12}'])
         self.assertEqual((status, stderr), (6, ""))
-        self.assertEqual(transaction_calls, [False])
+        self.assertEqual(transaction_calls, [False, False])
         self.assertEqual(_ledger_snapshot(path), before)
         failed_clock.assert_not_called()
         failed_identifier.assert_not_called()
@@ -911,7 +906,7 @@ class ObligationBatteryTests(unittest.TestCase):
                 ]
             )
         self.assertEqual((status, stdout), (2, ""))
-        self.assertEqual(transaction_calls, [])
+        self.assertEqual(transaction_calls, [False])
 
     def test_d07_the_payload_key_set_is_exactly_and_identically_in_all_thre(
         self,
@@ -1355,45 +1350,10 @@ class ObligationBatteryTests(unittest.TestCase):
     def test_d13_a_db_path_that_does_not_exist_answers_integrityerror_error(
         self,
     ) -> None:
-        """D13 obligation
+        """D13. Existing-only System construction owns the absent-ledger verdict.
 
-        CONTRACT:
-        A `--db` path that does not exist answers `IntegrityError` →
-        `{"error":"integrity","message":"ledger file is missing or unreadable"}` on stderr at
-        **5**, and **creates no file**. This is a resolve-only pre-construction check placed
-        between the `--partition` gate and `System(...)`, forwarding the library's own verdict
-        for the same condition (section 2) rather than inventing vocabulary. Stated honestly
-        and pinned as written: it is a check, not a read-only construction mode; the residual
-        race is that a path deleted between check and construction is still recreated by
-        `Store`, which is exactly the shipped behaviour, so the check strictly improves and
-        never worsens. `X02`'s full answer — a public existing-only construction mode — is out
-        of scope and deferred (section 11). This check is also what makes D04's ordering safe:
-        on an absent ledger nothing is constructed, so a malformed `--input` rejected after
-        construction can only ever touch a ledger that already existed.
-
-        AMENDED-BY A7, superseding the text above:
-        The pre-construction check strictly improves for a path that is STABLY ABSENT. The
-        claim `never worsens` is withdrawn as unconditional: in the inverse race a valid ledger
-        appearing between the check and construction turns a would-be success into exit 5. The
-        mechanism is decomposed rather than raced: `System` builds a valid ledger at a staging
-        path, the target tests absent, `os.replace` moves it in, and ordinary construction on
-        the now-present target succeeds — so the precheck's exit 5 would have been computed
-        from a state construction no longer sees. The window is the same microseconds D13
-        already discloses in the forward direction, and no code change is warranted; the
-        unconditional sentence is the defect.
-
-        AMENDED-BY A14, superseding the text above:
-        The precheck fires ONLY for a path `Store` would create — absent target under an
-        existing directory — and is implemented by `_absent_ledger`, not `os.path.exists`.
-        `exists` follows the link, so a DANGLING SYMLINK, a MISSING PARENT and an EMBEDDED NUL
-        all read as absent and all answered exit 5 `ledger file is missing or unreadable`,
-        where the identical paths on a precheck-free leaf answer exit 2 with a precise
-        diagnosis (`database path must not be a symbolic link`, `database parent directory does
-        not exist`, `database path must not contain NUL`). D12 freezes `ValidationError` → 2,
-        so two obligations contradicted each other in shipped code. Every path shape `System`
-        already diagnoses stays `System`'s, including a denied ancestor and a non-regular file
-        (`Y08`).
-        """
+        Pin exit5, exact message, no created file and zero input parsing before refusal.
+        Existing invalid path shapes keep their own exit2 diagnostics. A ledger present at open is accepted."""
         # BASELINE c8b82cd: red — no resolve-only missing-ledger precheck exists.
         _leaf_parser(self, cement_cli._parser(), ("resolve",))
         target = _temporary_path(self, "absent.db")
@@ -1437,7 +1397,7 @@ class ObligationBatteryTests(unittest.TestCase):
             mock.patch.object(
                 cement_cli,
                 "System",
-                side_effect=AssertionError("System built for stable absent ledger"),
+                wraps=System,
             ) as constructor,
         ):
             status, stdout, stderr = _invoke([*argv[:-1], "{"])
@@ -1447,7 +1407,7 @@ class ObligationBatteryTests(unittest.TestCase):
         )
         self.assertFalse(target.exists())
         reader.assert_not_called()
-        constructor.assert_not_called()
+        constructor.assert_called_once_with(str(target), create=False)
 
         directory_path = target.parent / "directory"
         directory_path.mkdir()
@@ -1487,7 +1447,7 @@ class ObligationBatteryTests(unittest.TestCase):
         raced_target = target.parent / "appeared.db"
         self.assertFalse(raced_target.exists())
         os.replace(staging, raced_target)
-        constructed = System(raced_target)
+        constructed = System(raced_target, create=False)
         self.assertEqual(constructed.store.path, raced_target)
         self.assertTrue(raced_target.is_file())
 
@@ -1747,44 +1707,24 @@ class ObligationBatteryTests(unittest.TestCase):
     def test_d16_the_aggregate_cap_is_2_default_max_bytes_provenance_max_by(
         self,
     ) -> None:
-        """D16 obligation
+        """D16. Four-key framing plus exported input/output/provenance/source-id wire limits derive the cap.
 
-        CONTRACT:
-        The aggregate cap is `2 * DEFAULT_MAX_BYTES + PROVENANCE_MAX_BYTES + framing` =
-        **2,162,722 bytes**, where `PROVENANCE_MAX_BYTES` is newly exported from `system.py`
-        and used at its three existing literal sites. No limit is copied. The cap is a
-        TRANSPORT bound that must admit every submission the library accepts; it replaces no
-        field validation (`Z13`, `X12`).
-
-        AMENDED-BY A9, superseding the text above:
-        The framing term is **34 bytes**, DERIVED and never written down: two braces, one comma
-        between each adjacent pair, and `"<key>":` per key, over `_SUBMISSION_KEYS`. It equals
-        `len('{"input":,"output":,"provenance":}')`. D16 gave the total `2,162,722` while
-        naming no byte template, so a copied total satisfied the numeric pin with nothing
-        deriving it (`A04`).
-
-        AMENDED-BY A20, superseding the text above:
-        `must admit every submission the library accepts` is WITHDRAWN as unconditional and
-        replaced by the value-level guarantee: for every field triple the library accepts, its
-        COMPACT CANONICAL envelope fits under the cap. Insignificant whitespace and escapes are
-        unbounded, so no transport bound can admit every serialization — measured, a
-        2,162,723-byte whitespace-padded envelope semantically equal to `{input:0, output:0,
-        provenance:{}}` is rejected by the cap while `submit_proposal` accepts the same values
-        directly (`Y25`).
-        """
+        No copied limit; maximal escaped source id fits beside maximal other fields.
+        Exact-cap success and cap+1 rejection bind byte, text and inline transports with zero failed writes."""
         # BASELINE c8b82cd: red — the aggregate cap and exported provenance constant are absent.
         _leaf_parser(self, cement_cli._parser(), ("proposal", "submit"))
         cap = cement_cli.SUBMISSION_MAX_BYTES
         provenance_max = system_module.PROVENANCE_MAX_BYTES
-        framing_bytes = b'{"input":,"output":,"provenance":}'
+        framing_bytes = b'{"input":,"output":,"provenance":,"source_id":}'
         framing = len(framing_bytes)
-        self.assertEqual(framing, 34)
+        self.assertEqual(framing, 47)
         self.assertEqual(cement_cli._SUBMISSION_FRAMING, framing)
         self.assertEqual(
             cap,
-            2 * DEFAULT_MAX_BYTES + provenance_max + framing,
+            2 * DEFAULT_MAX_BYTES + provenance_max + 3 * system_module.SOURCE_ID_MAX_BYTES + 2 + framing,
         )
-        self.assertEqual(cap, 2_162_722)
+        self.assertEqual(system_module.SOURCE_ID_MAX_BYTES, 512)
+        self.assertEqual(tuple(cement_cli._SUBMISSION_KEYS), ("input", "output", "provenance", "source_id"))
 
         cli_tree = ast.parse(
             (ROOT / "src/cement_runtime/cli.py").read_text(encoding="utf-8")
@@ -1840,7 +1780,7 @@ class ObligationBatteryTests(unittest.TestCase):
         }
         self.assertEqual(
             cap_names,
-            {"DEFAULT_MAX_BYTES", "PROVENANCE_MAX_BYTES", "_SUBMISSION_FRAMING"},
+            {"DEFAULT_MAX_BYTES", "PROVENANCE_MAX_BYTES", "_SOURCE_ID_WIRE_BYTES", "_SUBMISSION_FRAMING"},
         )
         self.assertFalse(
             any(
@@ -1855,6 +1795,7 @@ class ObligationBatteryTests(unittest.TestCase):
             for alias in node.names
         }
         self.assertIn("PROVENANCE_MAX_BYTES", imports)
+        self.assertIn("SOURCE_ID_MAX_BYTES", imports)
 
         system, path = _new_system(self)
         del system
@@ -1869,6 +1810,8 @@ class ObligationBatteryTests(unittest.TestCase):
             + maximal_field
             + ',"provenance":'
             + maximal_provenance
+            + ',"source_id":'
+            + json.dumps("😀" * (system_module.SOURCE_ID_MAX_BYTES // 4))
             + "}"
         )
         self.assertEqual(len(at_cap.encode("utf-8")), cap)
@@ -1915,15 +1858,10 @@ class ObligationBatteryTests(unittest.TestCase):
     def test_d17_validation_order_is_strict_parse_json_under_the_aggregate(
         self,
     ) -> None:
-        """D17 obligation
+        """D17. Strict parse uses aggregate bytes, field depth+1 and three field-item bounds+4 envelope members.
 
-        CONTRACT:
-        Validation order is: strict `parse_json` under the aggregate byte, depth and item
-        maxima (`X08` — depth `DEFAULT_MAX_DEPTH + 1`, items `3 * DEFAULT_MAX_ITEMS + 3`) →
-        top-level object type → unknown keys → missing required keys → the library call.
-        Duplicate members therefore fail inside the parser, before any exact-key check can
-        collapse them (`X09`, `Y05`).
-        """
+        Type, unknown keys and missing keys precede submission; duplicate keys fail inside parsing.
+        Adjacent depth/item pairs pin application of the derived bounds."""
         # BASELINE c8b82cd: red — no strict envelope pipeline exists.
         _leaf_parser(self, cement_cli._parser(), ("proposal", "submit"))
         path = _temporary_path(self)
@@ -1955,7 +1893,7 @@ class ObligationBatteryTests(unittest.TestCase):
             {
                 "max_bytes": cement_cli.SUBMISSION_MAX_BYTES,
                 "max_depth": DEFAULT_MAX_DEPTH + 1,
-                "max_items": 3 * DEFAULT_MAX_ITEMS + 3,
+                "max_items": 3 * DEFAULT_MAX_ITEMS + 4,
             },
         )
 
@@ -2010,7 +1948,7 @@ class ObligationBatteryTests(unittest.TestCase):
             + hundred_thousand
             + ',"provenance":'
             + hundred_thousand
-            + "}"
+            + ',"source_id":"observation"}'
         )
         over_items = at_items.replace('"input":[', '"input":[0,', 1)
         fake.reset_mock()
@@ -2031,25 +1969,10 @@ class ObligationBatteryTests(unittest.TestCase):
     def test_d18_input_and_output_are_required_provenance_is_optional_and_d(
         self,
     ) -> None:
-        """D18 obligation
+        """D18. Input/output required; provenance defaults to a fresh durable empty mapping.
 
-        CONTRACT:
-        `input` and `output` are required; `provenance` is optional and defaults to `{}`, which
-        is a durable empty mapping (`Z06`). Unknown keys and missing keys each name every
-        offending key, sorted. Every one of these is exit 2 on stderr before any transaction
-        opens (`X11`).
-
-        AMENDED-BY A5, superseding the text above:
-        `before any transaction opens` is TRUE as written at the `Store.transaction` seam and
-        is retained. Added, because D18 omitted it: envelope validation runs in the dispatch
-        branch, AFTER `System(...)`, so a writing leaf creates its ledger and initialises the
-        schema before rejecting a malformed envelope. Measured on all four envelope failures:
-        `System.__init__` 1, `sqlite3.connect` ≥ 1, `Store.transaction` 0,
-        `System.submit_proposal` 0, ledger present afterwards at ~208 KiB. Giving `proposal
-        submit` a D13-style precheck is REJECTED: creating the ledger is a legitimate first use
-        of a writing leaf. The residual — an invalid argument value creating the ledger on ANY
-        writing leaf — is CLI-wide, pre-existing, and deferred (section 12).
-        """
+        Existing-only construction makes one validation read before envelope rejection.
+        Every malformed envelope exits2, reports all sorted offending keys and makes zero submit calls."""
         # BASELINE c8b82cd: red — no envelope validation or durable default exists.
         _leaf_parser(self, cement_cli._parser(), ("proposal", "submit"))
         invalid = (
@@ -2060,6 +1983,7 @@ class ObligationBatteryTests(unittest.TestCase):
         )
         for index, (source, message) in enumerate(invalid):
             path = _temporary_path(self, f"invalid-{index}.db")
+            System(path)
             transaction_calls: list[bool] = []
             original_connect = sqlite3.connect
 
@@ -2099,9 +2023,10 @@ class ObligationBatteryTests(unittest.TestCase):
                 self.assertEqual(_payload(stderr)["message"], message)
                 constructor.assert_called_once()
                 self.assertEqual(constructor.call_args.args, (str(path),))
+                self.assertEqual(constructor.call_args.kwargs, {"create": False})
                 self.assertIsNone(constructor.call_args.kwargs.get("candidate_source"))
                 self.assertGreaterEqual(connections.call_count, 1)
-                self.assertEqual(transaction_calls, [])
+                self.assertEqual(transaction_calls, [False])
                 submit.assert_not_called()
                 self.assertTrue(path.is_file())
                 self.assertGreater(path.stat().st_size, 0)
@@ -2157,14 +2082,9 @@ class ObligationBatteryTests(unittest.TestCase):
     def test_d19_dispatch_builds_candidate_output_provenance_from_the_envel(
         self,
     ) -> None:
-        """D19 obligation
+        """D19. Candidate carries output/provenance, input stays positional, absent source_id is forwarded as None.
 
-        CONTRACT:
-        Dispatch builds `Candidate(output=..., provenance=...)` from the envelope and passes
-        the envelope's `input` as the library's third positional (`M10`, `M12`, `X21`).
-        Provenance shape stays library-graded: a non-mapping provenance is `candidate
-        provenance must be a mapping` at exit 2 (`Z07`), and no CLI-only coercion is added.
-        """
+        Provenance shape remains library-graded; transport adds no coercion."""
         # BASELINE c8b82cd: red — no envelope-to-Candidate wiring reaches submit_proposal.
         _leaf_parser(self, cement_cli._parser(), ("proposal", "submit"))
         path = _temporary_path(self)
@@ -2197,7 +2117,8 @@ class ObligationBatteryTests(unittest.TestCase):
         fake.submit_proposal.assert_called_once()
         call = fake.submit_proposal.call_args
         self.assertEqual(call.args, (PARTITION, OPERATION, {"input": 12}))
-        self.assertEqual(set(call.kwargs), {"candidate"})
+        self.assertEqual(set(call.kwargs), {"candidate", "source_id"})
+        self.assertIsNone(call.kwargs["source_id"])
         candidate = call.kwargs["candidate"]
         self.assertIs(type(candidate), Candidate)
         self.assertEqual(candidate.output, {"output": 34})
@@ -2360,7 +2281,7 @@ class ObligationBatteryTests(unittest.TestCase):
         self.assertEqual(after["events"] - before["events"], 1)
         with closing(sqlite3.connect(path)) as connection:
             proposal = connection.execute(
-                "SELECT request_id FROM proposals WHERE id = ? AND partition = ?",
+                "SELECT id FROM proposals WHERE id = ? AND partition = ?",
                 (proposal_id, PARTITION),
             ).fetchone()
             events = connection.execute(
@@ -2369,15 +2290,15 @@ class ObligationBatteryTests(unittest.TestCase):
                 (PARTITION, proposal_id),
             ).fetchall()
         self.assertIsNotNone(proposal)
-        request_id = str(proposal[0])
-        self.assertNotIn(request_id, stdout)
+        self.assertEqual(str(proposal[0]), proposal_id)
+        self.assertNotIn("request_id", stdout)
         self.assertEqual(
             events,
             [("proposal.created", "proposal", proposal_id, "{}")],
         )
         event_text = "".join(str(cell) for row in events for cell in row)
         self.assertFalse(any(secret in event_text for secret in secrets))
-        self.assertNotIn(request_id, event_text)
+        self.assertNotIn("request_id", event_text)
 
         decimal = "12345.678901"
         status, stdout, stderr = _invoke(
@@ -2439,7 +2360,7 @@ class ObligationBatteryTests(unittest.TestCase):
                 )
 
         before = _table_counts(path)
-        self.assertEqual(len(before), 13)
+        self.assertEqual(len(before), 15)
         status, stdout, stderr = _invoke(
             [
                 "--db",
@@ -2539,7 +2460,7 @@ class ObligationBatteryTests(unittest.TestCase):
         delta = {table: after[table] - before[table] for table in before}
         self.assertEqual(
             {table: count for table, count in delta.items() if count},
-            {"events": 2, "proposals": 2, "requests": 2},
+            {"events": 2, "proposals": 2},
         )
 
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
@@ -2556,7 +2477,9 @@ class ObligationBatteryTests(unittest.TestCase):
             cement_cli._parser(),
             ("proposal", "submit"),
         ).format_help()
-        self.assertIn("Cement gives no idempotency here", readme)
+        flat_readme = " ".join(readme.split())
+        self.assertIn("Without a source id, Cement gives no idempotency here", flat_readme)
+        self.assertIn("Do not retry a call that has no source id", flat_readme)
         self.assertIn("Do not retry a failed submission", readme)
         self.assertRegex(readme, r"proposal list[^\n]*--status pending")
         self.assertNotRegex(
@@ -2573,9 +2496,9 @@ class ObligationBatteryTests(unittest.TestCase):
         matched_units = [
             unit
             for unit in units
-            if re.search(r"\bsubmission\b|proposal submit", unit, re.IGNORECASE)
+            if re.search(r"\bsubmission\b|proposal submit|do not retry a call that has no source id", " ".join(unit.split()), re.IGNORECASE)
         ]
-        submission_paragraphs = "\n".join(matched_units).lower()
+        submission_paragraphs = "\n".join(" ".join(unit.split()) for unit in matched_units).lower()
         scrubbed = re.sub(
             r"\b(?:do not|never|must not)\s+(?:retry|resubmit|run again|repeat)\b",
             "",
@@ -2591,7 +2514,7 @@ class ObligationBatteryTests(unittest.TestCase):
         # place rather than dropped: an empty corpus, or one that never says `retry`, satisfies
         # the scoped absence assertion above for free (A08). These three bind the corpus to the
         # README sentence asserted above and prove the scrub removes real vocabulary.
-        self.assertEqual(len(matched_units), 10)
+        self.assertEqual(len(matched_units), 12)
         self.assertIn("do not retry a failed submission", submission_paragraphs)
         self.assertNotEqual(scrubbed, submission_paragraphs)
 
@@ -2674,11 +2597,12 @@ class ObligationBatteryTests(unittest.TestCase):
         self.assertEqual(constructor.call_count, 2)
 
         after = _table_counts(path)
+        self.assertNotIn("requests", after)
         leaf_delta = {table: leaves[table] - before[table] for table in before}
         control_delta = {table: after[table] - leaves[table] for table in before}
         self.assertEqual(
             {table: count for table, count in leaf_delta.items() if count},
-            {"events": 1, "proposals": 1, "requests": 1},
+            {"events": 1, "proposals": 1},
         )
         self.assertEqual(
             {table: count for table, count in control_delta.items() if count},
@@ -2836,7 +2760,7 @@ class ObligationBatteryTests(unittest.TestCase):
             hashlib.sha256(current_store).digest(),
             hashlib.sha256(baseline_store).digest(),
         )
-        self.assertEqual(SCHEMA_VERSION, 2)
+        self.assertEqual(SCHEMA_VERSION, 3)
 
         _, ledger = _new_system(self)
         before = _table_counts(ledger)
@@ -2856,10 +2780,11 @@ class ObligationBatteryTests(unittest.TestCase):
         self.assertEqual((status, stderr), (0, ""))
         self.assertEqual(set(_payload(stdout)), {"proposal_id"})
         after = _table_counts(ledger)
+        self.assertNotIn("requests", after)
         delta = {table: after[table] - before[table] for table in before}
         self.assertEqual(
             {table: count for table, count in delta.items() if count},
-            {"events": 1, "proposals": 1, "requests": 1},
+            {"events": 1, "proposals": 1},
         )
 
         cli_source = (ROOT / "src/cement_runtime/cli.py").read_text(encoding="utf-8")

@@ -9,8 +9,7 @@ compact JSON object to stdin:
   "operation": "support.reply",
   "operation_revision": 1,
   "partition": "tenant-42",
-  "protocol": "cement-candidate-v1",
-  "request_id": "ticket-123"
+  "protocol": "cement-candidate-v2"
 }
 ```
 
@@ -56,6 +55,5 @@ mapping.
 
 `System.propose` invokes the adapter at most one time for each call, and it never retries. A
 call that fails input validation or operation lookup invokes the adapter zero times. Provider
-calls must create no external effects. `request_id` is an opaque per-call tracing identifier. It is
-partition-local, and a provider can use it as an idempotency key. Adapters that use a global
-idempotency namespace must key on `(partition, request_id)`.
+calls must create no external effects. The request carries no per-call identifier, so an adapter
+that needs idempotency must derive its own key from the partition, the operation and the input.

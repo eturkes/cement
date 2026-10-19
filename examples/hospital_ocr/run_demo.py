@@ -128,7 +128,7 @@ def _print_event_trace(system: System) -> None:
             event_type = "<missing type>"
 
         detail = ""
-        for key in ("request_id", "proposal_id", "artifact_id"):
+        for key in ("proposal_id", "artifact_id"):
             value = event.get(key)
             if type(value) is str:
                 detail = f"  {key}={value}"

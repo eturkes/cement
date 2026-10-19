@@ -334,8 +334,7 @@ class SystemTests(unittest.TestCase):
         pending = self.system.propose("tenant-a", "echo", {"malformed": True})
         with self.system.store.transaction(write=True) as connection:
             connection.execute(
-                "UPDATE requests SET input_json = ? WHERE id = "
-                "(SELECT request_id FROM proposals WHERE id = ?)",
+                "UPDATE proposals SET input_json = ? WHERE id = ?",
                 ("{", pending),
             )
 
@@ -373,8 +372,7 @@ class SystemTests(unittest.TestCase):
         try:
             connection.execute("PRAGMA foreign_keys = OFF")
             connection.execute(
-                "DELETE FROM requests WHERE id = "
-                "(SELECT request_id FROM proposals WHERE id = ?)",
+                "UPDATE proposals SET input_hash = '' WHERE id = ?",
                 (pending,),
             )
             connection.commit()
@@ -593,7 +591,7 @@ class SystemTests(unittest.TestCase):
 
         with self.system.store.transaction(write=False) as connection:
             self.assertEqual(
-                connection.execute("SELECT count(*) FROM requests").fetchone()[0],
+                connection.execute("SELECT count(*) FROM sqlite_schema WHERE name = 'requests'").fetchone()[0],
                 0,
             )
             self.assertEqual(
@@ -654,18 +652,15 @@ class SystemTests(unittest.TestCase):
         connection = sqlite3.connect(self.database)
         try:
             (planted,) = connection.execute(
-                "SELECT count(*) FROM requests WHERE partition = ? AND id = "
-                "(SELECT request_id FROM proposals WHERE id = ?)",
+                "SELECT count(*) FROM proposals WHERE partition = ? AND id = ?",
                 ("tenant-a", confirmed.proposal_id),
             ).fetchone()
             self.assertEqual(planted, 1)
             with self.assertRaises(sqlite3.IntegrityError):
                 connection.execute(
                     """
-                    UPDATE requests SET source_kind = 'mystery', output_json = '"tampered"'
-                    WHERE partition = ? AND id = (
-                        SELECT request_id FROM proposals WHERE id = ?
-                    )
+                    UPDATE proposals SET status = 'mystery', final_output_json = '"tampered"'
+                    WHERE partition = ? AND id = ?
                     """,
                     ("tenant-a", confirmed.proposal_id),
                 )
@@ -775,8 +770,8 @@ class SystemTests(unittest.TestCase):
         with self.system.store.transaction(write=False) as connection:
             request = connection.execute(
                 """
-                SELECT status, operation_revision, proposal_id
-                FROM requests WHERE proposal_id = ?
+                SELECT status, operation_revision, id
+                FROM proposals WHERE id = ?
                 """,
                 (pending,),
             ).fetchone()
@@ -1069,9 +1064,9 @@ class SystemTests(unittest.TestCase):
         pending = self.system.propose("tenant-a", "echo", {"x": 1})
         connection = sqlite3.connect(self.database)
         try:
+            connection.execute("PRAGMA ignore_check_constraints = ON")
             connection.execute(
-                "UPDATE requests SET status = 'rejected' WHERE partition = ? AND id = "
-                "(SELECT request_id FROM proposals WHERE id = ?)",
+                "UPDATE proposals SET reviewer = 'premature' WHERE partition = ? AND id = ?",
                 ("tenant-a", pending),
             )
             connection.commit()
@@ -1451,6 +1446,7 @@ class SystemTests(unittest.TestCase):
             "candidate_count": candidate_count,
             "retired_artifact_ids_hash": bound_digest("retired"),
             "retired_count": retired_count,
+            "projection_hash": None,
             "promoted_by": f"promoter-{receipt_id}",
             "promoted_at_us": promoted_at_us,
         }
@@ -1461,9 +1457,9 @@ class SystemTests(unittest.TestCase):
                 id, partition, operation, operation_revision, policy_hash,
                 function_hash, membership_hash, member_count,
                 candidate_artifact_ids_hash, candidate_count,
-                retired_artifact_ids_hash, retired_count, promoted_by,
+                retired_artifact_ids_hash, retired_count, projection_hash, promoted_by,
                 promoted_at_us, receipt_hash
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             tuple(fields.values()),
         )
@@ -5594,7 +5590,7 @@ class SystemTests(unittest.TestCase):
 
 
     def test_function_promotion_schema_v2_is_reference_only_and_immutable(self) -> None:
-        self.assertEqual(SCHEMA_VERSION, 2)
+        self.assertEqual(SCHEMA_VERSION, 3)
         self.register(confirmations=2, reviewers=1, span=0)
         _, promotion = self._promote_three_as_function("function-schema")
 
@@ -5682,6 +5678,7 @@ class SystemTests(unittest.TestCase):
                 "candidate_count",
                 "retired_artifact_ids_hash",
                 "retired_count",
+                "projection_hash",
                 "promoted_by",
                 "promoted_at_us",
                 "receipt_hash",
@@ -5715,9 +5712,10 @@ class SystemTests(unittest.TestCase):
                 (10, "candidate_count", "INTEGER", 1, None, 0),
                 (11, "retired_artifact_ids_hash", "TEXT", 1, None, 0),
                 (12, "retired_count", "INTEGER", 1, None, 0),
-                (13, "promoted_by", "TEXT", 1, None, 0),
-                (14, "promoted_at_us", "INTEGER", 1, None, 0),
-                (15, "receipt_hash", "TEXT", 1, None, 0),
+                (13, "projection_hash", "TEXT", 0, None, 0),
+                (14, "promoted_by", "TEXT", 1, None, 0),
+                (15, "promoted_at_us", "INTEGER", 1, None, 0),
+                (16, "receipt_hash", "TEXT", 1, None, 0),
             ),
         )
         self.assertEqual(
@@ -5782,6 +5780,7 @@ class SystemTests(unittest.TestCase):
             frozenset(
                 {
                     (0, "c", 0, ("function_hash", "sequence")),
+                    (0, "c", 0, ("partition", "operation", "sequence")),
                     (
                         0,
                         "c",
@@ -5809,7 +5808,7 @@ class SystemTests(unittest.TestCase):
             table_properties,
             {
                 "function_memberships": ("table", 7, 0, 1),
-                "function_receipts": ("table", 16, 0, 1),
+                "function_receipts": ("table", 17, 0, 1),
             },
         )
         receipt_sql = schema_rows[("table", "function_receipts")]
@@ -6365,7 +6364,7 @@ class SystemTests(unittest.TestCase):
             connection.close()
         with self.assertRaisesRegex(
             IntegrityError,
-            "database schema 1 is unsupported; expected 2",
+            "database schema 1 is unsupported; expected 3",
         ):
             System(legacy)
         connection = sqlite3.connect(legacy)
@@ -6624,6 +6623,7 @@ class SystemTests(unittest.TestCase):
             "retired_count": 13,
             "promoted_by": "release-manager",
             "promoted_at_us": 1_234_567,
+            "projection_hash": None,
         }
         ordered_names = (
             "id",
@@ -6640,6 +6640,7 @@ class SystemTests(unittest.TestCase):
             "retired_count",
             "promoted_by",
             "promoted_at_us",
+            "projection_hash",
         )
         mutations: dict[str, object] = {
             "id": "fpr_changed",
@@ -6656,8 +6657,9 @@ class SystemTests(unittest.TestCase):
             "retired_count": 17,
             "promoted_by": "other-manager",
             "promoted_at_us": 1_234_568,
+            "projection_hash": "a" * 64,
         }
-        self.assertEqual(len(fields), 14)
+        self.assertEqual(len(fields), 15)
         self.assertEqual(set(mutations), set(fields))
         self.assertEqual(
             tuple(
@@ -6690,13 +6692,13 @@ class SystemTests(unittest.TestCase):
 
         self.assertEqual(
             FUNCTION_PROMOTION_RECEIPT_ABI,
-            "cement-function-promotion-v1",
+            "cement-function-promotion-v2",
         )
         self.assertEqual(
             baseline,
             framed_digest(
-                "cement-function-promotion-v1",
-                tuple(str(fields[name]) for name in ordered_names),
+                "cement-function-promotion-v2",
+                tuple("" if fields[name] is None else str(fields[name]) for name in ordered_names),
             ),
         )
 
@@ -14698,19 +14700,17 @@ class SystemTests(unittest.TestCase):
         for partition, operation in scopes:
             self.system.register_operation(partition, operation, policy=policy)
 
-        new_id = system_module._new_id
-
         def propose_with_request_id(
             partition: str,
             operation: str,
             value: object,
             request_id: str,
         ) -> str:
-            def fixed_id(prefix: str) -> str:
-                return request_id if prefix == "req" else new_id(prefix)
-
-            with mock.patch.object(system_module, "_new_id", side_effect=fixed_id):
-                return self.system.propose(partition, operation, value)
+            return self.system.submit_proposal(
+                partition, operation, value,
+                candidate=Candidate(output={"echo": value}, provenance={"model": "fake-v1"}),
+                source_id=request_id,
+            )
 
         target: list[str] = []
         for request_id, value in (
@@ -14762,11 +14762,11 @@ class SystemTests(unittest.TestCase):
 
         with self.system.store.transaction(write=False) as connection:
             shared_rows = connection.execute(
-                "SELECT partition, id FROM requests WHERE id = ?",
+                "SELECT partition, source_id FROM proposals WHERE source_id = ?",
                 ("shared_request",),
             ).fetchall()
         self.assertEqual(
-            {(str(row["partition"]), str(row["id"])) for row in shared_rows},
+            {(str(row["partition"]), str(row["source_id"])) for row in shared_rows},
             {("tenant_a", "shared_request"), ("tenantXa", "shared_request")},
         )
 
@@ -14795,39 +14795,28 @@ class SystemTests(unittest.TestCase):
         )
 
     def test_function_report_pending_count_reaches_the_10001_tail_with_bounded_detail(self) -> None:
+        """v3 has no separate row to orphan beyond the detail bound; validate its last materialized proposal."""
         self.system.register_operation(
             "tenant-a",
             "echo",
             policy=CompilePolicy(2, 1, 0),
         )
         provenance = canonicalize({"source": "tail"})
-        request_rows: list[tuple[object, ...]] = []
         proposal_rows: list[tuple[object, ...]] = []
         input_hashes: list[str] = []
         for index in range(10_001):
-            request_id = f"req_tail_{index:05d}"
             proposal_id = f"prop_tail_{index:05d}"
             input_json = canonicalize({"tail": index})
             proposed = canonicalize({"output": index})
             input_hashes.append(input_json.digest)
-            request_rows.append(
+            proposal_rows.append(
                 (
-                    request_id,
+                    proposal_id,
                     "tenant-a",
                     "echo",
                     1,
                     input_json.text,
                     input_json.digest,
-                    proposal_id,
-                    20_000 + index,
-                    20_000 + index,
-                )
-            )
-            proposal_rows.append(
-                (
-                    proposal_id,
-                    "tenant-a",
-                    request_id,
                     proposed.text,
                     proposed.digest,
                     provenance.text,
@@ -14837,24 +14826,15 @@ class SystemTests(unittest.TestCase):
                 )
             )
         with self.system.store.transaction(write=True) as connection:
-            connection.executemany(
-                """
-                INSERT INTO requests(
-                    id, partition, operation, operation_revision,
-                    input_json, input_hash, status, proposal_id,
-                    created_at_us, updated_at_us
-                ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
-                """,
-                request_rows,
-            )
+            self.assertEqual(connection.execute("SELECT name FROM sqlite_schema WHERE name = 'requests'").fetchall(), [])
             connection.executemany(
                 """
                 INSERT INTO proposals(
-                    id, partition, request_id,
+                    id, partition, operation, operation_revision, input_json, input_hash,
                     proposed_output_json, proposed_output_hash,
                     provenance_json, provenance_hash,
                     status, created_at_us, status_sequence
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
                 """,
                 proposal_rows,
             )
@@ -14912,7 +14892,7 @@ class SystemTests(unittest.TestCase):
         connection = sqlite3.connect(self.database)
         try:
             connection.execute("PRAGMA foreign_keys = OFF")
-            connection.execute("DELETE FROM requests WHERE id = ?", ("req_tail_10000",))
+            connection.execute("UPDATE proposals SET input_hash = '' WHERE id = ?", ("prop_tail_09999",))
             connection.commit()
         finally:
             connection.close()
@@ -15352,7 +15332,7 @@ class SystemTests(unittest.TestCase):
                 label: str | None = None
                 if "FROM function_memberships AS m" in sql and "LIMIT ?" in sql:
                     label = "members"
-                elif "ORDER BY p.id LIMIT ?" in sql:
+                elif "FROM proposals" in sql and "ORDER BY id LIMIT ?" in sql:
                     label = "pending"
                 elif (
                     "FROM artifacts" in sql
@@ -16497,23 +16477,17 @@ class SystemTests(unittest.TestCase):
                 elif fault_field == "ids-and-revision":
                     values = {
                         field: _CoercibleStoredScalar(row[field])
-                        for field in ("id", "bound_request_id", "operation_revision")
+                        for field in ("id", "operation_revision")
                     }
                 else:
-                    foreign = {
+                    values = {fault_field: {
                         "partition": "tenant-b",
-                        "bound_request_partition": "tenant-b",
-                        "request_id": str(rows[0]["bound_request_id"]),
+                        "operation": "other",
                         "status": "accepted",
-                        "bound_request_status": "resolved",
-                        "bound_proposal_id": str(rows[0]["id"]),
-                    }[fault_field]
-                    values = {
-                        fault_field: _LeftMismatchText(
-                            str(row[fault_field]),
-                            foreign,
-                        )
-                    }
+                        "proposed_output_hash": "0" * 64,
+                        "provenance_hash": "0" * 64,
+                        "input_json": "{",
+                    }[fault_field]}
                 rows[fault_position] = _OverlayRow(row, values)
                 return rows
 
@@ -16526,7 +16500,7 @@ class SystemTests(unittest.TestCase):
 
             def execute(self, sql: str, parameters=()):
                 cursor = self.connection.execute(sql, parameters)
-                if "ORDER BY p.id LIMIT ?" in sql:
+                if "FROM proposals" in sql and "ORDER BY id LIMIT ?" in sql:
                     return RowsCursor(cursor)
                 return cursor
 
@@ -16542,11 +16516,11 @@ class SystemTests(unittest.TestCase):
         scalar_fields = ("input_hash", "ids-and-revision")
         binding_fields = (
             "partition",
-            "bound_request_partition",
-            "request_id",
+            "operation",
             "status",
-            "bound_request_status",
-            "bound_proposal_id",
+            "proposed_output_hash",
+            "provenance_hash",
+            "input_json",
         )
         for field in scalar_fields + binding_fields:
             for position in (1, 2):
@@ -16558,23 +16532,20 @@ class SystemTests(unittest.TestCase):
                         "transaction",
                         side_effect=fault_transaction,
                     ):
-                        if field in scalar_fields:
-                            with self.assertRaises(IntegrityError):
-                                self.system.function_report(
-                                    "tenant-a",
-                                    "echo",
-                                    projection_limit=3,
-                                )
-                        else:
-                            with self.assertRaisesRegex(
-                                IntegrityError,
-                                "^pending proposal scope or request binding mismatch$",
-                            ):
-                                self.system.function_report(
-                                    "tenant-a",
-                                    "echo",
-                                    projection_limit=3,
-                                )
+                        message = {
+                            "input_hash": "proposal row has invalid scope fields",
+                            "ids-and-revision": "proposal row has invalid scope fields",
+                            "partition": "proposal row belongs to another partition",
+                            "operation": "pending proposal scope mismatch",
+                            "status": "pending proposal scope mismatch",
+                            "proposed_output_hash": "proposal output digest mismatch",
+                            "provenance_hash": "proposal provenance digest mismatch",
+                            "input_json": "stored proposal content is not valid JSON",
+                        }[field]
+                        with self.assertRaisesRegex(IntegrityError, f"^{message}$"):
+                            self.system.function_report(
+                                "tenant-a", "echo", projection_limit=3,
+                            )
 
     def test_function_report_pending_request_join_is_like_and_case_exact(self) -> None:
         self.system.register_operation(
@@ -16597,24 +16568,17 @@ class SystemTests(unittest.TestCase):
             )
             pending_by_request[request_id] = proposal_id
 
-        # `propose` mints its own request-row id, so the collider set this test
-        # exists to exercise has to be planted after submission. Every minted id
-        # is lowercase hex whose only `_` sits in the `req_` prefix, so without
-        # this a `=` -> `LIKE` or a case-folding mutation on the
-        # `r.id = p.request_id` join survives with the assertions below intact.
+        # Plant non-hex proposal identifiers so case/LIKE collisions survive the fixture.
+        # v3 binds directly to the proposal; no request join remains.
         connection = sqlite3.connect(self.database)
         try:
             connection.execute("PRAGMA foreign_keys = OFF")
             for request_id, proposal_id in pending_by_request.items():
                 connection.execute(
-                    "UPDATE requests SET id = ? WHERE id = "
-                    "(SELECT request_id FROM proposals WHERE id = ?)",
+                    "UPDATE proposals SET id = ? WHERE id = ?",
                     (request_id, proposal_id),
                 )
-                connection.execute(
-                    "UPDATE proposals SET request_id = ? WHERE id = ?",
-                    (request_id, proposal_id),
-                )
+                pending_by_request[request_id] = request_id
             connection.commit()
         finally:
             connection.close()

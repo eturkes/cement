@@ -1125,7 +1125,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         WRONG AS WRITTEN: cites D16 as the parser-shape carrier -- CORRECT: **D17** defines the
         digest re-base; D16 specifies exit classes and payload key sets (Y01)
         """
-        current = _leaf_fingerprints(cement_cli._parser())
+        current = _leaf_fingerprints(_module_from_git("1146421")._parser())
         baseline_module = _module_from_git("36f7890")
         baseline = _leaf_fingerprints(baseline_module._parser())
 
@@ -1770,7 +1770,11 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         failures; the three re-based helpers cleared **102**; **3** were re-based in place
         (A10)
         """
-        target = _function_node("tests/test_cli_channels.py", "test_x11_")
+        # M3.6a2 amended this frame's provenance-use count; freeze its latest closed transition.
+        closed = ast.parse(_git_bytes("ffe9848", "tests/test_cli_channels.py"))
+        targets = [node for node in ast.walk(closed) if isinstance(node, ast.FunctionDef) and node.name.startswith("test_x11_")]
+        self.assertEqual(len(targets), 1)
+        target = targets[0]
         tree = _executable_tree(target)
         strings = _code_strings(target)
         code = _code(target)
@@ -2230,7 +2234,10 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         failures; the three re-based helpers cleared **102**; **3** were re-based in place
         (A10)
         """
-        target = _function_node("tests/test_cli_channels_battery.py", "test_d16_")
+        closed = ast.parse(_git_bytes("1146421", "tests/test_cli_channels_battery.py"))
+        targets = [node for node in ast.walk(closed) if isinstance(node, ast.FunctionDef) and node.name.startswith("test_d16_")]
+        self.assertEqual(len(targets), 1)
+        target = targets[0]
         tree = _executable_tree(target)
         strings = _code_strings(target)
         code = _code(target)
@@ -2780,7 +2787,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         # carries a request identifier any more, so the pin asserts the replacement claim.
         self.assertRegex(
             flat_readme,
-            r"request row stays internal.{0,400}No public surface names it",
+            r"also expose no request identifier\. Use `proposal_id` to name a proposal on every surface",
         )
 
     def test_d22b_direction_library_route_every_library_api_locus_is_byt(self) -> None:

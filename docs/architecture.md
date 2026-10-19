@@ -62,17 +62,19 @@ Two methods enter the same pipeline at step 3
 alone. `System.submit_proposal` stores a caller-supplied candidate. `System.propose` validates its
 inputs and reads the operation first. If those checks pass, it calls the configured candidate source
 one time, outside every transaction that the call holds, and stores the result. Both methods
-write one request row, one proposal row, and one `proposal.created` event in one transaction. They
-return the new proposal identifier. Neither method resolves an artifact, and neither one reserves
-anything before it writes. Review at step 4 receives their proposals unchanged. The
-request row stays internal to this route, and schema v2 keeps it as internal storage.
+write one proposal row and one `proposal.created` event in one transaction. They return the new
+proposal identifier. Neither method resolves an artifact, and neither one reserves anything
+before it writes. Review at step 4 receives their proposals unchanged. A proposal can carry a
+source id that names the observation it came from. Cement refuses a second proposal with the
+same source id for the same partition and operation.
 
 Two CLI channels reach these seams directly. `cement proposal submit OPERATION --submission VALUE`
 calls `System.submit_proposal`. An operator enters the pipeline at step 3 with a candidate that the
 operator already holds. The leaf never runs a candidate source. `--submission` carries `input`,
-`output`, and an optional `provenance` in one JSON object, because separate flags cannot carry three
-maximum-size fields through one argument list. The command inherits the method's non-idempotency: two
-identical submissions write two proposals.
+`output`, an optional `provenance` and an optional `source_id` in one JSON object, because
+separate flags cannot carry three maximum-size fields through one argument list. Without a source
+id, the command inherits the method's non-idempotency: two identical submissions write two
+proposals.
 
 `cement resolve OPERATION --input VALUE` calls `System.resolve`, which runs `verify_function` and then
 evaluates the verified document under that one snapshot. The leaf writes nothing and opens one read

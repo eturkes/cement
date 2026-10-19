@@ -352,13 +352,11 @@ class PlanAdapterTests(unittest.TestCase):
     def request(
         self,
         signature,
-        request_id: str = "hospital-ocr-test",
     ) -> CandidateRequest:
         return CandidateRequest(
             partition="example-hospital",
             operation="document.extraction_plan",
             operation_revision=1,
-            request_id=request_id,
             input=signature,
         )
 
@@ -372,7 +370,7 @@ class PlanAdapterTests(unittest.TestCase):
             with self.subTest(filename=filename):
                 ocr_text = _document(filename)
                 signature = pipeline.layout_signature(ocr_text)
-                proposed = proposer.propose(self.request(signature, filename))
+                proposed = proposer.propose(self.request(signature))
                 reference = pipeline.reference_plan(DOCUMENT_TYPES[filename])
                 self.assertIsNotNone(reference)
                 self.assertEqual(
@@ -385,8 +383,8 @@ class PlanAdapterTests(unittest.TestCase):
             _document("layout_a_progress_note_01.txt")
         )
         proposer = plan_adapter.PlanProposer()
-        first = proposer.propose(self.request(signature, "determinism-1"))
-        second = proposer.propose(self.request(signature, "determinism-2"))
+        first = proposer.propose(self.request(signature))
+        second = proposer.propose(self.request(signature))
 
         self.assertEqual(
             _canonical_bytes(first.output),
@@ -404,7 +402,7 @@ class PlanAdapterTests(unittest.TestCase):
         document_type = "physician_progress_note"
         reference_before = _canonical_bytes(pipeline.REFERENCE_PLANS[document_type])
         proposer = plan_adapter.PlanProposer()
-        returned = proposer.propose(self.request(signature, "isolation-1")).output
+        returned = proposer.propose(self.request(signature)).output
 
         returned["fields"][0]["locator"]["label"] = "Mutated Patient"
 
@@ -412,7 +410,7 @@ class PlanAdapterTests(unittest.TestCase):
             _canonical_bytes(pipeline.REFERENCE_PLANS[document_type]),
             reference_before,
         )
-        later = proposer.propose(self.request(signature, "isolation-2"))
+        later = proposer.propose(self.request(signature))
         self.assertEqual(_canonical_bytes(later.output), reference_before)
 
     def test_drifted_known_layout_falls_back_to_applicable_best_effort_plan(self) -> None:

@@ -301,9 +301,9 @@ it never retries. The source runs outside every transaction that the call holds.
 back into the same `System` opens its own transaction, which Cement cannot prevent. Both methods
 return the new proposal identifier as a string.
 
-Each call writes one request row, one proposal row, and one `proposal.created` event. Cement writes
-the three records in one transaction, and it writes no other row. That count covers Cement's own
-transaction only. A source that calls back into the same `System` writes on its own transaction.
+Each call writes one proposal row and one `proposal.created` event. Cement writes the two records
+in one transaction, and it writes no other row. That count covers Cement's own transaction only. A
+source that calls back into the same `System` writes on its own transaction. Without a source id,
 Cement gives no idempotency here. Two identical calls write two proposals and return two different
 identifiers.
 
@@ -317,17 +317,17 @@ It binds whatever revision is current under its own write lock, so a concurrent 
 cannot make it fail.
 
 A failure before the commit writes nothing. One window is different. If the database commit succeeds
-and then fails, Cement raises `StateError` and returns no identifier, but the three records are
-durable. The ledger then looks the same as a success. Do not retry the call, because Cement gives no
-idempotency and a retry writes a second proposal. To recover, list the pending proposals for the
+and then fails, Cement raises `StateError` and returns no identifier, but the proposal and its event
+are durable. The ledger then looks the same as a success. Do not retry a call that has no source
+id, because a retry writes a second proposal. To recover, list the pending proposals for the
 partition with `System.proposals`. Then read each candidate with `System.get_proposal` and match your
 own input.
 
-The request row stays internal to this route. The two signatures neither accept nor return its
-identifier. Schema v2 keeps the row as internal storage, and no proposal, review, or report value
-shows it. No public surface names it on this route, and no caller supplies it. The adapter
-interface is different. A candidate source receives `CandidateRequest`, which names `request_id`.
-Cement fills that field itself.
+A proposal can carry a source id that names the observation it came from, for example the
+deployment, the chat, the user message and the digest of the input. Pass it as
+`submit_proposal(..., source_id=...)`, or as the `source_id` key of the `--submission` object.
+Cement refuses a second proposal with the same source id for the same partition and operation
+(`ConflictError`, exit 4), so a repeated delivery adds no second proposal.
 
 ### Reviewing a proposal
 

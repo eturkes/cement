@@ -19,7 +19,7 @@ from .errors import CandidateSourceError, ValidationError
 from .json_value import JSONValue, canonicalize, parse_json
 from .models import Candidate, CandidateRequest
 
-SOURCE_PROTOCOL = "cement-candidate-v1"
+SOURCE_PROTOCOL = "cement-candidate-v2"
 
 
 class CandidateSource(Protocol):
@@ -124,7 +124,6 @@ class CommandCandidateSource:
             "operation_revision": request.operation_revision,
             "partition": request.partition,
             "protocol": SOURCE_PROTOCOL,
-            "request_id": request.request_id,
         }
         request_bytes = canonicalize(envelope, max_bytes=2_097_152).text.encode("utf-8")
         environment = None

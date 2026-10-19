@@ -196,7 +196,7 @@ Gate reasons: support 1 is below required 2
 === Act 5: the verified set exports as portable bytes ===
 Exported set: 2 verified entries, promoted before Acts 2 and 3 resolved against them.
 Verified function hash: <function-hash>
-Exported bundle: 3344 bytes carrying no ledger.
+Exported bundle: 3385 bytes carrying no ledger.
 
 === Audit event trace ===
 01. operation.registered

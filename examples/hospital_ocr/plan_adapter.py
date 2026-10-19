@@ -145,7 +145,6 @@ def _self_check() -> None:
             partition="example-hospital",
             operation="document.extraction_plan",
             operation_revision=1,
-            request_id="self-check-known-layout",
             input=signature,
         )
     )
@@ -159,7 +158,6 @@ def _self_check() -> None:
             partition="example-hospital",
             operation="document.extraction_plan",
             operation_revision=1,
-            request_id="self-check-unknown-layout",
             input={
                 "document_type": "unknown_note",
                 "structure": [

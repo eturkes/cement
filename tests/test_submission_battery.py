@@ -138,6 +138,7 @@ class SubmissionBatteryTests(unittest.TestCase):
                     "WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
                 )
             )
+            self.assertEqual(connection.execute("SELECT name FROM sqlite_schema WHERE name = 'requests'").fetchall(), [])
             return {
                 table: int(connection.execute(f'SELECT count(*) FROM "{table}"').fetchone()[0])
                 for table in tables
@@ -147,8 +148,9 @@ class SubmissionBatteryTests(unittest.TestCase):
         with closing(sqlite3.connect(path)) as connection:
             counts = {
                 table: int(connection.execute(f"SELECT count(*) FROM {table}").fetchone()[0])
-                for table in ("requests", "proposals", "events")
+                for table in ("proposals", "events")
             }
+            self.assertEqual(connection.execute("SELECT name FROM sqlite_schema WHERE name = 'requests'").fetchall(), [])
             sequence_row = connection.execute(
                 "SELECT seq FROM sqlite_sequence WHERE name = 'events'"
             ).fetchone()
@@ -185,17 +187,20 @@ class SubmissionBatteryTests(unittest.TestCase):
         return system, path, source_snapshot, source
 
     def test_b01_schema_version_is_2_and_schema(self) -> None:
-        """B01. Hashing the encoded DDL pins version 2, 14,580 bytes, and its published fingerprint."""
-        encoded = SCHEMA.encode("utf-8")
+        """B01. Hashing the encoded DDL pins M3.3 closing DDL, 14,580 bytes, and its published fingerprint."""
+        closed = subprocess.check_output(("git", "-C", str(ROOT), "show", "32c2d11:src/cement_runtime/store.py"), text=True)
+        schema = next(ast.literal_eval(node.value) for node in ast.parse(closed).body
+                      if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "SCHEMA" for target in node.targets))
+        encoded = schema.encode("utf-8")
         digest = hashlib.sha256(encoded).hexdigest()
 
-        self.assertEqual(SCHEMA_VERSION, 2)
+        self.assertEqual(SCHEMA_VERSION, 3)
         self.assertEqual(len(encoded), 14_580)
         self.assertEqual(
             digest,
             "5be3d79fe1e21aca524f3937c8ce78521bcc7203bfe20b7352ef4b6dff468a77",
         )
-        self.assertEqual(SCHEMA_FINGERPRINT, digest)
+        self.assertEqual(SCHEMA_FINGERPRINT, hashlib.sha256(SCHEMA.encode("utf-8")).hexdigest())
 
     def test_b02_cli_py_command_supervisor_py_and(self) -> None:
         """B02. Comparing each M3.3 closing byte stream to git object f9b9755 pins both frozen runtime files.
@@ -250,9 +255,11 @@ class SubmissionBatteryTests(unittest.TestCase):
 
         self.assertEqual(
             tuple(submit.parameters),
-            ("self", "partition", "operation", "input_value", "candidate"),
+            ("self", "partition", "operation", "input_value", "candidate", "source_id"),
         )
         self.assertIs(submit.parameters["candidate"].default, inspect.Parameter.empty)
+        self.assertIsNone(submit.parameters["source_id"].default)
+        self.assertIs(submit.parameters["source_id"].kind, inspect.Parameter.KEYWORD_ONLY)
         self.assertIs(
             submit.parameters["candidate"].kind,
             inspect.Parameter.KEYWORD_ONLY,
@@ -350,7 +357,7 @@ class SubmissionBatteryTests(unittest.TestCase):
         self.assertEqual(len(set(measured)), 3)
 
     def test_d01_success_footprint_over_declared_schema_tables(self) -> None:
-        """D01. Per-table before/after counts pin exactly one request, proposal, and event on both routes."""
+        """D01. Per-table before/after counts pin exactly one proposal and event; requests absent on both routes."""
         for route in ("direct", "source"):
             with self.subTest(route=route):
                 source = _ReturningSource() if route == "source" else None
@@ -365,7 +372,7 @@ class SubmissionBatteryTests(unittest.TestCase):
                 after = self.table_counts(path)
                 delta = {table: after[table] - before[table] for table in before}
                 expected = {table: 0 for table in before}
-                expected.update({"requests": 1, "proposals": 1, "events": 1})
+                expected.update({"proposals": 1, "events": 1})
                 self.assertEqual(delta, expected)
 
     def test_d01_sqlite_sequence_is_outside_declared_schema_footprint(self) -> None:
@@ -393,7 +400,7 @@ class SubmissionBatteryTests(unittest.TestCase):
         self.assertEqual(after_sequence - before_sequence, 1)
 
     def test_d02_the_request_row_is_pending_with(self) -> None:
-        """D02. Reading each route's sole request row pins pending status, proposal binding, null lease, and attempt one."""
+        """D02. Reading each route's sole proposal row pins pending status, direct scope, and a null source id."""
         for route in ("direct", "source"):
             with self.subTest(route=route):
                 source = _ReturningSource() if route == "source" else None
@@ -410,11 +417,12 @@ class SubmissionBatteryTests(unittest.TestCase):
 
                 with closing(sqlite3.connect(path)) as connection:
                     row = connection.execute(
-                        "SELECT status, proposal_id, lease_owner, lease_until_us, attempts "
-                        "FROM requests"
+                        "SELECT status, id, operation, operation_revision, source_id "
+                        "FROM proposals"
                     ).fetchone()
 
-                self.assertEqual(row, ("pending", proposal_id, None, None, 1))
+                self.assertEqual(row, ("pending", proposal_id, OPERATION, 1, None))
+                self.assertEqual(self.table_counts(path)["proposals"], 1)
 
     def test_d03_the_event_is_proposal_created_with(self) -> None:
         """D03. Both proposal routes emit the exact empty payload and proposal subject."""
@@ -436,7 +444,7 @@ class SubmissionBatteryTests(unittest.TestCase):
             self.assertNotIn("request", row[3].lower())
 
     def test_d04_no_idempotency_byte_identical_content_submitted(self) -> None:
-        """D04. Repeating byte-identical content on each route yields distinct IDs and two rows in every footprint table."""
+        """D04. Repeating byte-identical content without a source id on each route yields distinct IDs and two rows in every footprint table."""
         for route in ("direct", "source"):
             with self.subTest(route=route):
                 source = _ReturningSource() if route == "source" else None
@@ -456,8 +464,8 @@ class SubmissionBatteryTests(unittest.TestCase):
                 after = self.table_counts(path)
                 self.assertNotEqual(first, second)
                 self.assertEqual(
-                    {table: after[table] - before[table] for table in ("requests", "proposals", "events")},
-                    {"requests": 2, "proposals": 2, "events": 2},
+                    {table: after[table] - before[table] for table in ("proposals", "events")},
+                    {"proposals": 2, "events": 2},
                 )
 
     def test_d04_domain_identifiers_remain_stored_verbatim(self) -> None:
@@ -511,7 +519,7 @@ class SubmissionBatteryTests(unittest.TestCase):
         self.assertEqual(len(source.calls), 1)
 
     def test_d06_one_private_persistence_seam_writes_all(self) -> None:
-        """D06. Wrapping the named System seam records one call and its three-row footprint from each public route."""
+        """D06. Wrapping the named System seam records one call and its two-row footprint from each public route."""
         for route in ("direct", "source"):
             with self.subTest(route=route):
                 source = _ReturningSource() if route == "source" else None
@@ -539,8 +547,8 @@ class SubmissionBatteryTests(unittest.TestCase):
                 )
                 after = self.table_counts(path)
                 self.assertEqual(
-                    {table: after[table] - before[table] for table in ("requests", "proposals", "events")},
-                    {"requests": 1, "proposals": 1, "events": 1},
+                    {table: after[table] - before[table] for table in ("proposals", "events")},
+                    {"proposals": 1, "events": 1},
                 )
 
     def test_d07_validation_order_partition_operation_input_canonicalization_1(self) -> None:
@@ -679,7 +687,8 @@ class SubmissionBatteryTests(unittest.TestCase):
                     candidate=CANDIDATE,
                     source=object(),  # type: ignore[call-arg]
                 ),
-                "System.submit_proposal() got an unexpected keyword argument 'source'",
+                "System.submit_proposal() got an unexpected keyword argument 'source'"
+                + (". Did you mean 'source_id'?" if __import__("sys").version_info >= (3, 13) else ""),
             ),
             (
                 lambda: system.propose(
@@ -749,8 +758,8 @@ class SubmissionBatteryTests(unittest.TestCase):
 
         self.assertEqual(len(source.calls), 1)
         self.assertEqual(
-            {key: self.table_counts(path)[key] for key in ("requests", "proposals")},
-            {"requests": 0, "proposals": 0},
+            {key: self.table_counts(path)[key] for key in ("proposals",)},
+            {"proposals": 0},
         )
         proposal_id = system.submit_proposal(
             PARTITION,
@@ -760,7 +769,7 @@ class SubmissionBatteryTests(unittest.TestCase):
         )
         with closing(sqlite3.connect(path)) as connection:
             revision = connection.execute(
-                "SELECT operation_revision FROM requests WHERE proposal_id = ?",
+                "SELECT operation_revision FROM proposals WHERE id = ?",
                 (proposal_id,),
             ).fetchone()[0]
         self.assertEqual(revision, 2)
@@ -848,7 +857,7 @@ class SubmissionBatteryTests(unittest.TestCase):
         )
 
     def test_d14_propose_hands_the_source_a_candidaterequest(self) -> None:
-        """D14. Capturing the sole adapter argument pins CandidateRequest fields and its generated req_ identity."""
+        """D14. Capturing the sole adapter argument pins CandidateRequest four fields without a request identity."""
         source = _ReturningSource()
         system, _ = self.new_system(source=source)
         caller_input = {"outer": {"value": 10}, "items": [11, 12]}
@@ -862,7 +871,7 @@ class SubmissionBatteryTests(unittest.TestCase):
             (request.partition, request.operation, request.operation_revision),
             (PARTITION, OPERATION, 1),
         )
-        self.assertTrue(request.request_id.startswith("req_"))
+        self.assertEqual(tuple(request.__dataclass_fields__), ("partition", "operation", "operation_revision", "input"))
         self.assertEqual(request.input, caller_input)
         self.assertIsNot(request.input, caller_input)
         self.assertEqual(system.get_proposal(PARTITION, proposal_id).input, caller_input)
@@ -882,7 +891,7 @@ class SubmissionBatteryTests(unittest.TestCase):
         after_counts = after["counts"]
         self.assertIsInstance(baseline_counts, dict)
         self.assertIsInstance(after_counts, dict)
-        self.assertEqual(baseline_counts["requests"], after_counts["requests"])
+        self.assertEqual(set(baseline_counts), {"proposals", "events"})
         self.assertEqual(baseline_counts["proposals"], after_counts["proposals"])
 
     def test_d15_a_failed_submission_mutates_nothing_of_2(self) -> None:
@@ -919,10 +928,10 @@ class SubmissionBatteryTests(unittest.TestCase):
         self.assertEqual(source_snapshot["dump"], self.ledger_snapshot(path)["dump"])
 
     def test_d15_a_failed_submission_mutates_nothing_of_5(self) -> None:
-        """D15. Injecting after writes one, two, and three rolls back every purity pin with no successful commit."""
+        """D15. Injecting after writes one and two rolls back every purity pin with no successful commit."""
         real_connect = sqlite3.connect
 
-        for fail_after in (1, 2, 3):
+        for fail_after in (1, 2):
             with self.subTest(fail_after=fail_after):
                 system, path = self.new_system()
                 baseline = self.ledger_snapshot(path)
@@ -942,7 +951,7 @@ class SubmissionBatteryTests(unittest.TestCase):
                         table = next(
                             (
                                 name
-                                for name in ("requests", "proposals", "events")
+                                for name in ("proposals", "events")
                                 if normalized.startswith(f"insert into {name}")
                             ),
                             None,
@@ -989,7 +998,7 @@ class SubmissionBatteryTests(unittest.TestCase):
                 after_counts = after["counts"]
                 self.assertIsInstance(baseline_counts, dict)
                 self.assertIsInstance(after_counts, dict)
-                self.assertEqual(baseline_counts["requests"], after_counts["requests"])
+                self.assertEqual(set(baseline_counts), {"proposals", "events"})
                 self.assertEqual(baseline_counts["proposals"], after_counts["proposals"])
                 self.assertEqual(baseline_counts["events"], after_counts["events"])
                 self.assertEqual(baseline["event_sequence"], after["event_sequence"])
@@ -1351,9 +1360,9 @@ class SubmissionBatteryTests(unittest.TestCase):
             system.propose(PARTITION, OPERATION, INPUT)
 
         with closing(sqlite3.connect(path)) as connection:
-            request_rows = int(connection.execute("SELECT count(*) FROM requests").fetchone()[0])
+            request_rows = int(connection.execute("SELECT count(*) FROM sqlite_schema WHERE name = 'requests'").fetchone()[0])
             failed_rows = int(
-                connection.execute("SELECT count(*) FROM requests WHERE status = 'failed'").fetchone()[0]
+                connection.execute("SELECT count(*) FROM proposals WHERE status = 'failed'").fetchone()[0]
             )
             proposal_rows = int(connection.execute("SELECT count(*) FROM proposals").fetchone()[0])
             fallback_events = int(
@@ -1408,12 +1417,9 @@ class SubmissionBatteryTests(unittest.TestCase):
                     proposal_id = system.propose(PARTITION, OPERATION, INPUT)
 
                 with closing(sqlite3.connect(path)) as connection:
-                    request_id = str(
-                        connection.execute(
-                            "SELECT request_id FROM proposals WHERE id = ?",
-                            (proposal_id,),
-                        ).fetchone()[0]
-                    )
+                    request_rows = connection.execute(
+                        "SELECT name FROM sqlite_schema WHERE name = 'requests'"
+                    ).fetchall()
                     event = connection.execute(
                         "SELECT subject_type, subject_id, payload_json FROM events "
                         "WHERE kind = 'proposal.created' AND subject_id = ?",
@@ -1421,18 +1427,17 @@ class SubmissionBatteryTests(unittest.TestCase):
                     ).fetchone()
 
                 self.assertIs(type(proposal_id), str)
-                self.assertNotEqual(proposal_id, request_id)
-                self.assertNotIn(request_id, proposal_id)
+                self.assertEqual(request_rows, [])
+                self.assertTrue(proposal_id.startswith("prop_"))
                 self.assertEqual(event, ("proposal", proposal_id, "{}"))
-                self.assertNotIn(request_id, event[2])
+                self.assertNotIn("request_id", event[2])
 
     def test_d23_the_eight_named_seams_still_expose(self) -> None:
-        """D23. Only CandidateRequest exposes the request ID across the six surviving seams."""
+        """D23. No seam exposes a request ID, including CandidateRequest."""
         source = _ReturningSource()
         system, _ = self.new_system(source=source)
         proposal_id = system.propose(PARTITION, OPERATION, INPUT)
         source_request = source.calls[0]
-        request_id = source_request.request_id
 
         report = system.function_report(PARTITION, OPERATION)
         gap = next(
@@ -1440,9 +1445,7 @@ class SubmissionBatteryTests(unittest.TestCase):
             for gap in report.operation_now.pending_proposals
             if gap.proposal_id == proposal_id
         )
-        # CandidateRequest still carries the adapter trace identity. The proposal,
-        # review, and report seams expose none; both sides remain explicit.
-        exposed = {"CandidateRequest": source_request.request_id}
+        exposed = {name: getattr(source_request, name) for name in source_request.__dataclass_fields__ if name == "request_id"}
         view = system.get_proposal(PARTITION, proposal_id)
         record = system.proposal(PARTITION, proposal_id)
         feed = system.proposals(PARTITION)[0]
@@ -1454,8 +1457,8 @@ class SubmissionBatteryTests(unittest.TestCase):
             note="rejected_23",
         )
 
-        self.assertEqual(len(exposed), 1)
-        self.assertEqual(set(exposed.values()), {request_id})
+        self.assertEqual(len(exposed), 0)
+        self.assertEqual(set(exposed.values()), set())
         self.assertNotIn("request_id", view.__dataclass_fields__)
         self.assertNotIn("request_id", record)
         self.assertNotIn("request_id", feed)
@@ -1466,7 +1469,7 @@ class SubmissionBatteryTests(unittest.TestCase):
         self.assertEqual(len(source.calls), 1)
 
     def test_d24_private_means_a_storage_role_the(self) -> None:
-        """D24. Signature inspection plus ledger lookup pins a retained request row that neither method accepts nor returns."""
+        """D24. Signature inspection plus ledger lookup pins the absent requests table and the returned proposal row."""
         for method in (System.submit_proposal, System.propose):
             with self.subTest(method=method.__name__):
                 parameters = inspect.signature(method).parameters
@@ -1487,21 +1490,24 @@ class SubmissionBatteryTests(unittest.TestCase):
                 else:
                     returned = system.propose(PARTITION, OPERATION, INPUT)
                 with closing(sqlite3.connect(path)) as connection:
-                    stored_request_id = str(
-                        connection.execute(
-                            "SELECT id FROM requests WHERE proposal_id = ?",
-                            (returned,),
-                        ).fetchone()[0]
-                    )
-                self.assertTrue(stored_request_id.startswith("req_"))
-                self.assertNotEqual(returned, stored_request_id)
+                    request_rows = connection.execute("SELECT name FROM sqlite_schema WHERE name = 'requests'").fetchall()
+                    stored_proposal_id = connection.execute("SELECT id FROM proposals WHERE id = ?", (returned,)).fetchone()[0]
+                self.assertEqual(request_rows, [])
+                self.assertEqual(returned, stored_proposal_id)
 
     def test_d25_shipped_prose_says_schema_v2_retains(self) -> None:
         """D25. Every public paragraph calling the row internal also states schema-v2 retention and reader visibility."""
-        surfaces = (ROOT / "README.md", *sorted((ROOT / "docs").glob("*.md")))
+        revision = "ffe9848"
+        surfaces = subprocess.check_output(
+            ("git", "-C", str(ROOT), "ls-tree", "-r", "--name-only", revision, "--", "README.md", "docs"),
+            text=True,
+        ).splitlines()
+        self.assertEqual(set(surfaces), {"README.md", "docs/architecture.md", "docs/adapter-protocol.md", "docs/threat-model.md"})
         identity_paragraphs: list[tuple[Path, str]] = []
-        for path in surfaces:
-            for paragraph in path.read_text(encoding="utf-8").split("\n\n"):
+        for relative in surfaces:
+            path = Path(relative)
+            source = subprocess.check_output(("git", "-C", str(ROOT), "show", f"{revision}:{relative}"), text=True)
+            for paragraph in source.split("\n\n"):
                 lowered = " ".join(paragraph.lower().split())
                 if "request row stays internal" in lowered:
                     identity_paragraphs.append((path, lowered))
@@ -1513,7 +1519,7 @@ class SubmissionBatteryTests(unittest.TestCase):
                 self.assertTrue("keeps" in paragraph or "retains" in paragraph)
                 self.assertIn("internal storage", paragraph)
         readme = " ".join(
-            (ROOT / "README.md").read_text(encoding="utf-8").lower().split()
+            subprocess.check_output(("git", "-C", str(ROOT), "show", f"{revision}:README.md"), text=True).lower().split()
         )
         self.assertIn(
             "no proposal, review, or report value shows it", readme
@@ -1748,7 +1754,7 @@ class SubmissionBatteryTests(unittest.TestCase):
 
         for method, docstring in (("submit_proposal", submit), ("propose", propose)):
             with self.subTest(method=method):
-                self.assertIn("one request row", docstring)
+                self.assertIn("the two rows stay durable", docstring)
                 self.assertIn("one proposal row", docstring)
                 self.assertIn("proposal.created", docstring)
                 self.assertIn("no idempotency", docstring)
@@ -1758,6 +1764,8 @@ class SubmissionBatteryTests(unittest.TestCase):
 
         # V-D12 leaves the direct path no revision guard, so naming StateError on
         # submit_proposal would publish an error that route cannot raise.
+        self.assertIn("without a ``source_id``", submit)
+        self.assertIn("conflicterror", submit)
         self.assertIn("stateerror", propose)
         self.assertNotIn("stateerror", submit)
         self.assertIn("binds whatever operation revision is current", submit)
@@ -1780,7 +1788,7 @@ class SubmissionBatteryTests(unittest.TestCase):
                 self.assertNotIn(banned, shipped_prose)
 
         readme = " ".join((ROOT / "README.md").read_text(encoding="utf-8").lower().split())
-        self.assertIn("one request row, one proposal row, and one `proposal.created` event", readme)
+        self.assertIn("one proposal row and one `proposal.created` event", readme)
         self.assertIn("no idempotency", readme)
         self.assertIn("`propose` invokes the configured source one time", readme)
 
@@ -1795,11 +1803,11 @@ class SubmissionBatteryTests(unittest.TestCase):
             ROOT / "docs/architecture.md": (
                 # M3.6a2 L23 permitted inversion: steps 1-3 no longer describe a lifecycle route.
                 "two methods enter the same pipeline at step 3 alone",
-                "schema v2 keeps it as internal storage",
+                "a proposal can carry a source id that names the observation it came from",
             ),
             ROOT / "docs/threat-model.md": (
-                "`submit_proposal` and `propose` give no idempotency",
-                "each call writes a new proposal",
+                "`propose` gives no idempotency, and `submit_proposal` gives none without a source id",
+                "each call without a source id writes a new proposal",
                 "do not repeat those calls to recover",
             ),
             ROOT / "docs/adapter-protocol.md": (
@@ -2181,7 +2189,7 @@ class SubmissionBatteryTests(unittest.TestCase):
         with closing(sqlite3.connect(path)) as connection:
             row = connection.execute(
                 "SELECT id, partition, operation, operation_revision, input_json, input_hash "
-                "FROM requests WHERE proposal_id = ?",
+                "FROM proposals WHERE id = ?",
                 (proposal_id,),
             ).fetchone()
 
@@ -2209,7 +2217,7 @@ class SubmissionBatteryTests(unittest.TestCase):
 
         with closing(sqlite3.connect(path)) as connection:
             stored = connection.execute(
-                "SELECT input_json, input_hash FROM requests WHERE proposal_id = ?",
+                "SELECT input_json, input_hash FROM proposals WHERE id = ?",
                 (proposal_id,),
             ).fetchone()
         self.assertEqual(stored, (expected.text, expected.digest))
@@ -2237,22 +2245,26 @@ class SubmissionBatteryTests(unittest.TestCase):
         self.assertIn("`propose` invokes the configured source one time", combined)
         self.assertIn("both methods return the new proposal identifier as a string", combined)
         self.assertIn(
-            "each call writes one request row, one proposal row, and one `proposal.created` event",
+            "each call writes one proposal row and one `proposal.created` event",
             combined,
         )
-        self.assertIn("cement gives no idempotency here", combined)
+        self.assertIn("without a source id, cement gives no idempotency here", combined)
         self.assertIn("that error carries no detail from the source", combined)
-        self.assertIn("schema v2 keeps the row", combined)
-        self.assertIn("no proposal, review, or report value shows it", combined)
+        self.assertIn("a proposal can carry a source id that names the observation it came from", combined)
+        self.assertIn("also expose no request identifier. use `proposal_id` to name a proposal on every surface", combined)
 
     def test_d42_the_proposal_row_shape_including_status(self) -> None:
-        """D42. Full-row comparison on both routes pins canonical content, pending defaults, shared time, request FK, and event sequence."""
+        """D42. Full-row comparison on both routes pins canonical content, pending defaults, shared time, direct scope, and event sequence."""
         expected_output = canonicalize(CANDIDATE.output)
         expected_provenance = canonicalize(dict(CANDIDATE.provenance))
         expected_columns = {
             "id",
             "partition",
-            "request_id",
+            "operation",
+            "operation_revision",
+            "input_json",
+            "input_hash",
+            "source_id",
             "proposed_output_json",
             "proposed_output_hash",
             "provenance_json",
@@ -2289,11 +2301,7 @@ class SubmissionBatteryTests(unittest.TestCase):
                             (proposal_id,),
                         ).fetchone()
                     )
-                    request = connection.execute(
-                        "SELECT id, partition, proposal_id, created_at_us FROM requests "
-                        "WHERE id = ?",
-                        (proposal["request_id"],),
-                    ).fetchone()
+                    request_rows = connection.execute("SELECT name FROM sqlite_schema WHERE name = 'requests'").fetchall()
                     event = connection.execute(
                         "SELECT sequence, subject_id, created_at_us FROM events "
                         "WHERE kind = 'proposal.created' AND subject_id = ?",
@@ -2304,7 +2312,7 @@ class SubmissionBatteryTests(unittest.TestCase):
                 self.assertEqual(proposal["id"], proposal_id)
                 self.assertTrue(proposal_id.startswith("prop_"))
                 self.assertEqual(proposal["partition"], PARTITION)
-                self.assertTrue(str(proposal["request_id"]).startswith("req_"))
+                self.assertEqual(request_rows, [])
                 self.assertEqual(proposal["proposed_output_json"], expected_output.text)
                 self.assertEqual(proposal["proposed_output_hash"], expected_output.digest)
                 self.assertEqual(proposal["provenance_json"], expected_provenance.text)
@@ -2324,13 +2332,8 @@ class SubmissionBatteryTests(unittest.TestCase):
                     (None, None, None, None, None),
                 )
                 self.assertEqual(
-                    tuple(request),
-                    (
-                        proposal["request_id"],
-                        PARTITION,
-                        proposal_id,
-                        proposal["created_at_us"],
-                    ),
+                    tuple(proposal[name] for name in ("operation", "operation_revision", "input_json", "input_hash", "source_id")),
+                    (OPERATION, 1, canonicalize(INPUT).text, canonicalize(INPUT).digest, None),
                 )
                 self.assertEqual(event[1], proposal_id)
                 self.assertEqual(event[2], proposal["created_at_us"])

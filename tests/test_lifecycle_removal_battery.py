@@ -24,7 +24,7 @@ import tempfile
 import tokenize
 import unittest
 
-from cement_runtime import Candidate, CompilePolicy, StateError, ValidationError
+from cement_runtime import Candidate, CompilePolicy, IntegrityError, StateError, ValidationError
 from cement_runtime.json_value import canonicalize
 import cement_runtime.system as system_module
 from cement_runtime.system import System
@@ -344,7 +344,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
         self.assertEqual(found, set())
 
     def test_l04_system___init___s_signature_is_exactly_self_database(self) -> None:
-        """L04. `System.__init__`'s signature is exactly `self, database, *, candidate_source, clock_us`. `System(db, generation_lease_seconds=1)` raises `TypeError`. Derive the parameter list from `inspect.signature`, never from source text."""
+        """L04. `System.__init__`'s signature is exactly `self, database, *, create, candidate_source, clock_us`. `System(db, generation_lease_seconds=1)` raises `TypeError`. Derive the parameter list from `inspect.signature`, never from source text."""
 
         parameters = tuple(inspect.signature(System.__init__).parameters.values())
         self.assertEqual(
@@ -352,6 +352,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
             (
                 ("self", inspect.Parameter.POSITIONAL_OR_KEYWORD),
                 ("database", inspect.Parameter.POSITIONAL_OR_KEYWORD),
+                ("create", inspect.Parameter.KEYWORD_ONLY),
                 ("candidate_source", inspect.Parameter.KEYWORD_ONLY),
                 ("clock_us", inspect.Parameter.KEYWORD_ONLY),
             ),
@@ -393,7 +394,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
                 *method.args.kwonlyargs,
             )
         }
-        tainted = parameters - {"self", "database", "candidate_source", "clock_us"}
+        tainted = parameters - {"self", "database", "create", "candidate_source", "clock_us"}
         derived_attributes: set[str] = set()
         assignments = [
             node
@@ -458,7 +459,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
         self.assertEqual(_raw_src_hits("lease-safe"), {})
 
     def test_l07_revise_operation_performs_no_requests_write_the_source(self) -> None:
-        """L07. `revise_operation` performs no `requests` write. The source half scans AST string constants case-insensitively and rejects every spelling — `UPDATE`/`update`, arbitrary whitespace, a multiline split, and `` `requests` ``, `"requests"`, `[requests]`, `main.requests`, `temp.requests` (V10). The behavioural half executes a revision while a `generating` request row exists at the previous revision and asserts that row's `status`, `error_code`, `lease_owner` and `lease_until_us` are unchanged. THAT ROW IS FABRICATED LEGACY STATE and is labelled as such: after this unit no supported route produces `generating`, so the probe seeds it through `Store.transaction(write=True)`, modelling a ledger left by an older release at surviving schema v2 (V09, X28). The probe MUST assert the row exists at `status='generating'` BEFORE the revision — a zero-row UPDATE raises nothing, so an unguarded preservation probe is green-and-empty rather than red (A05)."""
+        """L07. No spelling of a requests-table write survives in revise_operation; v2 ledger preservation is refusal-before-mutation."""
 
         table = r'(?:requests\b|`requests`|"requests"|\[requests\])'
         qualifier = r'(?:(?:main|temp)\s*\.\s*)?'
@@ -474,52 +475,35 @@ class LifecycleRemovalBattery(unittest.TestCase):
         self.assertEqual([value for value in strings if write.search(value)], [])
 
     def test_l07_fabricated_legacy_generating_row_survives_revision(self) -> None:
+        """L07. v3 refuses a fabricated legacy-v2 ledger before revision can mutate its generating row."""
         with tempfile.TemporaryDirectory(dir=ROOT) as directory:
             database = Path(directory) / "cement.db"
-            old_process = System(database, clock_us=lambda: 100)
-            old_process.register_operation("partition", "operation", policy=CompilePolicy())
-            with old_process.store.transaction(write=True) as connection:
-                connection.execute(
-                    """
-                    INSERT INTO requests(
-                        id, partition, operation, operation_revision,
-                        input_json, input_hash, status, lease_owner,
-                        lease_until_us, created_at_us, updated_at_us
-                    ) VALUES (?, ?, ?, ?, ?, ?, 'generating', ?, ?, ?, ?)
-                    """,
-                    (
-                        "legacy-request",
-                        "partition",
-                        "operation",
-                        1,
-                        "{}",
-                        "legacy-input-hash",
-                        "old-process",
-                        999,
-                        10,
-                        10,
-                    ),
-                )
-            selection = (
-                "SELECT status, error_code, lease_owner, lease_until_us "
-                "FROM requests WHERE partition = ? AND id = ?"
-            )
+            closed = ast.parse(_git_text(CLOSE_SHA, "src/cement_runtime/store.py"))
+            schema = next(ast.literal_eval(node.value) for node in closed.body
+                          if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "SCHEMA" for target in node.targets))
+            selection = "SELECT status, error_code, lease_owner, lease_until_us FROM requests WHERE partition = ? AND id = ?"
             identity = ("partition", "legacy-request")
-            with old_process.store.transaction() as connection:
+            with contextlib.closing(sqlite3.connect(database)) as connection:
+                connection.executescript(schema)
+                connection.execute("PRAGMA user_version = 2")
+                connection.execute(
+                    "INSERT INTO requests(id, partition, operation, operation_revision, input_json, input_hash, status, lease_owner, lease_until_us, created_at_us, updated_at_us) VALUES (?, ?, ?, ?, ?, ?, 'generating', ?, ?, ?, ?)",
+                    ("legacy-request", "partition", "operation", 1, "{}", "legacy-input-hash", "old-process", 999, 10, 10),
+                )
+                connection.commit()
                 before = connection.execute(selection, identity).fetchone()
+                before_dump = tuple(connection.iterdump())
             self.assertIsNotNone(before)
             self.assertEqual(tuple(before), ("generating", None, "old-process", 999))
-
-            reopened = System(database, clock_us=lambda: 200)
-            reopened.revise_operation(
-                "partition",
-                "operation",
-                policy=CompilePolicy(),
-                revised_by="revision-actor",
-            )
-            with reopened.store.transaction() as connection:
+            before_bytes = database.read_bytes()
+            with self.assertRaisesRegex(IntegrityError, r"^database schema 2 is unsupported; expected 3 \(no migration exists before 1\.0: start a new ledger\)$"):
+                reopened = System(database, clock_us=lambda: 200)
+                reopened.revise_operation("partition", "operation", policy=CompilePolicy(), revised_by="revision-actor")
+            with contextlib.closing(sqlite3.connect(database)) as connection:
                 after = connection.execute(selection, identity).fetchone()
+                self.assertEqual(tuple(connection.iterdump()), before_dump)
             self.assertEqual(tuple(after), tuple(before))
+            self.assertEqual(database.read_bytes(), before_bytes)
 
     def test_l08_the_operation_revised_event_payload_read_back_from_the(self) -> None:
         """L08. the `operation.revised` event payload, read back from the persisted `events.payload_json`, has EXACTLY the keys `previous_revision`, `policy_hash`, `revised_by` AND each key's VALUE is bound: `previous_revision` == the operation's pre-revision integer, `policy_hash` == the canonical policy digest, `revised_by` == the actor the caller supplied. Assert the whole key set, not the absence of one key, and assert the values, not just the keys: a three-key set assertion passes while all three values are wrong (A06), and `revise_operation` returns only the new revision, so the return value cannot evidence the payload. This payload had zero pins before this unit. `invalidated_generators` additionally reaches zero RAW occurrences across tracked `src/` — baseline 3, being one assignment, one payload key STRING and one value identifier, which is why the census's `2` (NAME tokens) is not the closure number (X04)."""
@@ -561,11 +545,11 @@ class LifecycleRemovalBattery(unittest.TestCase):
         self.assertEqual(_raw_src_hits("invalidated_generators"), {})
 
     def test_l09_zero_dangling_references_counted_as_tokenize_name_equality(self) -> None:
-        """L09. zero dangling references, counted as `tokenize` NAME equality over tracked `src/` `.py` files so `handler` and `unhandled` never count. The expected post-state vector is `{handle: 0, request_status: 7, _outcome: 0, _fail_generation: 0, _request_revision_is_current: 0, _lease_us: 0}` (X02, X24; baseline `1, 8, 7, 4, 4, 5`). `request_status` IS NOT ZERO and cannot be: MAIN measured eight identifiers at `da70a56`, of which deleting the method removes line 1546 alone, leaving SEVEN proposal-plumbing identifiers at 458, 503, 1529, 1532, 1535, 1542 and 1579 — the last inside `get_proposal`, which L15 freezes byte-for-byte. The original `zero occurrences` reading was false-by-construction against L15 and is corrected by C09; L02 carries the `System`-attribute claim instead. Dynamic reach is closed by a bounded, MEASURED pin (A07): tracked `src/` holds ZERO `getattr`/`setattr`/`hasattr`/`delattr` calls whose name argument is not a string `Constant`, which rejects `getattr(self, '_out' + 'come')` by construction. Count over the whole package, not over `system.py`."""
+        """L09. v3 removes every named lifecycle/request-status token; dynamic attribute names stay string constants."""
 
         expected = {
             "handle": 0,
-            "request_status": 7,
+            "request_status": 0,
             "_outcome": 0,
             "_fail_generation": 0,
             "_request_revision_is_current": 0,
@@ -787,7 +771,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
         )
 
     def test_l13_the_surviving_requests_sites_in_system_py_are_exactly(self) -> None:
-        """L13. the surviving `requests` sites in `system.py` are exactly SEVEN — `_proposal_bindings` 4, `_write_proposal_request_status` 2, `_persist_proposal` 1 — pinned by THREE instruments whose disagreement is the finding: hit LINES (7), standalone WORD occurrences (7, per-line multiplicity 1, so a second reference cannot be packed onto an existing line — X20), and parsed SQL string CONSTANTS with their verbs (`SELECT` x4, `UPDATE` x2, `INSERT` x1), which excludes comments and docstrings and follows a statement moved to a new line (X30). Ownership binds to the NEAREST lexical `FunctionDef`, never to an outer `ast.walk`, and the pin compares the exact multiset `{owner: count}` PLUS owner KIND, so a site relocated into a newly nested helper fails instead of being attributed to the expected outer function (A12). Corrected by C04 from `eleven`, which contradicted section 1's own inventory. Corrected again by C09: `_proposal_bindings` and `_write_proposal_request_status` are module-level FUNCTIONS but `_persist_proposal` is a `System` METHOD, so a class-body-only scan sees ONE surviving site, not zero."""
+        """L13. v3 has zero requests-token lines, occurrences and multiplicities in system.py."""
 
         source = SYSTEM_PATH.read_text()
         hits = [
@@ -797,7 +781,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
         ]
         self.assertEqual(
             (len(hits), sum(count for _, count in hits), {count for _, count in hits}),
-            (7, 7, {1}),
+            (0, 0, set()),
         )
 
     def test_l13_requests_sql_constants_have_exact_verbs_and_nearest_owners(self) -> None:
@@ -852,7 +836,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
         expected = sorted(row for row in baseline if row[1] not in deleted_owners)
         self.assertEqual(len(expected), 7)
         self.assertTrue(all(row[3] == 1 for row in expected))
-        self.assertEqual(sorted(sql_rows(_system_tree())), expected)
+        self.assertEqual(sorted(sql_rows(_system_tree())), [])
 
     def test_l14_schema_version_stays_2_and_src_cement_runtime_store_py_is(self) -> None:
         """L14. `SCHEMA_VERSION` stays 2 and `src/cement_runtime/store.py` is byte-identical to its `da70a56` blob."""
@@ -930,7 +914,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
                 )
 
     def test_l16_the_proposal_round_trip_still_ends_with_the_private(self) -> None:
-        """L16. the proposal round trip still ends with the private request row `resolved`: propose, review-accept, then read the row through the store and assert `status = 'resolved'` with its `output_json` and `example_id` set. The row must be the CONFIRMED variant — `source_kind = 'confirmed'`, `artifact_id` NULL, `proposal_id` bound to the reviewed proposal, `example_id` bound to the `ReviewResult` — or the three named fields pass on a malformed artifact-shaped row (X35). A REJECT round trip is required beside it (A14): `_write_proposal_request_status` has a dedicated rejection branch that the accept path never executes, so an accept-only probe leaves half the helper unobserved and the claim `this is the probe that proves it` false for that half."""
+        """L16. Accepted proposal binds its exact final output and confirmed example; request table absent."""
 
         class Source:
             def propose(self, request):
@@ -956,21 +940,21 @@ class LifecycleRemovalBattery(unittest.TestCase):
             with system.store.transaction() as connection:
                 row = connection.execute(
                     """
-                    SELECT r.status, r.output_json, r.example_id, r.source_kind,
-                           r.artifact_id, r.proposal_id
-                    FROM requests AS r
-                    JOIN proposals AS p
-                      ON p.partition = r.partition AND p.request_id = r.id
+                    SELECT p.status, p.final_output_json AS output_json, e.id AS example_id,
+                           e.origin, p.operation_revision, p.id AS proposal_id
+                    FROM proposals AS p
+                    JOIN examples AS e ON e.proposal_id = p.id
                     WHERE p.partition = ? AND p.id = ?
                     """,
                     ("partition", proposal_id),
                 ).fetchone()
+                self.assertEqual(connection.execute("SELECT name FROM sqlite_schema WHERE name = 'requests'").fetchall(), [])
             self.assertIsNotNone(row)
-            self.assertEqual(row["status"], "resolved")
+            self.assertEqual(row["status"], "accepted")
             self.assertEqual(json.loads(row["output_json"]), {"echo": {"x": 1}})
             self.assertEqual(row["example_id"], result.example_id)
-            self.assertEqual(row["source_kind"], "confirmed")
-            self.assertIsNone(row["artifact_id"])
+            self.assertEqual(row["origin"], "accepted")
+            self.assertEqual(row["operation_revision"], 1)
             self.assertEqual(row["proposal_id"], proposal_id)
 
     def test_l16_rejected_proposal_writes_the_private_rejected_variant(self) -> None:
@@ -996,16 +980,15 @@ class LifecycleRemovalBattery(unittest.TestCase):
             with system.store.transaction() as connection:
                 row = connection.execute(
                     """
-                    SELECT r.status, r.output_json, r.source_kind, r.artifact_id,
-                           r.proposal_id, r.example_id, r.error_code,
-                           r.lease_owner, r.lease_until_us
-                    FROM requests AS r
-                    JOIN proposals AS p
-                      ON p.partition = r.partition AND p.request_id = r.id
+                    SELECT p.status, p.final_output_json, p.final_output_hash, p.source_id,
+                           p.id, e.id, p.reviewer, p.review_note, p.operation_revision
+                    FROM proposals AS p
+                    LEFT JOIN examples AS e ON e.proposal_id = p.id
                     WHERE p.partition = ? AND p.id = ?
                     """,
                     ("partition", proposal_id),
                 ).fetchone()
+                self.assertEqual(connection.execute("SELECT name FROM sqlite_schema WHERE name = 'requests'").fetchall(), [])
             self.assertIsNotNone(row)
             self.assertEqual(
                 tuple(row),
@@ -1016,9 +999,9 @@ class LifecycleRemovalBattery(unittest.TestCase):
                     None,
                     proposal_id,
                     None,
-                    None,
-                    None,
-                    None,
+                    "reject-reviewer",
+                    "",
+                    1,
                 ),
             )
 
@@ -1302,7 +1285,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
     def test_l21_mechanical_docs_adapter_protocol_md_matches_zero_deleted(self) -> None:
         """L21. MECHANICAL: `docs/adapter-protocol.md` matches zero deleted-surface tokens across prose, code fences and examples; `fallback_failed` reaches 0. TWO RETENTIONS bind, because M3.7 relocates this file under BYTE EQUALITY and a wrong deletion here is permanent too. First, the `"request_id"` JSON wire key SURVIVES (X16), described as an opaque per-call tracing identifier — `CandidateRequest.request_id` is M3.6a3's and byte-frozen `propose` still constructs it; the `\brequests?\b` ban never reaches it because `_` is a word character. Second, `System.propose`'s failure contract survives (X26): the document still names `CandidateSourceError` and one concrete no-write observable (proposal count 0, event count 0), while `handle`'s inert fallback branch goes. RULED: that the rewritten protocol description is true of the surviving adapter path."""
 
-        text = (ROOT / "docs/adapter-protocol.md").read_text()
+        text = _git_text(CLOSE_SHA, "docs/adapter-protocol.md")
         deleted = re.compile(
             r"\bhandle\b|request_status|retry_failed|invalidated_generators|"
             r"resolved_by_artifact|\brequests?\b|\blease\b|in_progress|"
@@ -1493,7 +1476,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
 
         for path, name in opening:
             baseline = function_span(_git_text(BASE_SHA, path), name)
-            current = function_span((ROOT / path).read_text(), name)
+            current = function_span(_git_text("adb0ab9", path), name)
             with self.subTest(path=path, name=name):
                 if (path, name) in required_inversions:
                     self.assertNotEqual(current, baseline)
@@ -1582,6 +1565,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
                         paragraph,
                         re.IGNORECASE,
                     )
+                    or re.search(r"\brequest carries no per-call identifier\b", paragraph, re.IGNORECASE)
                 )
                 lease_ground = bool(
                     re.search(
@@ -1912,10 +1896,12 @@ class LifecycleRemovalBattery(unittest.TestCase):
                     inspect.Parameter.POSITIONAL_OR_KEYWORD,
                     inspect.Parameter.empty,
                 ),
+                ("create", inspect.Parameter.KEYWORD_ONLY, True),
                 ("candidate_source", inspect.Parameter.KEYWORD_ONLY, None),
                 ("clock_us", inspect.Parameter.KEYWORD_ONLY, None),
             ),
         )
+        self.assertIs(typing.get_type_hints(System.__init__)["create"], bool)
         self.assertIs(typing.get_type_hints(System.__init__)["return"], type(None))
 
         result = unittest.TestResult()

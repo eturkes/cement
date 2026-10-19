@@ -165,6 +165,7 @@ class CLITests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory(dir=".")
         self.addCleanup(self.temporary.cleanup)
         self.database = str(pathlib.Path(self.temporary.name) / "cli.db")
+        System(self.database)
         self.base = ["--db", self.database, "--partition", "tenant"]
 
     def run_cli(self, *arguments: str, text_only: bool = False) -> _CLIRun:
@@ -3051,7 +3052,7 @@ class CLITests(unittest.TestCase):
         self.assertEqual(run.stdout_bytes, self.live_document("empty").encode("utf-8"))
         document = typing.cast(dict[str, typing.Any], json.loads(run.stdout_text))
         self.assertEqual(document["entries"], [])
-        self.assertEqual(document["abi"], "cement-function-v2")
+        self.assertEqual(document["abi"], "cement-function-v3")
         self.assertEqual(document["scope"]["operation"], "empty")
 
     def test_function_export_refuses_a_drifted_set_with_the_whole_check_vector(self) -> None:
@@ -4214,14 +4215,14 @@ class CLITests(unittest.TestCase):
             "shape.json": (
                 b"{}",
                 "invalid function: expected keys ['abi', 'canonicalizer', 'entries',"
-                " 'function_hash', 'scope']",
+                " 'function_hash', 'projection', 'projection_hash', 'scope']",
             ),
             "dupe.json": (
                 b'{"abi": "cement-function-v2", "abi": "cement-function-v2"}',
                 "duplicate JSON object key: 'abi'",
             ),
             "abi.json": (
-                text.replace("cement-function-v2", "cement-function-v3").encode("utf-8"),
+                text.replace("cement-function-v3", "cement-function-v4").encode("utf-8"),
                 "unsupported function ABI",
             ),
             "canon.json": (

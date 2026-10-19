@@ -64,7 +64,6 @@ class CandidateRequest:
     partition: str
     operation: str
     operation_revision: int
-    request_id: str
     input: JSONValue
 
 

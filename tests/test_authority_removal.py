@@ -115,18 +115,18 @@ class FrozenShapeTests(unittest.TestCase):
 
     def test_system_constructor_shape(self) -> None:  # P3
         parameters = inspect.signature(system.System.__init__).parameters
-        # M3.6a2 L28: `generation_lease_seconds` leaves with the generation lease, so the
-        # frozen shape drops to three parameters. The remaining two keep their kind and their
-        # default here, which is the half of P3 the deletion does not touch.
+        # v3 adds explicit ledger creation; the other keyword defaults stay unchanged.
         self.assertEqual(
             list(parameters),
-            ["self", "database", "candidate_source", "clock_us"],
+            ["self", "database", "create", "candidate_source", "clock_us"],
         )
-        for name in ("candidate_source", "clock_us"):
+        for name in ("create", "candidate_source", "clock_us"):
             self.assertIs(parameters[name].kind, inspect.Parameter.KEYWORD_ONLY)
+        self.assertIs(parameters["create"].default, True)
         self.assertIsNone(parameters["candidate_source"].default)
         self.assertIsNone(parameters["clock_us"].default)
         hints = typing.get_type_hints(system.System.__init__)
+        self.assertIs(hints["create"], bool)
         self.assertIs(hints["return"], type(None))
 
     def test_library_identity_arguments_keep_their_required_or_defaulted_shape(self) -> None:

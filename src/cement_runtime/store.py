@@ -16,7 +16,7 @@ from pathlib import Path
 
 from .errors import CementError, IntegrityError, StateError, ValidationError
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 MIN_SQLITE = (3, 37, 0)  # STRICT tables
 
 SCHEMA = r"""
@@ -36,54 +36,14 @@ CREATE TABLE IF NOT EXISTS operations (
     PRIMARY KEY (partition, name)
 ) STRICT;
 
-CREATE TABLE IF NOT EXISTS requests (
-    id TEXT NOT NULL,
+CREATE TABLE IF NOT EXISTS proposals (
+    id TEXT PRIMARY KEY,
     partition TEXT NOT NULL,
     operation TEXT NOT NULL,
     operation_revision INTEGER NOT NULL CHECK (operation_revision >= 1),
     input_json TEXT NOT NULL,
     input_hash TEXT NOT NULL,
-    status TEXT NOT NULL CHECK (
-        status IN ('generating', 'pending', 'resolved', 'rejected', 'failed')
-    ),
-    output_json TEXT,
-    source_kind TEXT CHECK (source_kind IS NULL OR source_kind IN ('artifact', 'confirmed')),
-    artifact_id TEXT,
-    proposal_id TEXT,
-    example_id TEXT,
-    error_code TEXT,
-    lease_owner TEXT,
-    lease_until_us INTEGER,
-    attempts INTEGER NOT NULL DEFAULT 1 CHECK (attempts >= 1),
-    created_at_us INTEGER NOT NULL,
-    updated_at_us INTEGER NOT NULL,
-    CHECK (
-        (status = 'generating' AND output_json IS NULL AND source_kind IS NULL
-            AND artifact_id IS NULL AND proposal_id IS NULL AND example_id IS NULL
-            AND error_code IS NULL AND lease_owner IS NOT NULL AND lease_until_us IS NOT NULL)
-        OR (status = 'pending' AND output_json IS NULL AND source_kind IS NULL
-            AND artifact_id IS NULL AND proposal_id IS NOT NULL AND example_id IS NULL
-            AND error_code IS NULL AND lease_owner IS NULL AND lease_until_us IS NULL)
-        OR (status = 'resolved' AND output_json IS NOT NULL AND error_code IS NULL
-            AND lease_owner IS NULL AND lease_until_us IS NULL
-            AND ((source_kind = 'artifact' AND artifact_id IS NOT NULL
-                    AND proposal_id IS NULL AND example_id IS NULL)
-                OR (source_kind = 'confirmed' AND artifact_id IS NULL
-                    AND proposal_id IS NOT NULL AND example_id IS NOT NULL)))
-        OR (status = 'rejected' AND output_json IS NULL AND source_kind IS NULL
-            AND artifact_id IS NULL AND proposal_id IS NOT NULL AND example_id IS NULL
-            AND error_code IS NULL AND lease_owner IS NULL AND lease_until_us IS NULL)
-        OR (status = 'failed' AND output_json IS NULL AND source_kind IS NULL
-            AND artifact_id IS NULL AND proposal_id IS NULL AND example_id IS NULL
-            AND error_code IS NOT NULL AND lease_owner IS NULL AND lease_until_us IS NULL)
-    ),
-    PRIMARY KEY (partition, id)
-) STRICT;
-
-CREATE TABLE IF NOT EXISTS proposals (
-    id TEXT PRIMARY KEY,
-    partition TEXT NOT NULL,
-    request_id TEXT NOT NULL,
+    source_id TEXT,
     proposed_output_json TEXT NOT NULL,
     proposed_output_hash TEXT NOT NULL,
     provenance_json TEXT NOT NULL,
@@ -105,8 +65,7 @@ CREATE TABLE IF NOT EXISTS proposals (
             AND final_output_json IS NOT NULL AND final_output_hash IS NOT NULL
             AND reviewer IS NOT NULL AND review_note IS NOT NULL AND reviewed_at_us IS NOT NULL)
     ),
-    UNIQUE (partition, request_id),
-    FOREIGN KEY (partition, request_id) REFERENCES requests(partition, id)
+    FOREIGN KEY (partition, operation) REFERENCES operations(partition, name)
 ) STRICT;
 
 CREATE TABLE IF NOT EXISTS examples (
@@ -120,11 +79,14 @@ CREATE TABLE IF NOT EXISTS examples (
     output_json TEXT NOT NULL,
     output_hash TEXT NOT NULL,
     reviewer TEXT NOT NULL,
-    origin TEXT NOT NULL CHECK (origin IN ('accepted', 'corrected', 'challenge')),
+    origin TEXT NOT NULL CHECK (origin IN ('accepted', 'corrected', 'challenge', 'superseded')),
     proposal_id TEXT UNIQUE REFERENCES proposals(id),
+    supersedes_example_id TEXT UNIQUE REFERENCES examples(id),
+    source_id TEXT,
     receipt_json TEXT NOT NULL,
     receipt_hash TEXT NOT NULL UNIQUE,
-    confirmed_at_us INTEGER NOT NULL
+    confirmed_at_us INTEGER NOT NULL,
+    CHECK ((origin = 'superseded') = (supersedes_example_id IS NOT NULL))
 ) STRICT;
 
 CREATE TABLE IF NOT EXISTS example_revocations (
@@ -151,6 +113,7 @@ CREATE TABLE IF NOT EXISTS artifacts (
     policy_json TEXT NOT NULL,
     policy_hash TEXT NOT NULL,
     evidence_snapshot_hash TEXT NOT NULL,
+    projection_hash TEXT REFERENCES projection_programs(program_hash),
     status TEXT NOT NULL CHECK (
         status IN ('building', 'draft', 'verified', 'promoted', 'retired', 'suspended')
     ),
@@ -216,6 +179,7 @@ CREATE TABLE IF NOT EXISTS function_receipts (
     candidate_count INTEGER NOT NULL CHECK (candidate_count >= 0),
     retired_artifact_ids_hash TEXT NOT NULL,
     retired_count INTEGER NOT NULL CHECK (retired_count >= 0),
+    projection_hash TEXT REFERENCES projection_programs(program_hash),
     promoted_by TEXT NOT NULL,
     promoted_at_us INTEGER NOT NULL,
     receipt_hash TEXT NOT NULL UNIQUE,
@@ -237,6 +201,42 @@ CREATE TABLE IF NOT EXISTS function_memberships (
         REFERENCES function_receipts(id, function_hash) DEFERRABLE INITIALLY DEFERRED
 ) STRICT;
 
+CREATE TABLE IF NOT EXISTS projection_programs (
+    program_hash TEXT PRIMARY KEY,
+    abi TEXT NOT NULL,
+    program_json TEXT NOT NULL
+) STRICT;
+
+CREATE TABLE IF NOT EXISTS projection_settings (
+    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL UNIQUE,
+    partition TEXT NOT NULL,
+    operation TEXT NOT NULL,
+    operation_revision INTEGER NOT NULL CHECK (operation_revision >= 1),
+    program_hash TEXT NOT NULL REFERENCES projection_programs(program_hash),
+    set_by TEXT NOT NULL,
+    set_at_us INTEGER NOT NULL,
+    FOREIGN KEY (partition, operation) REFERENCES operations(partition, name)
+) STRICT;
+
+CREATE TABLE IF NOT EXISTS switch_settings (
+    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL UNIQUE,
+    partition TEXT NOT NULL,
+    operation TEXT NOT NULL,
+    mode TEXT NOT NULL CHECK (mode IN ('off', 'follow', 'pinned')),
+    receipt_id TEXT,
+    function_hash TEXT,
+    set_by TEXT NOT NULL,
+    set_at_us INTEGER NOT NULL,
+    CHECK (
+        (mode = 'pinned' AND receipt_id IS NOT NULL AND function_hash IS NOT NULL)
+        OR (mode IN ('off', 'follow') AND receipt_id IS NULL AND function_hash IS NULL)
+    ),
+    FOREIGN KEY (partition, operation) REFERENCES operations(partition, name),
+    FOREIGN KEY (receipt_id, function_hash) REFERENCES function_receipts(id, function_hash)
+) STRICT;
+
 CREATE TABLE IF NOT EXISTS events (
     sequence INTEGER PRIMARY KEY AUTOINCREMENT,
     partition TEXT NOT NULL,
@@ -247,8 +247,10 @@ CREATE TABLE IF NOT EXISTS events (
     created_at_us INTEGER NOT NULL
 ) STRICT;
 
-CREATE INDEX IF NOT EXISTS requests_scope
-    ON requests(partition, operation, operation_revision, input_hash);
+CREATE INDEX IF NOT EXISTS proposals_scope
+    ON proposals(partition, operation, status, status_sequence);
+CREATE UNIQUE INDEX IF NOT EXISTS proposals_source
+    ON proposals(partition, operation, source_id) WHERE source_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS examples_scope
     ON examples(partition, operation, operation_revision, input_hash, confirmed_at_us);
 CREATE INDEX IF NOT EXISTS artifacts_scope
@@ -262,6 +264,12 @@ CREATE INDEX IF NOT EXISTS function_receipts_scope
     ON function_receipts(partition, operation, operation_revision, sequence);
 CREATE INDEX IF NOT EXISTS function_receipts_hash
     ON function_receipts(function_hash, sequence);
+CREATE INDEX IF NOT EXISTS function_receipts_feed
+    ON function_receipts(partition, operation, sequence);
+CREATE INDEX IF NOT EXISTS projection_settings_scope
+    ON projection_settings(partition, operation, operation_revision, sequence);
+CREATE INDEX IF NOT EXISTS switch_settings_scope
+    ON switch_settings(partition, operation, sequence);
 CREATE INDEX IF NOT EXISTS function_memberships_artifact
     ON function_memberships(artifact_id, receipt_id);
 CREATE INDEX IF NOT EXISTS events_subject
@@ -303,6 +311,7 @@ WHEN NOT (
     OR (OLD.status = 'draft' AND NEW.status IN ('verified', 'retired', 'suspended'))
     OR (OLD.status = 'verified' AND NEW.status IN ('draft', 'promoted', 'retired', 'suspended'))
     OR (OLD.status = 'promoted' AND NEW.status IN ('retired', 'suspended'))
+    OR (OLD.status = 'retired' AND NEW.status = 'suspended')
 )
 BEGIN
     SELECT RAISE(ABORT, 'invalid artifact lifecycle transition');
@@ -311,7 +320,7 @@ CREATE TRIGGER IF NOT EXISTS artifacts_build_fields_immutable
 BEFORE UPDATE OF
     sequence, id, partition, operation, operation_revision, input_json, input_hash,
     output_json, output_hash, artifact_json, artifact_hash, scope_hash, build_hash,
-    policy_json, policy_hash, evidence_snapshot_hash, support, reviewer_count,
+    policy_json, policy_hash, evidence_snapshot_hash, projection_hash, support, reviewer_count,
     span_seconds, created_at_us
 ON artifacts BEGIN
     SELECT RAISE(ABORT, 'artifact build fields are immutable');
@@ -363,6 +372,39 @@ END;
 CREATE TRIGGER IF NOT EXISTS function_receipts_no_delete
 BEFORE DELETE ON function_receipts BEGIN
     SELECT RAISE(ABORT, 'function receipts are immutable');
+END;
+CREATE TRIGGER IF NOT EXISTS projection_programs_no_update
+BEFORE UPDATE ON projection_programs BEGIN
+    SELECT RAISE(ABORT, 'projection programs are immutable');
+END;
+CREATE TRIGGER IF NOT EXISTS projection_programs_no_delete
+BEFORE DELETE ON projection_programs BEGIN
+    SELECT RAISE(ABORT, 'projection programs are immutable');
+END;
+CREATE TRIGGER IF NOT EXISTS projection_settings_no_update
+BEFORE UPDATE ON projection_settings BEGIN
+    SELECT RAISE(ABORT, 'projection settings are append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS projection_settings_no_delete
+BEFORE DELETE ON projection_settings BEGIN
+    SELECT RAISE(ABORT, 'projection settings are append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS switch_settings_no_update
+BEFORE UPDATE ON switch_settings BEGIN
+    SELECT RAISE(ABORT, 'switch settings are append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS switch_settings_no_delete
+BEFORE DELETE ON switch_settings BEGIN
+    SELECT RAISE(ABORT, 'switch settings are append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS switch_settings_pin_scope
+BEFORE INSERT ON switch_settings
+WHEN NEW.receipt_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM function_receipts
+    WHERE id = NEW.receipt_id AND partition = NEW.partition AND operation = NEW.operation
+)
+BEGIN
+    SELECT RAISE(ABORT, 'a pin must name a receipt of its own operation');
 END;
 CREATE TRIGGER IF NOT EXISTS events_no_update
 BEFORE UPDATE ON events BEGIN
@@ -541,8 +583,25 @@ def _validate_ledger(connection: sqlite3.Connection) -> None:
         raise IntegrityError("live database schema does not match the runtime schema")
 
 
+def _unsupported_schema(version: int) -> IntegrityError:
+    # Pre-1.0 schemas carry no migration (contract §1), so the remedy is a new ledger.
+    return IntegrityError(
+        f"database schema {version} is unsupported; expected {SCHEMA_VERSION}"
+        " (no migration exists before 1.0: start a new ledger)"
+    )
+
+
 class Store:
-    def __init__(self, path: str | os.PathLike[str]) -> None:
+    def __init__(self, path: str | os.PathLike[str], *, create: bool = True) -> None:
+        """Open the ledger at ``path``; ``create=False`` opens an EXISTING ledger only.
+
+        An existing-only open never creates or writes: a missing ledger raises
+        ``IntegrityError`` before any connection exists, and validation runs on the read-only
+        connection. ``create=True`` creates and initializes a missing ledger.
+        """
+
+        if type(create) is not bool:
+            raise ValidationError("create must be a boolean")
         if sqlite3.sqlite_version_info < MIN_SQLITE:
             version = ".".join(str(part) for part in sqlite3.sqlite_version_info)
             raise IntegrityError(f"SQLite {version} is too old; 3.37+ is required")
@@ -565,6 +624,11 @@ class Store:
             raise ValidationError("database path must identify a regular file")
         if not self.path.parent.is_dir():
             raise ValidationError("database parent directory does not exist")
+        if not create:
+            if not self.path.exists():
+                raise IntegrityError("ledger file is missing or unreadable")
+            self._open_existing()
+            return
         try:
             descriptor = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         except FileExistsError:
@@ -634,9 +698,7 @@ class Store:
             try:
                 current = int(connection.execute("PRAGMA user_version").fetchone()[0])
                 if current not in (0, SCHEMA_VERSION):
-                    raise IntegrityError(
-                        f"database schema {current} is unsupported; expected {SCHEMA_VERSION}"
-                    )
+                    raise _unsupported_schema(current)
                 if current == 0:
                     if (
                         connection.execute("SELECT 1 FROM sqlite_schema LIMIT 1").fetchone()
@@ -663,6 +725,18 @@ class Store:
             connection.execute("PRAGMA journal_mode = DELETE")
         finally:
             connection.close()
+
+    def _open_existing(self) -> None:
+        try:
+            with self.transaction() as connection:
+                current = int(connection.execute("PRAGMA user_version").fetchone()[0])
+                if current == 0:
+                    raise IntegrityError("database is not an initialized Cement ledger")
+                if current != SCHEMA_VERSION:
+                    raise _unsupported_schema(current)
+                _validate_ledger(connection)
+        except _ReadOnlyViolation as exc:
+            raise IntegrityError("ledger validation attempted a write") from exc
 
     @contextmanager
     def transaction(self, *, write: bool = False) -> Iterator[sqlite3.Connection]:

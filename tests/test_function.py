@@ -597,7 +597,7 @@ print(json.dumps({"function_hash": bundle.function_hash, "text": bundle.text}, s
         self.assertEqual(observed["text"], bundle.text)
 
     def test_declared_limits_and_inclusive_document_boundaries(self) -> None:
-        self.assertEqual(FUNCTION_ABI, "cement-function-v2")
+        self.assertEqual(FUNCTION_ABI, "cement-function-v3")
         self.assertEqual(
             FUNCTION_ENTRY_SEAL_ABI,
             "cement-function-entry-seal-v1",

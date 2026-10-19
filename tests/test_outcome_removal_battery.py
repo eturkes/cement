@@ -12,6 +12,8 @@ import dataclasses
 import io
 import pathlib
 import subprocess
+import sys
+import types
 import tokenize
 import unittest
 
@@ -20,6 +22,7 @@ import cement_runtime.models as models
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 BASE = "629577d"  # the gate-tooling squash on main
+CLOSE = "17896eb"  # the M3.6a3 squash on main
 DELETED = (
     "Resolved",
     "ReviewRequired",
@@ -41,6 +44,22 @@ def _git_text(revision: str, path: str) -> str:
         capture_output=True,
         text=True,
     ).stdout
+
+
+def _models_at(revision: str) -> types.ModuleType:
+    name = f"cement_runtime._outcome_models_{revision}"
+    module = types.ModuleType(name)
+    module.__package__ = "cement_runtime"
+    previous = sys.modules.get(name)
+    sys.modules[name] = module
+    try:
+        exec(compile(_git_text(revision, "src/cement_runtime/models.py"), name, "exec"), module.__dict__)
+    finally:
+        if previous is None:
+            sys.modules.pop(name, None)
+        else:
+            sys.modules[name] = previous
+    return module
 
 
 def _src_paths() -> list[str]:
@@ -127,16 +146,17 @@ class OutcomeRemovalBattery(unittest.TestCase):
 
     def test_o4_models_survivors_are_byte_identical_and_in_order(self) -> None:
         base = _top_definitions(_git_text(BASE, "src/cement_runtime/models.py"))
-        head = _top_definitions((ROOT / "src/cement_runtime/models.py").read_text(encoding="utf-8"))
+        head = _top_definitions(_git_text(CLOSE, "src/cement_runtime/models.py"))
         self.assertEqual(sorted({name for name, _ in base} & set(DELETED)), sorted(DELETED))
         self.assertEqual(head, [(name, span) for name, span in base if name not in DELETED])
 
     def test_o5_preserved_models_keep_their_abi(self) -> None:
+        closed = _models_at(CLOSE)
         base_source = _git_text(BASE, "src/cement_runtime/models.py")
         base_tree = ast.parse(base_source)
         for name in PRESERVED:
             with self.subTest(name=name):
-                cls = getattr(models, name)
+                cls = getattr(closed, name)
                 base_class = next(
                     node for node in base_tree.body
                     if isinstance(node, ast.ClassDef) and node.name == name
@@ -166,7 +186,7 @@ class OutcomeRemovalBattery(unittest.TestCase):
                     ],
                     [value is None for *_, value in base_fields],
                 )
-        self.assertIn("request_id", {field.name for field in dataclasses.fields(models.CandidateRequest)})
+        self.assertIn("request_id", {field.name for field in dataclasses.fields(closed.CandidateRequest)})
 
 
 if __name__ == "__main__":

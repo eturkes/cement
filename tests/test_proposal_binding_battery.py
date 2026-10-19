@@ -401,33 +401,21 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         prefix: str = "tail",
     ) -> list[str]:
         provenance_json, provenance_hash = _canonical_json({"source": prefix})
-        request_rows: list[tuple[object, ...]] = []
         proposal_rows: list[tuple[object, ...]] = []
         input_hashes: list[str] = []
         for index in range(count):
-            request_id = f"req_{prefix}_{index:05d}"
             proposal_id = f"prop_{prefix}_{index:05d}"
             input_json, input_hash = _canonical_json({prefix: index})
             output_json, output_hash = _canonical_json({"output": index})
             input_hashes.append(input_hash)
-            request_rows.append(
+            proposal_rows.append(
                 (
-                    request_id,
+                    proposal_id,
                     "tenant_a",
                     "echo_1",
                     1,
                     input_json,
                     input_hash,
-                    proposal_id,
-                    20_000 + index,
-                    20_000 + index,
-                )
-            )
-            proposal_rows.append(
-                (
-                    proposal_id,
-                    "tenant_a",
-                    request_id,
                     output_json,
                     output_hash,
                     provenance_json,
@@ -437,24 +425,15 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                 )
             )
         with system.store.transaction(write=True) as connection:
-            connection.executemany(
-                """
-                INSERT INTO requests(
-                    id, partition, operation, operation_revision,
-                    input_json, input_hash, status, proposal_id,
-                    created_at_us, updated_at_us
-                ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
-                """,
-                request_rows,
-            )
+            self.assertEqual(connection.execute("SELECT name FROM sqlite_schema WHERE name = 'requests'").fetchall(), [])
             connection.executemany(
                 """
                 INSERT INTO proposals(
-                    id, partition, request_id,
+                    id, partition, operation, operation_revision, input_json, input_hash,
                     proposed_output_json, proposed_output_hash,
                     provenance_json, provenance_hash,
                     status, created_at_us, status_sequence
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
                 """,
                 proposal_rows,
             )
@@ -533,11 +512,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                 self._assert_request_identity_absent(child)
 
     def test_b01_one_named_private_reader_and_at(self) -> None:
-        """B01. one named private reader and at most one named private writer reach the request row
-
-        Reproduction: lexically classify shipped request-table SQL owners and pin the
-        sole read adapter plus the zero-or-one write-adapter boundary.
-        """
+        """B01. No private adapter reads or writes the removed requests table."""
         import ast
         import re
         from pathlib import Path
@@ -577,9 +552,9 @@ class ProposalBindingBatteryTests(unittest.TestCase):
             if {"insert", "update", "delete"} & tokens
         }
 
-        self.assertEqual({"_proposal_bindings"}, readers)
+        self.assertEqual(set(), readers)
         self.assertLessEqual(len(writers), 1)
-        self.assertEqual({"_write_proposal_request_status"}, writers)
+        self.assertEqual(set(), writers)
 
     def test_b02_confinement_is_a_complement_assertion_over(self) -> None:
         """B02. confinement is a complement assertion over the shipped module, never a forbidden list
@@ -622,20 +597,12 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                 for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", item.value)
             }
         }
-        permitted = {
-            "_persist_proposal",
-            "_proposal_bindings",
-            "_write_proposal_request_status",
-        }
+        permitted = set()
 
         self.assertSetEqual(permitted, owners)
 
     def test_b03_the_permitted_owner_set_is_exactly(self) -> None:
-        """B03. the permitted owner set is exactly three names and every freed path is absent from it
-
-        Reproduction: census literal request-table owners, pin all three surviving
-        names, and separately reject every public or converter owner freed by M3.4.
-        """
+        """B03. The request-table owner set is exactly empty, including every freed path."""
         import ast
         import re
         from pathlib import Path
@@ -664,11 +631,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                 for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", item.value)
             }
         }
-        permitted = {
-            "_persist_proposal",
-            "_proposal_bindings",
-            "_write_proposal_request_status",
-        }
+        permitted = set()
         freed = {
             "get_proposal",
             "proposal",
@@ -680,8 +643,8 @@ class ProposalBindingBatteryTests(unittest.TestCase):
             "_proposal_binding",
         }
 
-        self.assertEqual(3, len(permitted))
-        self.assertTrue(permitted <= owners, permitted - owners)
+        self.assertEqual(0, len(permitted))
+        self.assertEqual(permitted, owners)
         self.assertTrue(freed.isdisjoint(owners), freed & owners)
 
     def test_b04_the_walk_covers_module_level_constants(self) -> None:
@@ -988,11 +951,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         )
 
     def test_b12_every_kept_projected_value_stays_byte(self) -> None:
-        """B12. every kept projected value stays byte identical to baseline, with status the one named exemption
-
-        Reproduction: compare every request/proposal JSON projection to its canonical
-        stored bytes, then assert only status changes vocabulary on confirmation.
-        """
+        """B12. Direct proposal scope/content round-trips byte-exactly; accepted review binds its example."""
         clock = _Clock(1_234_567)
         system, database, _ = self._make_system(clock=clock)
         input_value = {"text": "π", "n": 11}
@@ -1009,10 +968,9 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         stored = self._rows(
             database,
             """
-            SELECT r.input_json, r.status AS request_status,
+            SELECT p.input_json, p.status,
                    p.proposed_output_json, p.provenance_json, p.created_at_us
-            FROM requests AS r
-            JOIN proposals AS p ON p.request_id = r.id
+            FROM proposals AS p
             WHERE p.id = ?
             """,
             (proposal_id,),
@@ -1056,10 +1014,9 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         confirmed = self._rows(
             database,
             """
-            SELECT p.status, p.final_output_json, r.status AS request_status,
+            SELECT p.status, p.final_output_json, e.origin AS example_origin,
                    e.id AS example_id, e.output_json AS example_output_json
             FROM proposals AS p
-            JOIN requests AS r ON r.id = p.request_id
             JOIN examples AS e ON e.proposal_id = p.id
             WHERE p.id = ?
             """,
@@ -1067,7 +1024,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         )[0]
         self.assertEqual(result.status, confirmed["status"])
         self.assertEqual(result.status, "accepted")
-        self.assertEqual(confirmed["request_status"], "resolved")
+        self.assertEqual(confirmed["example_origin"], "accepted")
         self.assertEqual(result.example_id, confirmed["example_id"])
         self.assertEqual(
             json.dumps(
@@ -1084,24 +1041,8 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         )
 
     def test_b13_a07_no_growth_the_converters_lose(self) -> None:
-        """B13. A07 no growth: the converters lose the request_id entry and gain no statement or span
-
-        Reproduction: measure each shipped converter's AST body and source span
-        against the budget below; any added responsibility fails.
-
-        BUDGET RE-BASELINED, deliberately, and this is a TRIPWIRE the unit updates in the
-        same commit that grows a converter. A07's no-growth reading was written against
-        D24's fabricated-only premise, which section 15 then FALSIFIED: malformed JSON
-        reaches these two converters on a real ledger, so both must translate it, and the
-        translation is code. `_proposal_content` also took the binding parameter when the
-        request row left the consumer-visible row. Budget moves 13/7 to 21/6 for
-        `_proposal_content` and 28/5 to 31/6 for `_proposal_record`, which are the exact
-        shipped measurements — an equality, not a ceiling, so growth AND shrinkage both
-        fail and neither can pass unnoticed. The obligation A07 still enforces is that
-        these converters gained no RESPONSIBILITY beyond the two named: no statement, no
-        request access, no new call. B01 and B35 pin those directly.
-        """
-        source = Path(system_module.__file__).read_text(encoding="utf-8")
+        """B13. M3.4 closing converters retain their exact span/statement budget and no request/SQL access."""
+        source = _git_source(M3U4_CLOSE, "src/cement_runtime/system.py")
         tree = ast.parse(source)
         converters = {
             node.name: node
@@ -1170,21 +1111,18 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         expected = {
             "reject": [
                 "proposal.state",
-                "request.state",
                 "event:proposal.rejected",
                 "proposal.status_sequence",
             ],
             "accept": [
                 "proposal.state",
                 "example.insert",
-                "request.state",
                 "event:proposal.accepted",
                 "proposal.status_sequence",
             ],
             "correct": [
                 "proposal.state",
                 "example.insert",
-                "request.state",
                 "event:proposal.corrected",
                 "proposal.status_sequence",
             ],
@@ -1241,7 +1179,6 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                 "example.insert",
                 "artifact.quarantine",
                 "event:artifact.counterexample",
-                "request.state",
                 "event:proposal.accepted",
                 "proposal.status_sequence",
             ],
@@ -1302,11 +1239,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                     )
 
     def test_b16_reviewer_nonempty_control_free_256_bytes_2(self) -> None:
-        """B16. reviewer nonempty control free 256 bytes, note empty allowed control free 2048 bytes, one shared now
-
-        Reproduction: exercise adjacent note boundaries, then compare every review
-        provenance timestamp and receipt timestamp to one injected clock reading.
-        """
+        """B16. Note bounds stay adjacent; proposal, example, event and confirmation receipt share one time."""
         cases = (
             ("empty accepted", "", True),
             ("control-free accepted", "note", True),
@@ -1355,10 +1288,9 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         provenance = self._rows(
             database,
             """
-            SELECT p.reviewed_at_us, r.updated_at_us, e.confirmed_at_us,
+            SELECT p.reviewed_at_us, e.confirmed_at_us,
                    e.receipt_json, ev.created_at_us AS event_created_at_us
             FROM proposals AS p
-            JOIN requests AS r ON r.id = p.request_id
             JOIN examples AS e ON e.proposal_id = p.id
             JOIN events AS ev
               ON ev.subject_id = p.id AND ev.kind = 'proposal.accepted'
@@ -1369,12 +1301,11 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         self.assertEqual(
             (
                 provenance["reviewed_at_us"],
-                provenance["updated_at_us"],
                 provenance["confirmed_at_us"],
                 provenance["event_created_at_us"],
                 json.loads(provenance["receipt_json"])["confirmed_at_us"],
             ),
-            (9_876_543,) * 5,
+            (9_876_543,) * 4,
         )
 
     def test_b17_a09_exactly_one_example_on_accept(self) -> None:
@@ -1821,22 +1752,10 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         )
 
     def test_b22_exact_pending_counts_bounded_detail_and_2(self) -> None:
-        """B22. exact pending counts, bounded detail, and a tail past 10000 that is counted and validated
+        """B22. Count every pending proposal, including malformed content beyond bounded detail.
 
-        Reproduction: prove row 10,001 contributes to the count, corrupt only that
-        schema-valid TEXT binding, and require the count to survive while the content
-        stays unreachable.
-
-        MAIN RULED THE UNDERDETERMINATION section 15 left open. "Counted and validated"
-        governs BINDING EXISTENCE, which the pending count statement proves over every
-        matching row with no cap. JSON CONTENT validation is scoped to RETURNED DETAIL.
-        Full-tail content validation, a capped detail projection and bounded
-        materialization cannot all hold at once, and 10,001 JSON parses to serve a
-        one-item page is the cost the report exists to bound. `projection_limit` is
-        capped at 10,000 (`system.py`, `_bounded_int(..., maximum=10_000)`), so row
-        10,001's CONTENT is unreachable at every legal limit — that is a stated bound,
-        not an accident, and B28 owns the split it implies.
-        """
+        v3 owns scope directly; there is no separate request binding to orphan. Content
+        validation remains bounded to returned detail, so the 10,001st row stays unparsed."""
         system, database, _ = self._make_system()
         self._insert_pending_rows(system, count=10_001)
         before = system.function_report(
@@ -1849,8 +1768,8 @@ class ProposalBindingBatteryTests(unittest.TestCase):
 
         with closing(sqlite3.connect(database)) as connection:
             connection.execute(
-                "UPDATE requests SET input_json = ? WHERE id = ?",
-                ("{", "req_tail_10000"),
+                "UPDATE proposals SET input_json = ? WHERE id = ?",
+                ("{", "prop_tail_10000"),
             )
             connection.commit()
 
@@ -1886,31 +1805,19 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         """
         system, _, _ = self._make_system()
         provenance_json, provenance_hash = _canonical_json({"source": "order"})
-        request_rows: list[tuple[object, ...]] = []
         proposal_rows: list[tuple[object, ...]] = []
         for insertion, index in enumerate(range(11, -1, -1)):
-            request_id = f"req_order_{index:02d}"
             proposal_id = f"prop_order_{index:02d}"
             input_json, input_hash = _canonical_json({"index": index})
             output_json, output_hash = _canonical_json({"output": index})
-            request_rows.append(
+            proposal_rows.append(
                 (
-                    request_id,
+                    proposal_id,
                     "tenant_a",
                     "echo_1",
                     1,
                     input_json,
                     input_hash,
-                    proposal_id,
-                    30_000 + insertion,
-                    30_000 + insertion,
-                )
-            )
-            proposal_rows.append(
-                (
-                    proposal_id,
-                    "tenant_a",
-                    request_id,
                     output_json,
                     output_hash,
                     provenance_json,
@@ -1920,24 +1827,15 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                 )
             )
         with system.store.transaction(write=True) as connection:
-            connection.executemany(
-                """
-                INSERT INTO requests(
-                    id, partition, operation, operation_revision,
-                    input_json, input_hash, status, proposal_id,
-                    created_at_us, updated_at_us
-                ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
-                """,
-                request_rows,
-            )
+            self.assertEqual(connection.execute("SELECT name FROM sqlite_schema WHERE name = 'requests'").fetchall(), [])
             connection.executemany(
                 """
                 INSERT INTO proposals(
-                    id, partition, request_id,
+                    id, partition, operation, operation_revision, input_json, input_hash,
                     proposed_output_json, proposed_output_hash,
                     provenance_json, provenance_hash,
                     status, created_at_us, status_sequence
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
                 """,
                 proposal_rows,
             )
@@ -1956,18 +1854,18 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                 )
 
     def test_b24_y14_scalar_inventory_nullable_versus_non_1(self) -> None:
-        """B24. Y14 scalar inventory: nullable versus non null fields, real ledger malformed JSON, middle and last
-
-        Reproduction: derive nullability for every converted proposal/request/operation
-        scalar, exercise all five real NULL guards, and send malformed input JSON through all five paths.
-        """
+        """B24. Pin v3 proposal-column/nullability inventory and six NULL values; malformed JSON fails on all five paths."""
         system, database, _ = self._make_system()
         proposal_id = self._submit(system)
         converted = {
             "proposals": {
                 "id",
                 "partition",
-                "request_id",
+                "operation",
+                "operation_revision",
+                "input_json",
+                "input_hash",
+                "source_id",
                 "proposed_output_json",
                 "proposed_output_hash",
                 "provenance_json",
@@ -1981,20 +1879,11 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                 "reviewed_at_us",
                 "status_sequence",
             },
-            "requests": {
-                "id",
-                "partition",
-                "operation",
-                "operation_revision",
-                "input_json",
-                "input_hash",
-                "status",
-                "proposal_id",
-            },
             "operations": {"revision"},
             "aggregate": {"pending_count"},
         }
         nullable = {
+            "source_id",
             "final_output_json",
             "final_output_hash",
             "reviewer",
@@ -2005,10 +1894,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
             row["name"]: bool(row["notnull"])
             for row in self._rows(database, "PRAGMA table_info(proposals)")
         }
-        request_info = {
-            row["name"]: bool(row["notnull"])
-            for row in self._rows(database, "PRAGMA table_info(requests)")
-        }
+        self.assertEqual(self._rows(database, "SELECT name FROM sqlite_schema WHERE name = 'requests'"), [])
         operation_info = {
             row["name"]: bool(row["notnull"])
             for row in self._rows(database, "PRAGMA table_info(operations)")
@@ -2020,16 +1906,17 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         )
         self.assertTrue(
             all(
-                request_info[name]
-                for name in converted["requests"] - {"proposal_id"}
+                proposal_info[name]
+                for name in {"operation", "operation_revision", "input_json", "input_hash"}
             )
         )
-        self.assertFalse(request_info["proposal_id"])
+        self.assertFalse(proposal_info["source_id"])
         self.assertTrue(operation_info["revision"])
 
         pending = system.proposal("tenant_a", proposal_id)
         self.assertEqual(
             {
+                "source_id": self._rows(database, "SELECT source_id FROM proposals WHERE id = ?", (proposal_id,))[0]["source_id"],
                 "final_output_json": pending["final_output"],
                 "final_output_hash": self._rows(
                     database,
@@ -2051,7 +1938,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
 
         with closing(sqlite3.connect(database)) as connection:
             connection.execute(
-                "UPDATE requests SET input_json = ? WHERE proposal_id = ?",
+                "UPDATE proposals SET input_json = ? WHERE id = ?",
                 ("{", proposal_id),
             )
             connection.commit()
@@ -2099,17 +1986,16 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                     ordered = self._rows(
                         database,
                         """
-                        SELECT p.id AS proposal_id, r.id AS request_id
+                        SELECT p.id AS proposal_id
                         FROM proposals AS p
-                        JOIN requests AS r ON r.id = p.request_id
                         ORDER BY p.id
                         """,
                     )
                     self.assertEqual(len(ordered), 3)
                     with closing(sqlite3.connect(database)) as connection:
                         connection.execute(
-                            "UPDATE requests SET input_json = ? WHERE id = ?",
-                            ("{", ordered[position]["request_id"]),
+                            "UPDATE proposals SET input_json = ? WHERE id = ?",
+                            ("{", ordered[position]["proposal_id"]),
                         )
                         connection.commit()
                     if reader == "proposals":
@@ -2251,10 +2137,10 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         self.assertIn("Cement publishes one review vocabulary and no second one", normalized)
 
     def test_b28_x32_a_binding_missing_beyond_the(self) -> None:
-        """B28. X32 a binding missing beyond the 10000 row detail cap still raises IntegrityError
+        """B28. v3 has no separate row to orphan beyond the detail bound.
 
-        Reproduction: prove 10,001 pending proposals, orphan only row 10,001,
-        request one detail row, and require fail-closed validation beyond the cap.
+        Prove 10,001 pending proposals and bounded detail; corrupt the last materialized
+        proposal and require IntegrityError, with requests-table absence pinned by the fixture.
         """
         system, database, _ = self._make_system()
         self._insert_pending_rows(system, count=10_001)
@@ -2266,10 +2152,14 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         self.assertEqual(before.pending_proposal_count, 10_001)
         self.assertEqual(len(before.pending_proposals), 1)
 
+        maximum = system.function_report("tenant_a", "echo_1", projection_limit=10_000).operation_now
+        self.assertEqual(maximum.pending_proposal_count, 10_001)
+        self.assertEqual(len(maximum.pending_proposals), 10_000)
+        self.assertEqual(maximum.pending_proposals[-1].proposal_id, "prop_tail_09999")
         with closing(sqlite3.connect(database)) as connection:
             connection.execute(
-                "DELETE FROM requests WHERE id = ?",
-                ("req_tail_10000",),
+                "UPDATE proposals SET input_hash = '' WHERE id = ?",
+                ("prop_tail_09999",),
             )
             connection.commit()
 
@@ -2277,32 +2167,20 @@ class ProposalBindingBatteryTests(unittest.TestCase):
             system.function_report(
                 "tenant_a",
                 "echo_1",
-                projection_limit=1,
+                projection_limit=10_000,
             )
 
     def test_b28_x32_a_binding_missing_beyond_the_2(self) -> None:
-        """B28. X32 past the 10000 row detail cap a MISSING BINDING raises at any limit, while malformed JSON raises only once the cap reaches it
+        """B28. v3 has no separate row to orphan beyond the detail bound.
 
-        Reproduction: the other half of the split. Corrupt one row's stored JSON and
-        show the report succeeds while that row sits outside the projection, then
-        raises once the projection includes it.
-
-        The two halves are governed by DIFFERENT statements and that is the whole
-        ruling. Binding EXISTENCE is proved by the pending count statement, which
-        carries no cap, so a missing binding fails closed at any limit — the sibling
-        test pins that at row 10,001. Stored CONTENT is parsed only for rows the
-        detail statement returns, so a malformed row is inert until the cap reaches
-        it. Both behaviours are conforming; reading section 15's "counted and
-        validated" as one undifferentiated obligation is what makes them look
-        contradictory.
-        """
+        Malformed proposal content stays counted outside the page and raises once materialized."""
         system, database, _ = self._make_system()
         self._insert_pending_rows(system, count=3, prefix="split")
 
         with closing(sqlite3.connect(database)) as connection:
             connection.execute(
-                "UPDATE requests SET input_json = ? WHERE id = ?",
-                ("{", "req_split_00002"),
+                "UPDATE proposals SET input_json = ? WHERE id = ?",
+                ("{", "prop_split_00002"),
             )
             connection.commit()
 
@@ -2349,11 +2227,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                 self.assertIs(type(raised.exception), NotFoundError)
 
     def test_b29_an_absent_proposal_is_notfounderror_and_2(self) -> None:
-        """B29. an absent proposal is NotFoundError and an absent or mismatched binding is IntegrityError
-
-        Reproduction: retain a real proposal while deleting or rebinding only its
-        private request row; every singular and bulk path must raise exact IntegrityError.
-        """
+        """B29. Retain a proposal with invalid or mismatched input hash; all five paths raise IntegrityError."""
         for corruption in ("absent", "mismatched"):
             with self.subTest(corruption=corruption):
                 system, database, _ = self._make_system()
@@ -2361,13 +2235,13 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                 with closing(sqlite3.connect(database)) as connection:
                     if corruption == "absent":
                         connection.execute(
-                            "DELETE FROM requests WHERE proposal_id = ?",
+                            "UPDATE proposals SET input_hash = '' WHERE id = ?",
                             (proposal_id,),
                         )
                     else:
                         connection.execute(
-                            "UPDATE requests SET proposal_id = ? WHERE proposal_id = ?",
-                            ("prop_" + "f" * 32, proposal_id),
+                            "UPDATE proposals SET input_hash = ? WHERE id = ?",
+                            ("f" * 64, proposal_id),
                         )
                     connection.commit()
                 paths: tuple[tuple[str, typing.Callable[[], object]], ...] = (
@@ -2588,18 +2462,17 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                 )
 
     def test_b32_the_schema_freeze_schema_version_2(self) -> None:
-        """B32. the schema freeze: SCHEMA_VERSION 2, 14580 bytes, sha256 5be3d79f, equal to SCHEMA_FINGERPRINT
-
-        Reproduction: hash the exact UTF-8 DDL payload and compare version, byte
-        length, full baseline digest, and exported fingerprint by equality.
-        """
+        """B32. M3.4 closing DDL keeps its exact byte/digest pin; live schema v3 binds its own fingerprint."""
         expected = "5be3d79fe1e21aca524f3937c8ce78521bcc7203bfe20b7352ef4b6dff468a77"
-        schema_bytes = store_module.SCHEMA.encode("utf-8")
+        closed = ast.parse(_git_source(M3U4_CLOSE, "src/cement_runtime/store.py"))
+        schema = next(ast.literal_eval(node.value) for node in closed.body
+                      if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "SCHEMA" for target in node.targets))
+        schema_bytes = schema.encode("utf-8")
 
-        self.assertEqual(store_module.SCHEMA_VERSION, 2)
+        self.assertEqual(store_module.SCHEMA_VERSION, 3)
         self.assertEqual(len(schema_bytes), 14_580)
         self.assertEqual(hashlib.sha256(schema_bytes).hexdigest(), expected)
-        self.assertEqual(store_module.SCHEMA_FINGERPRINT, expected)
+        self.assertEqual(store_module.SCHEMA_FINGERPRINT, hashlib.sha256(store_module.SCHEMA.encode("utf-8")).hexdigest())
 
     def test_b33_a02_literal_is_not_runtime_enforced(self) -> None:
         """B33. A02 Literal is not runtime enforced, so accept correct and reject are called and their values asserted
@@ -2668,20 +2541,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                 self.assertNotIn(b'"status": "resolved"', serialized)
 
     def test_b34_the_complete_statements_left_join_1(self) -> None:
-        """B34. the complete statements LEFT JOIN and the row validator refuses the NULL binding, so an orphan fails closed on all five paths and an absent proposal still answers NotFoundError
-
-        Reproduction: trace the singular adapter statement to pin its LEFT request
-        join, then orphan the existing proposal and require exact IntegrityError.
-
-        THE JOIN KIND IS LOAD-BEARING AND ITS FIRST READING WAS BACKWARDS. An inner
-        join deletes an orphaned proposal from the result set, so the singular paths
-        report NotFoundError and the feed silently omits it — indistinguishable from
-        a proposal that was never stored, which is the fail-open behaviour section 14
-        rejects. What section 15 condemns is a LEFT JOIN that PUBLISHES the NULL
-        binding columns. A LEFT JOIN whose row validator REFUSES them keeps absent and
-        orphaned distinguishable inside ONE statement, so the cardinality obligation
-        and the fail-closed obligation hold together.
-        """
+        """B34. One direct proposal statement replaces the request join; malformed scope never becomes absent."""
         system, database, _ = self._make_system()
         proposal_id = self._submit(system)
         with _record_sql() as (records, _):
@@ -2690,18 +2550,19 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         request_sql = [
             _normalized_sql(sql)
             for _, _, _, sql, _ in records
-            if "requests"
+            if "proposals"
             in {
                 token.casefold()
                 for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", sql)
             }
         ]
         self.assertEqual(len(request_sql), 1)
-        self.assertIn(" left join requests ", f" {request_sql[0]} ")
+        self.assertEqual(request_sql[0], "select * from proposals where partition = ? and id in (?)")
+        self.assertEqual(_request_statements(records), [])
 
         with closing(sqlite3.connect(database)) as connection:
             connection.execute(
-                "DELETE FROM requests WHERE proposal_id = ?",
+                "UPDATE proposals SET input_hash = '' WHERE id = ?",
                 (proposal_id,),
             )
             connection.commit()
@@ -2710,16 +2571,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         self.assertIs(type(raised.exception), IntegrityError)
 
     def test_b34_the_complete_statements_left_join_2(self) -> None:
-        """B34. the complete statements LEFT JOIN and the row validator refuses the NULL binding, so an orphan fails closed on all five paths and an absent proposal still answers NotFoundError
-
-        Reproduction: orphan one proposal, drive all five public paths, and require
-        IntegrityError from each while an absent id keeps answering NotFoundError
-        both before and after the corruption.
-
-        The control is the point. Without it these assertions pass just as well
-        against an implementation that answers IntegrityError for every unknown id,
-        which would destroy the distinction rather than establish it.
-        """
+        """B34. Corrupt direct scope fails on all five paths; an absent proposal remains NotFoundError."""
         system, database, _ = self._make_system()
         proposal_id = self._submit(system)
 
@@ -2728,7 +2580,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
 
         with closing(sqlite3.connect(database)) as connection:
             connection.execute(
-                "DELETE FROM requests WHERE proposal_id = ?",
+                "UPDATE proposals SET input_hash = '' WHERE id = ?",
                 (proposal_id,),
             )
             connection.commit()
@@ -2752,34 +2604,20 @@ class ProposalBindingBatteryTests(unittest.TestCase):
             system.get_proposal("tenant_a", "prop_absent_00000")
 
     def test_b35_y11_statement_cardinality_one_statement_per_1(self) -> None:
-        """B35. Y11 statement cardinality: one statement per adapter call over the whole channel, per path
+        """B35. Exact total/application/request-statement counts and one binding call per read path.
 
-        Reproduction: record execute, executemany, executescript, and cursor calls;
-        pin total/application/request counts plus the ruled adapter-call count for
-        every read path.
-
-        "ONE STATEMENT PER CALL" IS WITHDRAWN, and the numbers below are what replaced
-        it. Measured request statements per SELECTION are `_ProposalIds` 1,
-        `_ProposalFeed` 1, `_PendingProposals` 2 — the pending selection issues an
-        uncapped count statement beside its bounded detail statement. X32 forces
-        exactly that: a binding missing past the detail cap must still fail closed, so
-        the count cannot be derived from the capped rows. Two request statements inside
-        ONE adapter call is also exactly the pair baseline issued for the report, so
-        the cardinality obligation is met and only the wording was wrong. The last
-        element is the adapter call count, and pinning it at 1 for every path is the
-        stronger claim: it says no consumer reaches the request row twice.
-        """
+        Requests statements = zero. The pending adapter keeps an unbounded count and bounded detail."""
         expected = {
-            "get_proposal": (7, 1, 1, 1),
-            "proposal": (7, 1, 1, 1),
-            "proposals": (7, 1, 1, 1),
-            "function_report": (19, 13, 2, 1),
+            "get_proposal": (7, 1, 0, 1),
+            "proposal": (7, 1, 0, 1),
+            "proposals": (7, 1, 0, 1),
+            "function_report": (19, 13, 0, 1),
         }
         request_statements_per_path = {
-            "get_proposal": 1,
-            "proposal": 1,
-            "proposals": 1,
-            "function_report": 2,
+            "get_proposal": 0,
+            "proposal": 0,
+            "proposals": 0,
+            "function_report": 0,
         }
         real_adapter = system_module._proposal_bindings
         for path, counts in expected.items():
@@ -2821,18 +2659,14 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                 )
 
     def test_b35_y11_statement_cardinality_one_statement_per_2(self) -> None:
-        """B35. Y11 statement cardinality: one statement per adapter call over the whole channel, per path
-
-        Reproduction: trace all three review decisions and require baseline total and
-        application counts, with one request statement for each read and write adapter call.
-        """
+        """B35. Exact review statement counts; one binding read and one matching decision event, no request writes."""
         expected = {
-            "accept": (14, 8, 2),
-            "correct": (14, 8, 2),
-            "reject": (12, 6, 2),
+            "accept": (13, 7, 0),
+            "correct": (13, 7, 0),
+            "reject": (11, 5, 0),
         }
         real_reader = system_module._proposal_bindings
-        real_writer = system_module._write_proposal_request_status
+        real_writer = system_module._event
         for decision, counts in expected.items():
             with self.subTest(decision=decision):
                 system, _, _ = self._make_system()
@@ -2848,7 +2682,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                     wraps=real_reader,
                 ) as reader_spy, mock.patch.object(
                     system_module,
-                    "_write_proposal_request_status",
+                    "_event",
                     wraps=real_writer,
                 ) as writer_spy:
                     with _record_sql() as (records, _):
@@ -2869,9 +2703,10 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                 )
                 self.assertEqual(reader_spy.call_count, 1)
                 self.assertEqual(writer_spy.call_count, 1)
+                self.assertEqual(writer_spy.call_args.kwargs["kind"], {"accept": "proposal.accepted", "correct": "proposal.corrected", "reject": "proposal.rejected"}[decision])
                 self.assertEqual(
                     len(_request_statements(records)),
-                    reader_spy.call_count + writer_spy.call_count,
+                    0,
                 )
 
     def test_b36_y16_one_transaction_and_adapter_connection_1(self) -> None:
@@ -2934,13 +2769,9 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                 )
 
     def test_b36_y16_one_transaction_and_adapter_connection_2(self) -> None:
-        """B36. Y16 one transaction and adapter connection identity per path, with review sharing one write lock
-
-        Reproduction: capture both adapters for accept, correct, and reject; each
-        pair must receive the sole connection while its one BEGIN IMMEDIATE lock is active.
-        """
+        """B36. Binding reader and decision-event writer share the sole connection under one BEGIN IMMEDIATE."""
         real_reader = system_module._proposal_bindings
-        real_writer = system_module._write_proposal_request_status
+        real_writer = system_module._event
         for decision in ("accept", "correct", "reject"):
             with self.subTest(decision=decision):
                 system, _, _ = self._make_system()
@@ -2966,7 +2797,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                     reader,
                 ), mock.patch.object(
                     system_module,
-                    "_write_proposal_request_status",
+                    "_event",
                     writer,
                 ):
                     with _record_sql() as (records, connection_ids):
@@ -3040,9 +2871,8 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         statuses = self._rows(
             database,
             """
-            SELECT p.status AS proposal_status, r.status AS request_status
+            SELECT p.status AS proposal_status, p.operation_revision
             FROM proposals AS p
-            JOIN requests AS r ON r.id = p.request_id
             WHERE p.id = ?
             """,
             (proposal_id,),
@@ -3052,8 +2882,8 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         self.assertIsNone(result.example_id)
         self.assertIsNone(result.output)
         self.assertEqual(
-            (statuses["proposal_status"], statuses["request_status"]),
-            ("rejected", "rejected"),
+            (statuses["proposal_status"], statuses["operation_revision"]),
+            ("rejected", 1),
         )
         self.assertEqual(
             self._rows(
@@ -3171,16 +3001,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         )
 
     def test_b40_the_binding_request_status_comes_from_the_request_row(self) -> None:
-        """B40. binding.request_status is read from the request row, proved on a ledger whose two status columns differ
-
-        Reproduction: store one pending proposal, drive the two status columns apart
-        in the ledger, and read the binding through the adapter.
-
-        Equal columns prove nothing here. Every fixture that transitions a proposal
-        moves the proposal row and the request row together, so reading the
-        proposal's own status column returns the right answer until one ledger holds
-        two different values.
-        """
+        """B40. Binding has no duplicate request-status slot; the raw proposal row owns the reviewed status."""
         system, database, _ = self._make_system()
         proposal_id = self._submit(system)
         with closing(sqlite3.connect(database)) as connection:
@@ -3202,7 +3023,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                 selection=system_module._ProposalIds((proposal_id,)),
             )
         (binding,) = bindings.rows
-        self.assertEqual(binding.request_status, "pending")
+        self.assertEqual(tuple(binding.__dataclass_fields__), ("proposal_id", "partition", "operation", "operation_revision", "input_json", "input_hash", "row"))
         self.assertEqual(binding.row["status"], "rejected")
 
 

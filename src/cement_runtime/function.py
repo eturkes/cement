@@ -21,7 +21,9 @@ from .json_value import (
     parse_json,
 )
 
-FUNCTION_ABI = "cement-function-v2"
+FUNCTION_ABI = "cement-function-v3"
+# Bundles exported before the v3 ledger cut stay readable; they carry no projection.
+FUNCTION_ABI_V2 = "cement-function-v2"
 FUNCTION_ENTRY_SEAL_ABI = "cement-function-entry-seal-v1"
 FUNCTION_MAX_BYTES = 64 * DEFAULT_MAX_BYTES
 FUNCTION_MAX_ENTRIES = 50_000
@@ -70,6 +72,7 @@ class FunctionDocument:
     function_hash: str
     entries: tuple[_FunctionCase, ...]
     input_hashes: tuple[str, ...]
+    projection_hash: str | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -86,6 +89,7 @@ class _NormalizedFunction:
     content: CanonicalJSON
     entries: tuple[_FunctionCase, ...]
     input_hashes: tuple[str, ...]
+    projection_hash: str | None
 
 
 def _exact_keys(value: Any, expected: set[str], label: str) -> dict[str, Any]:
@@ -109,13 +113,22 @@ def _name(value: Any, label: str) -> str:
 
 
 def _normalize(value: Any) -> _NormalizedFunction:
+    abi = value.get("abi") if type(value) is dict else None
+    v2_keys = {"abi", "canonicalizer", "entries", "function_hash", "scope"}
     root = _exact_keys(
         value,
-        {"abi", "canonicalizer", "entries", "function_hash", "scope"},
+        v2_keys if abi == FUNCTION_ABI_V2 else v2_keys | {"projection", "projection_hash"},
         "function",
     )
-    if root["abi"] != FUNCTION_ABI:
+    # A bundle is untrusted bytes: an unhashable `abi` (list, object) must refuse, not raise.
+    if type(root["abi"]) is not str or root["abi"] not in {FUNCTION_ABI, FUNCTION_ABI_V2}:
         raise ValidationError("unsupported function ABI")
+    projection_hash: str | None = None
+    # Exact mode: a projection (M4.2) is the only non-null shape this ABI admits.
+    if root["abi"] == FUNCTION_ABI and (
+        root["projection"] is not None or root["projection_hash"] is not None
+    ):
+        raise ValidationError("function projection is not supported in exact mode")
     if root["canonicalizer"] != CANONICALIZER:
         raise ValidationError("unsupported function canonicalizer")
 
@@ -215,7 +228,7 @@ def _normalize(value: Any) -> _NormalizedFunction:
     normalized.sort(key=lambda item: item[0])
 
     content: dict[str, JSONValue] = {
-        "abi": FUNCTION_ABI,
+        "abi": root["abi"],
         "canonicalizer": CANONICALIZER,
         "entries": [item[1] for item in normalized],
         "scope": {
@@ -225,6 +238,9 @@ def _normalize(value: Any) -> _NormalizedFunction:
             "policy_hash": policy_hash,
         },
     }
+    if root["abi"] == FUNCTION_ABI:
+        content["projection"] = None
+        content["projection_hash"] = projection_hash
     canonical = canonicalize(
         content,
         max_bytes=FUNCTION_MAX_BYTES,
@@ -235,6 +251,7 @@ def _normalize(value: Any) -> _NormalizedFunction:
         content=canonical,
         entries=tuple(item[2] for item in normalized),
         input_hashes=tuple(item[0] for item in normalized),
+        projection_hash=projection_hash,
     )
 
 
@@ -258,6 +275,7 @@ def _document(normalized: _NormalizedFunction) -> FunctionDocument:
         function_hash=normalized.content.digest,
         entries=normalized.entries,
         input_hashes=normalized.input_hashes,
+        projection_hash=normalized.projection_hash,
     )
 
 
@@ -308,6 +326,8 @@ def build_function(
         "canonicalizer": CANONICALIZER,
         "entries": document_entries,
         "function_hash": "0" * 64,
+        "projection": None,
+        "projection_hash": None,
         "scope": {
             "operation": operation,
             "operation_revision": operation_revision,

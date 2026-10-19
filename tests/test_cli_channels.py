@@ -77,8 +77,9 @@ RESOLVE_KEYS = {
     "passed",
 }
 PROVENANCE_MAX_BYTES = getattr(system_module, "PROVENANCE_MAX_BYTES", 65_536)
-SUBMISSION_FRAMING = len(b'{"input":,"output":,"provenance":}')
-SUBMISSION_MAX_BYTES = 2 * DEFAULT_MAX_BYTES + PROVENANCE_MAX_BYTES + SUBMISSION_FRAMING
+SOURCE_ID_MAX_BYTES = system_module.SOURCE_ID_MAX_BYTES
+SUBMISSION_FRAMING = len(b'{"input":,"output":,"provenance":,"source_id":}')
+SUBMISSION_MAX_BYTES = cement_cli.SUBMISSION_MAX_BYTES
 
 
 @dataclass(frozen=True, slots=True)
@@ -277,6 +278,7 @@ class CliChannelTests(unittest.TestCase):
                     "WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
                 )
             )
+            self.assertEqual(connection.execute("SELECT name FROM sqlite_schema WHERE name = 'requests'").fetchall(), [])
             return {
                 table: int(
                     connection.execute(f'SELECT count(*) FROM "{table}"').fetchone()[0]
@@ -944,24 +946,13 @@ class CliChannelTests(unittest.TestCase):
         self.assertFalse(absent.exists())
 
     def test_v17_the_absent_ledger_check_precedes_input_parsing_so_a_malfor(self) -> None:
-        """V17 [D13] the absent-ledger check precedes --input parsing, so a malformed input creates no ledger
+        """V17 [D13]. Existing-only System construction refuses an absent ledger before input parsing.
 
-        ACTION: ENCODE
-
-        EXPECTED:
-        The command exits 5 with message `ledger file is missing or unreadable`; `_input` and
-        `System` have 0 calls and the absent path remains absent.
-
-        RULING:
-        CONFIRMED. Placing the precheck between the `--partition` gate and `System(...)` is
-        what makes D04's ordering safe: with the ledger absent nothing is constructed, so a
-        malformed `--input` rejected later can only ever touch a ledger that already existed.
-        Zero `_input` calls is the ordering evidence.
-        """
+        Exit5, exact message, constructor once with create=False, input zero times, no created file."""
         absent = self.root / "absent-malformed.db"
         with mock.patch.object(
             cement_cli, "_input", wraps=cement_cli._input
-        ) as input_, mock.patch.object(cement_cli, "System", autospec=True) as system:
+        ) as input_, mock.patch.object(cement_cli, "System", wraps=System) as system:
             run = self.run_argv(
                 [
                     "--db",
@@ -979,7 +970,8 @@ class CliChannelTests(unittest.TestCase):
         self.assertEqual(
             self.error(run)["message"], "ledger file is missing or unreadable"
         )
-        self.assertEqual((input_.call_count, system.call_count), (0, 0))
+        self.assertEqual((input_.call_count, system.call_count), (0, 1))
+        system.assert_called_once_with(str(absent), create=False)
         self.assertFalse(absent.exists())
 
     def test_v18_proposal_submit_grammar_sub_is_unrecognized_and_proposal_s(self) -> None:
@@ -1039,22 +1031,9 @@ class CliChannelTests(unittest.TestCase):
                 self.assertEqual(self.error(run)["message"], message)
 
     def test_v19_submission_read_failure_oversize_and_invalid_utf_8_answer(self) -> None:
-        """V19 [D15] --submission - read failure, oversize and invalid UTF-8 answer three distinct messages
+        """V19 [D15]. Read failure, live-cap overflow and invalid UTF-8 keep distinct submission errors.
 
-        ACTION: ENCODE
-
-        EXPECTED:
-        One concrete reading is exit 2 with respectively `submission stdin could not be read`,
-        `submission stdin exceeds 2162722 bytes`, and `submission stdin is not valid UTF-8`.
-
-        RULING:
-        CONFIRMED. The three shipped sentences are exactly `submission stdin could not be
-        read`, `submission stdin exceeds 2162722 bytes` and `submission stdin is not valid
-        UTF-8`. One warning for the battery: the TEXT-stream path says `exceeds 2162722
-        characters`, so a probe that patches a text `sys.stdin` must expect the characters
-        wording. Mirroring `_input`'s three families with submission-specific nouns is the
-        whole of D15.
-        """
+        Every error exits2 with empty stdout and zero submit calls; byte and character channels stay distinct."""
         class FailingBytes(io.BytesIO):
             def read(self, size: int = -1) -> bytes:
                 raise OSError("injected read failure")
@@ -1094,19 +1073,9 @@ class CliChannelTests(unittest.TestCase):
         )
 
     def test_v20_the_aggregate_cap_accepts_2162722_bytes_and_rejects_216272(self) -> None:
-        """V20 [D16] the aggregate cap accepts 2162722 bytes and rejects 2162723
+        """V20 [D16]. The live aggregate cap accepts its exact boundary and rejects one byte more.
 
-        ACTION: ENCODE
-
-        EXPECTED:
-        At 2162722 bytes `System.submit_proposal` is called exactly 1 time; at 2162723 bytes
-        status is 2, call count is 0, and the message names `2162722 bytes`.
-
-        RULING:
-        CONFIRMED. The adjacent accept/reject pair at 2,162,722 and 2,162,723 is what proves
-        the cap is APPLIED; X11 separately proves it is DERIVED. Neither claim implies the
-        other.
-        """
+        All four envelope fields fill their wire bounds; X11 independently pins the derivation."""
         input_json = '"' + "i" * (DEFAULT_MAX_BYTES - 2) + '"'
         provenance_json = (
             '{"p":"' + "p" * (PROVENANCE_MAX_BYTES - len(b'{"p":""}')) + '"}'
@@ -1121,6 +1090,8 @@ class CliChannelTests(unittest.TestCase):
                 + output_json
                 + ',"provenance":'
                 + provenance_json
+                + ',"source_id":'
+                + json.dumps("😀" * (SOURCE_ID_MAX_BYTES // 4))
                 + "}"
             ).encode("utf-8")
 
@@ -1265,8 +1236,8 @@ class CliChannelTests(unittest.TestCase):
             self.error(run)["message"], "candidate provenance must be a mapping"
         )
         self.assertEqual(
-            {table: after[table] - before[table] for table in ("requests", "proposals", "events")},
-            {"requests": 0, "proposals": 0, "events": 0},
+            {table: after[table] - before[table] for table in ("proposals", "events")},
+            {"proposals": 0, "events": 0},
         )
 
     def test_v24_success_emits_exactly_one_key_proposal_id_and_never_the_ba(self) -> None:
@@ -1319,7 +1290,7 @@ class CliChannelTests(unittest.TestCase):
         claim.
         """
         before = self.table_counts()
-        self.assertEqual(len(before), 13)
+        self.assertEqual(len(before), 15)
         source = json.dumps({"input": 1, "output": 2, "provenance": {}})
         run = self.run_cli(
             "proposal", "submit", "absent", "--submission", source
@@ -1367,11 +1338,11 @@ class CliChannelTests(unittest.TestCase):
         self.assertNotEqual(identifiers[0], identifiers[1])
         delta = {table: after[table] - before[table] for table in before}
         expected = {table: 0 for table in before}
-        expected.update({"requests": 2, "proposals": 2, "events": 2})
+        expected.update({"proposals": 2, "events": 2})
         self.assertEqual(delta, expected)
         self.assertEqual(
             {table: change for table, change in delta.items() if change},
-            {"requests": 2, "proposals": 2, "events": 2},
+            {"proposals": 2, "events": 2},
         )
 
     def test_v27_the_parser_census_moves_28_to_30_leaves_and_35_to_37_nodes(self) -> None:
@@ -1944,25 +1915,10 @@ class CliChannelTests(unittest.TestCase):
         self.assertLessEqual(stream.requests[0], SUBMISSION_MAX_BYTES + 1)
 
     def test_x11_the_aggregate_transport_cap_is_derived_from_one_exported_p(self) -> None:
-        """X11 [D16] the aggregate transport cap is derived from one exported provenance constant with no copied limit
+        """X11 [D16]. Derive the four-key transport bound from exported field limits and exact framing.
 
-        ACTION: ENCODE-SCOPED
-
-        EXPECTED:
-        `PROVENANCE_MAX_BYTES == 65536`, framing is 34, and `2*1048576+65536+34 == 2162722`;
-        CLI retains exactly 1 unrelated 65536 literal in `_source`, adds 0 provenance copies,
-        and all 3 system sites reference the constant.
-
-        RULING:
-        CONFIRMED as revised, and the revision is one MAIN supplied after measuring. `cli.py`
-        retains exactly one `65_536` literal, at line 370, bounding `--source-command`; it is
-        unrelated to provenance and shares the value by coincidence. The pre-revision `0
-        numeric 65536 literals` claim would have gone red against correct code. The ruled
-        obligation is that the SUBMISSION path copies no limit: `SUBMISSION_MAX_BYTES` is `2 *
-        DEFAULT_MAX_BYTES + PROVENANCE_MAX_BYTES + _SUBMISSION_FRAMING`, framing is computed
-        from `_SUBMISSION_KEYS` at 34, and all three system.py provenance sites reference the
-        exported constant. Retiring the coincidental literal is DEFERRED to polish.
-        """
+        Source-id wire bound includes worst-case JSON escapes and two quotes. Pin the arithmetic,
+        keys, AST references and zero provenance-limit copies independently."""
         self.assertTrue(hasattr(system_module, "PROVENANCE_MAX_BYTES"))
         self.assertTrue(hasattr(cement_cli, "SUBMISSION_MAX_BYTES"))
         self.assertTrue(hasattr(cement_cli, "_SUBMISSION_KEYS"))
@@ -1971,13 +1927,16 @@ class CliChannelTests(unittest.TestCase):
         keys = tuple(cement_cli._SUBMISSION_KEYS)
         framing = 2 + sum(len(json.dumps(key)) + 1 for key in keys) + len(keys) - 1
         self.assertEqual(provenance_limit, 65_536)
-        self.assertEqual(framing, 34)
+        self.assertEqual(framing, 47)
+        self.assertEqual(framing, SUBMISSION_FRAMING)
+        self.assertEqual(keys, ("input", "output", "provenance", "source_id"))
         self.assertEqual(cement_cli._SUBMISSION_FRAMING, framing)
         self.assertEqual(
             cement_cli.SUBMISSION_MAX_BYTES,
-            2 * DEFAULT_MAX_BYTES + provenance_limit + framing,
+            2 * DEFAULT_MAX_BYTES + provenance_limit + 3 * SOURCE_ID_MAX_BYTES + 2 + framing,
         )
-        self.assertEqual(cement_cli.SUBMISSION_MAX_BYTES, 2_162_722)
+        self.assertEqual(SOURCE_ID_MAX_BYTES, 512)
+        self.assertEqual(cement_cli._SOURCE_ID_WIRE_BYTES, len(json.dumps("😀" * (SOURCE_ID_MAX_BYTES // 4)).encode("utf-8")))
 
         cli_source = Path(inspect.getsourcefile(cement_cli) or "").read_text()
         system_source = Path(inspect.getsourcefile(System) or "").read_text()
@@ -2011,7 +1970,7 @@ class CliChannelTests(unittest.TestCase):
             node.id for node in ast.walk(cap_assignment) if isinstance(node, ast.Name)
         }
         self.assertTrue(
-            {"DEFAULT_MAX_BYTES", "PROVENANCE_MAX_BYTES", "_SUBMISSION_FRAMING"}
+            {"DEFAULT_MAX_BYTES", "PROVENANCE_MAX_BYTES", "_SOURCE_ID_WIRE_BYTES", "_SUBMISSION_FRAMING"}
             <= cap_names
         )
         system_uses = sum(
@@ -2058,25 +2017,11 @@ class CliChannelTests(unittest.TestCase):
         self.assertEqual(system.submit_proposal.call_count, 0)
 
     def test_x13_aggregate_depth_and_item_maxima_are_adjacent_accept_reject(self) -> None:
-        """X13 [D17] aggregate depth and item maxima are adjacent accept-reject boundaries rather than named constants only
+        """X13 [D17]. Pin adjacent aggregate depth/item boundaries with all four envelope members.
 
-        ACTION: ENCODE
-
-        EXPECTED:
-        Depth 65 and 300003 items each reach dispatch once; depth 66 and 300004 items exit 2
-        with respectively `JSON exceeds maximum depth 65` and `JSON exceeds maximum container
-        item count`.
-
-        RULING:
-        CONFIRMED, re-derived from the shipped call: `max_depth=DEFAULT_MAX_DEPTH + 1` = 65 and
-        `max_items=3 * DEFAULT_MAX_ITEMS + 3` = 300003, against library constants 64 and
-        100000. The envelope nests each field one level deeper and adds three members, so those
-        are the only values that let a submission the library accepts survive the transport.
-        The adjacent reject at 66 and 300004 is what proves the derived maxima are applied
-        rather than merely named.
-        """
+        Field limits remain DEFAULT_MAX_DEPTH/DEFAULT_MAX_ITEMS; the envelope adds one depth and four items."""
         max_depth = DEFAULT_MAX_DEPTH + 1
-        max_items = 3 * DEFAULT_MAX_ITEMS + 3
+        max_items = 3 * DEFAULT_MAX_ITEMS + 4
         depth_at = (
             '{"input":'
             + "[" * DEFAULT_MAX_DEPTH
@@ -2102,12 +2047,12 @@ class CliChannelTests(unittest.TestCase):
                 + field_array
                 + ',"provenance":{"p":'
                 + provenance
-                + "}}"
+                + '} ,"source_id":"observation"}'
             )
 
         item_at = item_frame(DEFAULT_MAX_ITEMS - 1)
         item_over = item_frame(DEFAULT_MAX_ITEMS)
-        self.assertEqual((max_depth, max_items), (65, 300_003))
+        self.assertEqual((max_depth, max_items), (65, 300_004))
         cases = (
             ("depth-at", depth_at, 1, 0, None),
             (
@@ -2198,6 +2143,7 @@ class CliChannelTests(unittest.TestCase):
             input_value: object,
             *,
             candidate: Candidate,
+            source_id: str | None = None,
         ) -> str:
             captured.append(candidate)
             return submit(
@@ -2206,6 +2152,7 @@ class CliChannelTests(unittest.TestCase):
                 operation,
                 input_value,
                 candidate=candidate,
+                source_id=source_id,
             )
 
         sources = (
@@ -2234,27 +2181,10 @@ class CliChannelTests(unittest.TestCase):
         self.assertEqual([len(value.encode()) for value in stored], [2, 2])
 
     def test_x16_unknown_and_missing_envelope_failures_open_no_submission_t(self) -> None:
-        """X16 [D18] unknown and missing envelope failures open no submission transaction after required System construction
+        """X16 [D18]. Invalid envelopes open only the constructor validation read, never a submission transaction.
 
-        ACTION: ENCODE-SCOPED
-
-        EXPECTED:
-        Each invalid envelope exits 2 with `System.__init__` count 1, `sqlite3.connect` count
-        at least 1, `Store.transaction` count 0, `System.submit_proposal` count 0, and the
-        ledger path present afterward.
-
-        RULING:
-        CONFIRMED as revised, and the revision is the honest boundary that forced amendment A5.
-        Measured on all four envelope failures: `System.__init__` 1, `sqlite3.connect` >= 1,
-        `Store.transaction` 0, `System.submit_proposal` 0, ledger present afterwards at ~208
-        KiB. D18's `before any transaction opens` is therefore TRUE as written at the
-        `Store.transaction` seam and is retained; A5 adds the clause D18 was missing -
-        construction precedes envelope validation, so a writing leaf creates its ledger before
-        rejecting a malformed envelope. Giving submit a D13-style precheck is REJECTED:
-        creating the ledger is a legitimate first use of a writing leaf. The residual - an
-        invalid argument value creating the ledger on any writing leaf - is CLI-wide and
-        pre-existing, and is DEFERRED to polish.
-        """
+        Start with an existing ledger; pin constructor/connection counts, one read-only transaction,
+        zero submit calls and unchanged file existence."""
         cases = (
             json.dumps({"input": 1, "output": 2, "z": 3}),
             json.dumps({"provenance": {}}),
@@ -2265,6 +2195,7 @@ class CliChannelTests(unittest.TestCase):
         real_connect = sqlite3.connect
         for index, source in enumerate(cases):
             path = self.root / f"invalid-envelope-{index}.db"
+            System(path)
             init_calls = 0
             transaction_calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
 
@@ -2313,13 +2244,14 @@ class CliChannelTests(unittest.TestCase):
             self.assertEqual(run.status, 2)
             self.assertEqual(init_calls, 1)
             self.assertGreaterEqual(connect.call_count, 1)
-            self.assertEqual(len(transaction_calls), 0)
+            self.assertEqual(transaction_calls, [((), {})])
+            self.assertIs(inspect.signature(Store.transaction).parameters["write"].default, False)
             self.assertEqual(submit.call_count, 0)
             self.assertTrue(path.exists())
         self.assertEqual(len(observations), 2)
         self.assertTrue(
             all(
-                init == 1 and connects >= 1 and transactions == 0 and submits == 0 and exists
+                init == 1 and connects >= 1 and transactions == 1 and submits == 0 and exists
                 for init, connects, transactions, submits, exists in observations
             )
         )
@@ -2401,17 +2333,18 @@ class CliChannelTests(unittest.TestCase):
         proposal_id = str(payload["proposal_id"])
         with closing(sqlite3.connect(self.database)) as connection:
             row = connection.execute(
-                "SELECT e.kind, e.subject_id, e.payload_json, p.request_id "
+                "SELECT e.kind, e.subject_id, e.payload_json, p.id "
                 "FROM events AS e JOIN proposals AS p ON p.id = e.subject_id "
                 "WHERE e.kind = 'proposal.created' ORDER BY e.sequence DESC LIMIT 1"
             ).fetchone()
         self.assertIsNotNone(row)
         assert row is not None
-        kind, subject_id, event_payload, request_id = map(str, row)
+        kind, subject_id, event_payload, stored_id = map(str, row)
         self.assertEqual((kind, subject_id, event_payload), ("proposal.created", proposal_id, "{}"))
         combined = run.stdout + event_payload
         self.assertEqual([combined.count(secret) for secret in secrets], [0, 0, 0])
-        self.assertNotIn(request_id, combined)
+        self.assertEqual(stored_id, proposal_id)
+        self.assertNotIn("request_id", combined)
         self.assertEqual(json.loads(event_payload), {})
 
     def test_x19_proposal_submit_preserves_every_parser_library_conflict_an(self) -> None:
@@ -2736,7 +2669,7 @@ class CliChannelTests(unittest.TestCase):
             hashlib.sha256(current).hexdigest(),
             "2b2650144d4b384af4d8bfe67e1f9de0e186b609f3bb2632e2f81b53536770f7",
         )
-        self.assertEqual(SCHEMA_VERSION, 2)
+        self.assertEqual(SCHEMA_VERSION, 3)
 
     def test_x25_one_successful_cli_submission_preserves_the_direct_library(self) -> None:
         """X25 [D26] one successful CLI submission preserves the direct library three-row footprint over all tables
@@ -2755,7 +2688,7 @@ class CliChannelTests(unittest.TestCase):
         """
         self.register()
         before = self.table_counts()
-        self.assertEqual(len(before), 13)
+        self.assertEqual(len(before), 15)
         source = json.dumps(
             {"input": {"value": 1}, "output": {"value": 2}, "provenance": {}}
         )
@@ -2767,10 +2700,10 @@ class CliChannelTests(unittest.TestCase):
         self.assertEqual(run.status, 0)
         self.assertEqual(
             {table: change for table, change in delta.items() if change},
-            {"requests": 1, "proposals": 1, "events": 1},
+            {"proposals": 1, "events": 1},
         )
         expected = {table: 0 for table in before}
-        expected.update({"requests": 1, "proposals": 1, "events": 1})
+        expected.update({"proposals": 1, "events": 1})
         self.assertEqual(delta, expected)
 
     def test_x26_commandcandidatesource_remains_imported_and_the_existing_h(self) -> None:

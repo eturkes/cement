@@ -18,7 +18,6 @@ class CommandCandidateSourceTests(unittest.TestCase):
             partition="tenant",
             operation="echo",
             operation_revision=1,
-            request_id="request-1",
             input={"x": 1},
         )
 

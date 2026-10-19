@@ -77,9 +77,9 @@
 - Treat results as plans. Re-run live policy and authorization immediately before an effect. Cement
   supplies no idempotency key, so supply one from your application and bind it to the exact input you
   act on. Stop for reconciliation after uncertain effect commit
-  state. `submit_proposal` and `propose` give no idempotency. `propose` invokes the configured source
-  one time for each call, and it never retries. Each call writes a new proposal. Do not
-  repeat those calls to recover. A `StateError` from either call does not prove that the proposal is
+  state. `propose` gives no idempotency, and `submit_proposal` gives none without a source id.
+  `propose` invokes the configured source one time for each call, and it never retries. Each call
+  without a source id writes a new proposal. Do not repeat those calls to recover. A `StateError` from either call does not prove that the proposal is
   absent, because a database commit can succeed and then fail. List the partition's pending proposals
   and match your input before you act. The `cement proposal submit` command inherits every sentence
   above, because it calls `submit_proposal` directly.
