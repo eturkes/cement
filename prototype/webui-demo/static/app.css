@@ -732,3 +732,7 @@ body:not(.tech) #operator-view {
 .fn-row.muted code { color: var(--quiet); }
 .fn-code { margin: 0; font-size: 13.5px; line-height: 1.7; background: #f6f8f5; white-space: pre; }
 .fn-view { width: min(760px, 100%); }
+.fn-code .kw { color: var(--green); font-weight: 700; }
+.fn-code .tag-shared, .fn-code .tag-from { font: 11px Space, sans-serif; border-radius: 10px; padding: 1px 8px; }
+.fn-code .tag-shared { background: #e4ece7; color: var(--quiet); }
+.fn-code .tag-from { background: #faf0dd; color: var(--amber); font-weight: 700; }

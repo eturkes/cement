@@ -349,17 +349,26 @@ function renderFnView() {
   const fn = STATE.functions.find((row) => row.operation === FN_OPEN && row.promoted && row.source);
   $("fnview").hidden = !fn;
   if (!fn) return;
-  const lines = [`function ${fn.operation}(form):`];
+  /* Each row is marked by the scripts it came from: in all of them = shared, else the
+     requests that needed it. The union is how one function covers every request. */
+  const rowsOf = METHOD[fn.operation][1];
+  const lines = [`<span class="kw">function</span> ${esc(fn.operation)}(form):`];
   for (const entry of fn.source.entries) {
-    lines.push(`  if form is a ${humanKey(entry.input.document_type || "form")}:`);
-    const rows = METHOD[fn.operation][1](entry.output || {});
+    lines.push(`  <span class="kw">if</span> form is a ${esc(humanKey(entry.input.document_type || "form"))}:`);
+    const rows = rowsOf(entry.output || {});
+    const scripts = (entry.originals || []).map((o) => ({ id: o.document_id, rows: rowsOf(o.provider_plan || {}).map(([k, v]) => k + "|" + v) }));
     const width = Math.max(...rows.map(([k]) => k.length));
-    rows.forEach(([k, v]) => lines.push(`      ${k.padEnd(width)}  ←  ${v}`));
+    rows.forEach(([k, v]) => {
+      const from = scripts.filter((sc) => sc.rows.includes(k + "|" + v)).map((sc) => sc.id);
+      const tag = !scripts.length ? "" : from.length === scripts.length
+        ? `<span class="tag-shared">shared</span>` : `<span class="tag-from">from ${esc(from.join(", ") || "Learn")}</span>`;
+      lines.push(`      ${esc(k.padEnd(width))}  ←  ${esc(v)}  ${tag}`);
+    });
   }
-  lines.push("  otherwise:", "      ask the AI");
+  lines.push("  <span class=\"kw\">otherwise</span>:", "      ask the AI");
   $("fnview-title").textContent = METHOD[fn.operation][0];
   $("fnview-sub").textContent = `${plural(fn.entries, "kind")} of form · ${isOn(fn.operation) ? "on" : "off"}`;
-  $("fnview-body").textContent = lines.join("\n");
+  $("fnview-body").innerHTML = lines.join("\n");
 }
 
 /* --- what happened to the latest request: document → method → reply ---
@@ -610,7 +619,7 @@ function renderSource() {
   if (overlay.hidden || key !== SOURCE_KEY) {
     $("overlay-title").textContent = fn.source.label;
     $("overlay-sub").textContent =
-      `${fn.operation} \u00b7 every supervised answer, condensed into one function`;
+      `${fn.operation} \u00b7 every learned script, merged into one function`;
     $("source").innerHTML = sourceHtml(fn);
     SOURCE_KEY = key;
   }
@@ -840,7 +849,6 @@ async function switchTo(names, on) {
 
 const learnAll = async () => { await learnNow(); };
 const switchAllOn = async () => { await switchTo(STATE.promoted_operations, true); };
-const firstNote = () => (turnParts().find((p) => p.note) || {}).note || "made a mistake";
 const patientOf = () => (STATE.latest_turn ? documentOf(STATE.latest_turn.document_id).patient : "");
 
 /* Each step runs once, then shows its beats: a spotlight (driver.js) on one element with
@@ -854,12 +862,12 @@ const STORY = [
     { el: "#side-hidden", title: "Behind the scenes", text: () => "What Cement does. Users never see it.", side: "left" } ] },
   { run: async () => { await select("file"); await send("q01"); }, beats: [
     { el: lastBubble, title: "An ordinary answer", text: () => "No change from an ordinary chatbot answer. Cement has nothing reusable for this yet.", side: "right" },
-    { el: "#mechanism .method", title: "The AI’s script", text: () => `To answer, the AI wrote a small script for this form. This one ${firstNote()}.`, side: "bottom" } ] },
+    { el: "#mechanism .method", title: "The AI’s script", text: () => "To answer, the AI wrote a small script for this form. This request needed no Provider row.", side: "bottom" } ] },
   { run: () => send("q02"), beats: [
-    { el: "#mechanism .method", title: "The same job again", text: () => "Another progress note. The AI wrote a slightly different script.", side: "bottom" } ] },
+    { el: "#mechanism .method", title: "The same job again", text: () => "Another progress note. This script also reads the Provider line.", side: "bottom" } ] },
   { run: learnAll, beats: [
-    { el: "#functions-list", title: "Learn", text: () => "An AI pass read the chats, found the repeat, and merged the scripts into one function.", side: "top" },
-    { el: "#fnview .overlay-card", fn: "document.extraction_plan", title: "The function", text: () => "Readable. One branch per kind of form. Anything else goes to the AI.", side: "left" } ] },
+    { el: "#functions-list", title: "Learn", text: () => "An AI pass read the chats, found the repeat, and merged both scripts into one function.", side: "top" },
+    { el: "#fnview .overlay-card", fn: "document.extraction_plan", title: "One function", text: () => "Shared rows came from both scripts; Provider from the one that needed it. It covers both requests.", side: "left" } ] },
   { run: () => switchTo(["document.extraction_plan"], true), beats: [
     { el: "#functions-list .switch", title: "Switch on", text: () => "Your one decision. Matching forms now skip the AI.", side: "top" } ] },
   { run: () => send("q03"), beats: [

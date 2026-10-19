@@ -68,7 +68,11 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
     line`), never a patient's values; chip amber `AI script` vs green `Function`. Below it
     `Functions` = one row per operation of the selected task: `ƒ <operation>`, `n kinds of form`,
     `Read`, its own switch; `not learned yet` / billing `never repeats`. `Read` = the function
-    alone as code (`if form is a <kind>:` rows … `otherwise: ask the AI`). Tally = chips `AI n`
+    alone as code (`if form is a <kind>:` rows … `otherwise: ask the AI`), each row tagged
+    `shared` (in every merged script) or `from <request>` (only the scripts that needed it),
+    computed from the entry's lineage — the union is how one function generalizes over
+    requests (owner-ruled r13). The stand-in AI is fixed, not sampled: a case's first script
+    reads less (progress note: no Provider row), every later one is complete. Tally = chips `AI n`
     `Function m`.
   - Chat + reply = labelled fields, never JSON. Users = `users`, never `staff`. Requests show under
     the five task pills. ONE `Show technical details` switch (off by default; `?tech`,
@@ -113,7 +117,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 - [x] 8722f0b ITERATE round 9: too wordy → icon workflow as progress, one-line band + one action, chips/dots/marks in the boxes.
 - [x] cbafe70 ITERATE round 10: audience needs gaze guidance → driver.js spotlight beats on the story; b7757b5 captions without file ids.
 - [x] 002c68d ITERATE round 11: ordinary-chatbot captions + tool-call line; 548e00b mistake-stake captions.
-- [ ] ITERATE round 12: human role corrected (Intent rewritten) → Ask → Learn → Switch on, learning pass = sole reviewer, per-function switch + `Read`; owner reviews it.
+- [ ] ITERATE round 12: human role corrected (Intent rewritten) → Ask → Learn → Switch on, learning pass = sole reviewer, per-function switch + `Read`; r13 generalization shown (`shared` / `from <request>` rows); owner reviews it.
   - Close (the owner's go) runs `Rules upkeep`; known backlog: origin stories + measured results in bare `ops.md` + `assurance.md`; area-bound law in bare `ops.md` (D28, D19, capture mechanics) → `paths:`.
 - [ ] M3.6a3 delete the 7 dead outcome types (`Outcome` + its 6 members).
   - Resume point: the suspended IMPLEMENT scope rejoins here once ITERATE closes on the owner's go.

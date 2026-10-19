@@ -75,7 +75,9 @@ One function serves several tasks. **File it into the record** promotes
 2. Send another form of the same kind. The AI writes a slightly different script.
 3. Select **Learn from chats**. The learning pass merges the scripts into one function.
 4. Select **Read** to see the function. It has one branch for each kind of form, and it
-   asks the AI for anything else.
+   asks the AI for anything else. A **shared** row came from every script. A **from A02**
+   row came only from the requests that needed it. That union is how one function covers
+   all of the requests.
 5. Select **Switch on**. The next form of that kind gets its answer without an AI call. The
    reply is the same, and a tool-call line above it shows that the function answered.
 6. Select **Code it for billing**. **Switch on** is struck through, because no two notes
@@ -91,8 +93,9 @@ no build step and no network access.
 
 ## Real and simulated
 
-The model is simulated. `StubProvider` in `demo.py` samples one answer variant and one
-latency between 1.1 and 3.4 seconds. The learning pass is simulated too: it merges the
+The model is simulated. `StubProvider` in `demo.py` returns a fixed script and samples one
+latency between 1.1 and 3.4 seconds. The first script for a kind of form reads less than the
+next one, for example no Provider row on the first progress note. The learning pass is simulated too: it merges the
 scripts of each case into that case's reference answer, and it reviews each retained answer
 as `learning-pass`. Compile, verification and promotion after it are real. It calls no model and uses no network. The page
 labels that number `simulated`. The mapping from a request to an operation is simulated

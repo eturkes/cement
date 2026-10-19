@@ -499,7 +499,7 @@ def _extraction_variants(document_type: str) -> list[dict[str, JSONValue]]:
         pool += [
             {
                 "key": "dropped-provider",
-                "note": "omitted the Provider field",
+                "note": "had no Provider row",
                 "plan": _without(reference, "provider"),
             },
             {
@@ -661,10 +661,10 @@ def _clinical_field(document_type: str) -> str:
 
 
 class StubProvider:
-    """Stand in for one in-house LLM: a sampled candidate and a sampled latency.
+    """Stand in for one in-house LLM: a fixed script per answer and a sampled latency.
 
-    The first candidate for a scope always diverges from the reference, so the
-    supervisor's correction is visible. Later candidates favour the complete answer.
+    The first script for a case reads less than the reference and every later one is
+    complete, so the learning pass shows shared rows plus the row only one script had.
     """
 
     def __init__(self, seed: int) -> None:
@@ -686,11 +686,9 @@ class StubProvider:
         pool = self._pools.setdefault(key, variants(operation, document))
         served = self._served.get(key, 0)
         self._served[key] = served + 1
-        if served == 0:
-            return copy.deepcopy(self._rng.choice(pool[1:]))
-        if self._rng.random() < 0.6:
-            return copy.deepcopy(pool[0])
-        return copy.deepcopy(self._rng.choice(pool[1:]))
+        # Fixed, not sampled: the first script for a case reads less than the next one, so a
+        # learning pass visibly keeps the shared rows and adds the row only one script had.
+        return copy.deepcopy(pool[1] if served == 0 else pool[0])
 
 
 def plan_diff(proposed: JSONValue, reference: JSONValue) -> list[dict[str, str]]:
