@@ -31,7 +31,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   confirmed examples; each entry drills down to the requests behind it, showing the plan the
   provider wrote and what the supervisor changed.
   Demo framing (owner-ruled): the prototype explains a concept and must never read as a
-  production control plane. Layout = TWO HALVES, `What staff see` | `Behind the scenes`. The chat is a PLAIN chat — no badge, id, model name, digest or
+  production control plane. Layout = TWO HALVES, `What users see` | `Behind the scenes` (owner-ruled: `users`, never `staff`). The chat is a PLAIN chat — no badge, id, model name, digest or
   timing — so the supervised answer and the cemented answer render IDENTICALLY; that identity
   is the demonstration. A TURN is one question however many operations answer it: it renders as
   the typing indicator while the model writes, then answers in ONE bubble; a part that misses
@@ -62,7 +62,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   the document (id, kind, first scanned lines) → the METHOD used per part, in plain rows
   (`Patient name ← the "Patient:" line`), badged `Written by the AI · not checked yet / a person
   fixed it / confirmed` or `Fixed answer · no AI` with its check count, a correction marking
-  each added/fixed/removed row → the reply staff got. This makes the saved thing visible: a
+  each added/fixed/removed row → the reply the user got. This makes the saved thing visible: a
   method for a KIND of form, which plain code applies to a new patient's form. A `What just
   happened` band under the strip captions every action in plain words (send, check, save,
   switch on, task change). `Play the story` = 11 narrated steps, one per `Next`, captions read

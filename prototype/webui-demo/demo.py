@@ -160,7 +160,7 @@ OPERATIONS: dict[str, dict[str, str]] = {
     },
 }
 
-# One task the staff recognize, one or more operations under it. The extraction plan
+# One task the users recognize, one or more operations under it. The extraction plan
 # serves four of the five, which is why a function promoted for one task answers the
 # next one for free.
 SCENARIOS: list[dict[str, JSONValue]] = [

@@ -277,7 +277,7 @@ function renderTray() {
   $("task-switch").innerHTML = STATE.scenarios.map(task =>
     `<button class="task-pill ${task.id === STATE.selected ? "on" : ""}" data-select="${esc(task.id)}" ${BUSY ? "disabled" : ""}>${esc(task.title)}</button>`).join("");
   const task = scenarioOf(STATE.selected);
-  $("tray").innerHTML = `<p class="tiny">Send a request. Staff word the same job in different ways.</p><div class="asks">
+  $("tray").innerHTML = `<p class="tiny">Send a request. Users word the same job in different ways.</p><div class="asks">
     ${task.requests.map(request => `<button class="ask-card" data-send="${esc(request.id)}" ${BUSY ? "disabled" : ""}>${esc(request.ask)}<small>${esc(request.document_id)}.pdf \u00b7 ${esc(documentOf(request.document_id).title || "")}</small></button>`).join("")}</div>`;
 }
 
@@ -337,11 +337,11 @@ function renderStory() {
     : "The AI answered.";
 
   let check = s.rejected ? "A person rejected the answer, so Cement learns nothing from it."
-    : s.corrected ? "A person fixed a mistake. Staff kept the reply they already had."
+    : s.corrected ? "A person fixed a mistake. The user kept the reply they already had."
     : s.model.length ? "A person confirmed the answer." : "Checked earlier, before the answer was saved.";
   let checkAction = "";
   if (s.pending) {
-    check = "A person now checks what the AI wrote. Staff already have their reply, so nobody waits.";
+    check = "A person now checks what the AI wrote. The user already has the reply, so nobody waits.";
     checkAction = button("Check the answer", 'data-check-open="1"');
     if (CHECK_OPEN) {
       const p = s.pending;
@@ -449,7 +449,7 @@ function renderMechanism() {
       <div class="flow-arrow" aria-hidden="true">→</div>
       <div class="flow-methods">${turn.parts.map((part) => methodBox(part, doc)).join("")}</div>
       <div class="flow-arrow" aria-hidden="true">→</div>
-      <div class="flow-box"><span class="method-badge">The reply staff got</span><div class="reply">${reply}</div></div>
+      <div class="flow-box"><span class="method-badge">The reply the user got</span><div class="reply">${reply}</div></div>
     </div></div>`;
 }
 
@@ -877,7 +877,7 @@ function reviewCaption(decision, note) {
   return `A person checked the AI’s work and fixed it: the AI ${note}. The reply already sent does not change. Cement keeps the fixed version as one check.`;
 }
 
-const SAVED = "Cement tested the checked work and saved it as a fixed answer. It saves how to handle this kind of form, not any patient’s details. Nothing changes for staff until someone switches it on.";
+const SAVED = "Cement tested the checked work and saved it as a fixed answer. It saves how to handle this kind of form, not any patient’s details. Nothing changes for users until someone switches it on.";
 const SWITCHED = "Fixed answers are switched on. Matching forms now skip the AI. Anything new still goes to the AI and a person.";
 
 /* A supervisor corrects what diverges and accepts what already matches. The first
@@ -895,18 +895,18 @@ const firstNote = () => (turnParts().find((p) => p.note) || {}).note || "made a 
 const patientOf = () => (STATE.latest_turn ? documentOf(STATE.latest_turn.document_id).patient : "");
 
 const STORY = [
-  { say: () => "Hospital staff use an AI assistant all day. A common job: pull the record fields out of a scanned physician progress note. Select Next to send the first one." },
+  { say: () => "Users at a hospital use an AI assistant all day. A common job: pull the record fields out of a scanned physician progress note. Select Next to send the first one." },
   { run: async () => { await select("file"); await send("q01"); },
-    say: () => `A clerk sent A01.pdf and asked for the record fields. The AI worked out how to read this kind of form, and the reply went out at once. The AI made a mistake that nobody has seen yet: it ${firstNote()}. Compare the boxes on the right.` },
+    say: () => `A user sent A01.pdf and asked for the record fields. The AI worked out how to read this kind of form, and the reply went out at once. The AI made a mistake that nobody has seen yet: it ${firstNote()}. Compare the boxes on the right.` },
   { run: settle,
-    say: () => "Later, a records supervisor checked the AI’s work and fixed it. The clerk’s reply stays as it was. Cement keeps the fixed version: that is the first check for progress notes." },
+    say: () => "Later, a records supervisor checked the AI’s work and fixed it. The user’s reply stays as it was. Cement keeps the fixed version: that is the first check for progress notes." },
   { run: () => turn("q02"),
     say: () => {
       const status = (turnParts()[0] || {}).status;
       return `A second progress note, A02.pdf, arrived with different wording. The AI read it ${status === "accepted" ? "correctly, and the supervisor confirmed it" : "with a mistake again, and the supervisor fixed it"}. Progress notes now have 2 checks, enough for Cement to save the work.`;
     } },
   { run: makeAutomatic,
-    say: () => "Cement tested the checked work and saved “how to read a progress note” as a fixed answer. It saved the reading method, not any patient’s details. Staff see no change yet." },
+    say: () => "Cement tested the checked work and saved “how to read a progress note” as a fixed answer. It saved the reading method, not any patient’s details. Users see no change yet." },
   { run: () => route(true),
     say: () => "An operator switched fixed answers on. From now on, a progress note skips the AI." },
   { run: () => send("q03"),

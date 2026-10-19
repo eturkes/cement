@@ -1,6 +1,6 @@
 # Cement web UI demo
 
-This demo shows what Cement is for. Hospital staff send scanned documents to a chat
+This demo shows what Cement is for. Users at a hospital send scanned documents to a chat
 assistant. They bring five different jobs, and they word each job differently every time.
 A supervisor reviews those answers afterwards. Cement collects that confirmed work into
 one deterministic function per operation. An operator then routes those operations to their
@@ -12,7 +12,7 @@ reaches the person typing.
 
 The page opens with one sentence of purpose and four steps: **Ask**, **Check**, **Save**
 and **Switch on**. A band under the steps tells you what just happened after each action.
-The left half is the chat that staff see. The right half first shows what happened to the
+The left half is the chat that users see. The right half first shows what happened to the
 latest request: the document, the method used on it and the reply. The method is either
 written by the AI or a fixed answer. A fixed answer is a method for one kind of form, so
 plain code can read a new patient's form with it. Below that, the right half shows the
