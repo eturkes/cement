@@ -15,6 +15,26 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## M3.6a3 close (IMPLEMENT, unit) — target `17896eb` (squash of `archive/m3u6a3-impl`), records in the next commit
+
+Check set fixed before the diff was read, one `reviewer` per lens: correctness C1-C6 + contract O1-O6 (reviewer-18), cleanup L1-L5 (reviewer-19), altitude AL1-AL4 (reviewer-20); target `55588a8` = the branch before its review fixes. Raw tables: `.scratch/review/m3u6a3/` (scratch; rulings restated here).
+
+| id | lens | verdict | ruling (MAIN-verified) |
+|---|---|---|---|
+| C1-C3, C5, C6 | correctness | pass | deletion = §1 set exactly; `resolve` docstring keeps its rule; 7 battery + 9 repaired tests OK at `55588a8`. |
+| C4, O6 | repairs | pass | burden re-measured MAIN-side (contract §4: stage 1 Ran 635 failures=3 errors=18, stage 2 failures=1 errors=7); every reddened id = import repair, inversion (D10) or git-object re-scope; none deleted/skipped. |
+| O1 | absence | finding F1 → fixed | `(Outcome,) = (int,)` passed O1's AST collector (O3 caught the token). `_bound_names` walks destructured targets; `def` names count. |
+| O4 | structure | finding F2 → fixed | `_top_definitions` skipped `FunctionDef`/`AsyncFunctionDef`: an added top-level function passed. Now enumerated. |
+| O5 | preserved ABI | finding F3 → fixed | `default_factory` kept `default` MISSING: `Candidate(output=17)` constructible while O5 stayed green. Requiredness vector added. |
+| O2, O3 | exports, residue | pass | 14 in-memory undo controls red (`.agent/decisions/m3u6a3-controls.py <root> controls`). |
+| L4 | dead code | finding F4 → fixed | unused `models_module` import (`tests/test_proposal_binding_battery.py:43`, ruff F401 in isolation) + a dead `namespace` in O5. |
+| L1-L3, L5 | cleanup | pass | — |
+| AL1-AL4 | altitude | pass | `__all__` 57 → 51 (exactly six); root `cement --help` byte-identical (1,443 B, `cmp` rc 0); no human-facing surface names the seven. |
+
+Fix credit: `m3u6a3-controls.py <root> red` (reviewer-18's three gap probes) → failures=3 at `55588a8`, OK at `899d84e`. O5 = preservation pin, UNCREDITED: `.agent/mutate` finds 0 in-scope mutants (post-import trace) → p91. Register: contract §4 placeholder (reviewer-19/-20 R1) → filled before the squash.
+
+Gate at the squash: `.agent/gate` on `17896eb` rc 0 (clean tree, `heavy`): unittest 1149.9 s, Ran 1043, outer skipped none, nested D28 = L30, D28 14 revisions / 1 replayed / 13 from green verdicts; slowest L29 474.4 s, D28 392.0 s (slot-1 load).
+
 ## M3.10 gate tooling close (IMPLEMENT, unit) — target `629577d`, review fixes in the commit that lands this section
 
 Check set fixed before the diff was read: correctness C1-C8 + acceptance A1-A6 (reviewer-15), cleanup L1-L8 (reviewer-16), altitude AL1-AL6 (reviewer-17), security S1-S7 (MAIN: scanner config is security vocabulary, kept off the teammate route). Raw tables: `.scratch/review/m3u10/`.
