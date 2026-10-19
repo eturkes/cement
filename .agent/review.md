@@ -15,6 +15,29 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p78 close (IMPLEMENT, unit) — target `1935f68` (squash of `archive/p78-impl`), records in the next commit
+
+Check set fixed before re-reading the diff: R1 every input the inner verdict depends on is keyed or
+excluded with grounds; R2 red is never recorded; R3 a damaged or foreign record replays; R4 D30's
+structure holds (helpers take `root`, one `subprocess.run` site); R5 tripwire census loci unchanged;
+R6 p78's acceptance measured; R7 law + records current. MAIN alone (a test-infrastructure cache with
+a mechanical seed; a teammate adds no assurance the seed + `D28VerdictCacheTests` miss).
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | key completeness | pass + register | key = tree id + `D28_INNER` + `sys.version` + implementation + platform + `sqlite3.sqlite_version` + primary `uv.lock` sha256 (`_d28_content_key`). Excluded with grounds: git version, kernel, locale — environment, not repository content; HEAD's outer suite grades it every run. |
+| R2 | red never recorded | pass | `_d28_record` sits after both replay assertions (structural pin `test_d28_records_only_after_both_of_its_assertions`); planted red: 2 runs rc 1, store 12 → 12. |
+| R3 | damaged record | pass | `test_a_damaged_or_foreign_record_replays_instead_of_passing`: corrupt, foreign format, foreign key, non-int `ran` → `None`. |
+| R4 | D30 structure | pass | `test_d30_every_obligation_reads_the_closed_transition` OK beside the new class; helpers name no `ROOT`/`__file__`; git via `_run`. |
+| R5 | census loci | pass | `m3u6a2-tripwires.py --emit` diff = the provenance-only `head` line; not committed. |
+| R6 | acceptance | pass | cold 2274.1 s / 12 replays vs warm 306.1 s / 1 replay on `1935f68`; `Ran >= 949` re-asserted on a served verdict; red firing above. |
+| R7 | law + records | pass | `history-gates.md` verdict-cache bullet, `ops.md` wall-time + 1036 tests, `gate-checks.md` seed record, p78 status, `Tasks` ticked. |
+
+Red-first credit: `D28VerdictCacheTests` red at `b5257fa` (`archive/p78-impl`, ancestor proven rc 0) by
+`uv run python -m unittest tests.test_migration_battery.D28VerdictCacheTests` → `FAILED (failures=1,
+errors=4)`. Preservation pins: none cited. Register: the first cold run hit p70's 600 s inner
+timeout at `9194f41` under load 13-20; the warm rerun replayed it green.
+
 ## ITERATE close (phase, owner's go) — target `d3635b5..6b90eb9`, fixes land in the close commit
 
 Check set fixed before reading: (a) every `Artifacts` entry runs by its recorded command; (b) `Decisions` hold
