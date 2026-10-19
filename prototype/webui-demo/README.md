@@ -129,7 +129,7 @@ Everything else is the shipped `cement_runtime`:
 - The policy uses the runtime defaults: two confirmations, one reviewer and no minimum span.
 - The artifact digests, the `function_hash` and the six set checks come from those
   commands.
-- The exported bundle is the real `cement-function-v2` document. The demo exports the
+- The exported bundle is the real `cement-function-v3` document. The demo exports the
   latest published receipt with `--receipt-id`, so you can read it before switching it on.
   This read does not enable the function. Without that option, the CLI exports the version
   that the switch selects, and it refuses while the switch is off.

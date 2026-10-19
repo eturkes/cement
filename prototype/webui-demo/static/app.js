@@ -644,7 +644,7 @@ function sourceHtml(fn) {
     `# ${count} entr${count === 1 ? "y" : "ies"} \u00b7 ${passed}/${fn.checks.length} ` +
       `checks passed \u00b7 receipt ${fn.receipt_id} \u00b7 ${fn.bundle_bytes} bytes`,
     `# called by ${fn.callers.join(", ")}`,
-    "# a reading of the exported cement-function-v2 bundle; Cement seals exact " +
+    "# a reading of the exported function bundle; Cement seals exact " +
       "entries, and it emits no code",
   ]
     .map((line) => `<span class="c">${esc(line)}</span>`)
