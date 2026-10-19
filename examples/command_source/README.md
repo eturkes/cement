@@ -1,6 +1,34 @@
-# Candidate adapter protocol
+# Command candidate source
 
-`CommandCandidateSource` invokes a trusted executable directly with `shell=False`. Cement writes one
+This optional example runs a trusted adapter executable for one candidate. The Cement core does
+not ship it: the core keeps only the `CandidateSource` protocol that `System.propose` calls.
+
+## Use the example
+
+Put this directory on the import path. Then pass a `CommandCandidateSource` to `System`. Run the
+block from the repository root:
+
+```python
+import sys
+
+sys.path.insert(0, "examples/command_source")
+
+from command_source import CommandCandidateSource
+from cement_runtime import CandidateRequest, System
+
+source = CommandCandidateSource([sys.executable, "examples/command_source/example_adapter.py"])
+system = System("cement.db", candidate_source=source)
+
+candidate = source.propose(CandidateRequest("tenant-42", "support.reply", 1, {"domain": "value"}))
+print(candidate.output)
+```
+
+`example_adapter.py` is a protocol stub, not an LLM. It echoes the input so that you can try the
+protocol locally. The block prints `{'kind': 'echo', 'value': {'domain': 'value'}}`.
+
+## Protocol
+
+`CommandCandidateSource` invokes a trusted executable directly with `shell=False`. It writes one
 compact JSON object to stdin:
 
 ```json

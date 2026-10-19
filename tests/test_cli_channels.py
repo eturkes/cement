@@ -57,6 +57,7 @@ from cement_runtime.store import SCHEMA_VERSION, Store
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "examples" / "command_source"))
 PARTITION = "tenant"
 OPERATION = "op"
 CHECK_KEYS = (
@@ -180,6 +181,9 @@ def _baseline_parser() -> argparse.ArgumentParser:
         ("git", "-C", str(ROOT), "show", "c8b82cd:src/cement_runtime/cli.py"),
         text=True,
     )
+    original_import = "from .source import CommandCandidateSource"
+    assert source.count(original_import) == 1
+    source = source.replace(original_import, "from command_source import CommandCandidateSource")
     name = "cement_runtime._m3u5a_baseline_cli"
     module = types.ModuleType(name)
     module.__file__ = f"{name}.py"
@@ -2840,7 +2844,7 @@ class CliChannelTests(unittest.TestCase):
             ROOT / "README.md",
             ROOT / "docs/architecture.md",
             ROOT / "docs/threat-model.md",
-            ROOT / "docs/adapter-protocol.md",
+            ROOT / "examples/command_source/README.md",
         )
         publication = "\n".join(path.read_text(encoding="utf-8") for path in paths)
         lowered = publication.lower()
@@ -2895,7 +2899,7 @@ class CliChannelTests(unittest.TestCase):
             ROOT / "docs/architecture.md",
             ROOT / "docs/threat-model.md",
         )
-        excluded = ROOT / "docs/adapter-protocol.md"
+        excluded = ROOT / "examples/command_source/README.md"
         patterns = (
             re.compile(
                 r"\bcement(?:\s+--(?:db|partition)\s+\S+)*\s+resolve\b",

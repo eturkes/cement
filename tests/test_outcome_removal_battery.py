@@ -1,8 +1,8 @@
 """M3.6a3 removal battery — the seven dead outcome types leave the package.
 
 Contract: `.agent/decisions/m3u6a3-contract.md`. BASE = the gate-tooling squash, the unit's own
-opening state, read from git so a later unit's edits to the tree never redden a settled question;
-HEAD-side frames read the working tree because their subject IS the shipped package.
+opening state. BASE/CLOSE delimit settled preservation claims; deletion predicates inspect the
+live package.
 """
 
 from __future__ import annotations
@@ -126,7 +126,9 @@ class OutcomeRemovalBattery(unittest.TestCase):
 
     def test_o2_all_loses_exactly_the_six_exports(self) -> None:
         base = _parsed_all(_git_text(BASE, "src/cement_runtime/__init__.py"))
-        head = _parsed_all((ROOT / "src/cement_runtime/__init__.py").read_text(encoding="utf-8"))
+        head = _parsed_all(_git_text(CLOSE, "src/cement_runtime/__init__.py"))
+        live = _parsed_all((ROOT / "src/cement_runtime/__init__.py").read_text(encoding="utf-8"))
+        self.assertEqual(set(live) & set(EXPORTED), set())
         self.assertEqual(sorted(set(base) & set(EXPORTED)), sorted(EXPORTED))  # BASE had them
         self.assertEqual(head, [name for name in base if name not in EXPORTED])
 

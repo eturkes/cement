@@ -46,8 +46,9 @@
 - Function receipt and membership rows are database-immutable. Historical receipt reconstruction
   survives member supersession, operation-revision retirement, and evidence revocation. An audit of a
   past promotion therefore does not depend on current artifact status.
-- Candidate commands bypass the shell, have timeout/output limits, and run outside database locks. On
-  Linux, a child-subreaper kills and reaps detached descendants before accepting output. That
+- The optional command candidate source (`examples/command_source/`) bypasses the shell, applies
+  timeout/output limits, and runs outside database locks. On Linux, its child-subreaper kills and
+  reaps detached descendants before accepting output. That
   mechanism is lifecycle containment for the trusted adapter, not a hostile-code sandbox. The outer
   watchdog covers unexpected supervisor exit for the shared process group. A cgroup/container is
   necessary to contain detached descendants across simultaneous supervisor/watchdog failure or OOM.

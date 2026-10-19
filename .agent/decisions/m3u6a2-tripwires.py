@@ -47,7 +47,7 @@ TABLE = pathlib.Path(__file__).resolve().with_name("m3u6a2-tripwires.json")
 DOCS: tuple[str, ...] = (
     "README.md",
     "docs/architecture.md",
-    "docs/adapter-protocol.md",
+    "examples/command_source/README.md",
     "docs/threat-model.md",
     "examples/hospital_ocr/README.md",
 )
@@ -110,7 +110,7 @@ OWNERS: dict[str, tuple[str, str]] = {
         "M3.6a2",
         "steps 1-3 describe `handle`; the lease paragraph describes the knob this unit deletes",
     ),
-    "docs/adapter-protocol.md": (
+    "examples/command_source/README.md": (
         "M3.6a2",
         "M3.7 relocates this document with BYTE EQUALITY, so it never rewrites a claim - "
         "leaving false `handle` prose here would relocate the defect instead of fixing it",

@@ -39,7 +39,6 @@ from unittest import mock
 from cement_runtime import (
     Candidate,
     CementError,
-    CommandCandidateSource,
     CompilePolicy,
     ConflictError,
     FunctionCheck,
@@ -64,6 +63,8 @@ from cement_runtime.json_value import (
 from cement_runtime.store import SCHEMA_VERSION, Store
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "examples" / "command_source"))
+from command_source import CommandCandidateSource
 PARTITION = "tenant_a"
 OPERATION = "echo_1"
 
@@ -2642,6 +2643,9 @@ class ObligationBatteryTests(unittest.TestCase):
             capture_output=True,
             text=True,
         ).stdout
+        original_import = "from .source import CommandCandidateSource"
+        self.assertEqual(base_source.count(original_import), 1)
+        base_source = base_source.replace(original_import, "from command_source import CommandCandidateSource")
         module_name = "cement_runtime._m3u5a_base_cli"
         base_module = types.ModuleType(module_name)
         base_module.__file__ = "<git:c8b82cd:src/cement_runtime/cli.py>"
@@ -2836,6 +2840,9 @@ class ObligationBatteryTests(unittest.TestCase):
             capture_output=True,
             text=True,
         ).stdout
+        original_import = "from .source import CommandCandidateSource"
+        self.assertEqual(base_source.count(original_import), 1)
+        base_source = base_source.replace(original_import, "from command_source import CommandCandidateSource")
         module_name = "cement_runtime._m3u5a_d26_base_cli"
         base_module = types.ModuleType(module_name)
         base_module.__file__ = "<git:c8b82cd:src/cement_runtime/cli.py>"
@@ -3161,7 +3168,7 @@ class ObligationBatteryTests(unittest.TestCase):
             for path in (
                 "README.md",
                 "docs/architecture.md",
-                "docs/adapter-protocol.md",
+                "examples/command_source/README.md",
                 "docs/threat-model.md",
             )
         }

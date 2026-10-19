@@ -6,34 +6,34 @@
   "freezes": [
     {
       "lines": 34,
-      "locus": "tests/test_cli_removal_battery.py:1140",
+      "locus": "tests/test_cli_removal_battery.py:1146",
       "scope": "GIT-RANGE",
       "test": "test_d15a_the_six_runtime_modules_stay_byte_identical_to_their_3"
     },
     {
       "lines": 41,
-      "locus": "tests/test_cli_removal_battery.py:1175",
+      "locus": "tests/test_cli_removal_battery.py:1181",
       "scope": "GIT-RANGE",
       "test": "test_d15b_the_twelve_examples_files_stay_byte_identical_to_their"
     },
     {
       "lines": 108,
-      "locus": "tests/test_cli_removal_battery.py:2793",
+      "locus": "tests/test_cli_removal_battery.py:2799",
       "scope": "GIT-RANGE",
       "test": "test_d22b_direction_library_route_every_library_api_locus_is_byt"
     },
     {
       "lines": 60,
-      "locus": "tests/test_cli_removal_battery.py:2902",
+      "locus": "tests/test_cli_removal_battery.py:2908",
       "scope": "GIT-RANGE",
       "test": "test_d22c_the_opening_text_handle_request_fence_is_protected_and"
     }
   ],
-  "head": "88c7f724582b2ed6a43f84984060578fc11a5cac",
+  "head": "1899134da293182c1aea3d7ba15d825c9926f328",
   "pins": [
     {
       "lines": 76,
-      "locus": "tests/test_cli_channels.py:2424",
+      "locus": "tests/test_cli_channels.py:2428",
       "scope": "WORKING-TREE",
       "test": "test_x20_new_command_help_and_publication_prohibit_retry_advice_and",
       "vocabulary": [
@@ -43,7 +43,7 @@
     },
     {
       "lines": 49,
-      "locus": "tests/test_cli_channels.py:2874",
+      "locus": "tests/test_cli_channels.py:2878",
       "scope": "WORKING-TREE",
       "test": "test_x29_the_publication_grep_scope_is_ambiguous_between_a_document",
       "vocabulary": [
@@ -54,7 +54,7 @@
     },
     {
       "lines": 81,
-      "locus": "tests/test_cli_channels.py:2924",
+      "locus": "tests/test_cli_channels.py:2928",
       "scope": "WORKING-TREE",
       "test": "test_x30_every_placeholder_in_each_shipped_shell_block_is_produced",
       "vocabulary": [
@@ -63,7 +63,7 @@
     },
     {
       "lines": 111,
-      "locus": "tests/test_cli_channels_battery.py:2409",
+      "locus": "tests/test_cli_channels_battery.py:2410",
       "scope": "WORKING-TREE",
       "test": "test_d23_there_is_no_idempotency_two_byte_identical_submissions_ret",
       "vocabulary": [
@@ -74,7 +74,7 @@
     },
     {
       "lines": 82,
-      "locus": "tests/test_cli_removal_battery.py:2710",
+      "locus": "tests/test_cli_removal_battery.py:2716",
       "scope": "WORKING-TREE",
       "test": "test_d22a_direction_cli_route_every_cli_route_locus_was_rewritte",
       "vocabulary": [
@@ -88,7 +88,7 @@
     },
     {
       "lines": 108,
-      "locus": "tests/test_cli_removal_battery.py:2793",
+      "locus": "tests/test_cli_removal_battery.py:2799",
       "scope": "GIT-RANGE",
       "test": "test_d22b_direction_library_route_every_library_api_locus_is_byt",
       "vocabulary": [
@@ -103,7 +103,7 @@
     },
     {
       "lines": 60,
-      "locus": "tests/test_cli_removal_battery.py:2902",
+      "locus": "tests/test_cli_removal_battery.py:2908",
       "scope": "GIT-RANGE",
       "test": "test_d22c_the_opening_text_handle_request_fence_is_protected_and",
       "vocabulary": [
@@ -221,7 +221,7 @@
         }
       ],
       "owner": "M3.6a2",
-      "total_lines": 440
+      "total_lines": 441
     },
     {
       "document": "docs/architecture.md",
@@ -251,19 +251,19 @@
       "total_lines": 210
     },
     {
-      "document": "docs/adapter-protocol.md",
+      "document": "examples/command_source/README.md",
       "grounds": "M3.7 relocates this document with BYTE EQUALITY, so it never rewrites a claim - leaving false `handle` prose here would relocate the defect instead of fixing it",
       "hit_lines": 1,
       "hits": [
         {
-          "line": 58,
+          "line": 82,
           "tokens": [
             "request"
           ]
         }
       ],
       "owner": "M3.6a2",
-      "total_lines": 59
+      "total_lines": 83
     },
     {
       "document": "docs/threat-model.md",
@@ -271,7 +271,7 @@
       "hit_lines": 0,
       "hits": [],
       "owner": "M3.6a2",
-      "total_lines": 116
+      "total_lines": 117
     },
     {
       "document": "examples/hospital_ocr/README.md",

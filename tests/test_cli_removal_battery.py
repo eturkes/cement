@@ -45,6 +45,7 @@ from cement_runtime.models import (
 from cement_runtime.system import System
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "examples" / "command_source"))
 REMOVED_LEAVES = frozenset({"handle", "request"})
 REMOVED_FLAGS = frozenset(
     {
@@ -339,6 +340,11 @@ def _module_from_git(revision: str) -> types.ModuleType:
     module.__package__ = "cement_runtime"
     sys.modules[name] = module
     source = _git_bytes(revision, "src/cement_runtime/cli.py")
+    original_import = b"from .source import CommandCandidateSource"
+    # Post-removal CLI revisions already lack this optional dependency.
+    if original_import in source:
+        assert source.count(original_import) == 1
+        source = source.replace(original_import, b"from command_source import CommandCandidateSource")
     exec(compile(source, module.__file__, "exec"), module.__dict__)  # noqa: S102
     return module
 
@@ -2977,7 +2983,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
             {path.relative_to(ROOT).as_posix() for path in surfaces},
             {
                 "README.md",
-                "docs/adapter-protocol.md",
+                "examples/command_source/README.md",
                 "docs/architecture.md",
                 "docs/threat-model.md",
                 "examples/hospital_ocr/README.md",
@@ -3091,7 +3097,7 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         """
         surfaces = [
             "README.md",
-            "docs/adapter-protocol.md",
+            "examples/command_source/README.md",
             "docs/architecture.md",
             "docs/threat-model.md",
             "examples/hospital_ocr/README.md",
@@ -3100,7 +3106,8 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         changed_paragraphs: list[str] = []
         for relative in surfaces:
             current = fence.sub("", (ROOT / relative).read_text())
-            baseline = fence.sub("", _git_bytes("36f7890", relative).decode())
+            baseline_path = "docs/adapter-protocol.md" if relative == "examples/command_source/README.md" else relative
+            baseline = fence.sub("", _git_bytes("36f7890", baseline_path).decode())
             baseline_units = {
                 " ".join(paragraph.split())
                 for paragraph in re.split(r"\n\s*\n", baseline)

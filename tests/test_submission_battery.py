@@ -1810,7 +1810,7 @@ class SubmissionBatteryTests(unittest.TestCase):
                 "each call without a source id writes a new proposal",
                 "do not repeat those calls to recover",
             ),
-            ROOT / "docs/adapter-protocol.md": (
+            ROOT / "examples/command_source/README.md": (
                 # M3.6a2 L23 permitted inversion: the adapter document has one route left.
                 "through `system.propose`, the same failures raise `candidatesourceerror`",
                 "`system.propose` invokes the adapter at most one time for each call",
@@ -2230,7 +2230,7 @@ class SubmissionBatteryTests(unittest.TestCase):
             ROOT / "README.md",
             ROOT / "docs/architecture.md",
             ROOT / "docs/threat-model.md",
-            ROOT / "docs/adapter-protocol.md",
+            ROOT / "examples/command_source/README.md",
         )
         normalized_by_path = {
             path: " ".join(path.read_text(encoding="utf-8").lower().split())

@@ -9,7 +9,10 @@ from unittest import mock
 
 from cement_runtime.errors import CandidateSourceError, ValidationError
 from cement_runtime.models import CandidateRequest
-from cement_runtime.source import CommandCandidateSource
+
+EXAMPLE_DIR = pathlib.Path(__file__).resolve().parents[1] / "examples" / "command_source"
+sys.path.insert(0, str(EXAMPLE_DIR))
+from command_source import CommandCandidateSource
 
 
 class CommandCandidateSourceTests(unittest.TestCase):

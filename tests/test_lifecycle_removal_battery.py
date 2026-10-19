@@ -1316,7 +1316,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
         )
 
     def test_l21_propose_failure_contract_survives_without_fallback_state(self) -> None:
-        text = (ROOT / "docs/adapter-protocol.md").read_text()
+        text = (ROOT / "examples/command_source/README.md").read_text()
         self.assertEqual(text.count("fallback_failed"), 0)
         self.assertGreaterEqual(text.count("System.propose"), 1)
         self.assertGreaterEqual(text.count("CandidateSourceError"), 1)
@@ -1476,6 +1476,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
 
         for path, name in opening:
             baseline = function_span(_git_text(BASE_SHA, path), name)
+            # The closed endpoint includes the owner's register amendment.
             current = function_span(_git_text("adb0ab9", path), name)
             with self.subTest(path=path, name=name):
                 if (path, name) in required_inversions:
@@ -1494,7 +1495,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
         owned = (
             "README.md",
             "docs/architecture.md",
-            "docs/adapter-protocol.md",
+            "examples/command_source/README.md",
             "docs/threat-model.md",
         )
         deleted = re.compile(

@@ -393,7 +393,8 @@ The root `verify` command does not use exit 6. It reports a failed verification 
 the exit status to get the verdict from the `function` commands in the table above. A script that
 changes between these two commands must change its verdict check at the same time.
 
-Read [docs/adapter-protocol.md](docs/adapter-protocol.md) for the command adapter protocol. Read
+Read [examples/command_source/README.md](examples/command_source/README.md) for the optional command
+candidate source and its protocol. Read
 [docs/architecture.md](docs/architecture.md) and [docs/threat-model.md](docs/threat-model.md) for the
 full state model and trust boundaries.
 
@@ -434,7 +435,7 @@ exact partition. That applies to operation registration and revision, proposal r
 verification, promotion, challenge, evidence revocation, and artifact suspension. It applies equally to
 every write route and to all reads. `operation revise`
 always creates a semantic revision and retires older builds, even when threshold values stay unchanged.
-Linux is the strongest command-adapter deployment target: Cement uses a subreaper supervisor there to
-kill and reap detached descendants. This is lifecycle containment for a trusted provider wrapper, not
-an arbitrary-code sandbox. If cleanup must survive simultaneous runtime/supervisor
+The optional command candidate source in `examples/command_source/` uses a subreaper supervisor on
+Linux to kill and reap detached descendants. This is lifecycle containment for a trusted provider
+wrapper, not an arbitrary-code sandbox. If cleanup must survive simultaneous runtime/supervisor
 termination or OOM, a host cgroup/container boundary remains necessary.

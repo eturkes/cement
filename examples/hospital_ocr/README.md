@@ -242,6 +242,6 @@ All checks passed.
 
 - [Repository overview](../../README.md)
 - [Architecture](../../docs/architecture.md) - state model, exact-scope guarantees, and trust boundary
-- [Candidate adapter protocol](../../docs/adapter-protocol.md) - candidate request, output, and failure contract
+- [Command candidate source](../command_source/README.md) - the optional adapter runner, its request, output, and failure contract
 
 Read `run_demo.py` for the lifecycle driver, `pipeline.py` for signature and extraction mechanics, and `plan_adapter.py` for the deterministic candidate source. `checkpoint_function` and `resolve_offline` in `run_demo.py` are the two helpers the offline phase uses.

@@ -54,7 +54,7 @@ from .models import (
     StaleRevisionAnomaly,
     VerificationReport,
 )
-from .source import CandidateSource, CommandCandidateSource
+from .source import CandidateSource
 from .system import System
 
 __all__ = [
@@ -69,7 +69,6 @@ __all__ = [
     "CandidateSource",
     "CandidateSourceError",
     "CementError",
-    "CommandCandidateSource",
     "CompilePolicy",
     "CompileResult",
     "CompileScope",
