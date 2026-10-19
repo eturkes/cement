@@ -15,6 +15,37 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## M4/M5 contract (IMPLEMENT, unit contract before code) — target `.agent/decisions/m45-contract.md` revision 3
+
+Check set fixed before the draft was read: the draft's own §8 questions C1-C8, plus the reviewer's
+open rows (X1-X7, capped at 12). `consultant-1` (raw table + re-review = `.agent/decisions/
+m45-consultant-1.md`); the advisor read revision 2 before the re-review. Every ruling below = MAIN's,
+on the reviewer's evidence re-derived (C3 + X1 repros: MAIN reran the reconstruction-after-revise
+probe, rc 0, hash equal; the other repros are cited verbatim in the raw table).
+
+| id | reviewer verdict | ruling + where it lands (revision 3 §) |
+|---|---|---|
+| C1 | sound-with-change | accepted: recognition = grammatical (G1); exact mode for every other operation; v1 = line-oriented forms (§0, §4). |
+| C2 | unsound | accepted as a claim correction: G2 consistency vs G3 no semantic guarantee, the lab counterexample published; owner O6 = the learning pass decides projectability, Read states the assumption (§0, §6 step 2). |
+| C3 | unsound | accepted with a MAIN departure (advisor-backed): a newer different output = a revision, never an unpin; contradiction = revocation (P-b), suspension (P-c, now allowed on retired members), `challenge` (P-d); review no longer auto-suspends. Owner O4: pins cross resets (§3, W4, W5, W5b, W5c). |
+| C4 | sound | seventh check `projection-uniform`, complete ordered vector pinned (§5). |
+| C5 | sound-with-change | accepted: three identities, one read snapshot for switch + receipt + program + evidence, one write transaction for `set_projection` (§3, §5, W10, L9). |
+| C6 | sound | accepted: off = every answer field null, syntax-only expected hash, exit 6, switch + operation reads alone (§3, W1). |
+| C7 | unsound | owner O7: Cement `source_id` unique per (partition, operation), repeat = exit 4; revision 3: the filter is the single writer after completion, `record_answer` writes nothing (§1 S6, §7, E2-E4). |
+| C8 | sound-with-change | accepted: source id, supersession lineage, two-branch switch CHECK, composite receipt FK, program table hash-checked; function ABI v3 lands WITH the cut so no v3-ledger receipt binds a v2 hash (§1). |
+| X1 | unsound | accepted: `supersede_examples` (one credit per observation), candidate-program grouping before confirmation, revoke-vs-supersede rule, resumable unfinished work (§2, §6 steps 1-3, X1a-d, LP0). |
+| X2 | unsound | owner O8: structured `record_answer` output = the candidate; the final reply = provenance (§7). |
+| X3 | unsound | accepted: content identity (`program_hash`) everywhere; identical setting = no-op; compile never revives retired rows (§5, L8). |
+| X4 | sound-with-change | accepted: diff covers scope, policy + program; `selected` over full history, `servable` separate (§3, W7, W8). |
+| X5 | unsound | accepted: exact program schema, normalized pairs, Unicode scalars, key caps → `NoMatch("key")`, I2/I3 restricted to the grammar's equivalences, work counter in place of two timings (§4). |
+| X6 | sound-with-change | accepted: capture binding = `kernel`; real Open WebUI 0.12.3 smoke over hit / miss / off / duplicate / regeneration / two calls (§7, §9). |
+| X7 | unsound (added by the reviewer) | accepted: every contrary-evidence path evaluates raw examples under the artifact's own program (§5, X7a). |
+
+Re-review of revision 2 (one round): 9 closed (C1 C2 C4 C5 C6 X2 X4 X6 X7); 6 open (C3 C7 C8 X1 X3
+X5) → ruled into revision 3 as listed above; their acceptance = the named predicates, graded when
+each unit's battery runs. Register: Open WebUI live delivery, cancellation + metadata keys stay
+UNCONFIRMED until M5.3's smoke; P-d cost is measured in M5.1, never assumed.
+
 ## p78 close (IMPLEMENT, unit) — target `1935f68` (squash of `archive/p78-impl`), records in the next commit
 
 Check set fixed before re-reading the diff: R1 every input the inner verdict depends on is keyed or
