@@ -736,6 +736,59 @@ class OracleValidationTests(ValidationMixin, unittest.TestCase):
     module_name = "tests.projection_oracle"
 
 
+class RuntimeMutantRulingTests(unittest.TestCase):
+    """Pins for the mutation survivors ruled missing-test (`.agent/review.md` M4.1 section)."""
+
+    def setUp(self):
+        self.impl = importlib.import_module("cement_runtime.projection")
+        self.errors = importlib.import_module("cement_runtime.errors")
+
+    def test_a_value_that_mimics_a_json_type_is_refused_as_a_validation_error(self):
+        # §4: parse_program(value: object) refuses every rule violation as ValidationError, even
+        # for an object whose type compares equal to everything (`type(x) != dict` is fooled).
+        class Mimic(type):
+            def __eq__(cls, other):
+                return True
+
+            def __ne__(cls, other):
+                return False
+
+            __hash__ = type.__hash__
+
+        class NotJSON(metaclass=Mimic):
+            pass
+
+        layout = {"name": "n", "title": "T", "entries": [{"label": "A"}]}
+        for where, program in (
+            ("root", NotJSON()),
+            ("text", {**minimal(), "text": NotJSON()}),
+            ("keep", {**minimal(), "keep": NotJSON()}),
+            ("layouts", {**minimal(), "layouts": NotJSON()}),
+            ("layout name", {**minimal(), "layouts": [{**layout, "name": NotJSON()}]}),
+            ("entries", {**minimal(), "layouts": [{**layout, "entries": NotJSON()}]}),
+            ("entry", {**minimal(), "layouts": [{**layout, "entries": [NotJSON()]}]}),
+        ):
+            with self.subTest(where=where), self.assertRaises(self.errors.ValidationError):
+                self.impl.parse_program(program)
+
+    def test_scalars_beside_the_surrogate_range_are_legal_literals(self):
+        for title in ("\ud7ff", "\ue000"):
+            with self.subTest(title=hex(ord(title))):
+                self.assertEqual(self.impl.parse_program(minimal(title=title)).layouts[0].title, title)
+        for title in ("\ud800", "\udfff"):
+            with self.subTest(title=hex(ord(title))), self.assertRaises(self.errors.ValidationError):
+                self.impl.parse_program(minimal(title=title))
+
+    def test_a_repeated_keep_field_is_refused_even_when_it_sorts_low(self):
+        with self.assertRaises(self.errors.ValidationError):
+            self.impl.parse_program(minimal(keep=["a", "a", "b"]))
+
+    def test_a_title_that_sorts_below_the_registered_one_is_no_match(self):
+        program = self.impl.parse_program(minimal(title="T"))
+        missed = self.impl.project(program, {"document": "S\nA:v"})
+        self.assertEqual((missed.matched, missed.reason), (False, "layout"))
+
+
 class RuntimeGrammarTests(GrammarMixin, unittest.TestCase):
     module_name = "cement_runtime.projection"
 
