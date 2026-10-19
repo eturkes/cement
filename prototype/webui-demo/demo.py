@@ -1296,6 +1296,17 @@ class Session:
             body=answer["body"],
             error=answer["error"],
             under=self._answer_under(unit, parts, document),
+            # The chat shows each promoted-function answer as a tool call, the way a chat
+            # product shows any tool the assistant used; model parts show nothing extra.
+            tools=[
+                {
+                    "operation": part["operation"],
+                    "label": part["label"],
+                    "resolve_ms": part["resolve_ms"],
+                }
+                for part in parts
+                if part["source"] == "function"
+            ],
         )
         # A review lands after the user has read this, so the turn is kept with its own
         # bubble: a later ruling restates the peel-back and never the answer.

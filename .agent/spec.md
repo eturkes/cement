@@ -31,9 +31,11 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   confirmed examples; each entry drills down to the requests behind it, showing the plan the
   provider wrote and what the supervisor changed.
   Demo framing (owner-ruled): the prototype explains a concept and must never read as a
-  production control plane. Layout = TWO HALVES, `What users see` | `Behind the scenes` (owner-ruled: `users`, never `staff`). The chat is a PLAIN chat — no badge, id, model name, digest or
-  timing — so the supervised answer and the cemented answer render IDENTICALLY; that identity
-  is the demonstration. A TURN is one question however many operations answer it: it renders as
+  production control plane. Layout = TWO HALVES, `What users see` | `Behind the scenes` (owner-ruled: `users`, never `staff`). The chat = an ordinary chatbot: no badge, id, model name or digest; an AI answer = a
+  plain reply, captioned `No change from an ordinary chatbot answer` while Cement has nothing
+  reusable for it. A promoted-function part adds ONE tool-call line above the reply (`ƒ Used
+  <operation> · <ms>`, expanding to one sentence), as chat products show tool use; the reply
+  body is identical either way (owner-ruled r11; supersedes identical rendering). A TURN is one question however many operations answer it: it renders as
   the typing indicator while the model writes, then answers in ONE bubble; a part that misses
   the promoted set returns to the model, and the user waits for the MODEL alone. The chat NEVER
   waits on a person: the model's answer goes out in that same turn and its candidate enters the
@@ -91,8 +93,8 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   `+ required_fields`, `route` → `intake_queue`, `bill` → `+ billing_codes`.
   The right half is SCOPED to the selected task while the operation map shows all five, so reuse
   is portrayed BOTH ways: the function card names its callers, and switching tasks lands on the
-  same card. A turn's parts may split across a promoted function and the model, and the bubble
-  hides that seam. `document.billing_codes` is keyed on one note's ASSESSMENT TEXT, not the
+  same card. A turn's parts may split across a promoted function and the model; the bubble shows
+  the function part's tool call and nothing for the model part. `document.billing_codes` is keyed on one note's ASSESSMENT TEXT, not the
   layout, so no second note repeats the input, every scope stays at support 1, `compile` blocks
   it, and it stays supervised BY DESIGN — the boundary is the claim, not a gap. The story cements
   every cementable task.
@@ -105,7 +107,8 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 - [x] d9fe5df ITERATE round 7: still dense + confusing → layperson framing (purpose sentence, four-step workflow, technical details behind one switch).
 - [x] 46c95e8 ITERATE round 8: still unclear what happens → mechanism boxes, `What just happened` captions, narrated story, readable replies; ba5230d `staff` → `users`.
 - [x] 8722f0b ITERATE round 9: too wordy → icon workflow as progress, one-line band + one action, chips/dots/marks in the boxes.
-- [ ] ITERATE round 10: audience needs gaze guidance → driver.js spotlight beats on the story; owner reviews it.
+- [x] cbafe70 ITERATE round 10: audience needs gaze guidance → driver.js spotlight beats on the story; b7757b5 captions without file ids.
+- [ ] ITERATE round 11: first answers read as an ordinary chatbot (nothing reusable yet); a promoted-function answer shows a tool-call line; owner reviews it.
   - Close (the owner's go) runs `Rules upkeep`; known backlog: origin stories + measured results in bare `ops.md` + `assurance.md`; area-bound law in bare `ops.md` (D28, D19, capture mechanics) → `paths:`.
 - [ ] M3.6a3 delete the 7 dead outcome types (`Outcome` + its 6 members).
   - Resume point: the suspended IMPLEMENT scope rejoins here once ITERATE closes on the owner's go.

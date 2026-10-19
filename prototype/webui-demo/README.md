@@ -14,7 +14,9 @@ The page opens with one headline and four icons: **Ask**, **Check**, **Save** an
 **Switch on**. The icons also show the step that the selected task has reached. A band
 under the icons tells you what just happened, and it holds the one next action.
 
-The left half is the chat that users see. The right half shows what happened to the latest
+The left half is the chat that users see. Until Cement has a saved method for a request,
+each answer is an ordinary chatbot answer. When a saved method answers, a tool-call line
+such as `ƒ Used document.extraction_plan` shows above the reply. The right half shows what happened to the latest
 request in three boxes: the form, the method used on it, and the reply. An amber **AI** chip
 marks a method that the AI wrote. A green **Fixed** chip marks a saved method that ran
 without the AI. The dots count the checks by a person. A `+`, `✎` or `–` mark shows a row
@@ -70,7 +72,7 @@ One function serves several tasks. **File it into the record** promotes
 3. Send and check another form of the same kind. The dots fill.
 4. Select **Save**. This runs compile, verification and promotion as real Cement commands.
 5. Select **Switch on**. The next form of that kind gets its answer without an AI call. The
-   chat looks the same.
+   reply is the same, and a tool-call line above it shows that Cement answered.
 6. Select **Code it for billing**. **Save** and **Switch on** are struck through, because no
    two notes repeat the same words.
 7. Select **Show technical details** for the commands, the evidence and the function source.
@@ -167,7 +169,7 @@ Each numbered frame must show its claim:
 | `02-answered.png` | The answer already with the user, and **Check** in the band. |
 | `03-evidence.png` | Two checks, with **Save** in the band. |
 | `04-cemented.png` | The fixed answer saved, with **Switch on** in the band. |
-| `05-routed.png` | A03 answered without the AI, in a bubble that looks the same. |
+| `05-routed.png` | A03 answered without the AI: the same reply under a tool-call line. |
 | `06-reuse.png` | One answer from a fixed answer and the AI together. |
 | `07-blocked.png` | Billing stays with the AI because assessment words do not repeat. |
 | `08-bundle.png` | The extraction plan drawer, with the answer from the exported bundle. |

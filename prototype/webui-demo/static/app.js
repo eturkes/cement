@@ -172,7 +172,7 @@ function render() {
   $("drawer").hidden = !DRAWER;
   $("drawer-title").textContent = DRAWER ? operationOf(DRAWER).label : "";
   $("benefit").textContent = STATE.stats.cement_answers
-    ? `${plural(STATE.stats.cement_answers, "operation")} answered without the model. The chat looks the same.`
+    ? `${plural(STATE.stats.cement_answers, "operation")} answered without the model, each shown in the chat as a tool call.`
     : "Repeated, checked answers can become exact deterministic entries.";
 }
 
@@ -220,8 +220,12 @@ function chatMessage(message) {
     : message.render === "text"
       ? `<div>${esc(message.body)}</div>`
       : fieldsHtml(message.body);
+  /* A promoted-function answer shows as a tool call, as a chat product shows any tool. */
+  const tools = (message.tools || []).map((tool) => `<details class="tool-call">
+    <summary><span class="tool-icon" aria-hidden="true">ƒ</span>Used <code>${esc(tool.operation)}</code><span class="tool-ms">${esc(tool.resolve_ms)} ms</span></summary>
+    <p>Cement’s saved, checked method for this form. The AI was not called for this part.</p></details>`).join("");
   return `<div class="msg assistant"><div class="avatar">AI</div>
-    <div class="bubble">${body}</div></div>` + under(message);
+    <div class="bubble">${tools}${body}</div></div>` + under(message);
 }
 
 /* The peel-back. It sits outside the bubble so the chat itself stays plain. */
@@ -801,9 +805,11 @@ function sentCaption() {
   if (!turn) return CAPTION;
   const parts = turnParts();
   const fixed = parts.filter((p) => p.source === "function").length;
-  if (fixed === parts.length) return "Answered by a fixed answer. No AI.";
-  if (fixed) return "Part answered by a fixed answer, the rest by the AI.";
-  return "The user got the AI’s reply. Nobody has checked it yet.";
+  if (fixed === parts.length) return "A tool call to Cement answered. No AI.";
+  if (fixed) return "A tool call to Cement did part. The AI did the rest.";
+  return taskStage().prepared && !STATE.routed
+    ? "An ordinary chatbot answer. A fixed answer is saved but not switched on."
+    : "An ordinary chatbot answer. Cement has nothing reusable for this yet.";
 }
 
 function reviewCaption(decision, note) {
@@ -838,7 +844,7 @@ const STORY = [
     { el: "#side-user", title: "What users see", text: () => "A normal AI chat.", side: "right" },
     { el: "#side-hidden", title: "Behind the scenes", text: () => "What Cement does. Users never see it.", side: "left" } ] },
   { run: async () => { await select("file"); await send("q01"); }, beats: [
-    { el: lastBubble, title: "The AI answers", text: () => "The user gets the reply right away. Nobody checks it first.", side: "right" },
+    { el: lastBubble, title: "An ordinary answer", text: () => "No change from an ordinary chatbot answer. Cement has nothing reusable for this yet.", side: "right" },
     { el: "#mechanism .method", title: "Its method", text: () => `How the AI read the form. It ${firstNote()}.`, side: "bottom" } ] },
   { run: settle, beats: [
     { el: "#mechanism .method", title: "A person checks", text: () => "Marked rows are the fix. The reply stays as sent.", side: "bottom" } ] },
@@ -849,7 +855,7 @@ const STORY = [
   { run: () => route(true), beats: [
     { el: '#how li[data-step="4"]', title: "Switched on", text: () => "Matching forms now skip the AI.", side: "bottom" } ] },
   { run: () => send("q03"), beats: [
-    { el: lastBubble, title: "A new patient", text: () => `Another progress note, for ${patientOf()}. The reply looks the same.`, side: "right" },
+    { el: () => [...document.querySelectorAll("#chat .tool-call")].pop(), title: "A tool call", text: () => `Another progress note, for ${patientOf()}. Cement’s saved method answered. No AI.`, side: "right" },
     { el: "#mechanism .method.fixed", title: "No AI", text: () => "The saved method read the form.", side: "bottom" } ] },
   { run: async () => { await turn("q05"); await turn("q06"); await makeAutomatic(); }, beats: [
     { el: "#mechanism .flow-methods", title: "Reuse", text: () => "A new job reuses the method. Only its new part went to the AI.", side: "bottom" } ] },
