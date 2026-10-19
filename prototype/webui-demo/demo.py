@@ -341,7 +341,7 @@ def operation_input(operation: str, document: dict[str, JSONValue]) -> JSONValue
 
 
 def reference_output(operation: str, document: dict[str, JSONValue]) -> JSONValue:
-    """The output a supervisor confirms for one operation on one document."""
+    """The merged output a learning pass keeps for one operation on one document."""
 
     document_type = str(document["document_type"])
     if operation == "document.extraction_plan":
@@ -789,7 +789,7 @@ def compose_answer(
     """Build the one answer the chat shows out of the outputs the operations returned.
 
     Every branch is deterministic given its outputs, so a cemented turn and a
-    supervised turn produce the same bytes for the same document.
+    model-answered turn produce the same bytes for the same document.
     """
 
     def fields() -> dict[str, JSONValue]:
@@ -1050,7 +1050,7 @@ class Session:
         function first, and only the parts that miss reach the model. The chat shows
         nothing until every part has an answer, because a person asked one question.
 
-        The chat never waits for a supervisor. A chat assistant answers, so the model's
+        The chat never waits for a learning pass. A chat assistant answers, so the model's
         answer goes out at once and its candidate goes to the review queue behind it.
         """
 
@@ -1200,7 +1200,7 @@ class Session:
             "resolve",
             f"{document['id']} · {operation}: no promoted entry for this input "
             f"({elapsed} ms)",
-            "this part of the request returns to the supervised path",
+            "this part of the request goes to the model",
         )
         return part
 
@@ -1212,7 +1212,7 @@ class Session:
         document: dict[str, JSONValue],
         provider_ms: int,
     ) -> None:
-        """Answer one part from the model and queue its candidate for a supervisor."""
+        """Answer one part from the model and retain its candidate for the learning pass."""
 
         operation = str(part["operation"])
         category = self._category(operation, document)
@@ -1390,9 +1390,9 @@ class Session:
                     }
                 )
         cemented = [part for part in parts if part["source"] == "function"]
-        supervised = [part for part in parts if part["source"] != "function"]
-        ruled = [part for part in supervised if part.get("status") != "unreviewed"]
-        if cemented and supervised:
+        modelled = [part for part in parts if part["source"] != "function"]
+        ruled = [part for part in modelled if part.get("status") != "unreviewed"]
+        if cemented and modelled:
             note = (
                 "This one answer has two sources. Cement returned the part it has "
                 "verified, and the model kept the part nobody has confirmed twice. "

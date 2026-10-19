@@ -178,16 +178,16 @@ function render() {
     : "Repeated, checked answers can become exact deterministic entries.";
 }
 
-/* --- chat: a plain chat, and nothing else ---
-   Every badge, id, digest and timing this pane once printed is machinery the
-   deployment never shows. It moved under the disclosure, so the supervised answer
-   and the cemented answer render identically. That identity is the point. */
+/* --- chat: an ordinary chatbot ---
+   Every badge, id, digest and timing is machinery the deployment never shows, so it
+   sits under the disclosure. The one visible difference is the tool-call line a
+   learned function adds; the reply body is identical either way. */
 
 function renderChat() {
   const chat = $("chat");
   /* A turn is one question, however many operations answer it. It shows the typing
      indicator while the model writes, and the reply lands in one bubble. The wait is
-     the model's alone: no supervisor holds up a chat. */
+     the model's alone: nobody holds up a chat. */
   const previous = STATE.chat.slice(0, -2);
   const history = previous.length ? `<button class="button small" data-history="1">${HISTORY ? "Hide" : "Show"} ${plural(previous.length / 2, "earlier turn")}</button>${HISTORY ? previous.map(chatMessage).join("") : ""}` : "";
   const messages = history + STATE.chat.slice(-2).map(chatMessage).join("");
@@ -506,7 +506,7 @@ function renderCategories() {
 function renderReview() {
   $("inbox-note").textContent = `${plural(STATE.pending.length, "answer")} in this task’s inbox. Users already have their replies.`;
   $("review").innerHTML = STATE.pending.map(p => `<div class="proposal"><div class="proposal-head">${esc(p.document_id)} · ${esc(p.scope_label)}</div>
-    <details><summary>Compare the model answer and correction</summary><p>Model answer</p><pre>${jsonHtml(p.plan)}</pre>${p.preview_error ? `<p>${esc(p.preview_error)}</p>` : ""}<p>Supervisor changes</p>${diffHtml(p.diff)}</details>
+    <details><summary>Compare the model answer and correction</summary><p>Model answer</p><pre>${jsonHtml(p.plan)}</pre>${p.preview_error ? `<p>${esc(p.preview_error)}</p>` : ""}<p>What the learning pass merged</p>${diffHtml(p.diff)}</details>
     <div class="actions">${["accept", "correct", "reject"].map(d => `<button class="button small" data-review="${d}" data-proposal="${esc(p.proposal_id)}">${d}</button>`).join("")}</div></div>`).join("");
 }
 
@@ -559,8 +559,8 @@ function unpromotedBody(fn) {
   const reason = fn.keyed_on === "text"
     ? `<div class="tiny dim" style="margin-top:9px">This operation is keyed on the
        note's own words, and no second note repeats them. Every scope stays at one
-       confirmation, so the compiler blocks it forever and the model keeps answering
-       under supervision. That is the design, not a gap.</div>`
+       confirmation, so the compiler blocks it forever and the model keeps answering.
+       That is the design, not a gap.</div>`
     : `<div class="tiny dim" style="margin-top:9px">A draft is not a function.
        Promotion is a separate, explicit act.</div>`;
   const empty = drafts || blocked
@@ -576,7 +576,7 @@ function excludedHtml(fn) {
       <span class="label">Outside this function</span></div>
     ${fn.excluded.map((scope) => `<div class="blocked-row">
       <span class="badge warn">${scope.confirmations}/${scope.required}</span>
-      <span>${esc(scope.label)} \u2014 still supervised</span></div>`).join("")}`;
+      <span>${esc(scope.label)} \u2014 still with the AI</span></div>`).join("")}`;
 }
 
 /* A document in a sealed scope that no confirmed example came from, so the bundle
@@ -643,13 +643,13 @@ function sourceHtml(fn) {
     .join("\n");
   const tail = [
     `    <span class="kw">raise</span> <span class="fn">NoMatch</span>   ` +
-      `<span class="c">${esc("# outside the verified boundary \u2192 the supervised path")}</span>`,
+      `<span class="c">${esc("# outside the verified boundary \u2192 the AI")}</span>`,
   ];
   for (const scope of fn.excluded || []) {
     if (tail.length === 1) tail.push("", `<span class="c">${esc("# not in this function:")}</span>`);
     tail.push(`<span class="c">${esc(
       `#   ${scope.label} \u00b7 ${scope.confirmations}/${scope.required} ` +
-      "confirmations \u00b7 still supervised")}</span>`);
+      "confirmations \u00b7 still with the AI")}</span>`);
   }
   const name = String(src.operation).replace(/[^A-Za-z0-9]+/g, "_");
   return `<pre class="code">${head}\n\n<span class="kw">def</span> ` +
@@ -695,7 +695,7 @@ function entryHtml(entry, total) {
      the very thing this view exists to fix. The rest stay one click away. */
   const origins = entry.originals.length
     ? `<details class="origins" ${entry.index === 1 ? "open" : ""}><summary>the
-         ${entry.originals.length} supervised
+         ${entry.originals.length}
          request${entry.originals.length === 1 ? "" : "s"} behind this entry</summary>
        <div class="hop-note">No command prints an entry beside its originals, and
          <code>events</code> carries no example filter. These
@@ -719,7 +719,7 @@ function originHtml(origin) {
     : `<span class="badge pass">accepted unchanged</span>`;
   const change = origin.diff.length
     ? `<div class="label-row" style="margin-top:10px">
-         <span class="label">What the supervisor changed</span></div>
+         <span class="label">What the learning pass merged</span></div>
        ${diffHtml(origin.diff)}`
     : `<div class="tiny dim" style="margin-top:10px">The entry holds this answer byte for
          byte.</div>`;
@@ -755,7 +755,7 @@ function renderRouting() {
             ? `${plural(count, "operation")} resolve${count === 1 ? "s" : ""} from a function`
             : "every request goes to the model"}</span>
         <span class="tiny dim">${on
-          ? "One switch covers every promoted operation. An input outside a promoted set returns to the supervised path."
+          ? "One switch covers every promoted operation. An input outside a promoted set goes to the AI."
           : "Turn this on when the operator decides the evidence is ready."}</span>
       </div>
     </div>`;
