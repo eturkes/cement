@@ -144,9 +144,9 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 - [x] 097de5b M5.3 Open WebUI example: Cement functions as a tool the chat model calls + a filter that retains answers.
 - [x] ef06a25 M3.8 demo + transcript regeneration via idempotent updater (`data`): the hospital example on projection + learning pass + switch.
 - [x] a97bbc3 Prototype on the real switch + versions (PROTOTYPE law).
-- [ ] M3.9a docs claim ledger rewrite (`docs`): README paragraph 1 + `docs/` + CLI help follow `Intent`; README install/run/configure current for everything shipped.
-  - Resume point: IMPLEMENT resumes here — `impl/m3u9a` (machine-local) holds the rewrite + claim ledger `.agent/decisions/m3u9a-claims.md`; its prose-pin repair runs on `wt/gp6`. Land: squash both, full gate, then M3.9b replays the ledger.
+- [x] 92a162e M3.9a docs claim ledger rewrite (`docs`): README paragraph 1 + `docs/` + CLI help follow `Intent`; README install/run/configure current for everything shipped.
 - [ ] M3.9b independent replay of the M3.9a rewrite (`docs`).
+  - Resume point: IMPLEMENT resumes here — the replay (reviewer-31) ran on 92a162e: 16 holds / 8 fail (F1-F8, prose); the fixes land as one docs commit, then the disposition row, rules upkeep and the phase-close review.
 - [ ] README + prototype disposition: `prototype/webui-demo` stays at `prototype/` (owner-ruled) → `Artifacts`.
 - [ ] Phase-close review over the whole phase diff: every lens, one `reviewer` per lens + MAIN's security lens.
   - Runs LAST, after the close's rules upkeep (`CLAUDE.md` `Rules upkeep`), nothing mutating after it; each unit's closing diff draws its OWN pass first (`reviewer` count per `Session flow` Teammates where MAIN dispatches), every pass adjudicated into `.agent/review.md` ⇒ never the only pass.

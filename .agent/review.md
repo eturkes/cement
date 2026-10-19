@@ -15,6 +15,12 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## M3.9a close (IMPLEMENT, unit, tier `docs`) — target `92a162e` (squash of `archive/m3u9a-land`), records in the next commit
+
+Tier `docs` = consistency pass: MAIN's register audit (rc 0, filler 0 on every Markdown surface) + the README quick start driven end to end through the CLI (every command rc 0) + the claim ledger `.agent/decisions/m3u9a-claims.md` (C01-C21), which M3.9b replays independently (its own section). Prose-pin repair (general-purpose-6, `.scratch/m3u9a-repair/table.md`, 7 rows): D22c D23 D26 L22 L23 D34 re-targeted at the rewritten claims (strings derived from the shipped files; D23's frozen baseline stays at 635a473, its new count derives from the live docs — a pre-squash SHA dependency was refused); B26, x28 and L24 were satisfied by prose (event-payload claim restored, one-line leaf sentence, inputs not requests). AST census: no id lost, `assert*` calls never fewer.
+
+Gate at the squash: `.agent/gate` on `92a162e` rc 0 (clean tree, `heavy`): unittest 625.5 s, Ran 1233, outer skipped none, nested D28 = L30, D28 25 revisions / 1 replayed.
+
 ## M3.8 close (IMPLEMENT, unit, tier `data`) — target `ef06a25` (squash of `archive/m3u8-land`; review read `7b71982`), records in the next commit
 
 Check set fixed before the diff was read, all lenses in one `reviewer` (data unit): D1 structural validator (the transcript updater), D2 live spot-check (the demo), D3 the lifecycle told, D4 masks, D5 test repairs, C1-C3 code lenses (reviewer-28). Raw table: `.scratch/review/m3u8/table.md`.
