@@ -15,6 +15,30 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## M4.2 close (IMPLEMENT, unit) — target `87d011f` (squash of `archive/m4u2-land`; round 1 read `93904e3`, re-review `e5b7f26`), records in the next commit
+
+Check set fixed before the diff was read: correctness (reviewer-10: contract §5 L1-L9, X7, C4, S7 + code lenses, 33 rows), cleanup (reviewer-11), altitude (reviewer-12); one re-review round (reviewer-21, 14 rows, acceptance checks alone). Raw tables: `.scratch/review/m4u2/`, `.scratch/review/m4u2-r2/`.
+
+| id | lens | verdict | ruling (MAIN-verified) |
+|---|---|---|---|
+| F1 / ALT1 | promotion | finding (major) → fixed | members built under a previous program stayed in a new-program set (and a zero-candidate promotion sealed them under the new program). Promotion now retires them (`projection-superseded`); reconstruction binds each member's program to its receipt's (L11 red at 93904e3; L17 red at 4b99157 via a build_function-swap probe). |
+| F2 | contrary evidence | finding (major) → fixed | raw-key equality contradicted a projected member on review, live verification and P-d; the exact-SQL branches now cover exact-mode artifacts alone (L15 L16 red at 7a65c03). |
+| F3 | verification | finding (major) → fixed | the structural probe deleted the title, not the last structural line (§5); L18 runs a lenient interpreter that verification must fail. |
+| F4 / ALT2 | preview | finding (major) → fixed | `test_projection` omitted pending proposals + per-key readiness (L13); re-review R2-F4: readiness ignored reviewers + span → readiness = compile's own gates via `_assess_examples` (L19 red at 376d520). |
+| F5 | battery | finding (major) → fixed | L2 full-ledger purity per refusal, L3 real stale builds, L5 ledger-free under patched System/sqlite3, L7 ordered vector, L8 real A→B→A + historical pin, V1 invalid program; `.agent/decisions/m4u2-mutants.py` 15 killed + V4 ruled EQUIVALENT (V1 ≥ 1 layout ∧ V2 every layout witnessed ⇒ V4). |
+| F6 / R2-F6 | battery | finding (minor) → fixed | expected outputs derived from the confirmed example or fixture bytes, none retyped. |
+| C1-C4 | cleanup | finding → fixed | one program loader; one verification projects each raw input once (L14); exact-mode counts in SQL; memo bounded — re-review R2-C2: a full memo cleared mid-verification → least-recently-used eviction (L20 red at b1b865b). |
+| ALT3 | altitude | finding (minor) → fixed | exact-mode reviewer count back in SQL. |
+| ALT4 | altitude | ruled KEEP | `System.projection` + `projection show` = contract amendment A7 (the skill's resume rule reads them). |
+| stack burden | correctness | src defect → fixed | the stack repair found exact-mode compile enumeration materialized every row (rows 39/41); exact mode streams again, a projection alone materializes (cf42b7c). |
+
+Red-first: `tests/test_projection_lifecycle_battery.py` red at 64ffac0 (archive/m4u2-red-base: no `cement_runtime.projection`); L10 at 2acd1a7 (archive/m4u2-impl).
+| comment | cleanup | finding (minor) → fixed | the streaming comment claimed memory bounded by one row; the duplicate check keeps one text per distinct input (general-purpose-5). Comment corrected in the records commit. |
+
+Preservation credit: closure probe `.agent/decisions/m4u2-mutants.py` (15 killed, V4 equivalent); default-operator credit over `system.py` = p93 (cost).
+
+Gate at the squash: `.agent/gate` on `87d011f` rc 0 (clean tree, `heavy`): unittest 909.4 s, Ran 1182, outer skipped none, nested D28 = L30, D28 21 revisions / 2 replayed.
+
 ## M4.1 close (IMPLEMENT, unit) — target `535a0a9` (squash of `archive/m4u1-land`; review read `e448ad2`), records in the next commit
 
 Check set fixed before the diff was read: correctness (reviewer-13: contract §4 + AM1-AM6, 24 rows), cleanup (reviewer-14, 8 rows), altitude (one unnamed reviewer). The `tester` (tester-1) wrote the diff-blind suite + the differential oracle `tests/projection_oracle.py` before MAIN's interpreter was read. Raw tables: `.scratch/review/m4u1/`.

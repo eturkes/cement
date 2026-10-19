@@ -1475,8 +1475,8 @@ class System:
             canonical_inputs[input_hash] = input_text
 
         if program is None:
-            # Exact mode streams one case per canonical input, checked and built as it arrives,
-            # so memory stays bounded by one row however many examples the revision holds.
+            # Exact mode streams one case per canonical input, checked and built as it arrives:
+            # no example rows materialize; the duplicate check keeps one text per distinct input.
             for row in connection.execute(
                 active.format(group="GROUP BY e.input_hash, e.input_json"),
                 (partition, operation, revision),
