@@ -77,9 +77,9 @@ def _parser() -> argparse.ArgumentParser:
     parser = _JSONArgumentParser(
         prog="cement",
         description=(
-            "Supervised proposal capture that compiles confirmed behavior into"
-            " exact deterministic artifacts, then answers inputs from the"
-            " promoted function set"
+            "Retain recorded LLM answers as proposals. A learning pass confirms the"
+            " cases that recur and compiles them into exact deterministic functions."
+            " Cement answers matching inputs from the version that a person switches on"
         ),
     )
     parser.add_argument("--db", default=os.environ.get("CEMENT_DB"), help="SQLite ledger path")
@@ -109,16 +109,16 @@ def _parser() -> argparse.ArgumentParser:
     # administers the function object, and this one answers from it.
     resolve = commands.add_parser(
         "resolve",
-        help="verify the promoted function set, then answer one input from it",
+        help="verify the version that the switch selects, then answer one input from it",
         allow_abbrev=False,
     )
     resolve.add_argument("operation")
     resolve.add_argument("--input", required=True, help="JSON text; '-' reads stdin")
     resolve.add_argument(
-        "--expected-function-hash", help="require the promoted set to hash to this digest"
+        "--expected-function-hash", help="require the served version to hash to this digest"
     )
 
-    proposal = commands.add_parser("proposal", help="submit/inspect/review supervised proposals")
+    proposal = commands.add_parser("proposal", help="submit/inspect/review retained proposals")
     proposal_commands = proposal.add_subparsers(dest="proposal_command", required=True)
     proposal_submit = proposal_commands.add_parser("submit", allow_abbrev=False)
     proposal_submit.add_argument("operation")
@@ -186,7 +186,7 @@ def _parser() -> argparse.ArgumentParser:
     example_supersede.add_argument("--reviewer", required=True)
     example_supersede.add_argument("--note", default="")
 
-    artifact = commands.add_parser("artifact", help="inspect/quarantine deterministic builds")
+    artifact = commands.add_parser("artifact", help="inspect/suspend deterministic builds")
     artifact_commands = artifact.add_subparsers(dest="artifact_command", required=True)
     artifact_list = artifact_commands.add_parser("list")
     artifact_list.add_argument("operation")
@@ -210,7 +210,9 @@ def _parser() -> argparse.ArgumentParser:
     report_list.add_argument("--after-sequence", type=int, default=0)
     report_list.add_argument("--limit", type=int, default=100)
 
-    function = commands.add_parser("function", help="inspect the operation's function set")
+    function = commands.add_parser(
+        "function", help="inspect, promote, switch and export the operation's function"
+    )
     function_commands = function.add_subparsers(dest="function_command", required=True)
     function_show = function_commands.add_parser("show")
     function_show.add_argument("operation")

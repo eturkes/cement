@@ -1785,8 +1785,10 @@ class SubmissionBatteryTests(unittest.TestCase):
                 "`propose` invokes the configured source one time",
             ),
             ROOT / "docs/architecture.md": (
-                # M3.6a2 L23 permitted inversion: steps 1-3 no longer describe a lifecycle route.
-                "two methods enter the same pipeline at step 3 alone",
+                # M3.9a names the shared capture transition directly, without a step-number pin.
+                "`system.submit_proposal` and `system.propose` both write one proposal row and one",
+                "`proposal.created` event in one transaction, and they return the new proposal identifier",
+                "neither method resolves an artifact",
                 "a proposal can carry a source id that names the observation it came from",
             ),
             ROOT / "docs/threat-model.md": (

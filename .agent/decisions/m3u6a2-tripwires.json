@@ -23,13 +23,13 @@
       "test": "test_d22b_direction_library_route_every_library_api_locus_is_byt"
     },
     {
-      "lines": 60,
+      "lines": 63,
       "locus": "tests/test_cli_removal_battery.py:2922",
       "scope": "GIT-RANGE",
       "test": "test_d22c_the_opening_text_handle_request_fence_is_protected_and"
     }
   ],
-  "head": "f33aa7b54196186bf44e11a97fee0443f6ae8068",
+  "head": "3c39ac8c1e4a677553333ad62a998c5cbb09cdc7",
   "pins": [
     {
       "lines": 76,
@@ -102,7 +102,7 @@
       ]
     },
     {
-      "lines": 60,
+      "lines": 63,
       "locus": "tests/test_cli_removal_battery.py:2922",
       "scope": "GIT-RANGE",
       "test": "test_d22c_the_opening_text_handle_request_fence_is_protected_and",
@@ -171,7 +171,7 @@
       ]
     },
     {
-      "lines": 30,
+      "lines": 32,
       "locus": "tests/test_submission_battery.py:1779",
       "scope": "WORKING-TREE",
       "test": "test_d34_readme_and_the_three_normative_docs",
@@ -181,7 +181,7 @@
     },
     {
       "lines": 28,
-      "locus": "tests/test_submission_battery.py:2211",
+      "locus": "tests/test_submission_battery.py:2213",
       "scope": "WORKING-TREE",
       "test": "test_d41_readme_and_the_normative_docs_name",
       "vocabulary": [
@@ -196,32 +196,32 @@
       "hit_lines": 4,
       "hits": [
         {
-          "line": 70,
+          "line": 82,
           "tokens": [
             "lease"
           ]
         },
         {
-          "line": 148,
+          "line": 169,
           "tokens": [
             "lease"
           ]
         },
         {
-          "line": 343,
+          "line": 405,
           "tokens": [
             "request"
           ]
         },
         {
-          "line": 360,
+          "line": 422,
           "tokens": [
             "request"
           ]
         }
       ],
       "owner": "M3.6a2",
-      "total_lines": 450
+      "total_lines": 523
     },
     {
       "document": "docs/architecture.md",
@@ -241,14 +241,14 @@
           ]
         },
         {
-          "line": 126,
+          "line": 177,
           "tokens": [
             "lease"
           ]
         }
       ],
       "owner": "M3.6a2",
-      "total_lines": 212
+      "total_lines": 267
     },
     {
       "document": "examples/command_source/README.md",
@@ -271,7 +271,7 @@
       "hit_lines": 0,
       "hits": [],
       "owner": "M3.6a2",
-      "total_lines": 117
+      "total_lines": 134
     },
     {
       "document": "examples/hospital_ocr/README.md",

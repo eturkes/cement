@@ -2970,13 +2970,16 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         # zero `handle` tokens in README, so byte-identity with `36f7890` is unreachable. The
         # baseline half stays load-bearing — it proves the deleted spelling WAS here — and the
         # freeze inverts onto the post-state, keeping the subproperty gate 5 still cannot
-        # reach: the opening fence names the surviving entry points and no CLI invocation.
+        # reach: the opening fence shows capture and resolution, with no CLI invocation.
         self.assertTrue(current)
         self.assertTrue(baseline)
         self.assertIn("handle(request)", baseline[0])
         self.assertNotEqual(current[0], baseline[0])
         self.assertNotRegex(current[0], r"\bhandle\b")
-        self.assertIn("propose / submit_proposal", current[0])
+        self.assertIn("Cement retains the answer as a proposal", current[0])
+        self.assertIn("learning pass (periodic skill)", current[0])
+        self.assertIn("review (learning-pass)", current[0])
+        self.assertIn("switch: off | follow the newest version | pinned to one", current[0])
         self.assertIn("resolve, against the ledger", current[0])
         self.assertNotRegex(current[0], r"\bcement\s+")
 
@@ -3030,6 +3033,13 @@ class RemovalObligationBatteryTests(unittest.TestCase):
             for relative in baseline_surfaces
             for command in _shell_commands(_git_bytes("635a473", relative).decode())
         )
+        # Published commands track the live documentation; only the closed baseline
+        # comes from git. Every extracted live command must reach the parser.
+        published_commands = sum(
+            _cement_argv(command) is not None
+            for relative in baseline_surfaces
+            for command in _shell_commands((ROOT / relative).read_text())
+        )
         added_commands = sum(
             _cement_argv(command) is not None
             for relative in added_surfaces
@@ -3037,8 +3047,9 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         )
         self.assertEqual(len(surfaces), len(baseline_surfaces | added_surfaces))
         self.assertEqual(baseline_commands, 18)
+        self.assertGreaterEqual(published_commands, baseline_commands)
         self.assertGreater(added_commands, 0)
-        self.assertEqual(len(invocations), baseline_commands + added_commands)
+        self.assertEqual(len(invocations), published_commands + added_commands)
         self.assertEqual(failures, [])
         self.assertEqual(removed_routes, [])
         for removed in sorted(REMOVED_LEAVES):
@@ -3191,8 +3202,11 @@ class RemovalObligationBatteryTests(unittest.TestCase):
             if isinstance(action, argparse._SubParsersAction)
         ).choices["proposal"].format_help()
 
-        self.assertRegex(description.lower(), r"\b(?:capture|submit|collect|record|receive)\w*\b")
-        self.assertRegex(description.lower(), r"\bsupervised\b.{0,40}\bproposal\b")
+        self.assertRegex(description.lower(), r"\b(?:capture|submit|collect|record|receive|retain)\w*\b")
+        self.assertIn("retain recorded llm answers as proposals", description.lower())
+        self.assertIn("a learning pass confirms the cases that recur", description.lower())
+        self.assertIn("compiles them into exact deterministic functions", description.lower())
+        self.assertIn("the version that a person switches on", description.lower())
         self.assertRegex(description.lower(), r"\b(?:deterministic|exact)\b")
         self.assertRegex(description.lower(), r"\b(?:answer|resolve)\w*\b")
         self.assertRegex(root_help.lower(), r"\bproposal\b.{0,80}\bsubmit\b")

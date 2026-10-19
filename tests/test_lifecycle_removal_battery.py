@@ -1353,16 +1353,18 @@ class LifecycleRemovalBattery(unittest.TestCase):
         paragraphs = [
             " ".join(paragraph.split())
             for paragraph in re.split(r"\n\s*\n", text)
-            if re.search(r"\bquarantin\w*\b", paragraph, re.IGNORECASE)
         ]
         surviving = [
             paragraph
             for paragraph in paragraphs
-            if re.search(r"\bcounterexample\b", paragraph, re.IGNORECASE)
+            if re.search(r"\bchallenge\b", paragraph, re.IGNORECASE)
             and re.search(r"\brevocation\b", paragraph, re.IGNORECASE)
             and re.search(r"\bintegrity failure\b", paragraph, re.IGNORECASE)
         ]
         self.assertEqual(len(surviving), 1)
+        self.assertIn("challenge suspends the member it contradicts", surviving[0])
+        self.assertIn("a revocation suspends every dependent build", surviving[0])
+        self.assertIn("an integrity failure fails closed", surviving[0])
         self.assertEqual(
             len(re.findall(r"\bambigu\w*\b", text, re.IGNORECASE)),
             0,

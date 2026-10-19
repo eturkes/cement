@@ -2,53 +2,60 @@
 
 ## Contract
 
-Cement is a pure decision-plan router, a local control plane, and a portable function object:
+Cement is a local control plane and a portable function object. It turns retained LLM answers into
+exact deterministic lookups:
 
 1. Canonicalize bounded JSON with `cement-json-v1`. It uses signed 64-bit integers and string decimal
    quantities, so binary-float rounding cannot widen an exact scope.
-2. Resolve only one integrity-valid promoted artifact whose partition, operation revision, and exact
-   canonical input all match.
-3. Otherwise store one pending proposal. `System.submit_proposal` takes the candidate from the
-   caller. `System.propose` calls the configured candidate source outside the SQLite transaction.
-   Both routes send the pending proposal to review.
-4. A separate review action accepts, corrects, or rejects the candidate. Accept/correct creates an
-   immutable replay fixture; reject remains audit evidence only. Review returns a `ReviewResult`,
-   which names the proposal, the decision, the created example, and the confirmed output. It carries
-   no request identifier, and neither does any proposal read or report value. The event payload of a
-   proposal or a review action also carries no request identifier.
-5. A scheduled compiler groups active fixtures by exact scope. It requires the operation's configured
-   support, distinct-reviewer, time-span, and zero-conflict gates.
-6. The compiler emits `cement-exact-lookup-v1`, a capability-free JSON document with only `exact` and
+2. Retain each answer as one pending proposal. `System.submit_proposal` takes the candidate from the
+   caller. `System.propose` calls the configured candidate source outside the SQLite transaction. A
+   proposal can carry a source id that names the observation it came from. Cement refuses a second
+   proposal with the same source id for the same partition and operation.
+3. The learning pass reviews each proposal: it accepts, corrects, or rejects the candidate. Accept and
+   correct create an immutable example; reject remains audit evidence only. Review returns a
+   `ReviewResult`, which names the proposal, the decision, the created example, and the confirmed
+   output. It carries no request identifier, and neither does any proposal read or report value.
+   The event payload of a proposal or a review action also carries no request identifier. The
+   learning pass runs as an operator skill (`skills/cement-learn/`) and records its
+   reviews as the reviewer `learning-pass`. Cement records the reviewer name that it receives and
+   decides nothing from it.
+4. Later confirmations can change the answer of a case. `supersede_examples` replaces earlier
+   examples with a re-merged output, one new example for each old one, so one observation still earns
+   one support credit. `revoke_example` withdraws an example that is wrong.
+5. An optional projection program maps a raw input to the exact key of its case. The learning pass
+   writes it; Cement verifies it before it stores it (see Projection below).
+6. A scheduled compiler groups active examples by exact key: the canonical input, or the projected
+   key under a program. It requires the operation's support, distinct-reviewer, time-span, and
+   zero-conflict gates. The defaults are 2 confirmations, 1 reviewer, and 0 seconds.
+7. The compiler emits `cement-exact-lookup-v1`, a capability-free JSON document with only `exact` and
    `return` operations.
-7. Verification binds artifact, policy, runtime/canonicalizer ABI, and the complete evidence snapshot.
-   It replays the finite scope and negative boundaries into a sealed, content-addressed test set.
-   `verify_drafts` verifies every current-build draft of one operation in one locked write transaction.
-   It reports superseded rows as benign skips.
-8. Promotion explicitly repeats the tested scope hash and rechecks every binding in one immediate
-   transaction. Its activation receipt binds the artifact, policy, evidence, report outcome, and exact
-   test-set digest. Only then can runtime dispatch use the artifact.
-
-Steps 9 to 11 aggregate the promoted artifacts of one operation into a single portable object. Check
-six binds the persisted receipt. A first nonempty set must therefore complete step 9 before step 10
-can pass:
-
+8. Verification binds artifact, policy, runtime/canonicalizer ABI, program hash, and the complete
+   evidence snapshot. It replays the finite scope and negative boundaries into a sealed,
+   content-addressed test set. `verify_drafts` verifies every current-build draft of one operation in
+   one locked write transaction. It reports superseded rows as benign skips.
 9. `inspect_function_promotion` projects the prospective union of retained members and verified
-   candidates. It returns the prospective function hash. `promote_function` repeats that hash under a
-   write lock. It then retires predecessors, activates candidates, and writes one immutable receipt
-   plus ordered memberships in one transaction. Set promotion retains established entries during
-   growth. It also permits a zero-candidate checkpoint over a nonempty retained set.
+   candidates and returns the prospective function hash. `promote_function` repeats that hash under a
+   write lock. It retires predecessors, activates candidates, and writes one immutable receipt plus
+   ordered memberships in one transaction. A receipt is a version of the function.
 10. `verify_function` returns seven ordered checks over one read snapshot of the complete promoted set:
     `duplicate-input-digests`, `abi-canonicalizer-uniform`, `sealed-passing-reports`,
     `current-promotion-receipts`, `function-hash-matches-snapshot`, `persisted-function-receipt`, and
-    `projection-uniform` (every member carries the set's one projection program, or none).
-    The call is read-only. A caller can supply an expected function hash. That hash
-    detects set growth or drift. An empty promoted set passes vacuously and builds a real empty
+    `projection-uniform`. The call is read-only. A caller can supply an expected function hash. That
+    hash detects set growth or drift. An empty promoted set passes vacuously and builds a real empty
     function.
-11. The set projects to `cement-function-v2`, a capability-free JSON document. Each entry carries the
-    exact canonical input and output plus the artifact, evidence, report, and `entry_seal` governance
-    digests. `evaluate` resolves an exported document without a ledger, an adapter, or an LLM.
+11. The set projects to `cement-function-v3`, a capability-free JSON document. Each entry carries the
+    exact key and output plus the artifact, evidence, report, and `entry_seal` governance digests. The
+    document also carries the projection program and its hash, or `null` for exact mode. `evaluate`
+    applies the program, then looks the key up, without a ledger, an adapter, or an LLM. A
+    `cement-function-v2` document still parses and evaluates.
+12. A person switches the function of each operation `off`, to `follow` the newest version, or
+    `pinned` to one version. A new operation starts `off`. `resolve` and `function export` serve the
+    version that the switch selects. This switch is the only human gate.
 
-Entry order is normalized by input hash, so equal content always produces equal bytes and one equal
+Steps 9 and 10 depend on each other: check six binds the persisted receipt, so a first nonempty set
+must complete step 9 before step 10 can pass.
+
+Entry order is normalized by key hash, so equal content always produces equal bytes and one equal
 `function_hash`. The embedded hash proves normalized self-consistency. Only an independently obtained
 expected hash binds caller-held identity. Neither mode proves origin or supplies a signature.
 
@@ -59,41 +66,85 @@ promoter and the promotion time, so those values never change the `function_hash
 The function format is bounded at 64 MiB, 50,000 entries, one million items, and depth 67. Per-value
 limits of 1 MiB, 100,000 items, and depth 64 still apply, so a rich set can fail before 50,000 entries.
 
-Two methods enter the same pipeline at step 3
-alone. `System.submit_proposal` stores a caller-supplied candidate. `System.propose` validates its
-inputs and reads the operation first. If those checks pass, it calls the configured candidate source
-one time, outside every transaction that the call holds, and stores the result. Both methods
-write one proposal row and one `proposal.created` event in one transaction. They return the new
-proposal identifier. Neither method resolves an artifact, and neither one reserves anything
-before it writes. Review at step 4 receives their proposals unchanged. A proposal can carry a
-source id that names the observation it came from. Cement refuses a second proposal with the
-same source id for the same partition and operation.
+### Contrary evidence
 
-Two CLI channels reach these seams directly. `cement proposal submit OPERATION --submission VALUE`
-calls `System.submit_proposal`. An operator enters the pipeline at step 3 with a candidate that the
-operator already holds. The leaf never runs a candidate source. `--submission` carries `input`,
-`output`, an optional `provenance` and an optional `source_id` in one JSON object, because
-separate flags cannot carry three maximum-size fields through one argument list. Without a source
-id, the command inherits the method's non-idempotency: two identical submissions write two
-proposals.
+A new confirmation that gives a promoted case a different output is a revision, not corruption. Review
+records an `artifact.contradicted` event and changes no artifact status. The live set then fails
+verification, so `follow` answers nothing for that operation until a promotion replaces the
+contradicted member. The promotion plan refuses (status 4) while a contradicted member has no verified
+replacement, and it names the remedies: supersede, revoke, or suspend. A pinned version keeps
+answering, because the switch pins what the person chose. `challenge` is an explicit judgment: it
+records a counterexample and suspends the member that it contradicts. A pinned version stops
+answering when a challenge, a revocation, or a suspension reaches one of its members.
 
-`cement resolve OPERATION --input VALUE` calls `System.resolve`, which runs `verify_function` and then
-evaluates the verified document under that one snapshot. The leaf writes nothing and opens one read
-transaction. It prints eight fixed keys in every state. `switch` names the mode that selected the
-version: an `off` switch verifies and answers nothing. `matched` carries the distinction that the
-shared status 6 cannot. `false` is a verified absence inside a verified set. `null` is a failed
-verdict that answers nothing. A caller must not collapse the two.
+### Projection
 
-The LLM proposes instance behavior. It never chooses scope, confirms examples, runs verification, or
-activates artifacts.
+A projection program (`cement-projection-v1`) is a closed, line-oriented recognizer. It matches a raw
+text field against named layouts. A layout is a title line, then labels and section headings. A match
+returns the case key: the layout and its field names, plus the value of each field that the program
+names in `keep`. The key holds no value from the text itself. An input that no layout recognizes is a miss,
+and the LLM answers it. The interpreter is pure, total, and linear in its input: it runs no
+regular expression on input and evaluates nothing.
+
+`projection test` previews a program over the current revision and writes nothing. `projection set`
+stores it in one write transaction after four checks:
+
+- V1: the program parses.
+- V2: an active example witnesses every layout.
+- V3: no key groups examples with different outputs.
+- V4: at least one active example projects.
+
+Setting a new program retires the drafts and verified builds of the old one
+(`projection superseded`). Promoted versions keep their own program, so a new program never
+reinterprets an existing version.
+
+Under a program, verification also replays every supporting raw input through the program to its key.
+It then deletes the last structural line of each one and shows that the edited input leaves the case.
+Set promotion keeps one program per version: members built under another program retire
+(`projection-superseded`). Per-artifact promotion is refused under a program (status 4).
+
+Cement verifies the grammar and the consistency of a program, never its semantic correctness. The
+learning pass decides that the answers of an operation depend on structure alone, and its report
+states that assumption.
+
+### Entry points
+
+`System.submit_proposal` and `System.propose` both write one proposal row and one
+`proposal.created` event in one transaction, and they return the new proposal identifier. Neither
+method resolves an artifact. `System.propose` validates its inputs and reads the operation first. If
+those checks pass, it calls the configured candidate source one time, outside every transaction that
+the call holds.
+
+`cement proposal submit OPERATION --submission VALUE` calls `System.submit_proposal`. The leaf never
+runs a candidate source. `--submission` carries `input`, `output`, an optional `provenance` and an
+optional `source_id` in one JSON object, because separate flags cannot carry three maximum-size fields
+through one argument list. Without a source id, the command inherits the method's non-idempotency: two
+identical submissions write two proposals.
+
+`cement resolve OPERATION --input VALUE` calls `System.resolve`. It reads the switch, verifies the
+version that the switch selects, and evaluates that version under the same snapshot.
+The leaf writes nothing and opens one read transaction. It prints eight fixed keys in every state. `switch` names the
+mode that selected the version: an `off` switch verifies and answers nothing. `matched` carries the
+distinction that the shared status 6 cannot. `false` is a verified absence inside a verified set.
+`null` is a failed verdict that answers nothing. A caller must not collapse the two.
+
+`cement learn cases OPERATION` is the learning pass's read surface. It groups pending proposals and
+active examples by case key, under the stored program or a candidate one (`--program`), and it lists
+unfinished publication work.
+
+The LLM proposes instance behavior. It never chooses scope or activates artifacts. The learning pass
+confirms examples, writes the program, compiles, verifies, and promotes. A person decides alone what
+production serves.
 
 ## Isolation and revisioning
 
 Scope identity is:
 
 ```text
-(partition, operation, operation_revision, canonical_input)
+(partition, operation, operation_revision, case_key)
 ```
+
+The case key is the canonical input in exact mode, or the projected key under a projection program.
 
 `partition` is mandatory to prevent accidental cross-tenant/workflow learning. Every explicit
 operation revision retires prior builds, including a revision that keeps the same numeric thresholds.
@@ -121,7 +172,7 @@ confirmations span the configured observation interval without conflicting final
 verifiable when the exact finite match set replays against all active fixtures and fixed boundary
 tests. Those three definitions apply to one entry. The promoted set adds one more gate. A passing
 `verify_function` result binds the complete current snapshot to all seven ordered checks. It also binds
-that snapshot to the latest current-revision receipt.
+that snapshot to the latest current-revision receipt, and every member to one program.
 
 Every verification result and every report is one committed read snapshot. It is not a lease, a
 signature, a semantic replay, or a statement about future state. The live ledger can later revise,
@@ -138,10 +189,11 @@ internal binding. It validates the content of only the members that it returns. 
 `reconstruct_function_receipt` to validate every member.
 
 These are operational gates, not proof that supervisors were correct. Exact matching makes the coverage
-claim honest: the artifact's match set contains one canonical value. The function object aggregates
-exact entries without widening any entry, so it proves no coverage outside its enumerated inputs.
-Broader predicates require a future domain contract with schemas, a trusted oracle/properties,
-exhaustive finite coverage, or formal proof.
+claim honest: the artifact's match set contains one case key. The function object aggregates exact
+entries without widening any entry. A projection program alone widens what one entry covers: every
+raw input that the program maps to the key. Verification samples that set with every confirmed raw
+input and one structural probe for each. It never proves the set complete. Broader predicates require a domain
+contract with schemas, a trusted oracle or properties, exhaustive finite coverage, or formal proof.
 
 ## Storage and transactions
 
@@ -163,13 +215,15 @@ without re-hashing test rows. It still scans active scope evidence for late conf
 so its safety-check cost grows with the artifact's support. Report inspection can re-hash the
 child set.
 
-Schema version 2 adds the function layer: the `function_receipts` and `function_memberships` tables,
-three indexes, and five triggers. A receipt is self-bound and stores the candidate and retired ID sets
+Schema version 3 holds the function layer: the `function_receipts` and `function_memberships` tables,
+their indexes, and their triggers. A receipt is self-bound and stores the candidate and retired ID sets
 as counts and digests. A membership row names its receipt, its ordinal, its artifact, and its report.
 Triggers reject every update and delete on both tables. A further trigger rejects a membership insert
 once the receipt row exists, so promotion must write the whole membership set before its receipt. A
 deferred composite foreign key binds each membership to its receipt and to exactly that receipt's
-`function_hash`. Initialization rejects a version-1 ledger; this release ships no migration runner.
+`function_hash`. Version 3 also stores proposals with their scope and source id, the supersession
+links between examples, the projection programs and settings, and the switch settings, each append-only.
+Initialization rejects a version-2 ledger and names the reset; this release ships no migration runner.
 
 Set promotion emits one `function.promoted` event with bounded ID projections. The membership table
 stays authoritative for the exact member list. `latest_function_receipt` returns the current-revision
@@ -194,8 +248,9 @@ channel that the database file does not protect.
 The runtime uses Python 3.11+ and the standard library alone. It imports no test framework and no
 third-party package. Examples of that use are `sqlite3` for the store and `json` for canonical
 encoding. Others are `hashlib` for content addressing and `unicodedata` for control-character
-validation. The command adapter uses `subprocess` and `signal`. This exact-lookup envelope needs no
-expression engine or provider SDK. A generalized language would enlarge the trusted computing base
+validation. The core imports neither `subprocess` nor `signal`: the optional command candidate source
+in `examples/command_source/` uses them. This exact-lookup envelope needs no expression engine or
+provider SDK; the projection interpreter is a closed recognizer, not an expression language. A generalized language would enlarge the trusted computing base
 without expanding the honestly tested scope.
 [Python's SQLite interface](https://docs.python.org/3/library/sqlite3.html) supplies the embedded
 serverless store; startup checks the distributor SQLite for STRICT-table support.

@@ -1,60 +1,72 @@
 # Cement
 
-Cement turns repeatedly supervised LLM answers into narrowly scoped deterministic behavior.
-The goal is to aggregate repeated work into a regular, if large, function that covers many situations
-and edge cases. That goal would be difficult to reach without LLMs. Once built and verified, the
-function is deterministic.
+Cement turns repeated LLM work into narrowly scoped deterministic functions. In a chat deployment
+such as Open WebUI, people ask for one kind of task many times with small variations: an OCR
+extraction from different documents, for example. The LLM answers each one, often with a small
+script, and Cement retains each input and answer. Periodically, an LLM-driven learning pass reads
+the retained answers, finds the tasks that recur, and merges their scripts into one deterministic
+function. The function covers every case that it has seen, and each case stays exact. The function
+grows as new variations appear.
 
-The safety boundary is intentionally small: Cement compiles only exact lookups. A promoted artifact
-matches one canonical JSON input inside one partition and one operation revision. This finite scope is
-fully replayable. Repetition does not justify a broader rule, and Cement makes no claim that repeated
-approval proves domain correctness.
+A person can read the function and decides whether to switch it on or off in production. While it
+is on, the function answers matching inputs instead of the LLM, so those results stop depending on
+probabilistic processing. Every other input still goes to the LLM. Learning never widens a case
+beyond the inputs that it has seen. Where inputs share one structure (one form layout, for
+example) but differ in their values, a verified projection maps each new input to the key of its
+case. The LLM answers an input that the projection does not recognize.
 
 ```text
-propose / submit_proposal → LLM candidate, hidden from the consumer
-                       ├─ reject → audit only
-                       └─ accept/correct → immutable example
-                                              ↓ periodic compile
-                                         draft artifact
-                                              ↓ replay + boundary tests
-                                         verified artifact
-                                              ↓ explicit scope-hash promotion
-                                         promoted exact match
-                                              ↓ set verification + set promotion
-                                    one function: every promoted match
-                                         ├─ resolve, against the ledger
-                                         │    ├─ exact match → resolved JSON plan
-                                         │    └─ no exact match → verified absence
-                                         └─ export → portable bundle
-                                              ↓ evaluate, with no ledger
-                                              ├─ exact match → resolved JSON plan
-                                              └─ no exact match → inert miss
+chat input ───┬─ switched-on function covers it → the function answers (deterministic)
+              └─ no coverage → the LLM answers → Cement retains the answer as a proposal
+                                                        ↓ learning pass (periodic skill)
+                                    review (learning-pass) · projection program · compile
+                                                        ↓ replay + boundary tests
+                                    verified artifacts → set promotion → a new version
+                                                        ↓ a person
+                                    switch: off | follow the newest version | pinned to one
+resolve, against the ledger → the selected version answers, or a verified miss
+export → portable bundle → function eval, with no ledger → the same answer, or an inert miss
 ```
+
+The safety boundary is small on purpose. Cement compiles exact lookups only. A promoted entry
+matches one case key inside one partition and one operation revision: the canonical JSON input, or
+the key that a verified projection gives it. This finite scope is fully replayable. Repetition does
+not justify a broader rule, and Cement makes no claim that repeated confirmation proves domain
+correctness.
 
 ## Guarantees
 
-- LLM output is inert until an explicit supervisor accepts or corrects it.
+- LLM output is inert until the learning pass accepts or corrects it, and a function answers only
+  after a person switches it on.
 - A proposal-creating call returns a proposal ID, never the proposed output. Review uses a
   separate surface.
 - Confirmed examples bind partition, operation revision, canonical input, final output, reviewer,
   resolution, time, and receipt digest.
 - Compilation is deterministic and model-free. Conflicts block builds; no majority vote hides them.
 - Verification replays every active example in the exact scope plus partition, operation, revision,
-  and input boundary probes. Set verification adds seven ordered checks over the complete promoted set.
+  and input boundary probes. Under a projection program it also replays each raw input to its key and
+  shows that a structural edit leaves the case. Set verification adds seven ordered checks over the
+  complete promoted set.
 - Promotion names the verified scope hash and atomically rechecks operation policy, artifact content,
   the complete evidence snapshot, and the sealed verification test set. Its receipt binds all of
   those values; retirement and suspension are one-way states. Set promotion repeats one function hash,
   retires predecessors, activates candidates, and writes one immutable receipt plus ordered
   memberships in the same transaction.
-- A counterexample, an evidence revocation, or a runtime integrity failure quarantines the affected
-  artifacts.
+- A new confirmation that contradicts a promoted case is a revision: the live set fails verification
+  and answers nothing until a promotion replaces that case. A challenge suspends the contradicted
+  artifact; an evidence revocation suspends every dependent build. A pinned version stops answering
+  when one of its members is challenged, revoked, or suspended.
+- The switch of each operation selects what production serves: `off` (the default for a new
+  operation), `follow` the newest version, or `pinned` to one version. Only a person sets it.
 - A configured candidate source runs outside every Cement transaction. `System.propose` invokes it
   one time for each call, and Cement never retries it.
 
 The promoted artifacts of one operation aggregate into a single portable object:
 
-- `cement-function-v2` is a capability-free JSON document. It gives the opening sentence a concrete
-  referent: the whole promoted set is one function, not one entry.
+- `cement-function-v3` is a capability-free JSON document. It gives the opening sentence a concrete
+  referent: the whole promoted set is one function, not one entry. It carries the projection program
+  of its version, so it answers raw inputs exactly as `resolve` does. A `cement-function-v2` bundle
+  still evaluates.
 - Entry order is normalized by input hash, so equal content produces equal bytes and one equal
   `function_hash`. The embedded hash proves normalized self-consistency. An independently obtained
   expected hash also pins caller-held identity. Neither mode proves origin or supplies a signature.
@@ -79,12 +91,12 @@ Requirements: Python 3.11+ with SQLite 3.37+ and `uv` for the development workfl
 
 ```bash
 uv sync
-uv run cement --db demo.db --partition acme operation register support.reply \
-  --min-confirmations 2 --min-reviewers 1 --min-span-seconds 0
+uv run cement --db demo.db --partition acme operation register support.reply
 ```
 
-The relaxed thresholds above are for a local demonstration. Defaults require three confirmations,
-two recorded reviewers, and a seven-day observation span.
+The default policy needs two confirmations of a case from at least one reviewer, with no minimum
+observation span. The learning pass is the reviewer, and the person who switches the function on is
+the gate. Pass `--min-confirmations`, `--min-reviewers`, or `--min-span-seconds` to require more.
 
 Generate a candidate with your own model or tooling. Then submit it. Cement stores it as one
 pending proposal.
@@ -95,36 +107,45 @@ uv run cement --db demo.db --partition acme proposal submit support.reply \
                  "output":{"kind":"reply","text":"Your invoice is in the billing portal."}}'
 ```
 
-The command returns a proposal ID and nothing else. Only the review surface reveals the candidate:
+The command returns a proposal ID and nothing else. Only the review surface reveals the candidate.
+The learning pass reviews each proposal. To review by hand as the learning pass does, run:
 
 ```bash
 uv run cement --db demo.db --partition acme proposal list
 uv run cement --db demo.db --partition acme proposal show prop_REPLACE_ME
 uv run cement --db demo.db --partition acme proposal review prop_REPLACE_ME \
-  --reviewer operator-1 --decision accept
+  --reviewer learning-pass --decision accept
 ```
 
-Repeat the submit and review steps until the confirmations satisfy the operation policy. Then run
-the independently gated lifecycle:
+Repeat the submit and review steps until the confirmations satisfy the operation policy. Then the
+learning pass compiles, verifies, and promotes a new version:
 
 ```bash
 uv run cement --db demo.db --partition acme compile support.reply
 uv run cement --db demo.db --partition acme function verify-drafts support.reply \
-  --actor release-manager
+  --actor learning-pass
 uv run cement --db demo.db --partition acme function inspect support.reply
 uv run cement --db demo.db --partition acme function promote support.reply \
-  --expected-function-hash HASH_FROM_INSPECT --actor release-manager
+  --expected-function-hash HASH_FROM_INSPECT --actor learning-pass
+```
+
+The new version answers nothing yet. A person reads it and switches it on:
+
+```bash
+uv run cement --db demo.db --partition acme function show support.reply
+uv run cement --db demo.db --partition acme function switch support.reply \
+  --mode follow --actor ops-lead
 ```
 
 `function verify-drafts` verifies every current-build draft of the operation in one locked transaction.
 `function inspect` then previews the retained members, the verified candidates, the replacements, and
 the skipped rows. It returns the prospective function hash that `function promote` must repeat.
 Promotion fails if the set drifts after the preview. The per-artifact `verify` and `promote` commands
-remain available for one artifact at a time. Per-artifact promotion leaves the sixth set check failing
-until you promote a set checkpoint. A live export then exits 6.
+remain available for one artifact at a time in exact mode. Per-artifact promotion leaves the sixth
+set check failing until you promote a set checkpoint. A live export then exits 6.
 
-Run `compile` periodically with a scheduler of your choice. It creates drafts and never verifies or
-promotes them automatically.
+`compile` creates drafts and never verifies or promotes them. In production, the learning pass runs
+these commands: see [The learning pass](#the-learning-pass).
 
 ### The function group
 
@@ -171,8 +192,9 @@ a superseded operation revision.
 
 ### Answering one input from the ledger
 
-`cement resolve` verifies the promoted set and then answers one input from it. Use it where the ledger
-is available. Use `function eval` where it is not.
+`cement resolve` reads the operation's switch, verifies the version that the switch selects, and then
+answers one input from it. Use it where the ledger is available. Use `function eval` where it is not.
+An `off` switch answers nothing.
 
 ```bash
 uv run cement --db demo.db --partition acme resolve support.reply \
@@ -211,10 +233,10 @@ verified absence reports `false`, and a failed verdict reports `null`. An unregi
 status 3. An empty promoted set is not an error: it verifies and reports a verified absence.
 
 One resolve runs the full seven-check verification, so it costs what `function verify` costs. Measured
-end to end through the shipped method, in exact mode before the seventh check existed: 5.7 ms for one entry, 613 ms for 1,000 entries, and 36,452 ms
-with 985,696 KiB peak resident memory at the 50,000-entry maximum
-(`.agent/decisions/m3u2b-resolve-bench.json`). The cost grows with the size of the set, not with the
-size of the input. Cement caches no verification between calls.
+end to end through the shipped method, in exact mode before the seventh check existed: 5.7 ms for
+one entry, 613 ms for 1,000 entries, and 36,452 ms with 985,696 KiB peak resident memory at the
+50,000-entry maximum (`.agent/decisions/m3u2b-resolve-bench.json`). The cost grows with the size of
+the set, not with the size of the input. Cement caches no verification between calls.
 
 ### Submitting a candidate you already hold
 
@@ -256,6 +278,46 @@ uv run cement --db demo.db --partition acme proposal list --status pending
 Review a submitted proposal with the `proposal review` command. Every route that writes a proposal
 shares that one review surface.
 
+### Projection
+
+Some operations receive inputs that share one structure and differ in their values: forms of one
+layout with different patients, for example. Exact keys would never repeat there. A projection program
+(`cement-projection-v1`) maps each raw input to the key of its case: the layout and its field names.
+The learning pass writes the program. Cement verifies it before it stores it:
+
+```bash
+uv run cement --db demo.db --partition acme projection test support.reply --program - < program.json
+uv run cement --db demo.db --partition acme projection set support.reply --program - \
+  --actor learning-pass < program.json
+uv run cement --db demo.db --partition acme projection show support.reply
+```
+
+`projection test` previews the program and writes nothing. `projection set` refuses a program that
+fails to parse, a layout that no confirmed example shows, a key that would merge different outputs,
+and a program that no confirmed example matches. A new program retires the drafts and verified
+builds of the old one.
+Promoted versions keep their own program. An input that no layout recognizes is a miss, and the LLM
+answers it. Cement verifies the program's grammar and consistency, not its semantic correctness: the
+learning pass decides that an operation's answers depend on the structure alone.
+
+### The learning pass
+
+The learning pass is an agent skill in `skills/cement-learn/`. An operator runs it periodically
+with an agent that loads Agent Skills. It reads the retained answers, merges the scripts of each
+recurring case into one output, reviews each proposal as `learning-pass`, writes or extends the
+projection program, compiles, verifies, and promotes. It never switches a function on.
+
+Its read surface groups pending proposals and active examples by case key:
+
+```bash
+uv run cement --db demo.db --partition acme learn cases support.reply
+uv run cement --db demo.db --partition acme learn cases support.reply --program - < program.json
+```
+
+Two commands change earlier confirmations. `example supersede` replaces earlier examples with a
+re-merged output that extends them. `example revoke` withdraws an example that is wrong, and it also
+stops every version built on that example from answering.
+
 ## Library API
 
 ```python
@@ -272,7 +334,7 @@ class ProviderAdapter:
 
 
 system = System("cement.db", candidate_source=ProviderAdapter())
-system.register_operation("tenant-42", "support.reply", policy=CompilePolicy())
+system.register_operation("tenant-42", "support.reply", policy=CompilePolicy())  # 2 / 1 / 0 s
 
 proposal_id = system.propose(
     "tenant-42",
@@ -359,15 +421,16 @@ for a missing key.
 `System.get_proposal`, `System.proposal`, `System.proposals`, and `function_report` also expose no
 request identifier. Use `proposal_id` to name a proposal on every surface.
 
-## Request outcomes
+## Outcomes
 
 Two routes answer a caller. `resolve` reads the ledger, and `function eval` reads an exported
 bundle. Each route reports an exact match, a verified absence, or a failed verdict, and neither route
-writes. The supervised route reports its own outcome through `proposal show` and `System.review`,
-which both return `accepted`, `corrected`, or `rejected`.
+writes. `resolve` also reports an `off` switch, which answers nothing. Review reports its own outcome
+through `proposal show` and `System.review`, which both return `accepted`, `corrected`, or `rejected`.
 
-A quarantined artifact stops answering. A later operation revision retires the older builds, and
-Cement then allows only rejection for a pending proposal from that older revision.
+A suspended artifact stops answering, and a contradicted one makes the live set fail verification
+until a promotion replaces it. A later operation revision retires the older builds, and Cement then
+allows only rejection for a pending proposal from that older revision.
 
 `cement-json-v1` accepts null, booleans, strings, signed 64-bit integers, arrays, and string-keyed
 objects. It rejects decimal and exponent numbers. Encode domain decimals as strings with a documented
@@ -409,19 +472,29 @@ full state model and trust boundaries.
 
 ## Examples
 
-[Hospital OCR layout-learning](examples/hospital_ocr/README.md) - offline walkthrough of supervised
-per-layout extraction plans becoming deterministic reuse. It ends by sealing the promoted layouts into
-one function, deleting the ledger, and answering a document from the exported bundle alone.
+- [Hospital OCR](examples/hospital_ocr/README.md): an offline walkthrough. Raw documents of three
+  form layouts become proposals, a scripted learning pass learns a projection and promotes a version,
+  a person switches it on, a later pass adds a case, and a pin rolls back to the first version. It
+  ends by exporting the version and answering a document from the bundle alone.
+- [Open WebUI](examples/open_webui/README.md): Cement as a tool that the chat model calls, plus a
+  filter that retains the model's answers for the learning pass.
+- [Command candidate source](examples/command_source/README.md): an optional source that runs a
+  trusted adapter executable for one candidate.
 
 ## Development
 
 ```bash
-uv run python -m unittest discover -s tests -t .
-uv build
+uv sync
+.agent/gate
 ```
 
-The project has no runtime package dependencies. It uses `uv_build` only to produce the wheel and
-source distribution.
+`.agent/gate` runs every check in order: format, lint, and type check (`ruff`, `mypy`), the dependency
+audit (`uv audit`), the secret scan (`gitleaks`), the skip census, the prose register audit, the test
+suite, the package build, and the spec check. It prints each step's exit status and time, and it exits
+0 only when every step passes. CI runs the same command.
+
+The runtime has no package dependencies. The development tools come from `uv sync`, and `uv_build`
+produces the wheel and the source distribution.
 
 ## Deployment boundary
 

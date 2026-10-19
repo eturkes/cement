@@ -4,8 +4,9 @@
 
 - The host, Python/SQLite runtime, database file permissions, Cement interpreter, and the deployment's
   external access control. Cement enforces no permission of its own.
-- Supervisors and release managers only within the context represented by their partition. The CLI
-  records identity strings but does not authenticate them.
+- The operator who runs the learning pass and the person who sets the switch, each only within the
+  context represented by their partition. The CLI records identity strings but does not authenticate
+  them.
 - The provider adapter process as a credential-bearing transport. Its model output remains untrusted.
 - For offline evaluation, the host runtime and the channel that delivers an independently held function
   hash. That path opens no database and starts no adapter.
@@ -13,7 +14,12 @@
 ## Untrusted
 
 - Request JSON, including prompt injection.
-- LLM candidate output and self-reported provenance.
+- LLM candidate output and self-reported provenance. A retained answer is evidence for the learning
+  pass, never an instruction: a chat integration can deliver fabricated tool calls (the Open WebUI
+  example states how).
+- The learning pass's judgment. It is an LLM run: its reviews, merges, and projection programs can be
+  wrong. Cement verifies a program's grammar and consistency, never its semantic correctness, and the
+  switch keeps a person between every learned version and production.
 - Stored input/output content when rendered by another system.
 - Frequency by itself, reviewer labels without deployment authentication, and any inferred scope.
 - Exported bundle files, including the hash embedded in them. The parser validates every bundle as
@@ -24,12 +30,18 @@
 - Strict bounded JSON; duplicate keys, decimal/non-finite numbers, non-string keys, deep/large
   containers, and signed-64-bit overflow fail closed. Decimal quantities use application-defined
   strings. Cement preserves Unicode without case folding or normalization.
-- Partition, operation revision, and byte-stable canonical equality control scope. Unknown or
-  near-match input falls back. Offline function evaluation has no fallback path: an unknown input
-  returns an inert miss.
+- Partition, operation revision, and byte-stable canonical equality of the case key control scope.
+  Unknown or near-match input falls back. Offline function evaluation has no fallback path: an
+  unknown input returns an inert miss.
+- A projection program is a closed recognizer, not code: no regular expression runs on input, no
+  expression is evaluated, and the work is linear in the input. A program is stored only after it
+  parses, after an active example witnesses every layout, after no key merges different outputs, and
+  after at least one example projects. An input that no layout recognizes is a miss.
+- A switched-off operation answers nothing. Only `function switch` changes the switch, and every
+  change writes one row and one event.
 - Artifacts and function bundles are inert data: no code, templates, loops, filesystem, process,
   network, environment, clock, randomness, or external effects.
-- The `cement-function-v2` format is bounded at 64 MiB, 50,000 entries, one million items, and depth
+- The `cement-function-v3` format is bounded at 64 MiB, 50,000 entries, one million items, and depth
   67. Per-value limits of 1 MiB, 100,000 items, and depth 64 also apply. The bundle reader accepts one
   strict UTF-8 regular file and enforces the 64 MiB bound independently from the 1 MiB bound on the
   evaluation input.
@@ -58,14 +70,19 @@
   verification and promotion. Whole-set verification adds seven ordered checks, and set promotion repeats
   one prospective function hash under a write lock. The sixth check requires the latest persisted
   receipt to bind the live promoted snapshot. Individually valid artifacts therefore cannot pass as a
-  set without a current checkpoint.
-- A counterexample, a revocation, or an integrity failure quarantines the affected builds.
+  set without a current checkpoint. The seventh check requires one program across the set.
+- A contradicting confirmation fails live verification until a promotion replaces the member. A
+  challenge suspends the member it contradicts, a revocation suspends every dependent build, and an
+  integrity failure fails closed. A pinned version stops answering when one of its members is
+  challenged, revoked, or suspended.
 
 ## Deployment obligations
 
 - Authenticate and authorize every control-plane call. That list covers operation registration and
-  revision, proposal review, compilation, verification, promotion, challenge, revocation, and
-  suspension. It also covers database access and audit access.
+  revision, proposal review, projection setting, compilation, verification, promotion, the switch,
+  challenge, supersession, revocation, and suspension. It also covers database access and audit access.
+- Read a learned version before you switch it on. Pin a version to stop a later learning pass from
+  changing what production serves.
 - Make every permission decision in your own service. Cement records the actor name that you supply.
 - Put every mutable answer dependency into the input, including identity, permissions, locale, policy
   revision, and external-state revision. Exclude behavior with hidden context from compilation.
@@ -107,11 +124,11 @@ This local release excludes:
 - Encryption and key erasure.
 - External signatures. A `function_hash` binds content integrity only.
 - Arbitrary code sandboxing.
-- Generalized-rule synthesis.
+- Generalized-rule synthesis. A projection maps inputs to exact keys; it never synthesizes a rule.
 - Domain schemas and oracles.
 - Active shadow sampling.
 - Quotas across principals.
 - Distributed consensus.
 
-Both exact formats, `cement-exact-lookup-v1` and `cement-function-v2`, leave those gaps visible. They
+The exact formats, `cement-exact-lookup-v1` and `cement-function-v3`, leave those gaps visible. They
 do not imply that Cement solves them.
