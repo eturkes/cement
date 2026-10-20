@@ -577,5 +577,125 @@ class LearningToolBattery(_Example):
         self.assertFalse(pathlib.Path(self.db + ".absent").exists())
 
 
+
+class SwitchActionBattery(_Example):
+    """MAINTAIN W4: the switch = an admin's click through a select + a confirmation, no model."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.module = _load("cement_admin")
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.action = self.module.Action()
+        self.action.valves = self.module.Action.Valves(ledger_path=self.db, partition=P, operations=GUIDE)
+        self.calls: list[dict[str, Any]] = []
+        self.answers: list[object] = []
+
+    async def _event_call(self, event: dict[str, Any]) -> object:
+        self.calls.append(event)
+        return self.answers.pop(0)
+
+    def _click(self, *answers: object, user: object = ADMIN) -> list[dict[str, Any]]:
+        self.answers = list(answers)
+        self.calls = []
+        self.notes = []
+
+        async def emit(event: dict[str, Any]) -> None:
+            self.notes.append(event)
+
+        asyncio.run(
+            self.action.action({"model": "cement-learning"}, __user__=user, __event_call__=self._event_call,
+                               __event_emitter__=emit)
+        )
+        return [call["data"]["options"] for call in self.calls if call["data"].get("type") == "select"]
+
+    def _values(self, options: list[dict[str, str]]) -> list[str]:
+        return [option["value"] for option in options]
+
+    def _version(self, value: object, output: object) -> str:
+        for _ in range(2):
+            proposal = self.system.submit_proposal(P, OP, value, candidate=Candidate(output=output, provenance={}))
+            self.system.review(P, proposal, reviewer="learning-pass", decision="accept")
+        self.system.compile(P, OP)
+        self.system.verify_drafts(P, OP, verified_by="learning-pass")
+        manifest = self.system.inspect_function_promotion(P, OP)
+        self.system.promote_function(P, OP, expected_function_hash=manifest.function_hash, promoted_by="learning-pass")
+        return manifest.function_hash
+
+    def test_w4_a_non_admin_gets_no_dialog_and_nothing_changes(self) -> None:
+        before = self._counts()
+        for user in ({"id": "u-1", "role": "user"}, None):
+            with self.subTest(user=user):
+                self._click("follow|extraction_plan", True, user=user)
+                self.assertEqual(self.calls, [])
+                self.assertEqual(self.notes[-1]["data"]["type"], "error")
+        self.assertEqual(self._counts(), before)
+        self.assertEqual(self.system.switch(P, OP).mode, "off")
+
+    def test_w4_set_up_creates_the_ledger_and_registers_with_the_switch_off(self) -> None:
+        ledger = pathlib.Path(self.db).parent / "cement" / "ledger.db"
+        self.action.valves.ledger_path = str(ledger)
+        (options,) = self._click("register|extraction_plan", True)
+        self.assertEqual(self._values(options), ["register|extraction_plan", "register|billing_codes"])
+        self.assertTrue(ledger.is_file())
+        system = System(str(ledger), create=False)
+        self.assertEqual([op["name"] for op in system.operations(P)], ["extraction_plan"])
+        self.assertEqual((system.switch(P, OP).mode, system.events(P)[0]["payload"]["registered_by"]),
+                         ("off", "open-webui:u-admin"))
+        self.assertEqual(self.notes[-1]["data"]["type"], "success")
+
+    def test_w4_declining_either_dialog_writes_nothing(self) -> None:
+        self._version(NOTE_A, PLAN)
+        before = self._counts()
+        for answers in ((False,), (None,), ("follow|extraction_plan", False), ("follow|extraction_plan", None)):
+            with self.subTest(answers=answers):
+                self._click(*answers)
+                self.assertEqual(self.notes[-1]["data"]["content"], "Nothing changed.")
+        self.assertEqual(self._counts(), before)
+        self.assertEqual(self.system.switch(P, OP).mode, "off")
+
+    def test_w4_a_version_is_switched_on_pinned_and_off_by_the_admin(self) -> None:
+        first = self._version(NOTE_A, PLAN)
+        (options,) = self._click("follow|extraction_plan", True)
+        self.assertEqual(
+            self._values(options),
+            ["follow|extraction_plan", f"pinned|extraction_plan|{first}", "register|billing_codes"],
+        )
+        state = self.system.switch(P, OP)
+        self.assertEqual((state.mode, state.set_by), ("follow", "open-webui:u-admin"))
+        second = self._version(NOTE_B, {"fields": ["patient", "mrn"]})
+        self.assertNotEqual(first, second)
+        (options,) = self._click(f"pinned|extraction_plan|{first}", True)
+        self.assertEqual(
+            self._values(options),
+            ["off|extraction_plan", f"pinned|extraction_plan|{second}", f"pinned|extraction_plan|{first}",
+             "register|billing_codes"],
+        )
+        self.assertEqual((self.system.switch(P, OP).mode, self.system.switch(P, OP).function_hash), ("pinned", first))
+        self.assertEqual(self.system.resolve(P, OP, NOTE_A).match.output, PLAN)
+        (options,) = self._click("off|extraction_plan", True)
+        self.assertIn("follow|extraction_plan", self._values(options))
+        self.assertEqual(self.system.switch(P, OP).mode, "off")
+
+    def test_w4_the_dialog_is_a_select_then_a_confirmation_naming_the_choice(self) -> None:
+        self._version(NOTE_A, PLAN)
+        self._click("follow|extraction_plan", True)
+        select, confirm = self.calls
+        self.assertEqual((select["type"], select["data"]["type"]), ("input", "select"))
+        self.assertIn("extraction_plan: off", select["data"]["message"])
+        self.assertIn("billing_codes: not set up", select["data"]["message"])
+        chosen = next(o["label"] for o in select["data"]["options"] if o["value"] == "follow|extraction_plan")
+        self.assertEqual((confirm["type"], confirm["data"]["message"]), ("confirmation", chosen))
+
+    def test_w4_a_value_the_dialog_did_not_offer_changes_nothing(self) -> None:
+        before = self._counts()
+        for forged in ("follow|extraction_plan", "register|triage_queue", "off|extraction_plan|x", "x"):
+            with self.subTest(forged=forged):
+                self._click(forged, True)
+                self.assertEqual(self.notes[-1]["data"]["content"], "Nothing changed.")
+        self.assertEqual(self._counts(), before)
+
+
 if __name__ == "__main__":
     unittest.main()

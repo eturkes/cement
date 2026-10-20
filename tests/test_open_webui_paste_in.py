@@ -154,9 +154,10 @@ class PasteInBattery(_PasteIn):
         self.assertEqual((proposals[0]["input"], proposals[0]["proposed_output"]), (DOC, PLAN))
 
     def test_w1_files_of_one_digest_share_one_package(self) -> None:
-        tools = self._load(PASTE_IN / "cement_tools.py")
-        retention = self._load(PASTE_IN / "cement_filter.py")
-        self.assertIs(tools.System, retention.System)
+        modules = [self._load(path) for path in sorted(PASTE_IN.glob("*.py"))]
+        self.assertEqual(len(modules), 4)
+        tools = modules[0]
+        self.assertEqual({module.System for module in modules}, {tools.System})
         self.assertEqual(self._packages(), [tools._CEMENT_PACKAGE])
         importers = [finder for finder in sys.meta_path if getattr(finder, "package", None)]
         self.assertEqual([finder.package for finder in importers], [tools._CEMENT_PACKAGE])
