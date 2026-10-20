@@ -344,5 +344,99 @@ class CaptureBindingBattery(FilterBattery):
         self.assertIs(asyncio.run(self.filter.outlet(body, __event_emitter__=broken)), body)
 
 
+
+GUIDE = (
+    "extraction_plan: The user pastes one form and asks what to extract."
+    ' input = {"document": the whole form text}\n'
+    "billing_codes: The user asks for billing codes of one note."
+)
+
+
+class ChatNoteBattery(_Example):
+    """MAINTAIN W2: the operations reach the model through the filter inlet (fixed system prompt)."""
+
+    def _inlet(self, body: dict[str, Any]) -> dict[str, Any]:
+        return asyncio.run(self.filter.inlet(body))
+
+    def test_w2_the_inlet_note_names_each_operation_on_the_last_user_message(self) -> None:
+        self.filter.valves.operations = GUIDE
+        body = {
+            "model": "m",
+            "messages": [
+                {"role": "system", "content": "Deployer prompt."},
+                {"role": "user", "content": "first question"},
+                {"role": "assistant", "content": "first answer"},
+                {"role": "user", "content": "Plan this form:\nPATIENT INTAKE FORM\nName: Bo"},
+            ],
+        }
+        before = json.loads(json.dumps(body))
+        returned = self._inlet(body)
+        self.assertEqual(body, before)
+        self.assertEqual(returned["messages"][:3], before["messages"][:3])
+        content = returned["messages"][3]["content"]
+        self.assertTrue(content.startswith(before["messages"][3]["content"] + "\n\n"))
+        note = content[len(before["messages"][3]["content"]) :]
+        for line in GUIDE.splitlines():
+            self.assertIn(f"- {line}", note)
+        for word in ("use_learned_function", "covered", "record_answer"):
+            self.assertIn(word, note)
+        self.assertEqual(returned["model"], "m")
+
+    def test_w2_the_inlet_leaves_what_it_cannot_annotate_unchanged(self) -> None:
+        self.filter.valves.operations = ""
+        empty = {"messages": [{"role": "user", "content": "x"}]}
+        self.assertEqual(self._inlet(empty), {"messages": [{"role": "user", "content": "x"}]})
+        self.filter.valves.operations = GUIDE
+        parts = {"messages": [{"role": "user", "content": [{"type": "text", "text": "x"}]}]}
+        annotated = self._inlet(parts)["messages"][0]["content"]
+        self.assertEqual(annotated[0], {"type": "text", "text": "x"})
+        self.assertEqual(annotated[1]["type"], "text")
+        self.assertIn("- billing_codes:", annotated[1]["text"])
+        self.assertEqual(len(parts["messages"][0]["content"]), 1)
+        for body in ({"messages": "x"}, {"messages": [{"role": "assistant", "content": "y"}]}, {}):
+            with self.subTest(body=body):
+                self.assertEqual(self._inlet(body), body)
+
+    def test_w2_a_described_operation_is_enabled_and_retained(self) -> None:
+        self.tools.valves.operations = GUIDE
+        self.filter.valves.operations = GUIDE
+        self.assertEqual(self._use()["reason"], "off")
+        miss = {"covered": False, "reason": "off", "instruction": "..."}
+        self._outlet(
+            _call("c1", "use_learned_function", {"operation": OP, "input": DOC}, miss)
+            + _call("c2", "record_answer", {"operation": OP, "input": DOC, "output": PLAN}, {"accepted": True})
+        )
+        self.assertEqual(len(self.system.proposals(P)), 1)
+
+    def test_w2_a_refusal_names_the_enabled_operations(self) -> None:
+        self.tools.valves.operations = GUIDE
+        refused = asyncio.run(self.tools.use_learned_function("extract_plan", DOC))
+        self.assertEqual((refused["covered"], refused["reason"]), (False, "invalid"))
+        self.assertEqual(refused["enabled_operations"], ["extraction_plan", "billing_codes"])
+        self.assertIn("extraction_plan", refused["error"])
+        record = asyncio.run(self.tools.record_answer("extract_plan", DOC, PLAN))
+        self.assertEqual(record["enabled_operations"], ["extraction_plan", "billing_codes"])
+
+    def test_w2_every_source_reads_the_operations_valve_alike(self) -> None:
+        import ast
+
+        bodies = {}
+        for path in sorted((ROOT / "examples/open_webui").glob("cement_*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            found = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "_operations"]
+            self.assertEqual(len(found), 1, path.name)
+            bodies[path.name] = ast.dump(found[0])
+        self.assertGreaterEqual(len(bodies), 2)
+        self.assertEqual(len(set(bodies.values())), 1, sorted(bodies))
+
+    def test_w2_a_covered_result_tells_the_model_to_answer_from_it(self) -> None:
+        self._publish()
+        self.system.set_switch(P, OP, mode="follow", actor="person")
+        answer = self._use()
+        self.assertIs(answer["covered"], True)
+        self.assertIn("output", answer["instruction"])
+        self.assertIn("record_answer", answer["instruction"])
+
+
 if __name__ == "__main__":
     unittest.main()

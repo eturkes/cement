@@ -8924,10 +8924,24 @@ MISS_INSTRUCTION = (
     "No learned function covers this request. Answer it yourself. Then call record_answer with"
     " the same operation and input and the structured output that your answer used."
 )
+HIT_INSTRUCTION = (
+    "A learned function answered this request. Use its output to answer, and do not call"
+    " record_answer for it."
+)
 
 
-def _allowed(operations: str) -> set[str]:
-    return {name.strip() for name in operations.split(",") if name.strip()}
+def _operations(text: str) -> dict[str, str]:
+    """Valve text → operation name → description: `name: description` lines, or names alone."""
+
+    operations: dict[str, str] = {}
+    for line in text.splitlines():
+        if ":" in line:
+            name, description = line.split(":", 1)
+            if name.strip():
+                operations[name.strip()] = description.strip()
+        else:
+            operations.update((name.strip(), "") for name in line.split(",") if name.strip())
+    return operations
 
 
 class Tools:
@@ -8935,15 +8949,24 @@ class Tools:
         ledger_path: str = Field(default="", description="Path of the existing Cement ledger file.")
         partition: str = Field(default="", description="Cement partition of this deployment.")
         operations: str = Field(
-            default="", description="Comma-separated operations that the model can use."
+            default="",
+            description="Operations that the model can use: one per line, `name` or"
+            " `name: description`.",
         )
 
     def __init__(self) -> None:
         self.valves = self.Valves()
 
+    def _enabled(self) -> list[str]:
+        return list(_operations(self.valves.operations))
+
     def _check(self, operation: str, input: Any) -> str | None:
-        if operation not in _allowed(self.valves.operations):
-            return f"operation {operation!r} is not enabled for this deployment"
+        if operation not in self._enabled():
+            enabled = ", ".join(self._enabled()) or "none"
+            return (
+                f"operation {operation!r} is not enabled for this deployment;"
+                f" the enabled operations are: {enabled}"
+            )
         try:
             canonicalize(input)
         except ValidationError as exc:
@@ -8966,6 +8989,7 @@ class Tools:
                 "covered": True,
                 "output": resolution.match.output,
                 "function_hash": verification.function_hash,
+                "instruction": HIT_INSTRUCTION,
             }
         else:
             reason = "unrecognized"
@@ -8982,7 +9006,12 @@ class Tools:
 
         problem = self._check(operation, input)
         if problem is not None:
-            return {"covered": False, "reason": "invalid", "error": problem}
+            return {
+                "covered": False,
+                "reason": "invalid",
+                "error": problem,
+                "enabled_operations": self._enabled(),
+            }
         try:
             return await asyncio.to_thread(self._resolve, operation, input)
         except CementError as exc:
@@ -9012,5 +9041,5 @@ class Tools:
             except ValidationError as exc:
                 problem = f"output is not canonical JSON: {exc}"
         if problem is not None:
-            return {"accepted": False, "error": problem}
+            return {"accepted": False, "error": problem, "enabled_operations": self._enabled()}
         return {"accepted": True}

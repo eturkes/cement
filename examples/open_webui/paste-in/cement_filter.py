@@ -8929,10 +8929,33 @@ log = logging.getLogger(__name__)
 
 USE = "use_learned_function"
 RECORD = "record_answer"
+NOTE_HEAD = "Cement learned functions are available for these operations:"
+NOTE_TAIL = (
+    "For a request that one of these operations covers, first call use_learned_function with"
+    " the operation and the exact input object that its description names. If the result says"
+    " covered, answer from its output. If it says not covered, answer the request yourself, then"
+    " call record_answer with the same operation and input and the structured output that your"
+    " answer used. Answer every other request as usual."
+)
 
 
-def _allowed(operations: str) -> set[str]:
-    return {name.strip() for name in operations.split(",") if name.strip()}
+def _operations(text: str) -> dict[str, str]:
+    """Valve text → operation name → description: `name: description` lines, or names alone."""
+
+    operations: dict[str, str] = {}
+    for line in text.splitlines():
+        if ":" in line:
+            name, description = line.split(":", 1)
+            if name.strip():
+                operations[name.strip()] = description.strip()
+        else:
+            operations.update((name.strip(), "") for name in line.split(",") if name.strip())
+    return operations
+
+
+def _note(operations: dict[str, str]) -> str:
+    lines = [f"- {name}: {text}" if text else f"- {name}" for name, text in operations.items()]
+    return "\n".join([NOTE_HEAD, *lines, NOTE_TAIL])
 
 
 def _named(value: object) -> str | None:
@@ -8997,7 +9020,9 @@ class Filter:
             default="open-webui", description="Names this deployment in each source id."
         )
         operations: str = Field(
-            default="", description="Comma-separated operations whose answers are retained."
+            default="",
+            description="Operations whose answers are retained, one per line: `name: description`."
+            " The description tells the chat model the request and its exact input.",
         )
 
     def __init__(self) -> None:
@@ -9039,7 +9064,7 @@ class Filter:
             call["name"] == RECORD for call in calls.values()
         ):
             return [], ["the chat or its question has no id, so no answer was retained"]
-        allowed = _allowed(self.valves.operations)
+        allowed = set(_operations(self.valves.operations))
         misses: dict[tuple[str, str], str] = {}
         covered: set[tuple[str, str]] = set()
         records: list[tuple[str, dict[str, Any]]] = []
@@ -9144,6 +9169,39 @@ class Filter:
             except CementError as exc:
                 notes.append(f"record_answer call {pair['record_call_id']} was not retained: {exc}")
         return notes
+
+    async def inlet(self, body: dict) -> dict:
+        """The deployer's system prompt stays fixed: the operations ride the last user message."""
+
+        try:
+            operations = _operations(self.valves.operations)
+            messages = body.get("messages")
+            if not operations or not isinstance(messages, list):
+                return body
+            index = next(
+                (
+                    i
+                    for i in range(len(messages) - 1, -1, -1)
+                    if isinstance(messages[i], dict) and messages[i].get("role") == "user"
+                ),
+                None,
+            )
+            if index is None:
+                return body
+            message = messages[index]
+            content = message.get("content")
+            note = _note(operations)
+            if isinstance(content, str):
+                content = f"{content}\n\n{note}"
+            elif isinstance(content, list):
+                content = [*content, {"type": "text", "text": note}]
+            else:
+                return body
+            annotated = [*messages[:index], {**message, "content": content}, *messages[index + 1 :]]
+            return {**body, "messages": annotated}
+        except Exception:  # the chat must never fail because the note did
+            log.exception("cement: the operations note failed")
+            return body
 
     async def outlet(
         self,
