@@ -138,7 +138,8 @@ Choose a change and confirm it. The ledger records your Open WebUI user id as th
 
 `local.py` starts Open WebUI 0.12.3 on Python 3.11, the Python of the official image. It installs
 no Cement package beside Open WebUI, and it pastes in every part through the Open WebUI API. Use
-any OpenAI-compatible endpoint for the model.
+any OpenAI-compatible endpoint for the model. The instance has no login and listens on
+`127.0.0.1` only. Use it for tests on your own computer, not as a shared server.
 
 1. Install Open WebUI into `.open-webui/` once:
 

@@ -17,6 +17,8 @@ from pydantic import BaseModel, Field
 
 from cement_runtime import CementError, NotFoundError, System
 
+PAGE = 100
+
 
 def _operations(text: str) -> dict[str, str]:
     """Valve text → operation name → description: `name: description` lines, or names alone."""
@@ -71,7 +73,17 @@ class Action:
                     {"label": f"Set up {name} (its switch starts off)", "value": f"register|{name}"}
                 )
                 continue
-            versions = system.function_versions(self.valves.partition, name, check=True).versions
+            # Every receipt, so a person can pin any earlier version and the numbers hold.
+            versions = []
+            before = None
+            while True:
+                page = system.function_versions(
+                    self.valves.partition, name, before_sequence=before, limit=PAGE, check=True
+                )
+                versions += page.versions
+                if page.next_before_sequence is None:
+                    break
+                before = page.next_before_sequence
             numbered = {
                 version.receipt.function_hash: len(versions) - index
                 for index, version in enumerate(versions)

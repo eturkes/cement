@@ -8902,23 +8902,25 @@ def _cement_module(name: str) -> object:
     import importlib
     import sys
 
-    if _CEMENT_PACKAGE not in sys.modules:
-        seal = hashlib.sha256()
-        for module in sorted(_CEMENT_SOURCES):
-            text = _CEMENT_SOURCES[module].removeprefix("\n")
-            seal.update(module.encode() + b"\0" + text.encode() + b"\0")
-        if seal.hexdigest() != _CEMENT_DIGEST:
-            raise ImportError(
-                "the embedded cement_runtime was edited; paste the generated file again"
-            )
-        if not any(getattr(finder, "package", None) == _CEMENT_PACKAGE for finder in sys.meta_path):
-            sys.meta_path.insert(0, _CementImporter(_CEMENT_PACKAGE, _CEMENT_SOURCES))
+    # Checked on every call, not once per process: an edited copy pasted after a clean one would
+    # otherwise reuse the clean package and hide the edit.
+    seal = hashlib.sha256()
+    for module in sorted(_CEMENT_SOURCES):
+        text = _CEMENT_SOURCES[module].removeprefix("\n")
+        seal.update(module.encode() + b"\0" + text.encode() + b"\0")
+    if seal.hexdigest() != _CEMENT_DIGEST:
+        raise ImportError("the embedded cement_runtime was edited; paste the generated file again")
+    if not any(getattr(finder, "package", None) == _CEMENT_PACKAGE for finder in sys.meta_path):
+        sys.meta_path.insert(0, _CementImporter(_CEMENT_PACKAGE, _CEMENT_SOURCES))
     return importlib.import_module(_CEMENT_PACKAGE + (f".{name}" if name else ""))
 
 
 CementError = _cement_module("").CementError
 NotFoundError = _cement_module("").NotFoundError
 System = _cement_module("").System
+
+
+PAGE = 100
 
 
 def _operations(text: str) -> dict[str, str]:
@@ -8974,7 +8976,17 @@ class Action:
                     {"label": f"Set up {name} (its switch starts off)", "value": f"register|{name}"}
                 )
                 continue
-            versions = system.function_versions(self.valves.partition, name, check=True).versions
+            # Every receipt, so a person can pin any earlier version and the numbers hold.
+            versions = []
+            before = None
+            while True:
+                page = system.function_versions(
+                    self.valves.partition, name, before_sequence=before, limit=PAGE, check=True
+                )
+                versions += page.versions
+                if page.next_before_sequence is None:
+                    break
+                before = page.next_before_sequence
             numbered = {
                 version.receipt.function_hash: len(versions) - index
                 for index, version in enumerate(versions)

@@ -19,7 +19,7 @@ import unittest
 from typing import Any
 from unittest import mock
 
-from cement_runtime import Candidate, CompilePolicy, System
+from cement_runtime import Candidate, CompilePolicy, StateError, System
 from cement_runtime.json_value import canonicalize
 from cement_runtime.system import PROVENANCE_MAX_BYTES
 
@@ -444,12 +444,6 @@ ADMIN = {"id": "u-admin", "role": "admin", "name": "Ward lead"}
 NOTE_A = {"document": "PHYSICIAN PROGRESS NOTE\nPatient: A\n"}
 NOTE_B = {"document": "PHYSICIAN PROGRESS NOTE\nPatient: B\n"}
 NOTE_C = {"document": "PHYSICIAN PROGRESS NOTE\nPatient: C\n"}
-PROGRAM = {
-    "abi": "cement-projection-v1",
-    "text": "document",
-    "keep": [],
-    "layouts": [{"name": "note", "title": "PHYSICIAN PROGRESS NOTE", "entries": [{"label": "Patient"}]}],
-}
 LEARNING_FUNCTIONS = {
     "learn_cases", "show_proposal", "merge_case", "reject_proposal", "revoke_example",
     "publish_version", "function_versions", "diff_versions",
@@ -591,6 +585,53 @@ class LearningToolBattery(_Example):
         self.assertNotIn("set_switch", named)
         self.assertIsNone(re.search(r"`cement [a-z]", text))
 
+    def test_w6_a_non_text_input_is_refused_not_raised(self) -> None:
+        self._retain((NOTE_A, PLAN), ({"document": 42}, PLAN))
+        refused = self._run("learn_cases", OP, True)
+        self.assertEqual(refused["error"], "invalid")
+
+    def test_w6_examples_of_an_older_revision_stay_out_of_the_program(self) -> None:
+        (old,) = self._retain(({"old_document": "x"}, PLAN))
+        self.system.review(P, old, reviewer="learning-pass", decision="accept")
+        self.system.revise_operation(P, OP, policy=POLICY, revised_by="ward-lead")
+        self._retain((NOTE_A, PLAN))
+        grouped = self._run("learn_cases", OP, True)
+        self.assertNotIn("error", grouped, grouped)
+        self.assertEqual(grouped["program"]["layouts"], [LAYOUT])
+
+    def test_w6_merge_case_reads_its_case_not_a_page_of_examples(self) -> None:
+        (proposal,) = self._retain((NOTE_A, PLAN))
+        self.system.review(P, proposal, reviewer="learning-pass", decision="accept")
+        (example,) = [e["id"] for e in self.system.examples(P, OP)]
+        with mock.patch.object(System, "examples", side_effect=AssertionError("paged read")):
+            merged = self._run("merge_case", OP, False, MERGED, "n", None, [example])
+        self.assertEqual(merged["superseded_example_ids"], [example], merged)
+
+    def test_w6_repeated_ids_are_refused_before_any_write(self) -> None:
+        (proposal,) = self._retain((NOTE_A, PLAN))
+        before = self._counts()
+        refused = self._run("merge_case", OP, False, PLAN, "n", [proposal, proposal])
+        self.assertEqual(refused["error"], "invalid")
+        self.assertEqual(self._counts(), before)
+        self.assertEqual(self.system.proposal(P, proposal)["status"], "pending")
+
+    def test_w6_a_failure_after_a_write_reports_the_writes(self) -> None:
+        first, second = self._retain((NOTE_A, PLAN), (NOTE_B, PLAN))
+        real = System.review
+        calls = []
+
+        def review(system: System, *args: Any, **kwargs: Any) -> Any:
+            calls.append(args[1])
+            if len(calls) == 2:
+                raise StateError("ledger busy")
+            return real(system, *args, **kwargs)
+
+        with mock.patch.object(System, "review", review):
+            result = self._run("merge_case", OP, True, PLAN, "n", [first, second])
+        self.assertEqual(result["error"], "conflict")
+        self.assertEqual(result["completed"]["reviewed"], [{"proposal_id": calls[0], "status": "accepted"}])
+        self.assertEqual(self.system.proposal(P, calls[0])["status"], "accepted")
+
     def test_w3_refusals_carry_the_cli_error_kinds(self) -> None:
         self.assertEqual(self._run("show_proposal", "prop_" + "0" * 32)["error"], "not_found")
         nothing = self._run("publish_version", OP, False)
@@ -709,6 +750,16 @@ class SwitchActionBattery(_Example):
         self.assertIn("billing_codes: not set up", select["data"]["message"])
         chosen = next(o["label"] for o in select["data"]["options"] if o["value"] == "follow|extraction_plan")
         self.assertEqual((confirm["type"], confirm["data"]["message"]), ("confirmation", chosen))
+
+    def test_w6_every_version_is_offered_past_one_page(self) -> None:
+        hashes = [self._version(value, {"fields": [name]}) for value, name in
+                  ((NOTE_A, "a"), (NOTE_B, "b"), (NOTE_C, "c"))]
+        with mock.patch.object(self.module, "PAGE", 2):
+            (options,) = self._click(False)
+        pins = {o["value"].rsplit("|", 1)[1]: o["label"] for o in options if o["value"].startswith("pinned|")}
+        self.assertEqual(set(pins), set(hashes))
+        for number, function_hash in enumerate(hashes, start=1):
+            self.assertIn(f"version {number} ", pins[function_hash])
 
     def test_w4_a_value_the_dialog_did_not_offer_changes_nothing(self) -> None:
         before = self._counts()

@@ -100,6 +100,51 @@ class LocalLauncherBattery(unittest.TestCase):
         self.assertNotIn("--api-key", parser_flags)
         self.assertTrue({"--base-url", "--model"} <= parser_flags)
 
+    def test_w6_serve_starts_the_server_with_the_key_in_its_environment_alone(self) -> None:
+        self.paths["server"].parent.mkdir(parents=True)
+        self.paths["server"].write_text("")
+        started = []
+
+        class Exited:
+            pid = 0
+
+            def poll(self) -> int:
+                return 1
+
+        def popen(argv: list[str], **kwargs: object) -> Exited:
+            started.append((argv, kwargs["env"]))
+            return Exited()
+
+        with mock.patch.dict("os.environ", {"OPENAI_API_KEY": "k-sentinel"}), \
+                mock.patch.object(LOCAL.subprocess, "Popen", popen), self.assertRaises(SystemExit):
+            LOCAL.serve(self.paths["venv"].parent, "http://127.0.0.1:1/v1", "m-1", 1, False)
+        ((argv, env),) = started
+        self.assertNotIn("k-sentinel", " ".join(argv))
+        self.assertEqual(env["OPENAI_API_KEY"], "k-sentinel")
+        self.assertEqual(argv[1:], ["serve", "--host", "127.0.0.1", "--port", "1"])
+
+    def test_w6_a_server_that_outlives_its_grace_period_is_killed(self) -> None:
+        import signal
+        import subprocess
+
+        class Stubborn:
+            pid = 4242
+            waits = 0
+
+            def poll(self) -> None:
+                return None
+
+            def wait(self, timeout: float | None = None) -> int:
+                self.waits += 1
+                if self.waits == 1:
+                    raise subprocess.TimeoutExpired("open-webui", timeout or 0)
+                return -9
+
+        sent = []
+        with mock.patch.object(LOCAL.os, "killpg", lambda pid, sig: sent.append((pid, sig))):
+            LOCAL._stop(Stubborn())
+        self.assertEqual(sent, [(4242, signal.SIGTERM), (4242, signal.SIGKILL)])
+
     def test_w5_a_server_that_is_not_listening_yet_reads_as_not_ready(self) -> None:
         import socket
 

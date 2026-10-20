@@ -172,6 +172,26 @@ class PasteInBattery(_PasteIn):
             self._load(edited)
         self.assertEqual(self._packages(), [])
 
+    def test_w6_an_edited_copy_refuses_after_a_clean_copy_loaded(self) -> None:
+        text = (PASTE_IN / "cement_tools.py").read_text(encoding="utf-8")
+        self._load(PASTE_IN / "cement_tools.py")
+        anchor = '"""Cement public API."""'
+        edited = self.directory / "cement_tools.py"
+        edited.write_text(text.replace(anchor, '"""Cement public API, edited."""'), encoding="utf-8")
+        with self.assertRaisesRegex(ImportError, "embedded cement_runtime was edited"):
+            self._load(edited)
+
+    def test_w6_the_generator_refuses_import_shapes_it_cannot_rebind(self) -> None:
+        sources = {"__init__": '"""x"""\n', "json_value": '"""y"""\n'}
+        for label, source in (
+            ("dotted without alias", "import cement_runtime.json_value\n\nX = 1\n"),
+            ("mixed import", "import json as j, cement_runtime as cr\n\nX = (j, cr)\n"),
+            ("statement between", "from cement_runtime import System\nOFFSET = 5\n"
+             "from cement_runtime.json_value import canonicalize\n\nX = (System, OFFSET, canonicalize)\n"),
+        ):
+            with self.subTest(label), self.assertRaises(SystemExit):
+                GENERATOR.render(source, sources, "0")
+
     def test_w1_the_generator_refuses_what_a_paste_in_cannot_carry(self) -> None:
         sources = {"__init__": '"""x"""\n'}
         good = "from __future__ import annotations\n\nfrom cement_runtime import System\n\nX = System\n"

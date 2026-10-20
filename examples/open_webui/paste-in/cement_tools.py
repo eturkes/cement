@@ -8900,17 +8900,16 @@ def _cement_module(name: str) -> object:
     import importlib
     import sys
 
-    if _CEMENT_PACKAGE not in sys.modules:
-        seal = hashlib.sha256()
-        for module in sorted(_CEMENT_SOURCES):
-            text = _CEMENT_SOURCES[module].removeprefix("\n")
-            seal.update(module.encode() + b"\0" + text.encode() + b"\0")
-        if seal.hexdigest() != _CEMENT_DIGEST:
-            raise ImportError(
-                "the embedded cement_runtime was edited; paste the generated file again"
-            )
-        if not any(getattr(finder, "package", None) == _CEMENT_PACKAGE for finder in sys.meta_path):
-            sys.meta_path.insert(0, _CementImporter(_CEMENT_PACKAGE, _CEMENT_SOURCES))
+    # Checked on every call, not once per process: an edited copy pasted after a clean one would
+    # otherwise reuse the clean package and hide the edit.
+    seal = hashlib.sha256()
+    for module in sorted(_CEMENT_SOURCES):
+        text = _CEMENT_SOURCES[module].removeprefix("\n")
+        seal.update(module.encode() + b"\0" + text.encode() + b"\0")
+    if seal.hexdigest() != _CEMENT_DIGEST:
+        raise ImportError("the embedded cement_runtime was edited; paste the generated file again")
+    if not any(getattr(finder, "package", None) == _CEMENT_PACKAGE for finder in sys.meta_path):
+        sys.meta_path.insert(0, _CementImporter(_CEMENT_PACKAGE, _CEMENT_SOURCES))
     return importlib.import_module(_CEMENT_PACKAGE + (f".{name}" if name else ""))
 
 

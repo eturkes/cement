@@ -8901,17 +8901,16 @@ def _cement_module(name: str) -> object:
     import importlib
     import sys
 
-    if _CEMENT_PACKAGE not in sys.modules:
-        seal = hashlib.sha256()
-        for module in sorted(_CEMENT_SOURCES):
-            text = _CEMENT_SOURCES[module].removeprefix("\n")
-            seal.update(module.encode() + b"\0" + text.encode() + b"\0")
-        if seal.hexdigest() != _CEMENT_DIGEST:
-            raise ImportError(
-                "the embedded cement_runtime was edited; paste the generated file again"
-            )
-        if not any(getattr(finder, "package", None) == _CEMENT_PACKAGE for finder in sys.meta_path):
-            sys.meta_path.insert(0, _CementImporter(_CEMENT_PACKAGE, _CEMENT_SOURCES))
+    # Checked on every call, not once per process: an edited copy pasted after a clean one would
+    # otherwise reuse the clean package and hide the edit.
+    seal = hashlib.sha256()
+    for module in sorted(_CEMENT_SOURCES):
+        text = _CEMENT_SOURCES[module].removeprefix("\n")
+        seal.update(module.encode() + b"\0" + text.encode() + b"\0")
+    if seal.hexdigest() != _CEMENT_DIGEST:
+        raise ImportError("the embedded cement_runtime was edited; paste the generated file again")
+    if not any(getattr(finder, "package", None) == _CEMENT_PACKAGE for finder in sys.meta_path):
+        sys.meta_path.insert(0, _CementImporter(_CEMENT_PACKAGE, _CEMENT_SOURCES))
     return importlib.import_module(_CEMENT_PACKAGE + (f".{name}" if name else ""))
 
 
@@ -8973,7 +8972,11 @@ def _inputs(system: System, partition: str, operation: str, *, pending: bool) ->
     after = 0
     while True:
         page = system.examples(partition, operation, after_sequence=after, limit=PAGE)
-        found += [row["input"] for row in page if row["superseded_by"] is None]
+        found += [
+            row["input"]
+            for row in page
+            if row["superseded_by"] is None and row["operation_revision"] == revision
+        ]
         if len(page) < PAGE:
             break
         after = int(page[-1]["sequence"])
@@ -9008,7 +9011,12 @@ def draft_program(inputs: list[object]) -> dict[str, Any]:
     if (
         not inputs
         or len(fields) != 1
-        or any(not isinstance(value, dict) or set(value) != fields for value in inputs)
+        or any(
+            not isinstance(value, dict)
+            or set(value) != fields
+            or not all(isinstance(text, str) for text in value.values())
+            for value in inputs
+        )
     ):
         raise ValidationError("a projection needs inputs that hold exactly one text field")
     (field,) = fields
@@ -9140,6 +9148,8 @@ class Tools:
         def step(system: System, partition: str) -> object:
             if not proposals and not examples:
                 raise ValidationError("name the proposal ids or example ids of one case")
+            if len(set(proposals)) != len(proposals) or len(set(examples)) != len(examples):
+                raise ValidationError("name each id once")
             cases = self._cases(system, partition, operation, projectable)["cases"]
             owner = [
                 case
@@ -9150,44 +9160,48 @@ class Tools:
             if len(owner) != 1:
                 raise ValidationError("the ids are not the pending or active ids of one case")
             canonicalize(output)
+            # The case already lists every output with its examples; a paged read could miss one.
+            outputs = {
+                example: entry["output"]
+                for entry in owner[0]["outputs"]
+                for example in entry["example_ids"]
+            }
             text = self._note(note, __chat_id__, __model__)
-            reviewed = []
-            for proposal_id in proposals:
-                proposed = system.proposal(partition, proposal_id)["proposed_output"]
-                if _same(proposed, output):
-                    result = system.review(
-                        partition, proposal_id, reviewer=REVIEWER, decision="accept", note=text
-                    )
-                else:
+            done: dict[str, Any] = {
+                "key_hash": owner[0]["key_hash"],
+                "reviewed": [],
+                "superseded_example_ids": [],
+                "new_example_ids": [],
+            }
+            try:
+                for proposal_id in proposals:
+                    proposed = system.proposal(partition, proposal_id)["proposed_output"]
+                    extra = {} if _same(proposed, output) else {"corrected_output": output}
                     result = system.review(
                         partition,
                         proposal_id,
                         reviewer=REVIEWER,
-                        decision="correct",
-                        corrected_output=output,
+                        decision="correct" if extra else "accept",
+                        note=text,
+                        **extra,
+                    )
+                    done["reviewed"].append({"proposal_id": proposal_id, "status": result.status})
+                differing = [example for example in examples if not _same(outputs[example], output)]
+                if differing:
+                    created = system.supersede_examples(
+                        partition,
+                        operation,
+                        example_ids=differing,
+                        output=output,
+                        reviewer=REVIEWER,
                         note=text,
                     )
-                reviewed.append({"proposal_id": proposal_id, "status": result.status})
-            outputs = {row["id"]: row["output"] for row in system.examples(partition, operation)}
-            differing = [example for example in examples if not _same(outputs[example], output)]
-            created = (
-                system.supersede_examples(
-                    partition,
-                    operation,
-                    example_ids=differing,
-                    output=output,
-                    reviewer=REVIEWER,
-                    note=text,
-                )
-                if differing
-                else ()
-            )
-            return {
-                "key_hash": owner[0]["key_hash"],
-                "reviewed": reviewed,
-                "superseded_example_ids": differing,
-                "new_example_ids": list(created),
-            }
+                    done["superseded_example_ids"] = differing
+                    done["new_example_ids"] = list(created)
+            except CementError as exc:
+                # Each write commits alone, so a later refusal must not hide the earlier ones.
+                return _failure(exc) | {"completed": done}
+            return done
 
         return await self._run(__user__, operation, step)
 

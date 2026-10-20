@@ -12,9 +12,10 @@ records that decision and publishes a new version of the operation's function. A
 decides whether to switch the function on.
 
 Run this skill only when the administrator asks for it. The administrator names the operation.
-Every tool returns JSON. A result with an `error` key is a refusal that wrote nothing; read its
-`message`. After `conflict`, call `learn_cases` again and continue from what it shows. After
-`integrity`, stop and report: the ledger needs the operator.
+Every tool returns JSON. A result with an `error` key is a refusal; read its `message`. A refusal
+wrote nothing, except a `merge_case` result that also has `completed`: it lists the writes made
+before the refusal. After `conflict`, call `learn_cases` again and continue from what it shows.
+After `integrity`, stop and report: the ledger needs the operator.
 
 ## Words
 

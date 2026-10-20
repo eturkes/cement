@@ -268,6 +268,19 @@ def setup(directory: pathlib.Path) -> int:
     return 0
 
 
+def _stop(server: Any) -> None:
+    """Stop the server's whole session; a server that outlives 30 s of SIGTERM gets SIGKILL."""
+
+    if server.poll() is not None:
+        return
+    os.killpg(server.pid, signal.SIGTERM)
+    try:
+        server.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        os.killpg(server.pid, signal.SIGKILL)
+        server.wait()
+
+
 def serve(directory: pathlib.Path, base_url: str, model: str, port: int, fresh: bool) -> int:
     paths = _paths(directory)
     if not paths["server"].is_file():
@@ -306,9 +319,7 @@ def serve(directory: pathlib.Path, base_url: str, model: str, port: int, fresh: 
     except KeyboardInterrupt:
         pass
     finally:
-        if server.poll() is None:
-            os.killpg(server.pid, signal.SIGTERM)
-            server.wait(timeout=30)
+        _stop(server)
     return 0
 
 

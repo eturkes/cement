@@ -79,17 +79,16 @@ def _cement_module(name: str) -> object:
     import importlib
     import sys
 
-    if _CEMENT_PACKAGE not in sys.modules:
-        seal = hashlib.sha256()
-        for module in sorted(_CEMENT_SOURCES):
-            text = _CEMENT_SOURCES[module].removeprefix("\\n")
-            seal.update(module.encode() + b"\\0" + text.encode() + b"\\0")
-        if seal.hexdigest() != _CEMENT_DIGEST:
-            raise ImportError(
-                "the embedded cement_runtime was edited; paste the generated file again"
-            )
-        if not any(getattr(finder, "package", None) == _CEMENT_PACKAGE for finder in sys.meta_path):
-            sys.meta_path.insert(0, _CementImporter(_CEMENT_PACKAGE, _CEMENT_SOURCES))
+    # Checked on every call, not once per process: an edited copy pasted after a clean one would
+    # otherwise reuse the clean package and hide the edit.
+    seal = hashlib.sha256()
+    for module in sorted(_CEMENT_SOURCES):
+        text = _CEMENT_SOURCES[module].removeprefix("\\n")
+        seal.update(module.encode() + b"\\0" + text.encode() + b"\\0")
+    if seal.hexdigest() != _CEMENT_DIGEST:
+        raise ImportError("the embedded cement_runtime was edited; paste the generated file again")
+    if not any(getattr(finder, "package", None) == _CEMENT_PACKAGE for finder in sys.meta_path):
+        sys.meta_path.insert(0, _CementImporter(_CEMENT_PACKAGE, _CEMENT_SOURCES))
     return importlib.import_module(_CEMENT_PACKAGE + (f".{{name}}" if name else ""))
 
 '''
@@ -136,6 +135,12 @@ def digest(sources: dict[str, str]) -> str:
 
 def _bindings(node: ast.ImportFrom | ast.Import) -> list[str]:
     if isinstance(node, ast.Import):
+        if any(alias.name != LIBRARY and alias.asname is None for alias in node.names) or any(
+            not (alias.name == LIBRARY or alias.name.startswith(LIBRARY + "."))
+            for alias in node.names
+        ):
+            # `import cement_runtime.x` binds the root name; a mixed statement binds others.
+            raise SystemExit(f"generate: import {LIBRARY} or `import {LIBRARY}.x as y`, alone")
         return [
             f'{alias.asname or alias.name} = _cement_module("{alias.name[len(LIBRARY) + 1 :]}")'
             for alias in node.names
@@ -171,7 +176,9 @@ def render(source: str, sources: dict[str, str], version: str) -> str:
         raise SystemExit(f"generate: the source imports nothing from {LIBRARY}")
     last = max(node.end_lineno or node.lineno for node in imports)
     first = min(node.lineno for node in library)
-    if any(not _is_library(node) and node.lineno > first for node in imports):
+    if any(not _is_library(node) and node.lineno > first for node in imports) or any(
+        first <= node.lineno <= last and not _is_library(node) for node in tree.body
+    ):
         raise SystemExit(f"generate: {LIBRARY} imports must close the import block")
     lines = source.splitlines(keepends=True)
     head = "".join(lines[: first - 1]).rstrip("\n") + "\n"
