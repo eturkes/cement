@@ -23,3 +23,6 @@ CLAUDE.local.md
 
 # Pinned gate tools the gate downloads itself (`.agent/gitleaks`)
 .tools/
+
+# Local Open WebUI instance of examples/open_webui/local.py (venv, data, ledger)
+.open-webui/

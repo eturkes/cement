@@ -320,7 +320,9 @@ learning pass decides that an operation's answers depend on the structure alone.
 The learning pass is an agent skill in `skills/cement-learn/`. An operator runs it periodically
 with an agent that loads Agent Skills. It reads the retained answers, merges the scripts of each
 recurring case into one output, reviews each proposal as `learning-pass`, writes or extends the
-projection program, compiles, verifies, and promotes. It never switches a function on.
+projection program, compiles, verifies, and promotes. It never switches a function on. The Open
+WebUI example ships the same pass as an Open WebUI skill and an administrator tool, so the pass
+runs inside Open WebUI with the chat model.
 
 Its read surface groups pending proposals and active examples by case key:
 
@@ -508,7 +510,9 @@ full state model and trust boundaries.
   a person switches it on, a later pass adds a case, and a pin rolls back to the first version. It
   ends by exporting the version and answering a document from the bundle alone.
 - [Open WebUI](examples/open_webui/README.md): Cement as a tool that the chat model calls, plus a
-  filter that retains the model's answers for the learning pass.
+  filter that retains the model's answers for the learning pass. The learning pass and the switch
+  also run inside Open WebUI. Every part installs by paste, and `local.py` starts a local instance
+  for a test with a real model.
 - [Command candidate source](examples/command_source/README.md): an optional source that runs a
   trusted adapter executable for one candidate.
 

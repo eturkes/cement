@@ -451,13 +451,17 @@ PROGRAM = {
     "layouts": [{"name": "note", "title": "PHYSICIAN PROGRESS NOTE", "entries": [{"label": "Patient"}]}],
 }
 LEARNING_FUNCTIONS = {
-    "learn_cases", "show_proposal", "review_proposal", "supersede_examples", "revoke_example",
-    "test_projection", "set_projection", "publish_version", "function_versions", "diff_versions",
+    "learn_cases", "show_proposal", "merge_case", "reject_proposal", "revoke_example",
+    "publish_version", "function_versions", "diff_versions",
 }
+LAB = {"document": "LAB RESULT SLIP\nPatient: A\nPotassium: 4.2\n"}
+LAYOUT = {"name": "physician progress note", "title": "PHYSICIAN PROGRESS NOTE", "entries": [{"label": "Patient"}]}
+MERGED = {"fields": ["patient", "mrn"]}
 
 
 class LearningToolBattery(_Example):
-    """MAINTAIN W3: the admin-only learning tool runs the pass inside Open WebUI and never switches."""
+    """MAINTAIN W3 + W5: the admin-only learning tool runs the pass inside Open WebUI and never
+    switches; the model judges projectability + each case's merge, the tool does the rest."""
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -476,10 +480,10 @@ class LearningToolBattery(_Example):
         accepted = inspect.signature(function).parameters
         return asyncio.run(function(*args, **kwargs, **{k: v for k, v in extra.items() if k in accepted}))
 
-    def _retain(self, *values: object) -> list[str]:
+    def _retain(self, *pairs: tuple[object, object]) -> list[str]:
         return [
-            self.system.submit_proposal(P, OP, value, candidate=Candidate(output=PLAN, provenance={}))
-            for value in values
+            self.system.submit_proposal(P, OP, value, candidate=Candidate(output=output, provenance={}))
+            for value, output in pairs
         ]
 
     def test_w3_the_public_surface_is_the_learning_steps_and_cannot_switch(self) -> None:
@@ -493,13 +497,13 @@ class LearningToolBattery(_Example):
         self.assertIn("promote_function", called)
 
     def test_w3_a_non_admin_is_refused_and_nothing_is_written(self) -> None:
-        (proposal,) = self._retain(NOTE_A)
+        (proposal,) = self._retain((NOTE_A, PLAN))
         before = self._counts()
         for user in ({"id": "u-1", "role": "user"}, None, "admin"):
             with self.subTest(user=user):
-                refused = self._run("review_proposal", proposal, "accept", "n", user=user)
+                refused = self._run("merge_case", OP, False, PLAN, "n", [proposal], user=user)
                 self.assertEqual(refused["error"], "forbidden")
-                self.assertEqual(self._run("publish_version", OP, user=user)["error"], "forbidden")
+                self.assertEqual(self._run("publish_version", OP, False, user=user)["error"], "forbidden")
         self.assertEqual(self._counts(), before)
 
     def test_w3_an_operation_outside_the_valve_is_refused(self) -> None:
@@ -507,44 +511,65 @@ class LearningToolBattery(_Example):
         self.assertEqual(refused["error"], "invalid")
         self.assertEqual(refused["enabled_operations"], ["extraction_plan", "billing_codes"])
 
-    def test_w3_a_whole_pass_through_the_tool_publishes_a_version_it_never_switches_on(self) -> None:
-        first, second = self._retain(NOTE_A, NOTE_B)
-        exact = self._run("learn_cases", OP)
-        self.assertEqual(exact["grouped_by"], "exact")
-        grouped = self._run("learn_cases", OP, PROGRAM)
+    def test_w5_a_projectable_pass_derives_the_program_and_publishes_a_version_it_never_switches_on(self) -> None:
+        first, second = self._retain((NOTE_A, PLAN), (NOTE_B, MERGED))
+        self.assertEqual(len(self._run("learn_cases", OP)["cases"]), 2)
+        grouped = self._run("learn_cases", OP, True)
+        self.assertEqual(grouped["program"]["layouts"], [LAYOUT])
         (case,) = grouped["cases"]
         self.assertEqual(sorted(case["pending_proposal_ids"]), sorted([first, second]))
-        shown = self._run("show_proposal", first)
-        self.assertEqual((shown["input"], shown["proposed_output"]), (NOTE_A, PLAN))
-        merged = {"fields": ["patient", "mrn"]}
-        reviewed = [
-            self._run("review_proposal", first, "accept", "kept the plan"),
-            self._run("review_proposal", second, "correct", "added mrn", merged),
-        ]
-        self.assertEqual([r["status"] for r in reviewed], ["accepted", "corrected"])
-        examples = [r["example_id"] for r in reviewed]
-        superseded = self._run("supersede_examples", OP, [examples[0]], merged, "extended to the merge")
-        self.assertEqual(superseded["superseded_example_ids"], [examples[0]])
-        self.assertIn("error", self._run("set_projection", OP, {"abi": "x"}))
-        self.assertEqual(self._run("test_projection", OP, PROGRAM)["keys"][0]["support"], 2)
-        self.assertNotIn("error", self._run("set_projection", OP, PROGRAM))
-        published = self._run("publish_version", OP)
+        merged = self._run("merge_case", OP, True, MERGED, "kept mrn", [first, second])
+        self.assertEqual(
+            [r["status"] for r in merged["reviewed"]], ["corrected", "accepted"], merged
+        )
+        published = self._run("publish_version", OP, True)
         self.assertIs(published["published"], True, published)
-        self.assertEqual(published["cases"], 1)
+        self.assertEqual((published["cases"], published["layouts"]), (1, ["PHYSICIAN PROGRESS NOTE"]))
         self.assertEqual(self.system.switch(P, OP).mode, "off")
         self.system.set_switch(P, OP, mode="follow", actor="ward-lead")
-        self.assertEqual(self.system.resolve(P, OP, NOTE_C).match.output, merged)
-        again = self._run("publish_version", OP)
+        self.assertEqual(self.system.resolve(P, OP, NOTE_C).match.output, MERGED)
+        again = self._run("publish_version", OP, True)
         self.assertEqual((again["published"], again["reason"]), (False, "the newest version already holds this set"))
         versions = self._run("function_versions", OP)["versions"]
-        self.assertEqual(len(versions), 1)
-        self.assertEqual(versions[0]["receipt"]["function_hash"], published["function_hash"])
+        self.assertEqual([v["receipt"]["function_hash"] for v in versions], [published["function_hash"]])
+
+    def test_w5_a_pass_recovers_exact_confirmations_by_superseding_them(self) -> None:
+        for value, output in ((NOTE_A, PLAN), (NOTE_B, {"fields": ["mrn"]})):
+            (proposal,) = self._retain((value, output))
+            self.system.review(P, proposal, reviewer="learning-pass", decision="accept")
+        exact = self._run("learn_cases", OP)
+        self.assertEqual((exact["nothing_to_learn"], exact["grouped_by"]), (True, "exact"))
+        (case,) = self._run("learn_cases", OP, True)["cases"]
+        self.assertEqual((case["support"], len(case["outputs"])), (2, 2))
+        merged = self._run("merge_case", OP, True, MERGED, "union", None, case["active_example_ids"])
+        self.assertEqual(sorted(merged["superseded_example_ids"]), sorted(case["active_example_ids"]))
+        self.assertEqual(len(merged["new_example_ids"]), 2)
+        self.assertIs(self._run("publish_version", OP, True)["published"], True)
+        self.system.set_switch(P, OP, mode="follow", actor="ward-lead")
+        self.assertEqual(self.system.resolve(P, OP, NOTE_C).match.output, MERGED)
+
+    def test_w5_merge_case_refuses_ids_of_two_cases_and_writes_nothing(self) -> None:
+        note, lab = self._retain((NOTE_A, PLAN), (LAB, PLAN))
+        self.assertEqual(len(self._run("learn_cases", OP, True)["cases"]), 2)
+        before = self._counts()
+        for ids in ([note, lab], []):
+            with self.subTest(ids=ids):
+                refused = self._run("merge_case", OP, True, PLAN, "n", ids)
+                self.assertEqual(refused["error"], "invalid")
+        self.assertEqual(self._counts(), before)
+
+    def test_w5_the_program_needs_one_text_field(self) -> None:
+        self._retain((NOTE_A, PLAN), ({"text": "PHYSICIAN PROGRESS NOTE\nPatient: Z\n"}, PLAN))
+        refused = self._run("learn_cases", OP, True)
+        self.assertEqual(refused["error"], "invalid")
+        self.assertIn("one text field", refused["message"])
 
     def test_w3_reviews_are_the_learning_pass_with_chat_and_model_provenance(self) -> None:
-        (proposal,) = self._retain(NOTE_A)
-        self._run("review_proposal", proposal, "accept", "kept the plan")
-        record = self.system.proposal(P, proposal)
-        self.assertEqual(record["reviewer"], "learning-pass")
+        kept, dropped = self._retain((NOTE_A, PLAN), (NOTE_B, {"x": 1}))
+        self.assertEqual(self._run("reject_proposal", dropped, "not a plan")["status"], "rejected")
+        self._run("merge_case", OP, True, PLAN, "kept the plan", [kept])
+        record = self.system.proposal(P, kept)
+        self.assertEqual((record["status"], record["reviewer"]), ("accepted", "learning-pass"))
         self.assertEqual(record["review_note"], "kept the plan (Open WebUI chat chat-9, model cement-learning)")
         (example,) = [e["id"] for e in self.system.examples(P, OP)]
         revoked = self._run("revoke_example", example, "the plan read the wrong label")
@@ -568,14 +593,11 @@ class LearningToolBattery(_Example):
 
     def test_w3_refusals_carry_the_cli_error_kinds(self) -> None:
         self.assertEqual(self._run("show_proposal", "prop_" + "0" * 32)["error"], "not_found")
-        (proposal,) = self._retain(NOTE_A)
-        self.assertEqual(self._run("review_proposal", proposal, "maybe", "n")["error"], "invalid")
-        nothing = self._run("publish_version", OP)
+        nothing = self._run("publish_version", OP, False)
         self.assertEqual((nothing["published"], nothing["reason"]), (False, "no case has enough confirmations"))
         self.learning.valves.ledger_path = self.db + ".absent"
         self.assertEqual(self._run("learn_cases", OP)["error"], "integrity")
         self.assertFalse(pathlib.Path(self.db + ".absent").exists())
-
 
 
 class SwitchActionBattery(_Example):

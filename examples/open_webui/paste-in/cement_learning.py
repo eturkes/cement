@@ -1,9 +1,9 @@
 """
 title: Cement learning pass
 author: Cement
-version: 0.1.0
+version: 0.2.0
 license: Apache-2.0
-description: Admin-only learning pass steps: review retained answers, publish a new version.
+description: Admin-only learning pass steps: merge retained answers by case, publish a new version.
 """
 
 from __future__ import annotations
@@ -8921,9 +8921,13 @@ IntegrityError = _cement_module("").IntegrityError
 NotFoundError = _cement_module("").NotFoundError
 StateError = _cement_module("").StateError
 System = _cement_module("").System
+ValidationError = _cement_module("").ValidationError
+canonicalize = _cement_module("json_value").canonicalize
+structure = _cement_module("projection").structure
 
 
 REVIEWER = "learning-pass"
+PAGE = 1_000
 _KINDS = (
     (NotFoundError, "not_found"),
     (ConflictError, "conflict"),
@@ -8955,6 +8959,78 @@ def _plain(value: object) -> object:
 def _failure(exc: CementError) -> dict[str, Any]:
     kind = next((name for cls, name in _KINDS if isinstance(exc, cls)), "invalid")
     return {"error": kind, "message": str(exc)}
+
+
+def _same(left: object, right: object) -> bool:
+    return canonicalize(left).digest == canonicalize(right).digest
+
+
+def _inputs(system: System, partition: str, operation: str, *, pending: bool) -> list[object]:
+    """Raw inputs of the active examples, plus the current pending proposals when asked."""
+
+    revision = system.learning_cases(partition, operation)["operation_revision"]
+    found: list[object] = []
+    after = 0
+    while True:
+        page = system.examples(partition, operation, after_sequence=after, limit=PAGE)
+        found += [row["input"] for row in page if row["superseded_by"] is None]
+        if len(page) < PAGE:
+            break
+        after = int(page[-1]["sequence"])
+    after = 0
+    while pending:
+        rows = system.proposals(partition, status="pending", after_sequence=after, limit=PAGE)
+        found += [
+            row["input"]
+            for row in rows
+            if row["operation"] == operation and row["operation_revision"] == revision
+        ]
+        if len(rows) < PAGE:
+            break
+        after = int(rows[-1]["sequence"])
+    return found
+
+
+def draft_program(inputs: list[object]) -> dict[str, Any]:
+    """One cement-projection-v1 layout per distinct title + structure of the raw inputs.
+
+    The learning pass decides that an operation is projectable; the program itself is
+    mechanical, so the tool derives it and the model never copies a label.
+    """
+
+    fields = {
+        name
+        for value in inputs
+        if isinstance(value, dict)
+        for name, text in value.items()
+        if isinstance(text, str)
+    }
+    if (
+        not inputs
+        or len(fields) != 1
+        or any(not isinstance(value, dict) or set(value) != fields for value in inputs)
+    ):
+        raise ValidationError("a projection needs inputs that hold exactly one text field")
+    (field,) = fields
+    layouts: dict[tuple[str, tuple[tuple[str, str], ...]], dict[str, Any]] = {}
+    for value in inputs:
+        parsed = structure(value[field])
+        if parsed is None or parsed in layouts:
+            continue
+        title, pairs = parsed
+        layouts[parsed] = {
+            "name": title.lower(),
+            "title": title,
+            "entries": [{kind: key} for kind, key in pairs],
+        }
+    if not layouts:
+        raise ValidationError("no input has a form layout that a projection can read")
+    return {
+        "abi": "cement-projection-v1",
+        "text": field,
+        "keep": [],
+        "layouts": [layouts[key] for key in sorted(layouts)],
+    }
 
 
 class Tools:
@@ -8998,27 +9074,34 @@ class Tools:
         model_id = model.get("id") if isinstance(model, dict) else None
         return f"{note} (Open WebUI chat {chat_id}, model {model_id})"
 
+    @staticmethod
+    def _cases(system: System, partition: str, operation: str, projectable: bool) -> dict[str, Any]:
+        if not projectable:
+            return system.learning_cases(partition, operation)
+        program = draft_program(_inputs(system, partition, operation, pending=True))
+        return system.learning_cases(partition, operation, program=program) | {"program": program}
+
     async def learn_cases(
-        self, operation: str, program: dict | None = None, __user__: Any = None
+        self, operation: str, projectable: bool = False, __user__: Any = None
     ) -> dict:
         """
-        Read the work list of one operation: its pending proposals and active examples grouped by
-        case key, the outputs of each case, and the unfinished steps. Pass a projection program to
-        group the inputs by that program instead. Call this first, and again after each step.
+        Read the work list of one operation: its pending proposals and confirmed examples grouped
+        into cases, the distinct outputs of each case, and its support. With projectable true,
+        the cases group documents by form layout, and the result shows the derived program.
         :param operation: The Cement operation.
-        :param program: Optional cement-projection-v1 program to group the inputs by.
+        :param projectable: True when every output is a procedure that reads values from the input.
         """
 
         return await self._run(
             __user__,
             operation,
-            lambda system, partition: system.learning_cases(partition, operation, program=program),
+            lambda system, partition: self._cases(system, partition, operation, projectable),
         )
 
     async def show_proposal(self, proposal_id: str, __user__: Any = None) -> dict:
         """
         Read one retained answer: its input, the output the chat model used, and its provenance
-        (the chat model's full reply). Merge from what the reply shows.
+        (the chat model's full reply).
         :param proposal_id: The proposal id from learn_cases.
         """
 
@@ -9026,71 +9109,113 @@ class Tools:
             __user__, None, lambda system, partition: system.proposal(partition, proposal_id)
         )
 
-    async def review_proposal(
+    async def merge_case(
         self,
-        proposal_id: str,
-        decision: str,
+        operation: str,
+        projectable: bool,
+        output: dict,
         note: str,
-        output: dict | None = None,
+        proposal_ids: list[str] | None = None,
+        example_ids: list[str] | None = None,
         __user__: Any = None,
         __chat_id__: Any = None,
         __model__: Any = None,
     ) -> dict:
         """
-        Review one pending proposal as the learning pass. Use decision "accept" when the proposed
-        output equals the merged output, "correct" with the merged output when it differs, and
-        "reject" when the answer is not usable for this operation.
-        :param proposal_id: The proposal id from learn_cases.
-        :param decision: One of "accept", "correct" or "reject".
-        :param note: Why: name this pass and what the merge kept.
-        :param output: The merged output. Required for "correct", omitted otherwise.
+        Confirm the merged output of one case. Each pending proposal of the case is accepted when
+        it equals the merge and corrected to the merge otherwise. Each confirmed example whose
+        output differs is superseded by the merge. Pass the ids of ONE case from learn_cases,
+        with the same projectable value.
+        :param operation: The Cement operation.
+        :param projectable: The value that you passed to learn_cases.
+        :param output: The merged output that covers what every request of the case needed.
+        :param note: What the merge kept or added.
+        :param proposal_ids: The case's pending proposal ids.
+        :param example_ids: The case's active example ids.
         """
 
+        proposals = list(proposal_ids or [])
+        examples = list(example_ids or [])
+
         def step(system: System, partition: str) -> object:
-            extra = {} if output is None else {"corrected_output": output}
-            return system.review(
+            if not proposals and not examples:
+                raise ValidationError("name the proposal ids or example ids of one case")
+            cases = self._cases(system, partition, operation, projectable)["cases"]
+            owner = [
+                case
+                for case in cases
+                if set(proposals) <= set(case["pending_proposal_ids"])
+                and set(examples) <= set(case["active_example_ids"])
+            ]
+            if len(owner) != 1:
+                raise ValidationError("the ids are not the pending or active ids of one case")
+            canonicalize(output)
+            text = self._note(note, __chat_id__, __model__)
+            reviewed = []
+            for proposal_id in proposals:
+                proposed = system.proposal(partition, proposal_id)["proposed_output"]
+                if _same(proposed, output):
+                    result = system.review(
+                        partition, proposal_id, reviewer=REVIEWER, decision="accept", note=text
+                    )
+                else:
+                    result = system.review(
+                        partition,
+                        proposal_id,
+                        reviewer=REVIEWER,
+                        decision="correct",
+                        corrected_output=output,
+                        note=text,
+                    )
+                reviewed.append({"proposal_id": proposal_id, "status": result.status})
+            outputs = {row["id"]: row["output"] for row in system.examples(partition, operation)}
+            differing = [example for example in examples if not _same(outputs[example], output)]
+            created = (
+                system.supersede_examples(
+                    partition,
+                    operation,
+                    example_ids=differing,
+                    output=output,
+                    reviewer=REVIEWER,
+                    note=text,
+                )
+                if differing
+                else ()
+            )
+            return {
+                "key_hash": owner[0]["key_hash"],
+                "reviewed": reviewed,
+                "superseded_example_ids": differing,
+                "new_example_ids": list(created),
+            }
+
+        return await self._run(__user__, operation, step)
+
+    async def reject_proposal(
+        self,
+        proposal_id: str,
+        note: str,
+        __user__: Any = None,
+        __chat_id__: Any = None,
+        __model__: Any = None,
+    ) -> dict:
+        """
+        Reject one pending proposal that is not a usable answer for its operation.
+        :param proposal_id: The proposal id from learn_cases.
+        :param note: Why the answer is not usable.
+        """
+
+        return await self._run(
+            __user__,
+            None,
+            lambda system, partition: system.review(
                 partition,
                 proposal_id,
                 reviewer=REVIEWER,
-                decision=decision,
+                decision="reject",
                 note=self._note(note, __chat_id__, __model__),
-                **extra,
-            )
-
-        return await self._run(__user__, None, step)
-
-    async def supersede_examples(
-        self,
-        operation: str,
-        example_ids: list[str],
-        output: dict,
-        note: str,
-        __user__: Any = None,
-        __chat_id__: Any = None,
-        __model__: Any = None,
-    ) -> dict:
-        """
-        Replace earlier confirmed examples of one case with a merged output that extends them.
-        Each old example gets one new example with the same input. Use it when a merge adds rows
-        that an earlier confirmation lacked.
-        :param operation: The Cement operation.
-        :param example_ids: The active example ids of the case that the merge extends.
-        :param output: The merged output.
-        :param note: Why: name this pass and what the merge added.
-        """
-
-        def step(system: System, partition: str) -> object:
-            created = system.supersede_examples(
-                partition,
-                operation,
-                example_ids=example_ids,
-                output=output,
-                reviewer=REVIEWER,
-                note=self._note(note, __chat_id__, __model__),
-            )
-            return {"example_ids": list(created), "superseded_example_ids": example_ids}
-
-        return await self._run(__user__, operation, step)
+            ),
+        )
 
     async def revoke_example(
         self,
@@ -9117,46 +9242,28 @@ class Tools:
 
         return await self._run(__user__, None, step)
 
-    async def test_projection(self, operation: str, program: dict, __user__: Any = None) -> dict:
+    async def publish_version(
+        self, operation: str, projectable: bool, __user__: Any = None
+    ) -> dict:
         """
-        Preview a projection program against the confirmed and pending inputs. Writes nothing.
+        Publish a new function version: store the derived projection program (when projectable),
+        compile the confirmed cases, verify them and promote the verified set. A version never
+        answers until a person switches it on.
         :param operation: The Cement operation.
-        :param program: The cement-projection-v1 program.
-        """
-
-        return await self._run(
-            __user__,
-            operation,
-            lambda system, partition: system.test_projection(partition, operation, program),
-        )
-
-    async def set_projection(self, operation: str, program: dict, __user__: Any = None) -> dict:
-        """
-        Store a projection program for the operation. Cement refuses a program that fails to
-        parse, names a layout that no confirmed example shows, or merges different outputs.
-        :param operation: The Cement operation.
-        :param program: The cement-projection-v1 program that test_projection accepted.
-        """
-
-        return await self._run(
-            __user__,
-            operation,
-            lambda system, partition: system.set_projection(
-                partition, operation, program, actor=REVIEWER
-            ),
-        )
-
-    async def publish_version(self, operation: str, __user__: Any = None) -> dict:
-        """
-        Compile the confirmed cases, verify the drafts and promote the verified set as a new
-        function version. A version never answers until a person switches it on.
-        :param operation: The Cement operation.
+        :param projectable: The value that you passed to learn_cases.
         """
 
         def step(system: System, partition: str) -> object:
+            report: dict[str, Any] = {}
+            if projectable:
+                program = draft_program(_inputs(system, partition, operation, pending=False))
+                report["projection"] = system.set_projection(
+                    partition, operation, program, actor=REVIEWER
+                )
+                report["layouts"] = [layout["title"] for layout in program["layouts"]]
             compiled = system.compile(partition, operation, compiled_by=REVIEWER)
             drafts = system.verify_drafts(partition, operation, verified_by=REVIEWER)
-            report = {"compile": _plain(compiled), "verify_drafts": _plain(drafts)}
+            report |= {"compile": _plain(compiled), "verify_drafts": _plain(drafts)}
             if not drafts.passed:
                 return report | {"published": False, "reason": "a draft failed verification"}
             manifest = system.inspect_function_promotion(partition, operation)
