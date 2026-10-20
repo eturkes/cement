@@ -72,3 +72,10 @@ plain prose or a table, except turn 1 (the bare JSON plan).
   the unseen document) and OUTPUT `{"covered": true, "output": {"fields": [...]}}`.
 - Turn 8 (the UI's own tool selection, no driver `tool_ids`): `covered: true` again; the model
   relabelled one row ("Lung exam") — the tool result is deterministic, the reply is not.
+
+## After review (fixes `6fdbb26`, re-pasted with `local.py provision`)
+
+| # | model | input | s | calls | covered |
+|---|---|---|---|---|---|
+| 9 | cement-chat | synthetic intake form B03 (Ravi Menon) | 14.7 | search_tools, use_learned_function | **true** |
+| L6 | cement-learning | "Run a Cement learning pass for extraction_plan." | 9.5 | learn_cases | — "Nothing to learn": 3 cases at support 2, nothing pending |

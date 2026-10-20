@@ -15,6 +15,31 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## MAINTAIN Open WebUI live testing (ad-hoc request close) — target `3188ba3..c832287`, fixes in `6fdbb26`
+
+Check set fixed before the diff was read: correctness C1-C8 + cleanup K1 (reviewer-35, raw table `.scratch/review/owui/reviewer-35.md`), security S1-S6 (MAIN). Every finding was reproduced red by MAIN at `88ab4c2` (tag `archive/owui-w6-red`) before its fix.
+
+| id | lens | verdict | ruling (MAIN-verified) |
+|---|---|---|---|
+| C1 (F1, F2) | correctness | minor → fixed | the generator rebound `import cement_runtime.x` (no `as`) and mixed import statements wrongly and dropped statements between library imports; all three shapes are now refused (`test_w6_the_generator_refuses_import_shapes_it_cannot_rebind`). The shipped sources use none of them. |
+| C2 | correctness | pass | the importer serves its digest package alone, repeat loads are idempotent, and the digest is checked before the first exec. |
+| C3 (F1, F2) | correctness | major → fixed | a non-text field value raised `TypeError` out of the tool, and examples of an older revision entered the derived program. Each input's value is now checked as text, and examples are taken from the current revision only (`test_w6_a_non_text_input_is_refused_not_raised`, `test_w6_examples_of_an_older_revision_stay_out_of_the_program`). |
+| C4 (F1, F2) | correctness | major → fixed | `merge_case` read outputs from a 1000-row page, repeated ids passed, and a later refusal hid committed writes. Outputs now come from the case, repeated ids are refused before any write, and a refusal after a write carries `completed` (skill sentence qualified; `test_w6_merge_case_reads_its_case_not_a_page_of_examples`, `test_w6_repeated_ids_are_refused_before_any_write`, `test_w6_a_failure_after_a_write_reports_the_writes`). |
+| C5, C6 | correctness | pass | projection is stored only when projectable, and the skip rules hold across revisions; the inlet copies on write, touches the last user message alone and never raises. |
+| C7 (F1) | correctness | minor → fixed | a server that outlived the 30 s grace period was orphaned; `_stop` now SIGKILLs it and reaps (`test_w6_a_server_that_outlives_its_grace_period_is_killed`). |
+| C8 (F1) | correctness | minor → fixed | the argv frame never ran `serve`; `test_w6_serve_starts_the_server_with_the_key_in_its_environment_alone` drives it with a fake `Popen` (seed: key appended to argv → red). Other frame families killed their sampled breaks. |
+| K1 | cleanup | minor → fixed | the unused `PROGRAM` fixture is removed. |
+| R1 | register → fixed | — | an edited copy loaded after a clean one reused the clean package, so the README's per-file refusal claim overreached. Every load now verifies its own sources (`test_w6_an_edited_copy_refuses_after_a_clean_copy_loaded`). |
+| R2 | register → fixed | — | the switch read one 100-receipt page, so older versions were unpinnable and misnumbered (Decision: rollback to any earlier version). It now pages every receipt (`test_w6_every_version_is_offered_past_one_page`). |
+| S1 | security | pass | all 8 learning functions route through `_run` (role `admin`); the action checks the role inline; the chat tool has none, by design (AST census). |
+| S2 | security | pass | `set_switch` / `register_operation` are reached only by `cement_admin.py` (AST pin over the learning tool; the chat tool names neither); Open WebUI actions are UI buttons, never model tools. |
+| S3 | security | pass | the action writes only a value its select offered, after a confirmation of exactly `True` (W4 battery). |
+| S4 | security | pass | the actor comes from Open WebUI's server-side `__user__` (`utils/actions.py` `user.model_dump()`), never the request body. |
+| S5 | security | pass | the model key travels by environment alone; a search over HEAD, all history and the run's scratch logs gives 0 hits, against a positive control of 1. |
+| S6 | security | minor → fixed | the README did not state that the local instance has no login and binds 127.0.0.1; it now does. |
+
+Findings: 4 major + 6 minor fixed, plus 2 register items fixed; 0 open. Live re-check after the fixes: the re-pasted files loaded, an unseen intake form returned `covered: true`, and an idle pass reported nothing to learn (`.agent/decisions/owui-live-e2e.md` § After review).
+
 ## IMPLEMENT phase close (phase) — target `2af499f..8be6d83`, fixes in `35ed37a`
 
 Check set fixed before the diff was read, one `reviewer` per lens over the units TOGETHER (each unit's own section stands): correctness X1-X7 (reviewer-32), cleanup K1-K4 (reviewer-33), altitude A1-A4 (reviewer-34), security P1-P6 (MAIN). Raw tables: `.scratch/review/phase/`.
