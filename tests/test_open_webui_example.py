@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
+import inspect
 import json
 import pathlib
 import sys
@@ -436,6 +437,144 @@ class ChatNoteBattery(_Example):
         self.assertIs(answer["covered"], True)
         self.assertIn("output", answer["instruction"])
         self.assertIn("record_answer", answer["instruction"])
+
+
+
+ADMIN = {"id": "u-admin", "role": "admin", "name": "Ward lead"}
+NOTE_A = {"document": "PHYSICIAN PROGRESS NOTE\nPatient: A\n"}
+NOTE_B = {"document": "PHYSICIAN PROGRESS NOTE\nPatient: B\n"}
+NOTE_C = {"document": "PHYSICIAN PROGRESS NOTE\nPatient: C\n"}
+PROGRAM = {
+    "abi": "cement-projection-v1",
+    "text": "document",
+    "keep": [],
+    "layouts": [{"name": "note", "title": "PHYSICIAN PROGRESS NOTE", "entries": [{"label": "Patient"}]}],
+}
+LEARNING_FUNCTIONS = {
+    "learn_cases", "show_proposal", "review_proposal", "supersede_examples", "revoke_example",
+    "test_projection", "set_projection", "publish_version", "function_versions", "diff_versions",
+}
+
+
+class LearningToolBattery(_Example):
+    """MAINTAIN W3: the admin-only learning tool runs the pass inside Open WebUI and never switches."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.module = _load("cement_learning")
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.learning = self.module.Tools()
+        self.learning.valves = self.module.Tools.Valves(
+            ledger_path=self.db, partition=P, operations=GUIDE
+        )
+
+    def _run(self, name: str, *args: Any, user: object = ADMIN, **kwargs: Any) -> dict[str, Any]:
+        extra = {"__user__": user, "__chat_id__": "chat-9", "__model__": {"id": "cement-learning"}}
+        function = getattr(self.learning, name)
+        accepted = inspect.signature(function).parameters
+        return asyncio.run(function(*args, **kwargs, **{k: v for k, v in extra.items() if k in accepted}))
+
+    def _retain(self, *values: object) -> list[str]:
+        return [
+            self.system.submit_proposal(P, OP, value, candidate=Candidate(output=PLAN, provenance={}))
+            for value in values
+        ]
+
+    def test_w3_the_public_surface_is_the_learning_steps_and_cannot_switch(self) -> None:
+        public = {name for name in dir(self.module.Tools) if not name.startswith("_")} - {"Valves"}
+        self.assertEqual(public, LEARNING_FUNCTIONS)
+        import ast
+
+        tree = ast.parse((ROOT / "examples/open_webui/cement_learning.py").read_text(encoding="utf-8"))
+        called = {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
+        self.assertTrue({"set_switch", "register_operation", "revise_operation"}.isdisjoint(called))
+        self.assertIn("promote_function", called)
+
+    def test_w3_a_non_admin_is_refused_and_nothing_is_written(self) -> None:
+        (proposal,) = self._retain(NOTE_A)
+        before = self._counts()
+        for user in ({"id": "u-1", "role": "user"}, None, "admin"):
+            with self.subTest(user=user):
+                refused = self._run("review_proposal", proposal, "accept", "n", user=user)
+                self.assertEqual(refused["error"], "forbidden")
+                self.assertEqual(self._run("publish_version", OP, user=user)["error"], "forbidden")
+        self.assertEqual(self._counts(), before)
+
+    def test_w3_an_operation_outside_the_valve_is_refused(self) -> None:
+        refused = self._run("learn_cases", "triage_queue")
+        self.assertEqual(refused["error"], "invalid")
+        self.assertEqual(refused["enabled_operations"], ["extraction_plan", "billing_codes"])
+
+    def test_w3_a_whole_pass_through_the_tool_publishes_a_version_it_never_switches_on(self) -> None:
+        first, second = self._retain(NOTE_A, NOTE_B)
+        exact = self._run("learn_cases", OP)
+        self.assertEqual(exact["grouped_by"], "exact")
+        grouped = self._run("learn_cases", OP, PROGRAM)
+        (case,) = grouped["cases"]
+        self.assertEqual(sorted(case["pending_proposal_ids"]), sorted([first, second]))
+        shown = self._run("show_proposal", first)
+        self.assertEqual((shown["input"], shown["proposed_output"]), (NOTE_A, PLAN))
+        merged = {"fields": ["patient", "mrn"]}
+        reviewed = [
+            self._run("review_proposal", first, "accept", "kept the plan"),
+            self._run("review_proposal", second, "correct", "added mrn", merged),
+        ]
+        self.assertEqual([r["status"] for r in reviewed], ["accepted", "corrected"])
+        examples = [r["example_id"] for r in reviewed]
+        superseded = self._run("supersede_examples", OP, [examples[0]], merged, "extended to the merge")
+        self.assertEqual(superseded["superseded_example_ids"], [examples[0]])
+        self.assertIn("error", self._run("set_projection", OP, {"abi": "x"}))
+        self.assertEqual(self._run("test_projection", OP, PROGRAM)["keys"][0]["support"], 2)
+        self.assertNotIn("error", self._run("set_projection", OP, PROGRAM))
+        published = self._run("publish_version", OP)
+        self.assertIs(published["published"], True, published)
+        self.assertEqual(published["cases"], 1)
+        self.assertEqual(self.system.switch(P, OP).mode, "off")
+        self.system.set_switch(P, OP, mode="follow", actor="ward-lead")
+        self.assertEqual(self.system.resolve(P, OP, NOTE_C).match.output, merged)
+        again = self._run("publish_version", OP)
+        self.assertEqual((again["published"], again["reason"]), (False, "the newest version already holds this set"))
+        versions = self._run("function_versions", OP)["versions"]
+        self.assertEqual(len(versions), 1)
+        self.assertEqual(versions[0]["receipt"]["function_hash"], published["function_hash"])
+
+    def test_w3_reviews_are_the_learning_pass_with_chat_and_model_provenance(self) -> None:
+        (proposal,) = self._retain(NOTE_A)
+        self._run("review_proposal", proposal, "accept", "kept the plan")
+        record = self.system.proposal(P, proposal)
+        self.assertEqual(record["reviewer"], "learning-pass")
+        self.assertEqual(record["review_note"], "kept the plan (Open WebUI chat chat-9, model cement-learning)")
+        (example,) = [e["id"] for e in self.system.examples(P, OP)]
+        revoked = self._run("revoke_example", example, "the plan read the wrong label")
+        self.assertEqual(revoked["example_id"], example)
+        events = [e for e in self.system.events(P) if e["kind"] == "example.revoked"]
+        self.assertEqual(len(events), 1)
+
+    def test_w3_the_skill_names_every_learning_function_and_no_command_line(self) -> None:
+        import re
+
+        text = (ROOT / "examples/open_webui/cement-learn/SKILL.md").read_text(encoding="utf-8")
+        front = re.match(r"---\n(.*?)\n---\n", text, re.DOTALL)
+        assert front is not None
+        fields = dict(line.split(": ", 1) for line in front.group(1).splitlines())
+        self.assertEqual(fields["name"], "cement-learn")
+        self.assertIn("never switches", fields["description"])
+        named = set(re.findall(r"`([a-z_]+)`", text))
+        self.assertEqual(LEARNING_FUNCTIONS - named, set())
+        self.assertNotIn("set_switch", named)
+        self.assertIsNone(re.search(r"`cement [a-z]", text))
+
+    def test_w3_refusals_carry_the_cli_error_kinds(self) -> None:
+        self.assertEqual(self._run("show_proposal", "prop_" + "0" * 32)["error"], "not_found")
+        (proposal,) = self._retain(NOTE_A)
+        self.assertEqual(self._run("review_proposal", proposal, "maybe", "n")["error"], "invalid")
+        nothing = self._run("publish_version", OP)
+        self.assertEqual((nothing["published"], nothing["reason"]), (False, "no case has enough confirmations"))
+        self.learning.valves.ledger_path = self.db + ".absent"
+        self.assertEqual(self._run("learn_cases", OP)["error"], "integrity")
+        self.assertFalse(pathlib.Path(self.db + ".absent").exists())
 
 
 if __name__ == "__main__":
