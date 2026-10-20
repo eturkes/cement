@@ -138,8 +138,10 @@ Choose a change and confirm it. The ledger records your Open WebUI user id as th
 
 `local.py` starts Open WebUI 0.12.3 on Python 3.11, the Python of the official image. It installs
 no Cement package beside Open WebUI, and it pastes in every part through the Open WebUI API. Use
-any OpenAI-compatible endpoint for the model. The instance has no login and listens on
-`127.0.0.1` only. Use it for tests on your own computer, not as a shared server.
+any OpenAI-compatible endpoint for the model. You do not need an OpenAI API account: a local
+proxy that signs in with your ChatGPT subscription and serves an OpenAI-compatible endpoint also
+works. The instance has no login and listens on `127.0.0.1` only. Use it for tests on your own
+computer, not as a shared server.
 
 1. Install Open WebUI into `.open-webui/` once:
 
@@ -147,7 +149,9 @@ any OpenAI-compatible endpoint for the model. The instance has no login and list
    uv run python examples/open_webui/local.py setup
    ```
 
-2. Start the instance. Put the key of your model endpoint in `OPENAI_API_KEY`:
+2. Start the instance. Put the access key that your endpoint accepts in `OPENAI_API_KEY`. For a
+   subscription proxy, this is the proxy's own access key from its configuration, not an OpenAI
+   API key. Open WebUI sends it to the endpoint in each request:
 
    ```sh
    OPENAI_API_KEY=<key> uv run python examples/open_webui/local.py serve \

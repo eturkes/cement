@@ -287,7 +287,10 @@ def serve(directory: pathlib.Path, base_url: str, model: str, port: int, fresh: 
         raise SystemExit("local: run `local.py setup` first")
     key = os.environ.get("OPENAI_API_KEY")
     if not key:
-        raise SystemExit("local: set OPENAI_API_KEY for the model endpoint")
+        raise SystemExit(
+            "local: set OPENAI_API_KEY to the access key that the endpoint accepts"
+            " (for a subscription proxy, the proxy's own access key)"
+        )
     if fresh and paths["data"].exists():
         shutil.rmtree(paths["data"])
     paths["data"].mkdir(parents=True, exist_ok=True)
