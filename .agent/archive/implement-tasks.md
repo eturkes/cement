@@ -1,0 +1,29 @@
+# IMPLEMENT phase — closed Tasks rows (moved from `.agent/spec.md` at the phase close)
+
+- [x] 1935f68 p78 D28 verdict cache (`kernel`, gate instrument): equal-strength speed-up of the dominating step.
+  - Accept: p78's acceptance — D28's `--durations` line before + after on one tree; a green verdict per content key (replayed tree id + interpreter + `uv.lock` digest), red never cached; a planted red revision reds D28 on its first run and on a rerun; `assertTrue(revisions)` + `Ran >= 949` kept.
+- [x] 629577d Gate tooling + CI + scanners = p01 p66 p85 p12 p40 p74 + the IMPLEMENT law gap, per the `Decisions` gate-tooling ruling, at this unit boundary.
+  - Format + lint + type check over `src/`; `uv audit`; gitleaks pinned binary; skip census; register audit; `.agent/mutate` (cosmic-ray); `.github/workflows/` + `.github/dependabot.yml`. L12 + L15 (`tests/test_lifecycle_removal_battery.py`) re-scope to git objects at M3.6a2's close (pin-repair approval): the probe measured those 3 failures of 1000 under `ruff format`.
+  - Accept: one gate command rc 0 clean-tree; `RUF100` zero; a seeded violation reds EACH of format, lint, type check, audit (a pinned vulnerable dev dep in a fixture lock), secret scan, skip census (a fourth skip, named by test id), register audit (a seeded `simply`; a seeded 30-word sentence stays green); `.agent/mutate` meets p74's acceptance; CI + Dependabot committed.
+- [x] 17896eb M3.6a3 delete the 7 dead outcome types (`Outcome` + its 6 members).
+  - `src/` holds zero constructors, only `models.py` defs, `__init__.py` import/`__all__`, one `system.py` docstring. `CandidateRequest.request_id` STAYS — live on the `cement-source-v1` envelope — and leaves with M3.6b's single schema/protocol cut.
+  - Accept: burden re-measured on its own deletion set; battery per contract.
+- [x] 9c2d0ff M4/M5 contract (`kernel`): switch + versions, learning pass + skill, projection IR + its verification, v3 tables, Open WebUI example; `researcher` on the Open WebUI tool/filter API + the Agent Skills format; `consultant` on the contract before code.
+  - Accept: `.agent/decisions/m45-contract.md` committed — testable predicates + tier + numbered gate list per unit; consultant verdict adjudicated in `.agent/review.md`.
+- [x] 93007ac M3.6b schema cut v2→v3 (direct proposal columns, `requests` + index gone, receipts index, switch + projection tables per the M4/M5 contract, refusal fixtures, 0.2.0); owns p50 p51 p04.
+  - Accept: fingerprint + `SCHEMA_VERSION` move together, suite green with the reset documented.
+- [x] 635a473 M3.7 command-runtime relocation under byte equality + blocked reverse imports; owns p54.
+  - The wheel already carries no `examples/`/`tests/`.
+- [x] 1289797 M5.1 switch + versions: per operation `off` | `follow` | `pinned`; rollback = pin; `resolve` + `function export` serve the selected version; `function versions` + Read diff.
+- [x] 535a0a9 M4.1 projection IR `cement-projection-v1`: a pure, total, terminating interpreter; `tester` differential oracle.
+- [x] 87d011f M4.2 projection lifecycle: raw input → projected key; verification against every confirmed raw input + boundary probes, fail-closed; compile by key; the bundle carries the projection; `resolve` + `function eval` on raw input.
+- [x] 6e9e715 M5.2 learning pass: defaults 2/1/0, `learning-pass` reviewer, a CLI read surface over retained answers by case, the skill (merge scripts, write the projection, compile, verify, promote).
+- [x] 097de5b M5.3 Open WebUI example: Cement functions as a tool the chat model calls + a filter that retains answers.
+- [x] ef06a25 M3.8 demo + transcript regeneration via idempotent updater (`data`): the hospital example on projection + learning pass + switch.
+- [x] a97bbc3 Prototype on the real switch + versions (PROTOTYPE law).
+- [x] 92a162e M3.9a docs claim ledger rewrite (`docs`): README paragraph 1 + `docs/` + CLI help follow `Intent`; README install/run/configure current for everything shipped.
+- [x] baf2743 M3.9b independent replay of the M3.9a rewrite (`docs`).
+- [x] bfd7d64 README + prototype disposition: `prototype/webui-demo` stays at `prototype/` (owner-ruled) → `Artifacts`.
+- [x] 35ed37a Phase-close review over the whole phase diff: every lens, one `reviewer` per lens + MAIN's security lens.
+  - Resume point: IMPLEMENT resumes here — the phase-close review (one reviewer per lens over 2af499f..HEAD + MAIN's security lens); then Tasks cleared, Phase: MAINTAIN.
+  - Runs LAST, after the close's rules upkeep (`CLAUDE.md` `Rules upkeep`), nothing mutating after it; each unit's closing diff draws its OWN pass first (`reviewer` count per `Session flow` Teammates where MAIN dispatches), every pass adjudicated into `.agent/review.md` ⇒ never the only pass.

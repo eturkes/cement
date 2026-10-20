@@ -15,6 +15,23 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## IMPLEMENT phase close (phase) — target `2af499f..8be6d83`, fixes in `35ed37a`
+
+Check set fixed before the diff was read, one `reviewer` per lens over the units TOGETHER (each unit's own section stands): correctness X1-X7 (reviewer-32), cleanup K1-K4 (reviewer-33), altitude A1-A4 (reviewer-34), security P1-P6 (MAIN). Raw tables: `.scratch/review/phase/`.
+
+| id | lens | verdict | ruling (MAIN-verified) |
+|---|---|---|---|
+| X2 (F1) | correctness | major → fixed | a challenge that a later supersession replaced still failed a historical pin's P-d (exact + projected); P-d now grades active challenges alone (`tests/test_phase_integration_battery.py` X2 ×2 red at 941d711, archive/phase-red). |
+| X4 (F2) | correctness | major → fixed | the skill's saved-program resume missed a merge stopped before its supersession (no pending proposal, two active outputs, empty build-current `work`); the rule now covers it (X3 pins the skill + workflow text). |
+| X1, X3, X5-X7 | correctness | pass | pinned version answers through its own program on resolve, export and eval (X1 battery test); 23 writer branches + 23 rollback injections + 10 refusals write all-or-nothing; skill CLI calls exist; examples use public API; no test names a SHA outside main; skip set = 3. |
+| K1 (F1) | cleanup | minor → fixed | `diff_versions` re-read programs that reconstruction already embedded (4 → 2 queries). |
+| K2-K4 | cleanup | pass + register | register: `SKILL.md` "No write is idempotent" reads broad beside `source_id` (the skill's own writes are not idempotent) — ruled no change. |
+| A2 / A4 (F1-F5) | altitude | minor → fixed | README publishes the `System` methods by purpose; supersede refusals by exit class; source-id idempotency; architecture keeps pins across a revision; spec Decisions + `runtime.md` + `assurance.md` state v3, case keys and verification per switch mode. |
+| A1, A3 | altitude | pass | — |
+| P1-P6 | security | pass + register | interpreter on raw text linear + refusal-total; LLM-only review gated by support + set verification + the switch, stated as untrusted; bundles re-validated; integrations open existing-only; zero runtime deps, scanners green; no process control in the core. Register: Open WebUI notifications can name the ledger path (M5.3 S6). |
+
+Findings: 2 major + 6 minor fixed in `35ed37a`; 0 open. This ledger holds no open row.
+
 ## M3.9b replay (IMPLEMENT, unit, tier `docs`) — target `92a162e`, fixes in `baf2743`
 
 Independent replay of the M3.9a claim ledger (reviewer-31): C01-C21 + D1 (README blocks run as printed) + D2 (no superseded model stated) + D3 (publication stated positively). 16 hold, 8 fail; raw table `.scratch/review/m3u9b/table.md`. Every ruling below = MAIN's, on the reviewer's code probes (pinned resolve → 4 checks; a reviewed proposal changes status; revoking the contradicting example restores the old receipt; follow serves v2 with no switch write; `source_id` accepted as a fourth key; distinct reviewer names gate compile).
