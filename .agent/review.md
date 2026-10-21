@@ -15,6 +15,15 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p35 + p36 (MAINTAIN queue run, owed) — target = the commit landing this section
+
+Check set: R1 each row's funding is blocked by a binding ruling, named on the row. MAIN alone; no code.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| p35 | scope | owed | `Decisions`: `resolve` pays full verification per call, no cache; `Dispositions`: p34-p37 = scope expansion queued with reasons. |
+| p36 | scope | owed | `Dispositions` (p34-p37 scope expansion) + `Decisions`: ambiguity quarantine left with `handle`. |
+
 ## p18 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 one CLI probe per shape (empty, boundary accepted, boundary+1 rejected, illegal character) with exit + mapped message; R2 the accepted boundary value is read back from the promotion receipt; R3 credit recorded, survivors routed. MAIN alone.
