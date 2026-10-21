@@ -15,6 +15,18 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p22 partial (MAINTAIN queue run, unit, tier `kernel`; row stays open, owed: owner approval to retire the observational test) — target = the commit landing this section
+
+Check set: R1 the mechanism test fixes every entropy source the bundle depends on; R2 exactly one id moves in the varied run; R3 length equality is derived, never retyped; R4 credit recorded, survivors routed; R5 the deletion half is recorded as owed, not performed. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | correctness | pass | `_new_id` → counter ids, `time.time_ns` → fixed stream; two runs byte-equal (text + hash). |
+| R2 | correctness | pass | only the first `ex` id differs (`ex_ffff…`); the counter advances identically in both runs. |
+| R3 | correctness | pass | `assertEqual(len(moved…), len(first…))`; 3,830 bytes measured today. |
+| R4 | verification integrity | open → p101 | killed 2108 / survived 1513 / invalid 92 (`.agent/decisions/p22-mutate.txt`). |
+| R5 | claim soundness | pass | the observational test stays; its retirement waits on the owner. |
+
 ## p63 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section
 
 Check set: R1 no row carries a line number; R2 every consumer of the table still parses it (L23 splits `locus` on `:`, `instrument_pruned()` matches `<file>:`); R3 the three seeds fire as the row specifies; R4 the re-emit changes nothing but keys + the measured prose delta. MAIN alone.

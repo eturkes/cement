@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import itertools
 import json
 import os
 from pathlib import Path
@@ -22,6 +23,7 @@ from cement_runtime import (
     IntegrityError,
     System,
 )
+import cement_runtime.system as system_module
 from cement_runtime.json_value import canonicalize
 from cement_runtime.projection import structure
 
@@ -775,6 +777,37 @@ class OfflineBundleTests(unittest.TestCase):
             len(second.text.encode("utf-8")), len(self.bundle_text.encode("utf-8"))
         )
         self.assertNotEqual(second.function_hash, self.function_hash)
+
+
+    def test_bundle_identity_follows_its_ids_and_clock_alone(self) -> None:
+        # The cause behind the README's per-run sentence: hold every id and the clock fixed and
+        # two independent ledgers export the same bytes; move ONE confirmed-example id and the
+        # root hash moves while the byte length holds.
+        def export(*, moved_example: bool) -> FunctionDocument:
+            counter = itertools.count(1)
+            clock = itertools.count(1_000_000_000, 1_000_000)
+            examples = itertools.count(1)
+
+            def ids(prefix: str) -> str:
+                number = next(counter)
+                if prefix == "ex" and next(examples) == 1 and moved_example:
+                    return f"ex_{'f' * 32}"
+                return f"{prefix}_{number:032x}"
+
+            with tempfile.TemporaryDirectory() as directory, mock.patch.object(
+                system_module, "_new_id", side_effect=ids
+            ), mock.patch.object(system_module.time, "time_ns", side_effect=lambda: next(clock)):
+                return _promoted_example_ledger(os.path.join(directory, "cement.db"))
+
+        first, second, moved = (
+            export(moved_example=False),
+            export(moved_example=False),
+            export(moved_example=True),
+        )
+        self.assertEqual(second.text, first.text)
+        self.assertEqual(second.function_hash, first.function_hash)
+        self.assertNotEqual(moved.function_hash, first.function_hash)
+        self.assertEqual(len(moved.text.encode("utf-8")), len(first.text.encode("utf-8")))
 
 
 class ShippedCommandRoundTripTests(unittest.TestCase):
