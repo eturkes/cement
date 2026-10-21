@@ -1,0 +1,797 @@
+{
+  "unit": "M3.6a1",
+  "rev": "dc4ab5e",
+  "instrument": ".agent/decisions/m3u6a1-mutants.py",
+  "verdict_modules": [
+    "tests.test_system",
+    "tests.test_resolve_battery",
+    "tests.test_proposal_binding_battery",
+    "tests.test_hospital_ocr_example"
+  ],
+  "pre_battery": {
+    "battery_sole_killer": "instrument `survived`: no pre-existing test kills the row",
+    "old_suite_kills": "instrument `misdirected`: `old_suite_killers` kill it without the battery"
+  },
+  "counts": {
+    "rows": 92,
+    "battery_sole_killer": 42,
+    "old_suite_kills": 50,
+    "battery_sole_killer.reversion": 20,
+    "battery_sole_killer.sensitivity": 22,
+    "old_suite_kills.reversion": 33,
+    "old_suite_kills.sensitivity": 17
+  },
+  "rows": [
+    {
+      "id": "M01",
+      "obligation": "D01",
+      "kind": "reversion",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M02",
+      "obligation": "D02",
+      "kind": "reversion",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M03",
+      "obligation": "D03",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_system.SystemTests.test_operation_revision_invalidates_every_old_request_path"
+      ]
+    },
+    {
+      "id": "M04",
+      "obligation": "D04",
+      "kind": "sensitivity",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b02_confinement_is_a_complement_assertion_over",
+        "tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b03_the_permitted_owner_set_is_exactly"
+      ]
+    },
+    {
+      "id": "M05",
+      "obligation": "D05",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_system.SystemTests.test_operation_revision_invalidates_every_old_request_path"
+      ]
+    },
+    {
+      "id": "M06",
+      "obligation": "D06",
+      "kind": "reversion",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M07",
+      "obligation": "D07",
+      "kind": "reversion",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M08",
+      "obligation": "D08",
+      "kind": "sensitivity",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M09",
+      "obligation": "D09",
+      "kind": "reversion",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M10",
+      "obligation": "D10",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_system.SystemTests.test_activation_requires_an_integrity_valid_promotion_receipt",
+        "tests.test_system.SystemTests.test_artifact_evidence_edges_are_database_immutable"
+      ]
+    },
+    {
+      "id": "M11",
+      "obligation": "D11",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_system.SystemTests.test_active_exact_scope_unique_index_rejects_second_promoted_row",
+        "tests.test_system.SystemTests.test_current_build_projection_helper_is_lazy_ordered_and_shared_by_compile"
+      ]
+    },
+    {
+      "id": "M12",
+      "obligation": "D12",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_system.SystemTests.test_active_exact_scope_unique_index_rejects_second_promoted_row",
+        "tests.test_system.SystemTests.test_function_promotion_retained_scope_is_partition_and_operation_exact"
+      ]
+    },
+    {
+      "id": "M13",
+      "obligation": "D13",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_resolve_battery.ResolveBatteryTests.test_b04",
+        "tests.test_resolve_battery.ResolveBatteryTests.test_b05"
+      ]
+    },
+    {
+      "id": "M14",
+      "obligation": "D14",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_system.SystemTests.test_function_report_reaches_every_compiler_block_reason_through_public_apis"
+      ]
+    },
+    {
+      "id": "M15",
+      "obligation": "D14a",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_system.SystemTests.test_function_report_reaches_every_compiler_block_reason_through_public_apis"
+      ]
+    },
+    {
+      "id": "M16",
+      "obligation": "D15",
+      "kind": "sensitivity",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M17",
+      "obligation": "D16",
+      "kind": "reversion",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M18",
+      "obligation": "D17",
+      "kind": "reversion",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M19",
+      "obligation": "D18",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript",
+        "tests.test_hospital_ocr_example.DemoTranscriptTests.test_the_offline_phase_runs_on_the_verified_bytes_after_teardown"
+      ]
+    },
+    {
+      "id": "M20",
+      "obligation": "D19",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript",
+        "tests.test_hospital_ocr_example.DemoTranscriptTests.test_the_offline_phase_runs_on_the_verified_bytes_after_teardown"
+      ]
+    },
+    {
+      "id": "M21",
+      "obligation": "D20",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript",
+        "tests.test_hospital_ocr_example.DemoTranscriptTests.test_the_offline_phase_runs_on_the_verified_bytes_after_teardown"
+      ]
+    },
+    {
+      "id": "M22",
+      "obligation": "D21",
+      "kind": "reversion",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M23",
+      "obligation": "D22",
+      "kind": "sensitivity",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript"
+      ]
+    },
+    {
+      "id": "M24",
+      "obligation": "D23",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript"
+      ]
+    },
+    {
+      "id": "M25",
+      "obligation": "D24",
+      "kind": "sensitivity",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b30_the_six_owned_event_payloads_are_2"
+      ]
+    },
+    {
+      "id": "M26",
+      "obligation": "D25",
+      "kind": "sensitivity",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M27",
+      "obligation": "D26",
+      "kind": "sensitivity",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b02_confinement_is_a_complement_assertion_over",
+        "tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b03_the_permitted_owner_set_is_exactly"
+      ]
+    },
+    {
+      "id": "M28",
+      "obligation": "D27",
+      "kind": "sensitivity",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M29",
+      "obligation": "D29",
+      "kind": "reversion",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M30",
+      "obligation": "D01",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_system.SystemTests.test_proposal_paths_translate_malformed_persisted_json"
+      ]
+    },
+    {
+      "id": "M31",
+      "obligation": "D01",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_system.SystemTests.test_orphaned_binding_fails_closed_and_stays_distinct_from_an_absent_proposal"
+      ]
+    },
+    {
+      "id": "M32",
+      "obligation": "D01",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_system.SystemTests.test_review_rejects_cross_table_state_corruption"
+      ]
+    },
+    {
+      "id": "M33",
+      "obligation": "D01",
+      "kind": "sensitivity",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_system.SystemTests.test_function_report_pending_request_join_is_like_and_case_exact"
+      ]
+    },
+    {
+      "id": "M34",
+      "obligation": "D03",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_system.SystemTests.test_unknown_resolved_source_kind_fails_closed_at_storage"
+      ]
+    },
+    {
+      "id": "M35",
+      "obligation": "D03",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_system.SystemTests.test_confirmed_request_cache_is_bound_to_immutable_example"
+      ]
+    },
+    {
+      "id": "M36",
+      "obligation": "D03",
+      "kind": "sensitivity",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_system.SystemTests.test_operation_revision_invalidates_every_old_request_path"
+      ]
+    },
+    {
+      "id": "M37",
+      "obligation": "D04",
+      "kind": "sensitivity",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b02_confinement_is_a_complement_assertion_over",
+        "tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b03_the_permitted_owner_set_is_exactly"
+      ]
+    },
+    {
+      "id": "M38",
+      "obligation": "D04",
+      "kind": "sensitivity",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M39",
+      "obligation": "D05",
+      "kind": "reversion",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M40",
+      "obligation": "D05",
+      "kind": "reversion",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M41",
+      "obligation": "D05",
+      "kind": "sensitivity",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b02_confinement_is_a_complement_assertion_over",
+        "tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b03_the_permitted_owner_set_is_exactly"
+      ]
+    },
+    {
+      "id": "M42",
+      "obligation": "D06",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_system.SystemTests.test_late_review_counterexample_quarantines_promoted_scope"
+      ]
+    },
+    {
+      "id": "M43",
+      "obligation": "D06",
+      "kind": "reversion",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M44",
+      "obligation": "D06",
+      "kind": "reversion",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M45",
+      "obligation": "D07",
+      "kind": "reversion",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M46",
+      "obligation": "D07",
+      "kind": "reversion",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M47",
+      "obligation": "D07",
+      "kind": "reversion",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M48",
+      "obligation": "D09",
+      "kind": "sensitivity",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M49",
+      "obligation": "D09",
+      "kind": "sensitivity",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M50",
+      "obligation": "D10",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_system.SystemTests.test_challenge_quarantines_corrupt_promoted_artifact",
+        "tests.test_system.SystemTests.test_counterexample_and_revocation_quarantine"
+      ]
+    },
+    {
+      "id": "M51",
+      "obligation": "D10",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_system.SystemTests.test_operation_revision_invalidates_every_old_request_path"
+      ]
+    },
+    {
+      "id": "M52",
+      "obligation": "D11",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_system.SystemTests.test_active_exact_scope_unique_index_rejects_second_promoted_row",
+        "tests.test_system.SystemTests.test_function_promotion_retained_scope_is_partition_and_operation_exact"
+      ]
+    },
+    {
+      "id": "M53",
+      "obligation": "D12",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_system.SystemTests.test_reconstruct_function_receipt_partition_lookup_is_case_and_like_exact",
+        "tests.test_system.SystemTests.test_reconstruct_function_receipt_validates_membership_digest_above_three_members"
+      ]
+    },
+    {
+      "id": "M54",
+      "obligation": "D13",
+      "kind": "reversion",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M55",
+      "obligation": "D13",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_hospital_ocr_example.OfflineBundleTests",
+        "tests.test_hospital_ocr_example.ShippedCommandRoundTripTests.test_shipped_cli_exports_the_bundle_and_answers_both_verdicts"
+      ]
+    },
+    {
+      "id": "M56",
+      "obligation": "D14",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_system.SystemTests.test_activation_requires_an_integrity_valid_promotion_receipt",
+        "tests.test_system.SystemTests.test_artifact_evidence_edges_are_database_immutable"
+      ]
+    },
+    {
+      "id": "M57",
+      "obligation": "D14",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_system.SystemTests.test_active_exact_scope_unique_index_rejects_second_promoted_row",
+        "tests.test_system.SystemTests.test_current_build_projection_helper_is_lazy_ordered_and_shared_by_compile"
+      ]
+    },
+    {
+      "id": "M58",
+      "obligation": "D14",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_system.SystemTests.test_active_exact_scope_unique_index_rejects_second_promoted_row",
+        "tests.test_system.SystemTests.test_function_promotion_retained_scope_is_partition_and_operation_exact"
+      ]
+    },
+    {
+      "id": "M59",
+      "obligation": "D14",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_resolve_battery.ResolveBatteryTests.test_b04",
+        "tests.test_resolve_battery.ResolveBatteryTests.test_b05"
+      ]
+    },
+    {
+      "id": "M60",
+      "obligation": "D14a",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_system.SystemTests.test_activation_requires_an_integrity_valid_promotion_receipt",
+        "tests.test_system.SystemTests.test_artifact_evidence_edges_are_database_immutable"
+      ]
+    },
+    {
+      "id": "M61",
+      "obligation": "D14a",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_system.SystemTests.test_operation_revision_invalidates_every_old_request_path"
+      ]
+    },
+    {
+      "id": "M62",
+      "obligation": "D15",
+      "kind": "sensitivity",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M63",
+      "obligation": "D16",
+      "kind": "reversion",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M64",
+      "obligation": "D16",
+      "kind": "sensitivity",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M65",
+      "obligation": "D16",
+      "kind": "sensitivity",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M66",
+      "obligation": "D17",
+      "kind": "sensitivity",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M67",
+      "obligation": "D17",
+      "kind": "reversion",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M68",
+      "obligation": "D17",
+      "kind": "reversion",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M69",
+      "obligation": "D18",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript",
+        "tests.test_hospital_ocr_example.DemoTranscriptTests.test_the_offline_phase_runs_on_the_verified_bytes_after_teardown"
+      ]
+    },
+    {
+      "id": "M70",
+      "obligation": "D19",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript",
+        "tests.test_hospital_ocr_example.DemoTranscriptTests.test_the_offline_phase_runs_on_the_verified_bytes_after_teardown"
+      ]
+    },
+    {
+      "id": "M71",
+      "obligation": "D20",
+      "kind": "sensitivity",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript"
+      ]
+    },
+    {
+      "id": "M72",
+      "obligation": "D20",
+      "kind": "sensitivity",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript"
+      ]
+    },
+    {
+      "id": "M73",
+      "obligation": "D20",
+      "kind": "sensitivity",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript",
+        "tests.test_hospital_ocr_example.DemoTranscriptTests.test_the_offline_phase_runs_on_the_verified_bytes_after_teardown"
+      ]
+    },
+    {
+      "id": "M74",
+      "obligation": "D21",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript",
+        "tests.test_hospital_ocr_example.DemoTranscriptTests.test_the_offline_phase_runs_on_the_verified_bytes_after_teardown"
+      ]
+    },
+    {
+      "id": "M75",
+      "obligation": "D21",
+      "kind": "sensitivity",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript",
+        "tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_refuses_to_run_where_python_removes_its_assertions"
+      ]
+    },
+    {
+      "id": "M76",
+      "obligation": "D22",
+      "kind": "sensitivity",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript"
+      ]
+    },
+    {
+      "id": "M77",
+      "obligation": "D22",
+      "kind": "sensitivity",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript"
+      ]
+    },
+    {
+      "id": "M78",
+      "obligation": "D23",
+      "kind": "reversion",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript"
+      ]
+    },
+    {
+      "id": "M79",
+      "obligation": "D24",
+      "kind": "sensitivity",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b10_y20_path_matrix_request_identity_is_2",
+        "tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b30_the_six_owned_event_payloads_are_1"
+      ]
+    },
+    {
+      "id": "M80",
+      "obligation": "D24",
+      "kind": "sensitivity",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b30_the_six_owned_event_payloads_are_2"
+      ]
+    },
+    {
+      "id": "M81",
+      "obligation": "D24",
+      "kind": "sensitivity",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M82",
+      "obligation": "D25",
+      "kind": "sensitivity",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M83",
+      "obligation": "D25",
+      "kind": "sensitivity",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M84",
+      "obligation": "D25",
+      "kind": "sensitivity",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M85",
+      "obligation": "D26",
+      "kind": "sensitivity",
+      "pre_battery": "old_suite_kills",
+      "old_suite_killers": [
+        "tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b02_confinement_is_a_complement_assertion_over",
+        "tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b03_the_permitted_owner_set_is_exactly"
+      ]
+    },
+    {
+      "id": "M86",
+      "obligation": "D27",
+      "kind": "sensitivity",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M87",
+      "obligation": "D27",
+      "kind": "sensitivity",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M88",
+      "obligation": "D27",
+      "kind": "sensitivity",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M89",
+      "obligation": "D27",
+      "kind": "sensitivity",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M90",
+      "obligation": "D27",
+      "kind": "sensitivity",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M91",
+      "obligation": "D29",
+      "kind": "sensitivity",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    },
+    {
+      "id": "M92",
+      "obligation": "D29",
+      "kind": "sensitivity",
+      "pre_battery": "battery_sole_killer",
+      "old_suite_killers": []
+    }
+  ]
+}

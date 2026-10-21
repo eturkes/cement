@@ -17,6 +17,17 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p61 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section
+
+Check set: R1 runner + output committed; R2 each pre-battery verdict in a dedicated field, never `note`; R3 the contract states how many rows the pre-existing suite already catches; R4 the output cannot drift from its transcript unseen. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `.agent/decisions/p61-prebattery.py` + `.txt` transcript + `.json`; the transcript = the pool run of the identical argv at `dc4ab5e` (`uv run python -u .agent/decisions/m3u6a1-mutants.py --verdict ×4`, rc 1 by construction: every row expects `killed`); the runner's fresh-sweep path was not executed end to end here (hours serially) — `--from-log` + `--check` were. |
+| R2 | acceptance | pass | field `pre_battery` ∈ {`battery_sole_killer`, `old_suite_kills`} + `old_suite_killers`; catalogue `note` untouched; ids/obligation/kind cross-checked against `dc4ab5e:.agent/decisions/m3u6a1-mutants.json`. |
+| R3 | acceptance | pass | contract §16: 50/92 already killed by the old suite (33 reversion, 17 sensitivity); battery sole killer of 42 (20 + 22); seven `contract-claims` rows graded against the committed JSON. |
+| R4 | correctness | pass | `--check` PASS; drift seed (pre_battery rewritten) rc 1; red-control seed (`CONTROL: RED`) aborts before writing. |
+
 ## p25 probe repair (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 root cause of the gate red at `5b4e947` (`test_an_interrupt_exits_130_with_a_json_error_and_no_traceback`: `4 != 130`, 10.135 s) proven by experiment; R2 the probe holds in every launch mode; R3 README `## Outcomes` states the inherited-ignore case. MAIN alone.

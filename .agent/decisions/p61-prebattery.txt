@@ -1,0 +1,104 @@
+VERDICT-MODULES: tests.test_system tests.test_resolve_battery tests.test_proposal_binding_battery tests.test_hospital_ocr_example
+VERDICT-TARGETS: 4
+VERDICT-EXCLUDED: test_d28_gate_1_stays_green_at_every_commit_never_only_at_the_last -- INSENSITIVE BY CONSTRUCTION. D28's subject is the commit set `git rev-list 6fb4d92..HEAD -- .agent/decisions/m3u6a1-surgery.py tests examples` returns, and every mutation this catalogue can express edits the WORKING TREE alone, leaving that history byte-identical. No reversion or sensitivity row can turn it red, so a row for it would certify only that the clause ignores the mutation. It was also RED at the `6fb4d92` baseline, so it already holds the red credential this instrument exists to supply for clauses that are green there. Its ~340 s cost and its one nested worktree per revision are consequences of the exclusion, never its grounds.
+CONTROL: GREEN
+MUTANTS: 92
+M01   survived     D01    reversion    -
+M02   survived     D02    reversion    -
+M03   misdirected  D03    reversion    tests.test_system.SystemTests.test_operation_revision_invalidates_every_old_request_path
+M04   misdirected  D04    sensitivity  tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b02_confinement_is_a_complement_assertion_over,tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b03_the_permitted_owner_set_is_exactly
+M05   misdirected  D05    reversion    tests.test_system.SystemTests.test_operation_revision_invalidates_every_old_request_path
+M06   survived     D06    reversion    -
+M07   survived     D07    reversion    -
+M08   survived     D08    sensitivity  -
+M09   survived     D09    reversion    -
+M10   misdirected  D10    reversion    tests.test_system.SystemTests.test_activation_requires_an_integrity_valid_promotion_receipt,tests.test_system.SystemTests.test_artifact_evidence_edges_are_database_immutable
+M11   misdirected  D11    reversion    tests.test_system.SystemTests.test_active_exact_scope_unique_index_rejects_second_promoted_row,tests.test_system.SystemTests.test_current_build_projection_helper_is_lazy_ordered_and_shared_by_compile
+M12   misdirected  D12    reversion    tests.test_system.SystemTests.test_active_exact_scope_unique_index_rejects_second_promoted_row,tests.test_system.SystemTests.test_function_promotion_retained_scope_is_partition_and_operation_exact
+M13   misdirected  D13    reversion    tests.test_resolve_battery.ResolveBatteryTests.test_b04,tests.test_resolve_battery.ResolveBatteryTests.test_b05
+M14   misdirected  D14    reversion    tests.test_system.SystemTests.test_function_report_reaches_every_compiler_block_reason_through_public_apis
+M15   misdirected  D14a   reversion    tests.test_system.SystemTests.test_function_report_reaches_every_compiler_block_reason_through_public_apis
+M16   survived     D15    sensitivity  -
+M17   survived     D16    reversion    -
+M18   survived     D17    reversion    -
+M19   misdirected  D18    reversion    tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript,tests.test_hospital_ocr_example.DemoTranscriptTests.test_the_offline_phase_runs_on_the_verified_bytes_after_teardown
+M20   misdirected  D19    reversion    tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript,tests.test_hospital_ocr_example.DemoTranscriptTests.test_the_offline_phase_runs_on_the_verified_bytes_after_teardown
+M21   misdirected  D20    reversion    tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript,tests.test_hospital_ocr_example.DemoTranscriptTests.test_the_offline_phase_runs_on_the_verified_bytes_after_teardown
+M22   survived     D21    reversion    -
+M23   misdirected  D22    sensitivity  tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript
+M24   misdirected  D23    reversion    tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript
+M25   misdirected  D24    sensitivity  tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b30_the_six_owned_event_payloads_are_2
+M26   survived     D25    sensitivity  -
+M27   misdirected  D26    sensitivity  tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b02_confinement_is_a_complement_assertion_over,tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b03_the_permitted_owner_set_is_exactly
+M28   survived     D27    sensitivity  -
+M29   survived     D29    reversion    -
+M30   misdirected  D01    reversion    tests.test_system.SystemTests.test_proposal_paths_translate_malformed_persisted_json
+M31   misdirected  D01    reversion    tests.test_system.SystemTests.test_orphaned_binding_fails_closed_and_stays_distinct_from_an_absent_proposal
+M32   misdirected  D01    reversion    tests.test_system.SystemTests.test_review_rejects_cross_table_state_corruption
+M33   misdirected  D01    sensitivity  tests.test_system.SystemTests.test_function_report_pending_request_join_is_like_and_case_exact
+M34   misdirected  D03    reversion    tests.test_system.SystemTests.test_unknown_resolved_source_kind_fails_closed_at_storage
+M35   misdirected  D03    reversion    tests.test_system.SystemTests.test_confirmed_request_cache_is_bound_to_immutable_example
+M36   misdirected  D03    sensitivity  tests.test_system.SystemTests.test_operation_revision_invalidates_every_old_request_path
+M37   misdirected  D04    sensitivity  tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b02_confinement_is_a_complement_assertion_over,tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b03_the_permitted_owner_set_is_exactly
+M38   survived     D04    sensitivity  -
+M39   survived     D05    reversion    -
+M40   survived     D05    reversion    -
+M41   misdirected  D05    sensitivity  tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b02_confinement_is_a_complement_assertion_over,tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b03_the_permitted_owner_set_is_exactly
+M42   misdirected  D06    reversion    tests.test_system.SystemTests.test_late_review_counterexample_quarantines_promoted_scope
+M43   survived     D06    reversion    -
+M44   survived     D06    reversion    -
+M45   survived     D07    reversion    -
+M46   survived     D07    reversion    -
+M47   survived     D07    reversion    -
+M48   survived     D09    sensitivity  -
+M49   survived     D09    sensitivity  -
+M50   misdirected  D10    reversion    tests.test_system.SystemTests.test_challenge_quarantines_corrupt_promoted_artifact,tests.test_system.SystemTests.test_counterexample_and_revocation_quarantine
+M51   misdirected  D10    reversion    tests.test_system.SystemTests.test_operation_revision_invalidates_every_old_request_path
+M52   misdirected  D11    reversion    tests.test_system.SystemTests.test_active_exact_scope_unique_index_rejects_second_promoted_row,tests.test_system.SystemTests.test_function_promotion_retained_scope_is_partition_and_operation_exact
+M53   misdirected  D12    reversion    tests.test_system.SystemTests.test_reconstruct_function_receipt_partition_lookup_is_case_and_like_exact,tests.test_system.SystemTests.test_reconstruct_function_receipt_validates_membership_digest_above_three_members
+M54   survived     D13    reversion    -
+M55   misdirected  D13    reversion    tests.test_hospital_ocr_example.OfflineBundleTests,tests.test_hospital_ocr_example.ShippedCommandRoundTripTests.test_shipped_cli_exports_the_bundle_and_answers_both_verdicts
+M56   misdirected  D14    reversion    tests.test_system.SystemTests.test_activation_requires_an_integrity_valid_promotion_receipt,tests.test_system.SystemTests.test_artifact_evidence_edges_are_database_immutable
+M57   misdirected  D14    reversion    tests.test_system.SystemTests.test_active_exact_scope_unique_index_rejects_second_promoted_row,tests.test_system.SystemTests.test_current_build_projection_helper_is_lazy_ordered_and_shared_by_compile
+M58   misdirected  D14    reversion    tests.test_system.SystemTests.test_active_exact_scope_unique_index_rejects_second_promoted_row,tests.test_system.SystemTests.test_function_promotion_retained_scope_is_partition_and_operation_exact
+M59   misdirected  D14    reversion    tests.test_resolve_battery.ResolveBatteryTests.test_b04,tests.test_resolve_battery.ResolveBatteryTests.test_b05
+M60   misdirected  D14a   reversion    tests.test_system.SystemTests.test_activation_requires_an_integrity_valid_promotion_receipt,tests.test_system.SystemTests.test_artifact_evidence_edges_are_database_immutable
+M61   misdirected  D14a   reversion    tests.test_system.SystemTests.test_operation_revision_invalidates_every_old_request_path
+M62   survived     D15    sensitivity  -
+M63   survived     D16    reversion    -
+M64   survived     D16    sensitivity  -
+M65   survived     D16    sensitivity  -
+M66   survived     D17    sensitivity  -
+M67   survived     D17    reversion    -
+M68   survived     D17    reversion    -
+M69   misdirected  D18    reversion    tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript,tests.test_hospital_ocr_example.DemoTranscriptTests.test_the_offline_phase_runs_on_the_verified_bytes_after_teardown
+M70   misdirected  D19    reversion    tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript,tests.test_hospital_ocr_example.DemoTranscriptTests.test_the_offline_phase_runs_on_the_verified_bytes_after_teardown
+M71   misdirected  D20    sensitivity  tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript
+M72   misdirected  D20    sensitivity  tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript
+M73   misdirected  D20    sensitivity  tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript,tests.test_hospital_ocr_example.DemoTranscriptTests.test_the_offline_phase_runs_on_the_verified_bytes_after_teardown
+M74   misdirected  D21    reversion    tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript,tests.test_hospital_ocr_example.DemoTranscriptTests.test_the_offline_phase_runs_on_the_verified_bytes_after_teardown
+M75   misdirected  D21    sensitivity  tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript,tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_refuses_to_run_where_python_removes_its_assertions
+M76   misdirected  D22    sensitivity  tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript
+M77   misdirected  D22    sensitivity  tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript
+M78   misdirected  D23    reversion    tests.test_hospital_ocr_example.DemoTranscriptTests.test_demo_output_matches_the_pinned_readme_transcript
+M79   misdirected  D24    sensitivity  tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b10_y20_path_matrix_request_identity_is_2,tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b30_the_six_owned_event_payloads_are_1
+M80   misdirected  D24    sensitivity  tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b30_the_six_owned_event_payloads_are_2
+M81   survived     D24    sensitivity  -
+M82   survived     D25    sensitivity  -
+M83   survived     D25    sensitivity  -
+M84   survived     D25    sensitivity  -
+M85   misdirected  D26    sensitivity  tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b02_confinement_is_a_complement_assertion_over,tests.test_proposal_binding_battery.ProposalBindingBatteryTests.test_b03_the_permitted_owner_set_is_exactly
+M86   survived     D27    sensitivity  -
+M87   survived     D27    sensitivity  -
+M88   survived     D27    sensitivity  -
+M89   survived     D27    sensitivity  -
+M90   survived     D27    sensitivity  -
+M91   survived     D29    sensitivity  -
+M92   survived     D29    sensitivity  -
+KILLED: 0
+MISDIRECTED: 50 ['M03', 'M04', 'M05', 'M10', 'M11', 'M12', 'M13', 'M14', 'M15', 'M19', 'M20', 'M21', 'M23', 'M24', 'M25', 'M27', 'M30', 'M31', 'M32', 'M33', 'M34', 'M35', 'M36', 'M37', 'M41', 'M42', 'M50', 'M51', 'M52', 'M53', 'M55', 'M56', 'M57', 'M58', 'M59', 'M60', 'M61', 'M69', 'M70', 'M71', 'M72', 'M73', 'M74', 'M75', 'M76', 'M77', 'M78', 'M79', 'M80', 'M85']
+SURVIVORS: 42 ['M01', 'M02', 'M06', 'M07', 'M08', 'M09', 'M16', 'M17', 'M18', 'M22', 'M26', 'M28', 'M29', 'M38', 'M39', 'M40', 'M43', 'M44', 'M45', 'M46', 'M47', 'M48', 'M49', 'M54', 'M62', 'M63', 'M64', 'M65', 'M66', 'M67', 'M68', 'M81', 'M82', 'M83', 'M84', 'M86', 'M87', 'M88', 'M89', 'M90', 'M91', 'M92']
+NAMED-SURVIVOR-SET: 0 []
+PATCH-NOOP: 0 []
+UNEXPECTED-SURVIVORS: 42 ['M01', 'M02', 'M06', 'M07', 'M08', 'M09', 'M16', 'M17', 'M18', 'M22', 'M26', 'M28', 'M29', 'M38', 'M39', 'M40', 'M43', 'M44', 'M45', 'M46', 'M47', 'M48', 'M49', 'M54', 'M62', 'M63', 'M64', 'M65', 'M66', 'M67', 'M68', 'M81', 'M82', 'M83', 'M84', 'M86', 'M87', 'M88', 'M89', 'M90', 'M91', 'M92']
+RESULT: FAIL

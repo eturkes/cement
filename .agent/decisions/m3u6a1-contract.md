@@ -1038,3 +1038,20 @@ measured fact.
 875	29	json	88e18c9:.agent/decisions/m3u6a1-mutants.json rows	29
 876	92	json	96d155d:.agent/decisions/m3u6a1-mutants.json rows	92
 ```
+
+## 16. Pre-battery sweep (p61)
+
+S8 graded each row with the battery as its sole verdict module, so a kill never showed the battery to be the row's ONLY killer.
+Runner `.agent/decisions/p61-prebattery.py` = the instrument at `dc4ab5e`, `--verdict` = the four owning modules, battery absent; transcript `.agent/decisions/p61-prebattery.txt`; per-row field `pre_battery` in `.agent/decisions/p61-prebattery.json`.
+Result: the pre-existing suite already kills 50 of the 92 rows (33 `reversion`, 17 `sensitivity`) → `old_suite_kills`, killers in `old_suite_killers`.
+The battery is the sole killer of 42 (20 `reversion`, 22 `sensitivity`) → `battery_sole_killer`; `CONTROL: GREEN`, `KILLED: 0`, `PATCH-NOOP: 0`.
+
+```claims
+1046	50 of the	count	HEAD:.agent/decisions/p61-prebattery.json "pre_battery": "old_suite_kills"	50
+1046	of the 92 rows	json	HEAD:.agent/decisions/p61-prebattery.json rows	92
+1046	33 `reversion`	count	HEAD:.agent/decisions/p61-prebattery.json "kind": "reversion",\s+"pre_battery": "old_suite_kills"	33
+1046	17 `sensitivity`	count	HEAD:.agent/decisions/p61-prebattery.json "kind": "sensitivity",\s+"pre_battery": "old_suite_kills"	17
+1047	sole killer of 42	count	HEAD:.agent/decisions/p61-prebattery.json "pre_battery": "battery_sole_killer"	42
+1047	20 `reversion`	count	HEAD:.agent/decisions/p61-prebattery.json "kind": "reversion",\s+"pre_battery": "battery_sole_killer"	20
+1047	22 `sensitivity`	count	HEAD:.agent/decisions/p61-prebattery.json "kind": "sensitivity",\s+"pre_battery": "battery_sole_killer"	22
+```
