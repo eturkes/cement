@@ -1096,6 +1096,11 @@ class MigrationBatteryTests(unittest.TestCase):
         rather than mutating the wrong span.
 
         CORRECTED-BY C02, C05
+
+        p59: ONE source answers both halves — the script committed at `M3U6A1_TIP`
+        (`self.root` is the class's detached worktree at that tip, and `_copy_surgery` copies
+        from it). Seed = a throwaway commit on that tip whose script prints `applied:` where it
+        owes `no-op`, with `M3U6A1_TIP` pointed at it: the first half goes red.
         """
         self.assertTrue((self.root / SURGERY).is_file())
         with _detached_worktree(self.root, M3U6A1_TIP) as repaired:

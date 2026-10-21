@@ -15,6 +15,16 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p59 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 both D15 halves name ONE source; R2 the chosen branch is reddened by its own seed; R3 the unchanged half stays green. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance (re-derived) | pass | since `ffe9848` (M3.6a2) `MigrationBatteryTests.setUpClass` binds `cls.root` to a detached worktree at `M3U6A1_TIP`, so `repaired / SURGERY` and `_copy_surgery(self.root, …)` both read the script committed at `dc4ab5e`; the docstring now states that one source. |
+| R2 | acceptance | pass | throwaway commit `337506d` (= `dc4ab5e` + the script printing `applied: seed` where it owes `no-op`) with `M3U6A1_TIP` pointed at it → D15 red: `'no-op' not found in 'applied: seed\n'`. A working-tree seed leaves D15 green by design (closed-transition frame). |
+| R3 | regression | pass | unpatched → D15 green. |
+
 ## p49 (MAINTAIN queue run, owed) — target = the commit landing this section
 
 Check set: R1 the acceptance's grammar change is compatible with the standing pins. MAIN alone; no code.
