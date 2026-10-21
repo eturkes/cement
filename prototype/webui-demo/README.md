@@ -46,8 +46,9 @@ part of it, with a short note beside it. Select **Next** in the note to go on, o
 to go to the previous note. Going back to an earlier step replays the story up to that step
 without the simulated wait, so the page shows the same state as before. Select the **×** in
 the note or **Leave the story** to stop.
-Stop the server with Ctrl+C. The ledger is a temporary SQLite file, and it disappears with the
-process.
+Stop the server with Ctrl+C. The ledger is a temporary SQLite file, and Ctrl+C removes it with
+the process. A server that a signal such as `SIGTERM` stops leaves its `cement-demo-*` directory
+in the system temporary directory. Remove that directory by hand.
 
 ## Five tasks, four functions
 

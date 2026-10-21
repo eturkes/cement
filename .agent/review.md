@@ -15,6 +15,14 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p82 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
+
+Check set: R1 the README names the Ctrl+C-only cleanup (the row's documented option). MAIN alone; prototype law (no suite owed).
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `prototype/webui-demo/README.md`: Ctrl+C removes the temporary ledger; a `SIGTERM`-stopped server leaves its `cement-demo-*` directory, to remove by hand. |
+
 ## p24 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
 
 Check set: R1 the arm is documented as deliberate breadth over schema-fixed inputs, with no claim of a real-ledger repro. MAIN alone.
