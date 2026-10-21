@@ -15,6 +15,16 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p26 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 adjacent 256/257-byte + printable/control `--actor` pairs pin exit 0 vs invalid/2 with rejected stdout empty; R2 the accepted boundary value persists in the verification report; R3 credit recorded, survivors routed. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `test_function_verify_drafts_actor_bounds_are_adjacent_pairs`: `é`×128+`a` (257 B) + BEL → rc 2, stdout empty, `verified_by must be control-free and at most 256 UTF-8 bytes`; `é`×128 (256 B) + `verifier` → rc 0. |
+| R2 | acceptance | pass | the accepted 256-byte value = the `artifact.verified` event's `verified_by` and the report's `details.verified_by`. |
+| R3 | verification integrity | open → p107 | killed 1307 / survived 1026 / invalid 70 of 2403 (`.agent/decisions/p26-mutate.txt`). |
+
 ## p59 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 both D15 halves name ONE source; R2 the chosen branch is reddened by its own seed; R3 the unchanged half stays green. MAIN alone.

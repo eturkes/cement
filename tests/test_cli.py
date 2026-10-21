@@ -1768,6 +1768,30 @@ class CLITests(unittest.TestCase):
         self.assertEqual(run.stdout_bytes, b"")
         self.assertEqual(self.error(run)["error"], "invalid")
 
+    def test_function_verify_drafts_actor_bounds_are_adjacent_pairs(self) -> None:
+        # p26: `--actor` becomes `verified_by` (`_text`, 256 UTF-8 bytes, control-free) in the
+        # verification report it seals; each bound is an accepted value beside its rejected twin.
+        self.compile_drafts("drafts-actor", (9,))
+        bounded = "verified_by must be control-free and at most 256 UTF-8 bytes"
+        for rejected in ("é" * 128 + "a", "verifier\x07"):
+            with self.subTest(actor=rejected):
+                run = self.run_cli("function", "verify-drafts", "drafts-actor", "--actor", rejected)
+                self.assertEqual((run.status, run.stdout_bytes), (2, b""))
+                self.assertEqual(self.error(run), {"error": "invalid", "message": bounded})
+        boundary = "é" * 128
+        self.assertEqual(len(boundary.encode("utf-8")), 256)
+        accepted = self.run_cli("function", "verify-drafts", "drafts-actor", "--actor", boundary)
+        self.assertEqual(accepted.status, 0)
+        verified = [
+            event for event in typing.cast(list[dict[str, typing.Any]], self.run_cli("events").stdout_json)
+            if event["kind"] == "artifact.verified"
+        ]
+        self.assertEqual([event["payload"]["verified_by"] for event in verified], [boundary])
+        report = self.payload(self.run_cli("report", "show", verified[0]["payload"]["report_id"]))
+        self.assertEqual(report["details"]["verified_by"], boundary)
+        printable = self.run_cli("function", "verify-drafts", "drafts-actor", "--actor", "verifier")
+        self.assertEqual(printable.status, 0)
+
     def test_function_verify_projects_a_passing_promoted_set_without_document_content(self) -> None:
         self.promoted_operation("verify-pass", 3)
         system = System(self.database)
