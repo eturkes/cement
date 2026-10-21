@@ -15,6 +15,16 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p06 partial (MAINTAIN queue run, unit, tier `data`; row stays open, owed: owner ruling on u4c1) — target = the commit landing this section
+
+Check set: R1 each ported row reproduces its driver's mutated bytes at the catalogue base; R2 each replay reproduces its recorded closure set; R3 the unported part is recorded as owed, unclaimed. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | correctness | pass | builder asserts, per row, that `old → new` at `line` over `git show <base>:src/cement_runtime/cli.py` equals the driver's `str.replace` result (u4c5b's `gate-first-ordering` with its second edit); u4c5a's base `291e0e9` = the commit whose cli.py sha256 equals the driver's recorded baseline `aa5503faa223…`. |
+| R2 | acceptance (partial) | pass | u4c5a 16/16 killed rc 0; u4c5b 12 killed + `installed-file-unlinked` = ruled equivalent rc 0; CONTROL green ×8 each; all restored. |
+| R3 | claim soundness | pass | u4c1's catalogue has no surviving source; the row keeps `reproduces 9/9` open and names the ruling it needs. |
+
 ## p04 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section
 
 Check set: R1 acceptance rerun at HEAD (plans, page cost, control, version + fingerprint, reset doc). MAIN alone; no code changed.
