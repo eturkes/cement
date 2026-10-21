@@ -2392,6 +2392,13 @@ class CLITests(unittest.TestCase):
             "function_hash"
         ]
         self.assertNotEqual(fresh, stale)
+
+        def ledger() -> list[str]:
+            with contextlib.closing(sqlite3.connect(self.database)) as connection:
+                return list(connection.iterdump())
+
+        before = ledger()
+        self.assertTrue(any("INSERT INTO \"artifacts\"" in line for line in before))
         run = self.run_cli(
             "function",
             "promote",
@@ -2409,6 +2416,11 @@ class CLITests(unittest.TestCase):
                 "error": "conflict",
                 "message": "expected_function_hash does not match the locked prospective function",
             },
+        )
+        # The refusal writes nothing: no receipt, no status move, no event.
+        self.assertEqual(ledger(), before)
+        self.assertEqual(
+            self.payload(self.run_cli("function", "receipts", "promote-stale"))["receipts"], []
         )
 
     def test_function_promote_keeps_hash_after_nonqualifying_change(self) -> None:

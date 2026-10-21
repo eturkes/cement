@@ -15,6 +15,17 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p17 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 the re-derivation is grounded (the quoted message + pre-call probe left with the authority callback); R2 the successor acceptance holds on a real ledger through supported calls; R3 the no-write assertion is non-vacuous; R4 preservation credit recorded, survivors routed. MAIN alone (a test-only change to an existing CLI race test).
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | claim soundness | pass | `tests/test_authority_removal.py` R8 pins the quoted message absent from src + docs + tests; `promote_function` holds one locked comparison (`system.py` `expected_function_hash does not match the locked prospective function`); `LockedGuardTests` keeps it. |
+| R2 | acceptance | pass | the CLI test passes at this commit: rc 4 + exact conflict payload after inspect → confirm + compile + verify-drafts. |
+| R3 | correctness | pass | the before-dump holds artifact rows (asserted); after = before; receipts `[]`. |
+| R4 | verification integrity | open → p99 | credit run killed 1562 / survived 1170 / invalid 70 of 2802; survivors listed in `.agent/decisions/p17-mutate.txt`, unruled here → born row p99 (non-author rulings, suite-replay triage first). |
+
 ## p50 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 acceptance rerun at HEAD (absent paths + read-only directories create nothing, exit 5; no `System` built before the assertion). MAIN alone; no code changed.
