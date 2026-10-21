@@ -15,6 +15,15 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p93 + p95 (MAINTAIN queue run, owed) — target = the commit landing this section
+
+Check set: R1 each row's remaining part needs the owner, named on the row. MAIN alone; no code.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| p93 | scope | owed | per-survivor non-author rulings at 160-1,700 survivors a pin = the open survivor-scale question (p99-p110). |
+| p95 | scope | owed | the acceptance is an owner ruling on the prototype header vs the `Decisions` presentation rule. |
+
 ## p60 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 a committed checker reads every count-bearing contract line and resolves it against the named committed artifact, nonzero on divergence; R2 seeded both ways; R3 the shipped contract exits 0; R4 teammate output re-derived. MAIN + general-purpose-2.
