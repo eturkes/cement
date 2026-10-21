@@ -15,6 +15,15 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p58 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 the literal is derived from the baseline blob, never retyped, and its existence asserted; R2 the seed reds the new frame and leaves the old one green. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | correctness | pass | one heading found in `6fb4d92`'s `run_demo.py`, asserted to name `exportable function`; read through `_run` from `self.root`. |
+| R2 | acceptance | pass | baseline heading restored in the closed tree → new D20 RED, old D20 GREEN. |
+
 ## p57 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 the work list is drawn from a frozen, main-reachable source and asserted non-empty; R2 the seed reds the new frame and leaves the old one green; R3 D30 holds (the frame reads git objects, never the working tree). MAIN alone.

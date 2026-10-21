@@ -1364,7 +1364,16 @@ class MigrationBatteryTests(unittest.TestCase):
 
         result = _run_demo(self.root)
         self.assertEqual(result.returncode, 0, _result(result))
-        self.assertNotIn("becomes one exportable function", result.stdout)
+        # p58: the framing is the baseline's own act-5 heading, derived from its blob — a
+        # retyped literal ("becomes", where the blob says "become") matched nothing either side.
+        baseline = _run(
+            ["git", "show", f"{BASELINE}:{path}"], cwd=self.root, root=self.root
+        )
+        self.assertEqual(baseline.returncode, 0, _result(baseline))
+        headings = re.findall(r"=== Act 5: ([^=]+?) ===", baseline.stdout)
+        self.assertEqual(len(headings), 1)
+        self.assertIn("exportable function", headings[0])
+        self.assertNotIn(headings[0], result.stdout)
         act_five = result.stdout.split("=== Act 5:", 1)[1].split(
             "=== Audit event trace ===", 1
         )[0]
