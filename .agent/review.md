@@ -15,6 +15,16 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p97 partial (MAINTAIN queue run, unit, tier `kernel`; owed: owner ruling on the separator set + ABI) — target = the commit landing this section
+
+Check set: R1 the defect reproduced at HEAD; R2 the design input states what each option changes for already-promoted versions; R3 nothing implemented ahead of the ruling. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | correctness | pass | `structure()` on a full-width-colon form → `None`; same form with `:` → a 3-label layout. |
+| R2 | claim soundness | pass | in-place widening changes `structure()` for every stored v1 program, so promoted versions would start recognizing inputs no confirmed example showed; a v2 ABI leaves v1 programs unchanged. |
+| R3 | scope | pass | no source change; the row stays open. |
+
 ## p103 close (MAINTAIN queue run, born row pulled forward as an enabler, tier `data`) — target = the commit landing this section
 
 Check set: R1 equal strength (identical emitted table, all self-test controls fire); R2 the speed-up measured; R3 scope (only the segment source changed). MAIN alone.
