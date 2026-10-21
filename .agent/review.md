@@ -15,6 +15,14 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p50 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 acceptance rerun at HEAD (absent paths + read-only directories create nothing, exit 5; no `System` built before the assertion). MAIN alone; no code changed.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `ExistingOnlyBattery` p50 ×3 OK; live CLI probe on an absent path in a `0o555` directory → rc 5, nothing created. |
+
 ## p19 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section
 
 Check set: R1 acceptance from a clean checkout (good rc 0; bad anchor + `TODO-FILL` rc 1, each printing its line); R2 fixtures cannot drift with source edits; R3 records. MAIN alone (a dev validator with mechanical fixtures).
