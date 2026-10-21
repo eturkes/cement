@@ -1111,6 +1111,81 @@ class CLITests(unittest.TestCase):
         self.assertIs(result, spy.return_value)
         self.assertNotIsInstance(result, _Outcome)
 
+    def test_function_show_and_receipts_take_the_last_of_a_repeated_flag(self) -> None:
+        for leaf, method, arguments, expected in (
+            ("receipts", "function_receipts", ("--limit", "3", "--limit", "1"),
+             {"operation_revision": None, "before_sequence": None, "limit": 1}),
+            ("receipts", "function_receipts", ("--limit", "1", "--limit", "3"),
+             {"operation_revision": None, "before_sequence": None, "limit": 3}),
+            ("receipts", "function_receipts",
+             ("--operation-revision", "2", "--operation-revision", "1",
+              "--before-sequence", "9", "--before-sequence", "4"),
+             {"operation_revision": 1, "before_sequence": 4, "limit": 100}),
+            ("show", "function_report", ("--receipt-id", "fpr_a", "--receipt-id", "fpr_b"),
+             {"receipt_id": "fpr_b", "projection_limit": 100}),
+            ("show", "function_report", ("--receipt-id", "fpr_b", "--receipt-id", "fpr_a"),
+             {"receipt_id": "fpr_a", "projection_limit": 100}),
+            ("show", "function_report", ("--projection-limit", "3", "--projection-limit", "1"),
+             {"receipt_id": None, "projection_limit": 1}),
+        ):
+            with self.subTest(arguments=arguments), mock.patch.object(
+                System, method, autospec=True
+            ) as spy:
+                spy.return_value = {"forwarded": True}
+                run = self.run_cli("function", leaf, "echo", *arguments)
+                self.assertEqual(run.status, 0)
+                self.assertEqual(spy.call_count, 1)
+                self.assertEqual(spy.call_args.kwargs, expected)
+
+    def test_function_show_and_receipts_read_unicode_decimal_digits_as_integers(self) -> None:
+        # `type=int` is `int(str)`, which reads every Unicode decimal digit: ARABIC-INDIC DIGIT
+        # ONE (U+0661), FULLWIDTH DIGIT TWO (U+FF12) and DEVANAGARI DIGITS ONE + ZERO (U+0967
+        # U+0966) reach the library as 1, 2 and 10.
+        for spelling, value in (("١", 1), ("２", 2), ("१०", 10)):
+            for leaf, method, flag, expected in (
+                ("receipts", "function_receipts", "--limit",
+                 {"operation_revision": None, "before_sequence": None, "limit": value}),
+                ("receipts", "function_receipts", "--before-sequence",
+                 {"operation_revision": None, "before_sequence": value, "limit": 100}),
+                ("show", "function_report", "--projection-limit",
+                 {"receipt_id": None, "projection_limit": value}),
+            ):
+                with self.subTest(spelling=spelling, flag=flag), mock.patch.object(
+                    System, method, autospec=True
+                ) as spy:
+                    spy.return_value = {"forwarded": True}
+                    run = self.run_cli("function", leaf, "echo", flag, spelling)
+                    self.assertEqual(run.status, 0)
+                    self.assertEqual(spy.call_args.kwargs, expected)
+
+    def test_function_show_and_receipts_reject_each_others_flags(self) -> None:
+        for leaf, arguments in (
+            ("show", ("--limit", "1")),
+            ("show", ("--before-sequence", "1")),
+            ("show", ("--operation-revision", "1")),
+            ("receipts", ("--receipt-id", "fpr_" + "0" * 32)),
+            ("receipts", ("--projection-limit", "5")),
+        ):
+            with self.subTest(leaf=leaf, flag=arguments[0]):
+                run = self.run_cli("function", leaf, "echo", *arguments)
+                self.assertEqual(run.status, 2)
+                self.assertEqual(run.stdout_bytes, b"")
+                self.assertEqual(
+                    self.error(run),
+                    {"error": "invalid", "message": "unrecognized arguments: " + " ".join(arguments)},
+                )
+
+    def test_function_show_and_receipts_reject_a_surplus_positional(self) -> None:
+        for leaf in ("show", "receipts"):
+            with self.subTest(leaf=leaf):
+                run = self.run_cli("function", leaf, "echo", "surplus")
+                self.assertEqual(run.status, 2)
+                self.assertEqual(run.stdout_bytes, b"")
+                self.assertEqual(
+                    self.error(run),
+                    {"error": "invalid", "message": "unrecognized arguments: surplus"},
+                )
+
     def test_function_show_receipt_id_pins_a_historical_anchor(self) -> None:
         history = self.receipt_history("echo", members=2, receipts=3)
         current = self.payload(self.run_cli("function", "show", "echo"))

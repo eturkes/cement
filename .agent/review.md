@@ -15,6 +15,17 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p21 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 each acceptance class pinned with an exact expectation; R2 pins mock the library boundary, never the CLI's own dispatch; R3 no existing test touched; R4 preservation credit recorded, survivors routed. MAIN alone (CLI grammar pins).
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | last-wins in both orders per flag; three Unicode digit spellings per integer flag; 5 cross-leaf flags with the exact `unrecognized arguments` message; surplus positional on both leaves. |
+| R2 | correctness | pass | spies = `mock.patch.object(System, "function_receipts" / "function_report", autospec=True)`, asserting `call_args.kwargs` exactly. |
+| R3 | correctness | pass | `git diff` adds lines only. |
+| R4 | verification integrity | open → p100 | killed 268 / 266 / 147 / 147; survivors in `.agent/decisions/p21-mutate.txt` → born row p100. |
+
 ## p58 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 the literal is derived from the baseline blob, never retyped, and its existence asserted; R2 the seed reds the new frame and leaves the old one green. MAIN alone.
