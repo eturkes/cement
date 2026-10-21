@@ -15,6 +15,15 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p70 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
+
+Check set: R1 `.claude/rules/ops.md` names D28's per-revision 600 s limit as load-sensitive with both measurements; R2 a change to the limit is bound to an owner-approved unit recording this firing. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | ops.md Env/gate bullet: `timeout=600` at `tests/test_migration_battery.py:1639` (the D28 inner replay), `ffe9848` TimeoutExpired at load 8.7-11 vs 379.1 s alone at load 4.8-6.0 (63%; recurrences to 88%). |
+| R2 | acceptance | pass | same sentence: a TimeoutExpired is load until a quiet rerun reproduces it; a limit change = an owner-approved gate change recording this firing. |
+
 ## p66 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 a committed census enumerates every `skipTest` call + `skip*` decorator under `tests/` and EQUALS a three-member allowlist with each condition; R2 it excludes itself + prints every unmatched hit; R3 a seeded fourth skip reds it naming the test id; the shipped tree exits 0. MAIN alone; no change (acceptance met at `629577d`).
