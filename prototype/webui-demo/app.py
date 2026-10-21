@@ -122,7 +122,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == "/api/bundle.json":
             bundle = session().bundle(query.get("operation", [None])[0])
             if bundle is None:
-                self._json({"error": "no verified function to export"}, status=409)
+                self._json({"error": "No function is learned yet. Select Learn from chats first."}, status=409)
                 return
             self._send(200, bundle.encode("utf-8"), "application/json; charset=utf-8")
             return

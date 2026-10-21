@@ -2095,7 +2095,7 @@ class Session:
         with self._lock:
             target = self._bundle_target(operation)
             if target not in self.functions:
-                raise RuntimeError("no verified function to export for this task")
+                raise RuntimeError("No function is learned for this task yet. Select Learn from chats first.")
             document = self._document(document_id)
             expected = str(self.functions[target]["function_hash"])
             bundle = self.bundles[target]

@@ -724,7 +724,7 @@ body:not(.tech) #operator-view {
 /* Learned functions for the selected task: name, cases, Read, its own switch. */
 .fn-list { margin-top: 4px; }
 .fn-list h3 { font-size: 15px; margin: 0 0 8px; }
-.fn-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; color: var(--green); }
+.fn-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; color: var(--green); }
 .fn-row code { font: 13px Mono, monospace; color: var(--ink); }
 .fn-row .fn-note { font-size: 12.5px; color: var(--quiet); margin-right: auto; }
 .fn-row .fn-note.never { color: var(--amber); font-weight: 700; }
@@ -738,3 +738,8 @@ body:not(.tech) #operator-view {
 .fn-code .tag-from { background: #faf0dd; color: var(--amber); font-weight: 700; }
 .cement-pop .driver-popover-footer button.driver-popover-prev-btn { background: white; color: var(--ink); border: 1px solid #b7c8c0; }
 .cement-pop .driver-popover-footer button.driver-popover-btn-disabled { opacity: 0.4; cursor: default; }
+
+/* Reduced motion: the typing dots hold still (driver.js animation is off in app.js). */
+@media (prefers-reduced-motion: reduce) {
+  .dots span { animation: none; }
+}

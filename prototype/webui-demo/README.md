@@ -186,7 +186,8 @@ every frame from one ledger into `.scratch/webui-demo-capture/`, which git ignor
 The visual check uses its own browser: a pinned Playwright and its headless Chromium.
 Install them once with the first command below. The command needs Node.js and pnpm. It
 writes only to `prototype/webui-demo/node_modules/`, which git ignores. `capture.sh`,
-`measure-height.mjs` and `density.mjs` all use that browser through `browser.mjs`.
+`measure-height.mjs`, `density.mjs` and `quality.mjs` all use that browser through `browser.mjs`.
+`quality.mjs` checks reduced motion, a 390 px viewport, keyboard focus and text contrast.
 
 ```bash
 pnpm --dir prototype/webui-demo install

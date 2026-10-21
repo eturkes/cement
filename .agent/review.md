@@ -17,6 +17,19 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p80 close (MAINTAIN queue run, unit, tier `docs` — PROTOTYPE law) — target = the commit landing this section
+
+Check set (the row's acceptance): R1 reduced motion; R2 390×844 reach; R3 Tab focus ring; R4 contrast ≥ 4.5:1; R5 UI copy ruled against `Decisions`; R6 fixes captured. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | fixed | `.dots span` `pulse` → `none` under `prefers-reduced-motion: reduce` (positive control: `pulse` without it); driver.js already ran `animate: false` there. |
+| R2 | acceptance | fixed | story state: a function row's switch sat at 380-423 px (clipped) → `.fn-row` wraps; now 0 off-screen controls, `scrollWidth` 390, both states; frame inspected. |
+| R3 | acceptance | pass | Tab stops 13/13 (reset) and 17/17 (story end), each with an outline ring (`:focus-visible` rule already present). |
+| R4 | acceptance | pass | 73 (reset) / 360 (`?tech=1` story end) text nodes, 0 pairs below 4.5:1 (blended backgrounds). |
+| R5 | acceptance | fixed | errors must state the fix: client fallback `request failed`, `/api/bundle.json` `no verified function to export`, offline `… for this task` → each names the next action (`Reset`, `Learn from chats`); controls, empty states and the technical-details toggle match `Decisions` wording; the `cement · Concept demo` header = p95's open owner question, untouched. |
+| R6 | acceptance | pass | `capture.sh` rc 0, 10 frames, duplicate check empty; density 155/155/12 at `?reset=1` (unchanged), 244/244/15 at story end; `quality.mjs` committed so the floor reruns. |
+
 ## p79 close (MAINTAIN queue run, unit, tier `docs` — PROTOTYPE law) — target = the commit landing this section
 
 Check set: R1 the three tools drive a browser the prototype installs (one command, `node_modules/` gitignored); R2 the machine-bound grep is rc 1; R3 fresh clone → 10 PNGs + transcript + timings, no duplicate frame; R4 density grade at `?reset=1`; R5 Template rulings (4) retires. MAIN alone.

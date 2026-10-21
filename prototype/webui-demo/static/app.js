@@ -97,7 +97,7 @@ async function call(path, body) {
     if (run !== RUN) return null;
     if (!response.ok) {
       if (payload.state) STATE = payload.state;
-      toast(payload.error || "request failed");
+      toast(payload.error || "That step did not finish. Select Reset, then try again.");
       return null;
     }
     STATE = payload;
