@@ -655,6 +655,32 @@ class SubmissionTests(unittest.TestCase):
                     )
                 self.assertEqual(str(caught.exception), fragment)
 
+    def test_a_non_mapping_provenance_is_refused_never_normalized(self):
+        # p09: `dict([])` would read `[]` as `{}`; the Mapping guard refuses it first. A caller's
+        # own candidate gets the validation text; a source's candidate is contained whole.
+        for provenance in ([], "text", 7, None):
+            with self.subTest(provenance=provenance):
+                source = _Source(lambda request, provenance=provenance: Candidate(
+                    output={"v": 1}, provenance=provenance
+                ))
+                system, database, _ = self._make_system(source=source)
+                before = self._counts(database)
+                with self.assertRaises(ValidationError) as caught:
+                    system.submit_proposal(
+                        "tenant_a", "echo_1", {"k": 1},
+                        candidate=Candidate(output={"v": 1}, provenance=provenance),
+                    )
+                self.assertEqual(str(caught.exception), "candidate provenance must be a mapping")
+                with self.assertRaises(CandidateSourceError) as contained:
+                    system.propose("tenant_a", "echo_1", {"k": 1})
+                self.assertEqual(str(contained.exception), "candidate source failed")
+                self.assertIsNone(contained.exception.__context__)
+                self.assertEqual(self._counts(database), before)
+        system, _, _ = self._make_system(
+            source=_Source(lambda request: Candidate(output={"v": 1}, provenance={}))
+        )
+        self.assertTrue(system.propose("tenant_a", "echo_1", {"k": 1}))
+
     def test_a_rejected_call_opens_no_transaction_and_invokes_no_source(self):
         system, _, source = self._make_system()
         with mock.patch.object(

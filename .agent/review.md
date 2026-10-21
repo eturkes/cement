@@ -15,6 +15,17 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p09 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 re-derivation grounded (`handle` gone; successor paths share `_canonical_candidate`); R2 both ownership classes pinned (caller → validation text; source → contained, no context); R3 no write on refusal + `{}` control; R4 credit recorded, survivors routed. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | claim soundness | pass | `rg 'def handle' src` → none; `_canonical_candidate` guards `Mapping` before `dict()`. |
+| R2 | acceptance | pass | 4 shapes × 2 paths, exact classes + messages, `__context__ is None`. |
+| R3 | correctness | pass | `_counts(database)` equal before/after per shape; `{}` accepted. |
+| R4 | verification integrity | open → p104 | 321 / 281 / 40 (`.agent/decisions/p09-mutate.txt`). |
+
 ## p74 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section
 
 Check set: R1 the command runs from clean clones with default operators; R2 the seed raises the survivor count on the same scope; R3 records + the p02 ruling. MAIN alone.
