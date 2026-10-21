@@ -15,6 +15,15 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p16 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
+
+Check set: R1 README names the four meanings + the disambiguation; R2 each leaf's exit-6 test pins its channel. MAIN alone; no change.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | README `## Outcomes` table + the leaf/payload sentence. |
+| R2 | acceptance | pass | verify-drafts, verify, export, eval exit-6 tests each assert stdout/stderr per the table. |
+
 ## p09 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 re-derivation grounded (`handle` gone; successor paths share `_canonical_candidate`); R2 both ownership classes pinned (caller → validation text; source → contained, no context); R3 no write on refusal + `{}` control; R4 credit recorded, survivors routed. MAIN alone.
