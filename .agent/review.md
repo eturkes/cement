@@ -15,6 +15,18 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p32 + p33 plan review (MAINTAIN queue run, partial, tier `kernel`) — target = the commit landing this section
+
+Check set (the plan's own): A policy family, B bound-report family, C FunctionEntry construction, D decomposition, V verification, Q1-Q3. Reviewer = `consultant-1` (consultant), table `.agent/decisions/p32-plan-review.md`; MAIN re-verified each decisive anchor.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| D | gate safety | finding, owed | B20 `tests/test_read_capability_battery.py:883` `self.assertEqual(reached_helpers, expected_helpers)` over an exact 24-name set ⇒ any read-reachable extracted helper reds it; extending the set = a grading-check change ⇒ owner ruling, recorded on p32. |
+| B | completeness | finding, recorded | six bound-report owners, not four (+ `promote` `:5222`, `_validate_promoted` `:6321`); member-binding family missing — recorded on p32 as design input. |
+| V | verification | finding, recorded | literal census ≠ equivalence; behavioral differential over compound defects recorded on p32. |
+| R | rules accuracy | finding, fixed | `.claude/rules/runtime.md` said over-capacity returns "all six checks FALSE"; `system.py:3076-3082` returns seven ⇒ fixed to seven. |
+| Q1-Q3, A, C | design | pass / recorded | per-caller message maps = one owner per predicate; p33 closes `closed=<p32 sha>` after its own census; C sound. |
+
 ## p39 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 each S3 KEEP row + source-docstring row carries a disposition + falsifier at HEAD; R2 a deterministic check rejects callback/runtime ACCESS-CONTROL ATTRIBUTION (not merely unclassified tokens); R3 each check is seen firing on planted text; R4 credit status stated. MAIN alone.
