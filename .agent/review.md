@@ -17,6 +17,16 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p78 close (MAINTAIN queue run, row closure at `1935f68`, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 the acceptance met at `1935f68` holds on recheck; R2 planted red reds twice, store unchanged; R3 the kept assertions. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `1935f68` + records `2d84f3b`: cold 2274.1 s / 12 replays → warm 306.1 s / 1 replay on one tree; this session's warm D28 = 143.1 s and 340.9 s at 1 replay. Cold not re-measured (≈ 61 replays now). |
+| R2 | acceptance | pass | throwaway `099c9a7` on `c323edd` (one failing test in `tests/`): run 1 + run 2 both rc 1, `1 replayed, 60 from green verdicts`, failing revision = `099c9a7`; store listing 87 entries, digest `911f79d12d20836b` before = after. |
+| R3 | acceptance | pass | `tests/test_migration_battery.py`: `assertTrue(revisions, …)` + `assertGreaterEqual(ran, 949)` on a replay + `assertGreaterEqual(verdict[0], 949)` on a served verdict. |
+
 ## p03 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 §G audits every site + nullability; R2 public paths reject non-int stored integers; R3 numeric-text receipt probe expects `IntegrityError`; R4 fabricated / schema-rewrite probes labelled non-real-ledger; R5 existing pins the change moves; R6 paste-ins regenerated. MAIN alone.
