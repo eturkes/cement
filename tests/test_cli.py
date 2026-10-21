@@ -2,6 +2,7 @@ import argparse
 import contextlib
 import dataclasses
 import errno
+import hashlib
 import inspect
 import io
 import json
@@ -4904,6 +4905,109 @@ class CLITests(unittest.TestCase):
             run.stdout_bytes,
             b'{\n  "operation": "regression",\n  "revision": 1\n}\n',
         )
+
+
+class ParserShapeTests(unittest.TestCase):
+    """One digest over every facet of the live grammar (p53).
+
+    M3.5b's `parser_shape` digest grades git object `1146421` and omits help, choices and
+    type, so a false help string, a narrowed choice set or an `int` -> `str` swap in the live
+    CLI moves no digest. This one reads the live `_parser()`: per node its `allow_abbrev` +
+    description, per subcommand group its dest + required, per subcommand its help, per action
+    dest, option strings, default, required, nargs, class, help, choices and type. A deliberate
+    grammar or help change re-pins it.
+    """
+
+    SHAPE = (218, "9efacf438f50f647")
+
+    @staticmethod
+    def shape(parser: argparse.ArgumentParser) -> tuple[int, str]:
+        rows: list[str] = []
+
+        def visit(node: argparse.ArgumentParser, path: tuple[str, ...]) -> None:
+            where = " ".join(path)
+            rows.append("|".join((where, "<node>", repr(node.allow_abbrev), repr(node.description))))
+            for action in sorted(node._actions, key=lambda item: (item.dest, item.option_strings)):
+                if isinstance(action, argparse._SubParsersAction):
+                    continue
+                rows.append(
+                    "|".join(
+                        (
+                            where,
+                            action.dest,
+                            ",".join(sorted(action.option_strings)),
+                            repr(action.default),
+                            repr(action.required),
+                            repr(action.nargs),
+                            type(action).__name__,
+                            repr(action.help),
+                            repr(None if action.choices is None else list(action.choices)),
+                            getattr(action.type, "__name__", repr(action.type)),
+                        )
+                    )
+                )
+            for action in node._actions:
+                if isinstance(action, argparse._SubParsersAction):
+                    rows.append("|".join((where, "<subcommands>", action.dest, repr(action.required))))
+                    for choice in action._choices_actions:
+                        rows.append("|".join((where, "<command>", choice.dest, repr(choice.help))))
+                    for name, child in sorted(action.choices.items()):
+                        visit(child, (*path, name))
+
+        visit(parser, ())
+        return len(rows), hashlib.sha256("\n".join(rows).encode("utf-8")).hexdigest()[:16]
+
+    def test_the_live_grammar_digest_covers_help_choices_and_type(self) -> None:
+        from cement_runtime.cli import _parser
+
+        self.assertEqual(self.shape(_parser()), self.SHAPE)
+
+    def test_each_facet_moves_the_digest(self) -> None:
+        from cement_runtime.cli import _parser
+
+        def action(parser: argparse.ArgumentParser, *path: str, dest: str) -> argparse.Action:
+            node = parser
+            for name in path:
+                node = next(
+                    item for item in node._actions if isinstance(item, argparse._SubParsersAction)
+                ).choices[name]
+            return next(item for item in node._actions if item.dest == dest)
+
+        baseline = self.shape(_parser())
+        seeds = {
+            "help": lambda parser: setattr(
+                action(parser, "function", "show", dest="receipt_id"), "help", "a false help"
+            ),
+            "choices": lambda parser: setattr(
+                action(parser, "proposal", "list", dest="status"),
+                "choices",
+                ("all", "pending"),
+            ),
+            "type": lambda parser: setattr(
+                action(parser, "function", "receipts", dest="limit"), "type", str
+            ),
+            "subcommand required": lambda parser: setattr(
+                next(
+                    item for item in parser._actions if isinstance(item, argparse._SubParsersAction)
+                ),
+                "required",
+                False,
+            ),
+            "command help": lambda parser: setattr(
+                next(
+                    item for item in parser._actions if isinstance(item, argparse._SubParsersAction)
+                )._choices_actions[0],
+                "help",
+                "a false command help",
+            ),
+        }
+        for facet, seed in seeds.items():
+            with self.subTest(facet=facet):
+                parser = _parser()
+                seed(parser)
+                moved = self.shape(parser)
+                self.assertEqual(moved[0], baseline[0])
+                self.assertNotEqual(moved[1], baseline[1])
 
 
 if __name__ == "__main__":

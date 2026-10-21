@@ -15,6 +15,17 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p53 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 the re-derivation is grounded (Gate 4 grades a git object); R2 every facet the row names is in the live digest and moves it; R3 the frozen D02 digest + census stay untouched; R4 credit recorded, its first run's survivors acted on, the rest routed. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | claim soundness | pass | D02 + the channels oracle call `_module_from_git("1146421")._parser()`. |
+| R2 | acceptance | pass | 5 in-test seeds, each `assertNotEqual(digest)` at equal count; pinned `(218, "9efacf438f50f647")`. |
+| R3 | correctness | pass | `tests/test_cli_removal_battery.py` + `tests/test_cli_channels_battery.py` unchanged by this commit. |
+| R4 | verification integrity | open → p102 | first run 114/86: 9 survivors = subcommand-group `required` → facet added; second run 123/77 (`.agent/decisions/p53-mutate.txt`). |
+
 ## p22 partial (MAINTAIN queue run, unit, tier `kernel`; row stays open, owed: owner approval to retire the observational test) — target = the commit landing this section
 
 Check set: R1 the mechanism test fixes every entropy source the bundle depends on; R2 exactly one id moves in the varied run; R3 length equality is derived, never retyped; R4 credit recorded, survivors routed; R5 the deletion half is recorded as owed, not performed. MAIN alone.
