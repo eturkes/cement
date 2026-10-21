@@ -13,7 +13,18 @@ fixed before the close it reviews; a finding outside it is born as a `.agent/def
 row with its acceptance check. The one open row this ledger holds = an IMPLEMENT mutation
 survivor its unit left unruled, open until the closing-diff `reviewer` rules it against the
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
-against its acceptance check alone.
+against its acceptance check alone. A pass here is a reviewer's opinion about the repository: neither a
+replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
+names all three).
+
+## p84 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
+
+Check set: R1 `docs/architecture.md` names, per proof, what it binds, what makes it stale and whether it gates promotion; R2 `.agent/review.md`'s preamble uses the same three names. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `## Stability and verification claims`: reviewer's opinion (example + receipt hash; stale on revoke/supersede; one confirmation, gates nothing alone), replay verdict (artifact/build/policy hash + evidence snapshot; stale on evidence or revision change; promotion requires a passing one), promotion receipt (function hash + entry seals; a true record; gates nothing, each call re-checks the selected version). Claims checked against `_validate_report` bindings + promote's passing-report rule. |
+| R2 | acceptance | pass | review preamble: a pass here is a reviewer's opinion, neither a replay verdict nor a promotion receipt. |
 
 ## p45 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 

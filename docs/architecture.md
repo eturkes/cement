@@ -182,6 +182,15 @@ tests. Those three definitions apply to one entry. The promoted set adds one mor
 `verify_function` result binds the complete current snapshot to all seven ordered checks. It also binds
 that snapshot to the latest current-revision receipt, and every member to one program.
 
+Three records prove different things. A reviewer's opinion is the review of one proposal. It binds
+the confirmed example and its receipt hash, it goes stale when the example is revoked or superseded,
+and it gates nothing alone: it adds one confirmation toward the policy. A replay verdict is a sealed
+verification report. It binds the artifact hash, the build hash, the policy hash and the evidence
+snapshot, it goes stale when that evidence or the operation revision changes, and promotion requires
+a passing one. A promotion receipt binds the function hash and every member's entry seal. It records
+one promotion and stays true as that record. It gates nothing: the switch selects the version that
+answers, and each call checks that version again.
+
 Every verification result and every report is one committed read snapshot. It is not a lease, a
 signature, a semantic replay, or a statement about future state. The live ledger can later revise,
 suspend, revoke, replace, or checkpoint the same scope. Exported bytes stay deterministic because they
