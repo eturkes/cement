@@ -14702,7 +14702,7 @@ class SystemTests(unittest.TestCase):
         before = self._database_dump()
         with self.assertRaisesRegex(
             IntegrityError,
-            "^operation artifact row is invalid:",
+            "^stored report passed is invalid$",
         ):
             reader.function_report("tenant-a", "echo")
         self.assertEqual(self._database_dump(), before)
@@ -14760,7 +14760,7 @@ class SystemTests(unittest.TestCase):
         before = self._database_dump()
         with self.assertRaisesRegex(
             IntegrityError,
-            "^current build projection is invalid:",
+            "^stored example confirmed_at_us is invalid$",
         ):
             reader.function_report("tenant-a", "echo")
         self.assertEqual(self._database_dump(), before)
@@ -17059,6 +17059,88 @@ class SystemTests(unittest.TestCase):
                             "echo",
                             projection_limit=3,
                         )
+
+
+    def test_a_numeric_text_integer_column_raises_integrity_error_on_every_read_path(self) -> None:
+        # p03, FABRICATED (no real ledger): STRICT tables convert numeric text at write, so no
+        # stored INTEGER reads back as "7"; a row proxy plants it to pin that each public read
+        # rejects a non-int stored integer (`_stored_int`) where `int(...)` coerced it.
+        self.register(confirmations=2, reviewers=2, span=0)
+        artifact_id = self._promote_function_entry({"x": 1}, "numeric-text")[0]
+        report_id = self.system.reports("tenant-a")[0]["id"]
+        proposal_id = self.system.propose("tenant-a", "echo", {"x": 9})
+        real_transaction = self.system.store.transaction
+        planted = ""
+
+        class Row:
+            def __init__(self, row: sqlite3.Row) -> None:
+                self.row = row
+
+            def __getitem__(self, key: object) -> object:
+                value = self.row[key]  # type: ignore[index]
+                return str(value) if key == planted and type(value) is int else value
+
+            def keys(self) -> list[str]:
+                return self.row.keys()
+
+        class Cursor:
+            def __init__(self, cursor: sqlite3.Cursor) -> None:
+                self.cursor = cursor
+
+            def fetchone(self) -> object:
+                row = self.cursor.fetchone()
+                return None if row is None else Row(row)
+
+            def fetchall(self) -> list[object]:
+                return [Row(row) for row in self.cursor.fetchall()]
+
+            def __iter__(self):
+                return (Row(row) for row in self.cursor)
+
+            def __getattr__(self, name: str) -> object:
+                return getattr(self.cursor, name)
+
+        class Connection:
+            def __init__(self, connection: sqlite3.Connection) -> None:
+                self.connection = connection
+
+            def execute(self, *args: object) -> Cursor:
+                return Cursor(self.connection.execute(*args))  # type: ignore[arg-type]
+
+            def __getattr__(self, name: str) -> object:
+                return getattr(self.connection, name)
+
+        @contextmanager
+        def transaction(*args: object, **kwargs: object):
+            with real_transaction(*args, **kwargs) as connection:  # type: ignore[arg-type]
+                yield Connection(connection)
+
+        artifact_columns = ("sequence", "operation_revision", "support", "reviewer_count", "span_seconds", "created_at_us")
+        report_columns = ("sequence", "test_count", "created_at_us", "passed")
+        paths = (
+            ("operations", lambda: self.system.operations("tenant-a"), ("revision", "created_at_us", "updated_at_us")),
+            ("examples", lambda: self.system.examples("tenant-a", "echo"), ("sequence", "operation_revision", "confirmed_at_us")),
+            ("artifact", lambda: self.system.artifact("tenant-a", artifact_id), (*artifact_columns, "promoted_at_us")),
+            ("artifacts", lambda: self.system.artifacts("tenant-a", "echo"), artifact_columns),
+            ("report", lambda: self.system.report("tenant-a", report_id), report_columns),
+            ("reports", lambda: self.system.reports("tenant-a"), report_columns),
+            ("events", lambda: self.system.events("tenant-a"), ("sequence", "created_at_us")),
+            ("get_proposal", lambda: self.system.get_proposal("tenant-a", proposal_id), ("created_at_us",)),
+            ("proposal", lambda: self.system.proposal("tenant-a", proposal_id), ("created_at_us", "status_sequence")),
+            ("function_receipts", lambda: self.system.function_receipts("tenant-a", "echo"), ("sequence", "operation_revision", "member_count", "promoted_at_us")),
+            ("compile", lambda: self.system.compile("tenant-a", "echo"), ("revision",)),
+        )
+        for name, read, columns in paths:
+            for column in columns:
+                with self.subTest(path=name, column=column):
+                    self.assertTrue(read())
+                    planted = column
+                    try:
+                        with mock.patch.object(self.system.store, "transaction", transaction):
+                            with self.assertRaises(IntegrityError):
+                                read()
+                    finally:
+                        planted = ""
 
 
 if __name__ == "__main__":

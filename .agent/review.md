@@ -17,6 +17,19 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p03 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 §G audits every site + nullability; R2 public paths reject non-int stored integers; R3 numeric-text receipt probe expects `IntegrityError`; R4 fabricated / schema-rewrite probes labelled non-real-ledger; R5 existing pins the change moves; R6 paste-ins regenerated. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | census script → §G table: 91 sites (79 exact, 4 pre-checked, 7 in-memory, 1 driver, 0 UNGUARDED); graded both ways: pre-fix source 62 UNGUARDED rc 1, fixed rc 0. Nullability from `store.SCHEMA`; surfaces from the AST call graph. |
+| R2 | acceptance | pass | 57 conversions → `_stored_int` (56 UNGUARDED + 1 pre-checked) with schema CHECK minima (revision/sequence 1, support 2, reviewer_count 1, test_count 1, passed ≤ 1, timestamps 0 — clock values are validated ≥ 0 at write); receipts: exact-type check before the existing range messages. |
+| R3 | acceptance | pass | probe covers `function_receipts` sequence / operation_revision / member_count / promoted_at_us beside 10 other public paths; red at the unfixed source (36 of 37 subtests; `artifact`/`operation_revision` already raised). |
+| R4 | acceptance | pass | probe comment: FABRICATED (STRICT tables cannot hold numeric text); the NULL probe rewrites the schema and stays so labelled. |
+| R5 | correctness | fixed | `test_function_report_translates_null_persisted_projection_scalars`: its two message pins (`^operation artifact row is invalid:`, `^current build projection is invalid:`) wrapped a raw `TypeError`; `_stored_int` now raises the field's own `IntegrityError` → re-targeted to `^stored report passed is invalid$` + `^stored example confirmed_at_us is invalid$` (class kept, anchored + exact; standing pin-repair approval); the prefixes stay live for other `TypeError`/`ValueError`. |
+| R6 | acceptance | pass | `examples/open_webui/generate.py` rerun; paste-in battery green. |
+
 ## p15 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 each of the 28 probes mapped to a subsuming shipped test or merged; R2 merged count recorded; R3 scratch suite removed; R4 the merged probes earn preservation credit; R5 the map's anchors resolve in the landed tree. MAIN + general-purpose-1 (map author).

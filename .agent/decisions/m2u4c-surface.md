@@ -127,33 +127,105 @@ No class adds structured attributes; subclasses/message families are the only su
 
 ## G — stored-scalar boundary audit
 
-Census method: AST over every `int(...)`/`float(...)`/`bool(...)` and `_stored_int(...)` call in `src/cement_runtime/system.py`; rows group adjacent same-boundary fields. `guarded` means exact `type(value) is int` through `_stored_int` or an explicit preceding exact-type check. `translated` means enclosing boundary catches conversion failures to `IntegrityError`; ordinary `int(bool)` writes from runtime booleans are not persisted-row reads.
+Census = `uv run python .agent/decisions/p03-stored-int-census.py --markdown` (p03; regenerates the table below, rc 1 on an UNGUARDED site): every `int(…)`, `bool(…)` and `_stored_int(…)` call in `src/cement_runtime/system.py`, its guard class, the schema's INTEGER columns of that key (`?` = nullable) and the public `System` methods whose call graph reaches the enclosing function. Line numbers = the p03 closing commit.
 
-| ID | anchor / expression | guard/translation | reachable Section-A surfaces | status / reproduction |
-|---|---|---|---|---|
-| G01 | `src/cement_runtime/system.py:312-325` receipt `sequence`, `operation_revision`, `member_count`, `candidate_count`, `retired_count`, `promoted_at_us` → bare `int(...)` | outside preceding scalar `try`; no exact type; no `TypeError`/`ValueError`/`OverflowError` translation | `verify_function` P6, `function_report` selected anchor, `function_receipts`, `latest_function_receipt`, `reconstruct_function_receipt` | **PROBED-LEAKS**: `uv run python -c '… row["sequence"]=None; _function_receipt_from_row(row)'` → raw `TypeError`; value=`"x"` → raw `ValueError`. Exact probe output recorded in H01. |
-| G02 | same six receipt fields | bare coercion accepts numeric text | same five surfaces | **PROBED-LEAKS**: resealed `sequence="1"` → `FunctionReceipt.sequence == 1` (`int`), violating exact stored integer typing. |
-| G03 | `src/cement_runtime/system.py:390` `int(cursor.lastrowid)` | generated SQLite value; explicit `None` check immediately before; invalid/missing sequence raises `IntegrityError` | `compile`, `verify`, `verify_drafts`, `promote_function` events | **static-only** safe-by-driver + explicit check; no persisted input coercion. |
-| G04 | `src/cement_runtime/system.py:1461-1496` operation revision + assessment support/reviewer/span → `int(...)` | no exact type locally; assessment values are internal integers. `function_report` wraps projection iteration and translates `TypeError`/`ValueError`/`OverflowError`; other callers do not uniformly translate. | `compile`, `verify_drafts`, `function_report`, `inspect_function_promotion`, `promote_function` | **static-only**: malformed persisted revision can coerce/leak on non-report callers; report path is translated. |
-| G05 | `src/cement_runtime/system.py:1565` operation revision → `int(...)` | no exact type/translation locally | `compile`, `function_report` | **static-only**. |
-| G06 | `src/cement_runtime/system.py:1881` SQL `COUNT(DISTINCT…)` → `int(row[0])` | SQLite aggregate; no explicit row/typing guard | `compile`, `verify`, `verify_drafts`, `function_report`, `inspect_function_promotion`, `promote_function` | **static-only** driver-scalar assumption. |
-| G07 | `src/cement_runtime/system.py:1960` promoted `COUNT(*)` → `int(row["entry_count"])` | missing row/column translated to `IntegrityError`; conversion type not exact/translated | `verify_function` | **static-only** driver-scalar assumption. |
-| G08 | `src/cement_runtime/system.py:2243` registered revision → `int(stored_revision)` | exact `type(stored_revision) is int` + range check first | `latest_function_receipt` | **PROBED-SAFE** by exact guard semantics; numeric text rejected as `IntegrityError`. |
-| G09 | `src/cement_runtime/system.py:2320-2344` membership ordinal/support/reviewer → `_stored_int(...)` | exact type + range guard → `IntegrityError` | `function_report` | **PROBED-SAFE** helper semantics; text/bool/None rejected. |
-| G10 | `src/cement_runtime/system.py:2448` pending operation revision → `_stored_int(...)` | exact type/range guard | `function_report` | **PROBED-SAFE** helper semantics. |
-| G11 | `src/cement_runtime/system.py:2491-2514` operation-artifact sequence/revision/support/reviewer/span → `_stored_int(...)` | exact type/range guard; nested artifact faults also translate `TypeError`/`ValueError`/`OverflowError` | `function_report` | **PROBED-SAFE** helper semantics. |
-| G12 | `src/cement_runtime/system.py:2582` operation revision → `_stored_int(...)` | exact type/range guard | `function_report` | **PROBED-SAFE** helper semantics. |
-| G13 | `src/cement_runtime/system.py:2726-2782` pending/status `COUNT(*)` values → `_stored_int(...)` | exact type/range guard | `function_report` | **PROBED-SAFE** helper semantics. |
-| G14 | `src/cement_runtime/system.py:2842` stale count → `_stored_int(...)` | exact type/range guard | `function_report` | **PROBED-SAFE** helper semantics. |
-| G15 | `src/cement_runtime/system.py:2980` registered revision → `int(...)` | exact `type(...) is int` check immediately before | `verify_function` | **PROBED-SAFE** exact guard. |
-| G16 | `src/cement_runtime/system.py:3403` + `src/cement_runtime/system.py:3959` registered revision → `int(...)` | exact type checks immediately before | `verify_drafts`; `inspect_function_promotion`; `promote_function` | **PROBED-SAFE** exact guards. |
-| G17 | `src/cement_runtime/system.py:3510-3564` runtime `passed: bool` → `int(...)` for persisted tests/report | runtime boolean produced in process, not row read | `verify`, `verify_drafts`; promotion planning can invoke verification replay | **static-only** safe write conversion. |
-| G18 | `src/cement_runtime/system.py:3745-3804` artifact/current revisions and evidence count fields → `int(...)` | no exact guard; `_verify_row` catches only `IntegrityError`/`ValidationError`, so raw conversion errors can escape; some mismatches become failed report | `verify`, `verify_drafts`; `inspect_function_promotion`/`promote_function` candidate replay | **static-only** potential raw `TypeError`/`ValueError`; not dynamically probed. |
-| G19 | `src/cement_runtime/system.py:5175-5198` report `test_count` → `int`; `passed` → `bool` | no exact type; malformed count can leak raw conversion error; `bool("0")` is true and accepts non-exact storage before binding checks | `verify_function`, `function_report`, `reconstruct_function_receipt`, `inspect_function_promotion`, `promote_function` | **static-only** coercive boundary; not dynamically probed. `function_report` catches selected promoted-row conversion faults in its operation-artifact wrapper, but receipt-member and other callers differ. |
-| G20 | `src/cement_runtime/system.py:5201-5322` promoted report `int(passed)` + artifact support/reviewer/span `int(...)` | no exact type/translation inside helpers; callers inconsistently catch only project errors; `function_report` wraps selected operation-artifact validation with the full conversion exception set | `verify_function`, `verify`, `verify_drafts`, `function_report`, `reconstruct_function_receipt`, `inspect_function_promotion`, `promote_function` | **static-only** coercive boundary; numeric text accepted where hashes may still bind text; malformed values can leak outside translated report path. |
-| G23 | `src/cement_runtime/system.py:1626` `compile` registered revision → bare `int(registered["revision"])` | no exact type; no `TypeError`/`ValueError`/`OverflowError` translation | `compile` | **PROBED-LEAKS**: NULL stored revision → raw `TypeError: int() argument must be ... not 'NoneType'`. Same corrupt row is **PROBED-SAFE** on `verify_drafts` (`src/cement_runtime/system.py:3403`), `verify_function` (`src/cement_runtime/system.py:2980`) and `inspect_function_promotion` (`src/cement_runtime/system.py:3959`), each raising `IntegrityError "stored operation revision is invalid"` — the guarded pattern exists and is simply unapplied here. |
-| G21 | `src/cement_runtime/system.py:488-1322` legacy operation/request/proposal conversions | bare `int(...)`; mixed guards; no uniform three-exception translation | non-function-layer public APIs only | **static-only**. |
-| G22 | `src/cement_runtime/system.py:4616-5168` legacy challenge/list/report/event/artifact-summary conversions incl. `bool(row["passed"])` | bare coercions; no uniform exact guard/translation | non-function-layer public APIs only | **static-only**. |
+- At p03's close: 91 sites = 79 `exact` (`_stored_int`: exact `type(v) is int` + the schema's CHECK bounds → `IntegrityError`), 4 `pre-checked` (an exact type check raises just above), 7 `in-memory` (computed assessments, runtime `passed` bools, the `failures` list), 1 `driver` (`cursor.lastrowid` behind its `None` check), 0 `UNGUARDED`. Before p03: 97 sites, 62 `UNGUARDED` (bare `int(…)`/`bool(…)` over stored rows coerced numeric text, and `bool("0")` is true).
+- Nullable INTEGER columns read here = `proposals.reviewed_at_us`, `artifacts.promoted_at_us`, plus `example_revocations.revoked_at_us` through `examples`' LEFT JOIN (NULL when unrevoked); each read sits behind an `is not None` branch. Every other INTEGER column is `NOT NULL` (`AUTOINCREMENT` keys included).
+- STRICT tables convert numeric text at write, so no real ledger holds a non-int INTEGER value: the probe `tests.test_system.SystemTests.test_a_numeric_text_integer_column_raises_integrity_error_on_every_read_path` plants one through a FABRICATED row proxy (labelled in the test) and pins `IntegrityError` on 37 (path, column) reads over 11 public paths; schema-rewrite NULL probes (`test_function_report_translates_null_persisted_projection_scalars`) stay labelled non-real-ledger.
+
+| line | function | conversion | guard | INTEGER column (`?` = nullable) | public surfaces |
+|---|---|---|---|---|---|
+| 404 | `_event` | `int(cursor.lastrowid)` | driver | - | `challenge`, `compile`, `promote`, `promote_function`, `propose`, `register_operation`, `review`, `revise_operation`, `revoke_example`, `set_projection`, `set_switch`, `submit_proposal`, `supersede_examples`, `suspend_artifact`, `verify`, `verify_drafts` |
+| 482 | `_proposal_binding_from_row` | `_stored_int(row['operation_revision'])` | exact | proposals, examples, artifacts, function_receipts, projection_settings | `function_report`, `get_proposal`, `proposal`, `proposals`, `review` |
+| 554 | `_proposal_bindings` | `_stored_int(count_row['item_count'])` | exact | - | `function_report`, `get_proposal`, `proposal`, `proposals`, `review` |
+| 652 | `register_operation` | `_stored_int(existing['revision'])` | exact | operations | `register_operation` |
+| 698 | `revise_operation` | `_stored_int(current['revision'])` | exact | operations | `revise_operation` |
+| 766 | `_submission_revision` | `_stored_int(registered['revision'])` | exact | operations | `propose` |
+| 789 | `_persist_proposal` | `_stored_int(registered['revision'])` | exact | operations | `propose`, `submit_proposal` |
+| 1029 | `get_proposal` | `_stored_int(row['created_at_us'])` | exact | operations, proposals, artifacts, test_reports, events | `get_proposal` |
+| 1096 | `_proposal_record` | `_stored_int(row['created_at_us'])` | exact | operations, proposals, artifacts, test_reports, events | `proposal`, `proposals` |
+| 1106 | `_proposal_record` | `_stored_int(row['reviewed_at_us'])` | exact | proposals? | `proposal`, `proposals` |
+| 1111 | `_proposal_record` | `_stored_int(row['status_sequence'])` | exact | proposals | `proposal`, `proposals` |
+| 1158 | `review` | `_stored_int(current['revision'])` | exact | operations | `review` |
+| 1211 | `review` | `_stored_int(row['operation_revision'])` | exact | proposals, examples, artifacts, function_receipts, projection_settings | `review` |
+| 1355 | `_project_current_build` | `_stored_int(operation_row['revision'])` | exact | operations | `compile`, `function_report`, `inspect_function_promotion`, `learning_cases`, `promote_function`, `verify_drafts` |
+| 1391 | `_project_current_build` | `int(assessment['support'])` | in-memory | artifacts | `compile`, `function_report`, `inspect_function_promotion`, `learning_cases`, `promote_function`, `verify_drafts` |
+| 1392 | `_project_current_build` | `int(assessment['reviewer_count'])` | in-memory | artifacts | `compile`, `function_report`, `inspect_function_promotion`, `learning_cases`, `promote_function`, `verify_drafts` |
+| 1393 | `_project_current_build` | `int(assessment['span_seconds'])` | in-memory | artifacts | `compile`, `function_report`, `inspect_function_promotion`, `learning_cases`, `promote_function`, `verify_drafts` |
+| 1469 | `_current_build_projections` | `_stored_int(operation_row['revision'])` | exact | operations | `compile`, `function_report`, `inspect_function_promotion`, `learning_cases`, `promote_function`, `verify_drafts` |
+| 1594 | `compile` | `_stored_int(registered['revision'])` | exact | operations | `compile` |
+| 1793 | `_assess_examples` | `_stored_int(row['confirmed_at_us'])` | exact | examples | `compile`, `function_report`, `inspect_function_promotion`, `learning_cases`, `promote`, `promote_function`, `test_projection`, `verify`, `verify_drafts` |
+| 1893 | `_active_reviewer_count` | `_stored_int(row[0])` | exact | - | `compile`, `function_report`, `inspect_function_promotion`, `learning_cases`, `promote`, `promote_function`, `verify`, `verify_drafts` |
+| 1994 | `_test_snapshot` | `_stored_int(row['passed'])` | exact | test_reports, artifact_tests | `verify`, `verify_drafts` |
+| 2021 | `_promoted_function_count` | `_stored_int(row['entry_count'])` | exact | - | `function_versions`, `resolve`, `serving`, `verify_function` |
+| 2294 | `latest_function_receipt` | `int(stored_revision)` | pre-checked | - | `latest_function_receipt` |
+| 2379 | `_receipt_rows` | `_stored_int(page[-1]['sequence'])` | exact | examples, artifacts, test_reports, function_receipts, projection_settings, switch_settings, events | `function_receipts`, `function_versions` |
+| 2409 | `_function_report_member` | `_stored_int(row['membership_ordinal'])` | exact | - | `function_report` |
+| 2428 | `_function_report_member` | `_stored_int(row['support'])` | exact | artifacts | `function_report` |
+| 2433 | `_function_report_member` | `_stored_int(row['reviewer_count'])` | exact | artifacts | `function_report` |
+| 2558 | `_operation_report_artifact` | `_stored_int(row['sequence'])` | exact | examples, artifacts, test_reports, function_receipts, projection_settings, switch_settings, events | `function_report` |
+| 2564 | `_operation_report_artifact` | `_stored_int(row['operation_revision'])` | exact | proposals, examples, artifacts, function_receipts, projection_settings | `function_report` |
+| 2570 | `_operation_report_artifact` | `_stored_int(row['support'])` | exact | artifacts | `function_report` |
+| 2575 | `_operation_report_artifact` | `_stored_int(row['reviewer_count'])` | exact | artifacts | `function_report` |
+| 2581 | `_operation_report_artifact` | `_stored_int(row['span_seconds'])` | exact | artifacts | `function_report` |
+| 2653 | `function_report` | `_stored_int(operation_row['revision'])` | exact | operations | `function_report` |
+| 2819 | `function_report` | `_stored_int(count_row['item_count'])` | exact | - | `function_report` |
+| 2877 | `function_report` | `_stored_int(stale_count_row['item_count'])` | exact | - | `function_report` |
+| 3024 | `_verify_function_snapshot` | `int(registered['revision'])` | pre-checked | operations | `function_versions`, `resolve`, `serving`, `verify_function` |
+| 3571 | `test_projection` | `_stored_int(registered['revision'])` | exact | operations | `test_projection` |
+| 3661 | `_submission_revision_in` | `_stored_int(row['revision'])` | exact | operations | `projection`, `set_projection` |
+| 3813 | `_switch_state` | `_stored_int(row['set_at_us'])` | exact | projection_settings, switch_settings | `function_versions`, `resolve`, `serving`, `set_switch`, `switch` |
+| 3814 | `_switch_state` | `_stored_int(row['sequence'])` | exact | examples, artifacts, test_reports, function_receipts, projection_settings, switch_settings, events | `function_versions`, `resolve`, `serving`, `set_switch`, `switch` |
+| 3945 | `count` | `_stored_int(connection.execute(sql, (receipt_id,)).fetchone()[0])` | exact | - | - |
+| 4083 | `function_versions` | `_stored_int(revision_row['revision'])` | exact | operations | `function_versions` |
+| 4176 | `diff_versions` | `_stored_int(rows[0]['operation_revision'])` | exact | proposals, examples, artifacts, function_receipts, projection_settings | `diff_versions` |
+| 4177 | `diff_versions` | `_stored_int(rows[1]['operation_revision'])` | exact | proposals, examples, artifacts, function_receipts, projection_settings | `diff_versions` |
+| 4212 | `_draft_verification_plan` | `int(registered['revision'])` | pre-checked | operations | `learning_cases`, `verify_drafts` |
+| 4289 | `record_test` | `int(passed)` | in-memory | - | - |
+| 4344 | `_verify_row` | `int(passed)` | in-memory | - | `verify`, `verify_drafts` |
+| 4522 | `_run_verification` | `_stored_int(row['operation_revision'])` | exact | proposals, examples, artifacts, function_receipts, projection_settings | `inspect_function_promotion`, `learning_cases`, `promote`, `promote_function`, `verify`, `verify_drafts` |
+| 4531 | `_run_verification` | `_stored_int(registered['revision'])` | exact | operations | `inspect_function_promotion`, `learning_cases`, `promote`, `promote_function`, `verify`, `verify_drafts` |
+| 4590 | `_run_verification` | `_stored_int(row[field])` | exact | - | `inspect_function_promotion`, `learning_cases`, `promote`, `promote_function`, `verify`, `verify_drafts` |
+| 4590 | `_run_verification` | `int(assessment[field])` | in-memory | - | `inspect_function_promotion`, `learning_cases`, `promote`, `promote_function`, `verify`, `verify_drafts` |
+| 4778 | `_function_promotion_plan` | `int(registered['revision'])` | pre-checked | operations | `inspect_function_promotion`, `learning_cases`, `promote_function` |
+| 5245 | `promote` | `_stored_int(report['passed'])` | exact | test_reports, artifact_tests | `promote` |
+| 5429 | `challenge` | `_stored_int(registered['revision'])` | exact | operations | `challenge` |
+| 5473 | `challenge` | `_stored_int(registered['revision'])` | exact | operations | `challenge` |
+| 5581 | `learning_cases` | `_stored_int(registered['revision'])` | exact | operations | `learning_cases` |
+| 5827 | `supersede_examples` | `_stored_int(old['operation_revision'])` | exact | proposals, examples, artifacts, function_receipts, projection_settings | `supersede_examples` |
+| 5851 | `supersede_examples` | `_stored_int(old['operation_revision'])` | exact | proposals, examples, artifacts, function_receipts, projection_settings | `supersede_examples` |
+| 6000 | `operations` | `_stored_int(row['created_at_us'])` | exact | operations, proposals, artifacts, test_reports, events | `operations` |
+| 6006 | `operations` | `_stored_int(row['revision'])` | exact | operations | `operations` |
+| 6009 | `operations` | `_stored_int(row['updated_at_us'])` | exact | operations | `operations` |
+| 6052 | `examples` | `_stored_int(row['confirmed_at_us'])` | exact | examples | `examples` |
+| 6058 | `examples` | `_stored_int(row['operation_revision'])` | exact | proposals, examples, artifacts, function_receipts, projection_settings | `examples` |
+| 6066 | `examples` | `_stored_int(row['sequence'])` | exact | examples, artifacts, test_reports, function_receipts, projection_settings, switch_settings, events | `examples` |
+| 6078 | `examples` | `_stored_int(row['revoked_at_us'])` | exact | example_revocations | `examples` |
+| 6186 | `report` | `_stored_int(row['created_at_us'])` | exact | operations, proposals, artifacts, test_reports, events | `report` |
+| 6190 | `report` | `_stored_int(row['passed'])` | exact | test_reports, artifact_tests | `report` |
+| 6192 | `report` | `_stored_int(row['sequence'])` | exact | examples, artifacts, test_reports, function_receipts, projection_settings, switch_settings, events | `report` |
+| 6194 | `report` | `_stored_int(row['test_count'])` | exact | test_reports | `report` |
+| 6204 | `report` | `_stored_int(test['passed'])` | exact | test_reports, artifact_tests | `report` |
+| 6255 | `reports` | `_stored_int(row['created_at_us'])` | exact | operations, proposals, artifacts, test_reports, events | `reports` |
+| 6260 | `reports` | `_stored_int(row['passed'])` | exact | test_reports, artifact_tests | `reports` |
+| 6262 | `reports` | `_stored_int(row['sequence'])` | exact | examples, artifacts, test_reports, function_receipts, projection_settings, switch_settings, events | `reports` |
+| 6266 | `reports` | `_stored_int(row['test_count'])` | exact | test_reports | `reports` |
+| 6299 | `events` | `_stored_int(row['created_at_us'])` | exact | operations, proposals, artifacts, test_reports, events | `events` |
+| 6304 | `events` | `_stored_int(row['sequence'])` | exact | examples, artifacts, test_reports, function_receipts, projection_settings, switch_settings, events | `events` |
+| 6316 | `_artifact_summary` | `_stored_int(row['created_at_us'])` | exact | operations, proposals, artifacts, test_reports, events | `artifact`, `artifacts` |
+| 6320 | `_artifact_summary` | `_stored_int(row['operation_revision'])` | exact | proposals, examples, artifacts, function_receipts, projection_settings | `artifact`, `artifacts` |
+| 6324 | `_artifact_summary` | `_stored_int(row['promoted_at_us'])` | exact | artifacts?, function_receipts | `artifact`, `artifacts` |
+| 6329 | `_artifact_summary` | `_stored_int(row['reviewer_count'])` | exact | artifacts | `artifact`, `artifacts` |
+| 6332 | `_artifact_summary` | `_stored_int(row['sequence'])` | exact | examples, artifacts, test_reports, function_receipts, projection_settings, switch_settings, events | `artifact`, `artifacts` |
+| 6334 | `_artifact_summary` | `_stored_int(row['span_seconds'])` | exact | artifacts | `artifact`, `artifacts` |
+| 6337 | `_artifact_summary` | `_stored_int(row['support'])` | exact | artifacts | `artifact`, `artifacts` |
+| 6353 | `_validate_report` | `_stored_int(row['test_count'])` | exact | test_reports | `diff_versions`, `function_report`, `function_versions`, `inspect_function_promotion`, `learning_cases`, `promote`, `promote_function`, `reconstruct_function_receipt`, `report`, `reports`, `resolve`, `serving`, `verify_function` |
+| 6364 | `_validate_report` | `_stored_int(row['passed'])` | exact | test_reports, artifact_tests | `diff_versions`, `function_report`, `function_versions`, `inspect_function_promotion`, `learning_cases`, `promote`, `promote_function`, `reconstruct_function_receipt`, `report`, `reports`, `resolve`, `serving`, `verify_function` |
+| 6364 | `_validate_report` | `bool(failures)` | in-memory | - | `diff_versions`, `function_report`, `function_versions`, `inspect_function_promotion`, `learning_cases`, `promote`, `promote_function`, `reconstruct_function_receipt`, `report`, `reports`, `resolve`, `serving`, `verify_function` |
+| 6384 | `_validate_promoted` | `_stored_int(report['passed'])` | exact | test_reports, artifact_tests | `artifact`, `challenge`, `function_report`, `inspect_function_promotion`, `learning_cases`, `promote_function` |
+| 6512 | `_artifact_from_row` | `_stored_int(row['support'])` | exact | artifacts | `artifact`, `challenge`, `diff_versions`, `function_report`, `function_versions`, `inspect_function_promotion`, `learning_cases`, `promote`, `promote_function`, `reconstruct_function_receipt`, `resolve`, `serving`, `verify`, `verify_drafts`, `verify_function` |
+| 6513 | `_artifact_from_row` | `_stored_int(row['reviewer_count'])` | exact | artifacts | `artifact`, `challenge`, `diff_versions`, `function_report`, `function_versions`, `inspect_function_promotion`, `learning_cases`, `promote`, `promote_function`, `reconstruct_function_receipt`, `resolve`, `serving`, `verify`, `verify_drafts`, `verify_function` |
+| 6516 | `_artifact_from_row` | `_stored_int(row['span_seconds'])` | exact | artifacts | `artifact`, `challenge`, `diff_versions`, `function_report`, `function_versions`, `inspect_function_promotion`, `learning_cases`, `promote`, `promote_function`, `reconstruct_function_receipt`, `resolve`, `serving`, `verify`, `verify_drafts`, `verify_function` |
 
 ## H — discrepancies
 

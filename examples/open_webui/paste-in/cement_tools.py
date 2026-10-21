@@ -18,8 +18,8 @@ from pydantic import BaseModel, Field
 # The embedded source keeps its own line breaks; one of its pragma comments runs past 100
 # columns inside the string, where ruff reads no pragma.
 # ruff: noqa: E501
-_CEMENT_PACKAGE = "_cement_runtime_e6d8a16f9171a9ee"
-_CEMENT_DIGEST = "e6d8a16f9171a9eed4b6a9bc7acf7e79aa090c3989822afdf1e04a31d67da642"
+_CEMENT_PACKAGE = "_cement_runtime_7fde77d2182b544f"
+_CEMENT_DIGEST = "7fde77d2182b544fd2543ff8141c6b46836957897a3189780863cc583c42c02b"
 _CEMENT_SOURCES = {
     "__init__": r'''
 """Cement public API."""
@@ -2767,12 +2767,14 @@ def _function_receipt_from_row(
         "retired_count": row["retired_count"],
         "promoted_at_us": row["promoted_at_us"],
     }
-    sequence = int(integers["sequence"])
-    operation_revision = int(integers["operation_revision"])
-    member_count = int(integers["member_count"])
-    candidate_count = int(integers["candidate_count"])
-    retired_count = int(integers["retired_count"])
-    promoted_at_us = int(integers["promoted_at_us"])
+    if any(type(value) is not int for value in integers.values()):
+        raise IntegrityError("stored function receipt has invalid scalar fields")
+    sequence = integers["sequence"]
+    operation_revision = integers["operation_revision"]
+    member_count = integers["member_count"]
+    candidate_count = integers["candidate_count"]
+    retired_count = integers["retired_count"]
+    promoted_at_us = integers["promoted_at_us"]
     if not 1 <= sequence <= _MAX_SQLITE_INTEGER:
         raise IntegrityError("stored function receipt sequence is invalid")
     if not 1 <= operation_revision <= _MAX_SQLITE_INTEGER:
@@ -3087,7 +3089,7 @@ class System:
             ).fetchone()
             if existing is not None:
                 if existing["policy_hash"] == policy_json.digest:
-                    return int(existing["revision"])
+                    return _stored_int(existing["revision"], "stored operation revision", minimum=1)
                 raise ConflictError(
                     "operation exists with a different policy; revise it explicitly"
                 )
@@ -3133,7 +3135,7 @@ class System:
             ).fetchone()
             if current is None:
                 raise NotFoundError("operation is not registered in this partition")
-            previous = int(current["revision"])
+            previous = _stored_int(current["revision"], "stored operation revision", minimum=1)
             revision = previous + 1
             connection.execute(
                 """
@@ -3201,7 +3203,7 @@ class System:
             ).fetchone()
         if registered is None:
             raise NotFoundError("operation is not registered in this partition")
-        return int(registered["revision"])
+        return _stored_int(registered["revision"], "stored operation revision", minimum=1)
 
     def _persist_proposal(
         self,
@@ -3224,7 +3226,7 @@ class System:
             ).fetchone()
             if registered is None:
                 raise NotFoundError("operation is not registered in this partition")
-            revision = int(registered["revision"])
+            revision = _stored_int(registered["revision"], "stored operation revision", minimum=1)
             if expected_revision is not None and revision != expected_revision:
                 raise StateError("operation revision changed before proposal submission")
             if source_id is not None:
@@ -3464,7 +3466,7 @@ class System:
                 input=input_json.value,
                 proposed_output=proposed.value,
                 provenance=provenance.value,
-                created_at_us=int(row["created_at_us"]),
+                created_at_us=_stored_int(row["created_at_us"], "stored proposal created_at_us"),
             )
 
     def proposal(self, partition: str, proposal_id: str) -> dict[str, JSONValue]:
@@ -3531,7 +3533,7 @@ class System:
         if final_output is not None and final_output.digest != row["final_output_hash"]:
             raise IntegrityError("proposal final output digest mismatch")
         return {
-            "created_at_us": int(row["created_at_us"]),
+            "created_at_us": _stored_int(row["created_at_us"], "stored proposal created_at_us"),
             "final_output": final_output.value if final_output is not None else None,
             "id": str(row["id"]),
             "input": input_json.value,
@@ -3541,10 +3543,14 @@ class System:
             "provenance": provenance.value,
             "review_note": str(row["review_note"]) if row["review_note"] is not None else None,
             "reviewed_at_us": (
-                int(row["reviewed_at_us"]) if row["reviewed_at_us"] is not None else None
+                _stored_int(row["reviewed_at_us"], "stored proposal reviewed_at_us")
+                if row["reviewed_at_us"] is not None
+                else None
             ),
             "reviewer": str(row["reviewer"]) if row["reviewer"] is not None else None,
-            "sequence": int(row["status_sequence"]),
+            "sequence": _stored_int(
+                row["status_sequence"], "stored proposal status_sequence", minimum=1
+            ),
             "status": str(row["status"]),
         }
 
@@ -3588,7 +3594,9 @@ class System:
                 (partition, binding.operation),
             ).fetchone()
             if decision != "reject" and (
-                current is None or int(current["revision"]) != binding.operation_revision
+                current is None
+                or _stored_int(current["revision"], "stored operation revision", minimum=1)
+                != binding.operation_revision
             ):
                 raise StateError(
                     "proposal belongs to an obsolete operation revision; "
@@ -3640,7 +3648,9 @@ class System:
                 "input": input_json.value,
                 "note": note,
                 "operation": str(row["operation"]),
-                "operation_revision": int(row["operation_revision"]),
+                "operation_revision": _stored_int(
+                    row["operation_revision"], "stored proposal operation_revision", minimum=1
+                ),
                 "output": final.value,
                 "partition": partition,
                 "proposal_id": proposal_id,
@@ -3782,7 +3792,7 @@ class System:
     ) -> _CurrentBuild | _BlockedBuild:
         partition = str(operation_row["partition"])
         operation = str(operation_row["name"])
-        revision = int(operation_row["revision"])
+        revision = _stored_int(operation_row["revision"], "stored operation revision", minimum=1)
         policy_json = str(operation_row["policy_json"])
         policy_hash = str(operation_row["policy_hash"])
         policy = _policy_from_text(policy_json)
@@ -3896,7 +3906,7 @@ class System:
 
         partition = str(operation_row["partition"])
         operation = str(operation_row["name"])
-        revision = int(operation_row["revision"])
+        revision = _stored_int(operation_row["revision"], "stored operation revision", minimum=1)
         program = self._build_program(
             connection, partition=partition, operation=operation, revision=revision
         )
@@ -4021,7 +4031,7 @@ class System:
             ).fetchone()
             if registered is None:
                 raise NotFoundError("operation is not registered in this partition")
-            revision = int(registered["revision"])
+            revision = _stored_int(registered["revision"], "stored operation revision", minimum=1)
             program = self._build_program(
                 connection, partition=partition, operation=operation, revision=revision
             )
@@ -4220,7 +4230,7 @@ class System:
                 output_conflict = True
             if reviewer_count is None and len(reviewers) < policy.min_reviewers:
                 reviewers.add(str(row["reviewer"]))
-            timestamp = int(row["confirmed_at_us"])
+            timestamp = _stored_int(row["confirmed_at_us"], "stored example confirmed_at_us")
             earliest = timestamp if earliest is None else min(earliest, timestamp)
             latest = timestamp if latest is None else max(latest, timestamp)
 
@@ -4320,7 +4330,7 @@ class System:
                 """,
                 (partition, operation, revision, input_hash, input_text),
             ).fetchone()
-            return int(row[0])
+            return _stored_int(row[0], "active reviewer count")
         rows = self._active_evidence(
             connection,
             partition=partition,
@@ -4421,7 +4431,7 @@ class System:
                 str(row["test_key"]),
                 "none" if row["example_id"] is None else "example",
                 "" if row["example_id"] is None else str(row["example_id"]),
-                "1" if int(row["passed"]) else "0",
+                "1" if _stored_int(row["passed"], "stored test passed", maximum=1) else "0",
                 str(row["detail"]),
             )
             for part in parts:
@@ -4448,7 +4458,7 @@ class System:
         ).fetchone()
         if row is None or type(row["entry_count"]) is not int:
             raise IntegrityError("promoted-set count is invalid")
-        return int(row["entry_count"])
+        return _stored_int(row["entry_count"], "promoted entry count")
 
     @staticmethod
     def _promoted_function_rows(
@@ -6372,7 +6382,9 @@ class System:
         def count(sql: str) -> int:
             if receipt_id is None:
                 return 0
-            return int(connection.execute(sql, (receipt_id,)).fetchone()[0])
+            return _stored_int(
+                connection.execute(sql, (receipt_id,)).fetchone()[0], "pinned receipt count"
+            )
 
         revoked = count(
             """
@@ -6947,14 +6959,17 @@ class System:
             raise IntegrityError(f"artifact integrity failure: {exc}") from exc
         partition = str(row["partition"])
         operation = str(row["operation"])
-        revision = int(row["operation_revision"])
+        revision = _stored_int(
+            row["operation_revision"], "stored artifact operation_revision", minimum=1
+        )
         registered = connection.execute(
             "SELECT * FROM operations WHERE partition = ? AND name = ?",
             (partition, operation),
         ).fetchone()
         current_ok = (
             registered is not None
-            and int(registered["revision"]) == revision
+            and _stored_int(registered["revision"], "stored operation revision", minimum=1)
+            == revision
             and registered["policy_hash"] == row["policy_hash"]
             and registered["policy_json"] == row["policy_json"]
         )
@@ -7012,7 +7027,7 @@ class System:
             failures.append("evidence snapshot changed")
         else:
             for field in ("support", "reviewer_count", "span_seconds"):
-                if int(row[field]) != int(assessment[field]):
+                if _stored_int(row[field], f"stored artifact {field}") != int(assessment[field]):
                     raise IntegrityError(f"artifact {field} does not match active evidence")
         input_json = parse_json(str(row["input_json"]))
         expected_output = str(row["output_json"])
@@ -7667,7 +7682,9 @@ class System:
                 "SELECT * FROM test_reports WHERE id = ? AND artifact_id = ?",
                 (row["verified_report_id"], artifact_id),
             ).fetchone()
-            if report is None or not int(report["passed"]):
+            if report is None or not _stored_int(
+                report["passed"], "stored report passed", maximum=1
+            ):
                 raise StateError("artifact's bound verification report is missing or failed")
             report_details = self._validate_report(connection, report)
             if (
@@ -7849,7 +7866,7 @@ class System:
             ).fetchone()
             if registered is None:
                 raise NotFoundError("operation is not registered in this partition")
-            revision = int(registered["revision"])
+            revision = _stored_int(registered["revision"], "stored operation revision", minimum=1)
             rows = [
                 row
                 for row, _ in self._promoted_for_input(
@@ -7893,7 +7910,7 @@ class System:
             ).fetchone()
             if registered is None:
                 raise NotFoundError("operation is not registered in this partition")
-            revision = int(registered["revision"])
+            revision = _stored_int(registered["revision"], "stored operation revision", minimum=1)
             keyed = self._promoted_for_input(connection, partition, operation, revision, input_json)
             matches: list[tuple[sqlite3.Row, CanonicalJSON]] = []
             for row, key in keyed:
@@ -8247,7 +8264,11 @@ class System:
                         "input": parse_json(str(old["input_json"])).value,
                         "note": note,
                         "operation": operation,
-                        "operation_revision": int(old["operation_revision"]),
+                        "operation_revision": _stored_int(
+                            old["operation_revision"],
+                            "stored example operation_revision",
+                            minimum=1,
+                        ),
                         "output": final.value,
                         "partition": partition,
                         "reviewer": reviewer,
@@ -8267,7 +8288,11 @@ class System:
                         example_id,
                         partition,
                         operation,
-                        int(old["operation_revision"]),
+                        _stored_int(
+                            old["operation_revision"],
+                            "stored example operation_revision",
+                            minimum=1,
+                        ),
                         str(old["input_json"]),
                         str(old["input_hash"]),
                         final.text,
@@ -8412,12 +8437,18 @@ class System:
             ).fetchall()
             return [
                 {
-                    "created_at_us": int(row["created_at_us"]),
+                    "created_at_us": _stored_int(
+                        row["created_at_us"], "stored operation created_at_us"
+                    ),
                     "name": str(row["name"]),
                     "policy": parse_json(str(row["policy_json"]), max_bytes=16_384).value,
                     "policy_hash": str(row["policy_hash"]),
-                    "revision": int(row["revision"]),
-                    "updated_at_us": int(row["updated_at_us"]),
+                    "revision": _stored_int(
+                        row["revision"], "stored operation revision", minimum=1
+                    ),
+                    "updated_at_us": _stored_int(
+                        row["updated_at_us"], "stored operation updated_at_us"
+                    ),
                 }
                 for row in rows
             ]
@@ -8458,17 +8489,21 @@ class System:
             ).fetchall()
             return [
                 {
-                    "confirmed_at_us": int(row["confirmed_at_us"]),
+                    "confirmed_at_us": _stored_int(
+                        row["confirmed_at_us"], "stored example confirmed_at_us"
+                    ),
                     "id": str(row["id"]),
                     "input": parse_json(str(row["input_json"])).value,
                     "input_hash": str(row["input_hash"]),
-                    "operation_revision": int(row["operation_revision"]),
+                    "operation_revision": _stored_int(
+                        row["operation_revision"], "stored example operation_revision", minimum=1
+                    ),
                     "origin": str(row["origin"]),
                     "output": parse_json(str(row["output_json"])).value,
                     "output_hash": str(row["output_hash"]),
                     "receipt_hash": str(row["receipt_hash"]),
                     "reviewer": str(row["reviewer"]),
-                    "sequence": int(row["sequence"]),
+                    "sequence": _stored_int(row["sequence"], "stored example sequence", minimum=1),
                     "source_id": None if row["source_id"] is None else str(row["source_id"]),
                     "superseded_by": (
                         None if row["superseded_by"] is None else str(row["superseded_by"])
@@ -8480,7 +8515,9 @@ class System:
                     ),
                     "revocation": (
                         {
-                            "at_us": int(row["revoked_at_us"]),
+                            "at_us": _stored_int(
+                                row["revoked_at_us"], "stored example revoked_at_us"
+                            ),
                             "by": str(row["revoked_by"]),
                             "reason": str(row["revocation_reason"]),
                         }
@@ -8586,15 +8623,15 @@ class System:
                 "artifact_hash": str(row["artifact_hash"]),
                 "artifact_id": str(row["artifact_id"]),
                 "build_hash": str(row["build_hash"]),
-                "created_at_us": int(row["created_at_us"]),
+                "created_at_us": _stored_int(row["created_at_us"], "stored report created_at_us"),
                 "details": details.value,
                 "evidence_snapshot_hash": str(row["evidence_snapshot_hash"]),
                 "id": report_id,
-                "passed": bool(row["passed"]),
+                "passed": bool(_stored_int(row["passed"], "stored report passed", maximum=1)),
                 "policy_hash": str(row["policy_hash"]),
-                "sequence": int(row["sequence"]),
+                "sequence": _stored_int(row["sequence"], "stored report sequence", minimum=1),
                 "scope_hash": str(row["scope_hash"]),
-                "test_count": int(row["test_count"]),
+                "test_count": _stored_int(row["test_count"], "stored report test_count", minimum=1),
                 "test_set_hash": str(row["test_set_hash"]),
                 "tests": [
                     {
@@ -8603,7 +8640,9 @@ class System:
                             str(test["example_id"]) if test["example_id"] is not None else None
                         ),
                         "key": str(test["test_key"]),
-                        "passed": bool(test["passed"]),
+                        "passed": bool(
+                            _stored_int(test["passed"], "stored test passed", maximum=1)
+                        ),
                     }
                     for test in tests
                 ],
@@ -8653,12 +8692,20 @@ class System:
                     {
                         "artifact_id": str(row["artifact_id"]),
                         "build_hash": str(row["build_hash"]),
-                        "created_at_us": int(row["created_at_us"]),
+                        "created_at_us": _stored_int(
+                            row["created_at_us"], "stored report created_at_us"
+                        ),
                         "id": str(row["id"]),
-                        "passed": bool(row["passed"]),
-                        "sequence": int(row["sequence"]),
+                        "passed": bool(
+                            _stored_int(row["passed"], "stored report passed", maximum=1)
+                        ),
+                        "sequence": _stored_int(
+                            row["sequence"], "stored report sequence", minimum=1
+                        ),
                         "scope_hash": str(row["scope_hash"]),
-                        "test_count": int(row["test_count"]),
+                        "test_count": _stored_int(
+                            row["test_count"], "stored report test_count", minimum=1
+                        ),
                         "test_set_hash": str(row["test_set_hash"]),
                     }
                 )
@@ -8689,10 +8736,12 @@ class System:
             ).fetchall()
             return [
                 {
-                    "created_at_us": int(row["created_at_us"]),
+                    "created_at_us": _stored_int(
+                        row["created_at_us"], "stored event created_at_us"
+                    ),
                     "kind": str(row["kind"]),
                     "payload": parse_json(str(row["payload_json"]), max_bytes=262_144).value,
-                    "sequence": int(row["sequence"]),
+                    "sequence": _stored_int(row["sequence"], "stored event sequence", minimum=1),
                     "subject_id": str(row["subject_id"]),
                     "subject_type": str(row["subject_type"]),
                 }
@@ -8704,22 +8753,28 @@ class System:
         return {
             "artifact_hash": str(row["artifact_hash"]),
             "build_hash": str(row["build_hash"]),
-            "created_at_us": int(row["created_at_us"]),
+            "created_at_us": _stored_int(row["created_at_us"], "stored artifact created_at_us"),
             "evidence_snapshot_hash": str(row["evidence_snapshot_hash"]),
             "id": str(row["id"]),
             "input_hash": str(row["input_hash"]),
-            "operation_revision": int(row["operation_revision"]),
+            "operation_revision": _stored_int(
+                row["operation_revision"], "stored artifact operation_revision", minimum=1
+            ),
             "promoted_at_us": (
-                int(row["promoted_at_us"]) if row["promoted_at_us"] is not None else None
+                _stored_int(row["promoted_at_us"], "stored artifact promoted_at_us")
+                if row["promoted_at_us"] is not None
+                else None
             ),
             "promotion_hash": str(row["promotion_hash"]) if row["promotion_hash"] else None,
-            "reviewer_count": int(row["reviewer_count"]),
-            "sequence": int(row["sequence"]),
+            "reviewer_count": _stored_int(
+                row["reviewer_count"], "stored artifact reviewer_count", minimum=1
+            ),
+            "sequence": _stored_int(row["sequence"], "stored artifact sequence", minimum=1),
             "scope_hash": str(row["scope_hash"]),
-            "span_seconds": int(row["span_seconds"]),
+            "span_seconds": _stored_int(row["span_seconds"], "stored artifact span_seconds"),
             "status": str(row["status"]),
             "status_reason": str(row["status_reason"]) if row["status_reason"] else None,
-            "support": int(row["support"]),
+            "support": _stored_int(row["support"], "stored artifact support", minimum=2),
             "verified_report_id": (
                 str(row["verified_report_id"]) if row["verified_report_id"] else None
             ),
@@ -8735,7 +8790,7 @@ class System:
         details = parse_json(str(row["details_json"]), max_bytes=262_144)
         if details.digest != row["details_hash"] or type(details.value) is not dict:
             raise IntegrityError("verification report details digest mismatch")
-        test_count = int(row["test_count"])
+        test_count = _stored_int(row["test_count"], "stored report test_count", minimum=1)
         if verify_test_set:
             stored_count, test_set_hash = System._test_snapshot(connection, str(row["id"]))
             if stored_count != test_count or test_set_hash != row["test_set_hash"]:
@@ -8746,7 +8801,7 @@ class System:
         if (
             details.value.get("tests") != test_count
             or type(failures) is not list
-            or bool(row["passed"]) == bool(failures)
+            or bool(_stored_int(row["passed"], "stored report passed", maximum=1)) == bool(failures)
         ):
             raise IntegrityError("verification report outcome binding mismatch")
         return details
@@ -8766,7 +8821,7 @@ class System:
             "SELECT * FROM test_reports WHERE id = ? AND artifact_id = ?",
             (row["verified_report_id"], row["id"]),
         ).fetchone()
-        if report is None or not int(report["passed"]):
+        if report is None or not _stored_int(report["passed"], "stored report passed", maximum=1):
             raise IntegrityError("promoted artifact has no passing bound report")
         for field in (
             "artifact_hash",
@@ -8894,9 +8949,11 @@ class System:
             artifact_digest=artifact.digest,
             policy_digest=policy.digest,
             evidence_snapshot_digest=str(row["evidence_snapshot_hash"]),
-            support=int(row["support"]),
-            reviewer_count=int(row["reviewer_count"]),
-            span_seconds=int(row["span_seconds"]),
+            support=_stored_int(row["support"], "stored artifact support", minimum=2),
+            reviewer_count=_stored_int(
+                row["reviewer_count"], "stored artifact reviewer_count", minimum=1
+            ),
+            span_seconds=_stored_int(row["span_seconds"], "stored artifact span_seconds"),
             projection_digest=(
                 None if row["projection_hash"] is None else str(row["projection_hash"])
             ),
