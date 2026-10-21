@@ -9,6 +9,7 @@ import shutil
 import sqlite3
 import tempfile
 import threading
+import time
 import typing
 from typing import Literal
 import unittest
@@ -4823,6 +4824,85 @@ class SystemTests(unittest.TestCase):
             (current,),
         )
         self.assertEqual(result.skipped, ())
+
+    def test_verify_drafts_holds_the_write_lock_while_a_blocking_clock_runs(self) -> None:
+        # p41: verify_drafts reads the caller's clock inside BEGIN IMMEDIATE (timestamp order), so a
+        # clock that blocks holds the write lock and a second default writer waits for it.
+        self.system.register_operation("tenant-a", "echo", policy=CompilePolicy(2, 1, 0))
+        self._compile_three_drafts("blocking-clock")
+        armed = threading.Event()
+        entered = threading.Event()
+        release = threading.Event()
+
+        def blocking_clock() -> int:
+            if armed.is_set():
+                entered.set()
+                if not release.wait(timeout=5):
+                    raise AssertionError("clock release timed out")
+            return self.clock()
+
+        verifier = System(self.database, clock_us=blocking_clock)
+        writer = System(self.database)
+        outcomes: dict[str, typing.Any] = {}
+
+        def verify() -> None:
+            outcomes["verify"] = verifier.verify_drafts("tenant-a", "echo", verified_by="verifier")
+            outcomes["verified_at"] = time.monotonic()
+
+        def write() -> None:
+            outcomes["revision"] = writer.register_operation("tenant-a", "other")
+            outcomes["written_at"] = time.monotonic()
+
+        armed.set()
+        verify_thread = threading.Thread(target=verify)
+        verify_thread.start()
+        self.assertTrue(entered.wait(timeout=5))
+        write_thread = threading.Thread(target=write)
+        started = time.monotonic()
+        write_thread.start()
+        write_thread.join(timeout=0.5)
+        self.assertTrue(write_thread.is_alive(), "the second writer did not wait for the lock")
+        release.set()
+        verify_thread.join(timeout=10)
+        write_thread.join(timeout=10)
+        self.assertFalse(verify_thread.is_alive() or write_thread.is_alive())
+        self.assertTrue(outcomes["verify"].passed)
+        self.assertEqual(len(outcomes["verify"].entries), 3)
+        self.assertEqual(outcomes["revision"], 1)
+        self.assertLess(outcomes["verified_at"], outcomes["written_at"])
+        self.assertGreaterEqual(outcomes["written_at"] - started, 0.5)
+
+    def test_promote_function_rolls_back_when_its_clock_reenters_the_ledger(self) -> None:
+        # p41: promote_function reads the caller's clock inside BEGIN IMMEDIATE; a clock that
+        # writes the same ledger through another System waits on that lock until the busy timeout
+        # and raises, so the promotion rolls back and neither write lands.
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._verify_three_function_candidates("reentrant-clock")
+        manifest = self.system.inspect_function_promotion("tenant-a", "echo")
+        other = System(self.database)
+        armed = threading.Event()
+        calls = 0
+
+        def reentrant_clock() -> int:
+            nonlocal calls
+            if armed.is_set():
+                calls += 1
+                other.register_operation("tenant-a", "reentry")
+            return self.clock()
+
+        promoter = System(self.database, clock_us=reentrant_clock)
+        before = self._database_dump()
+        armed.set()
+        with self.assertRaises(StateError) as raised:
+            promoter.promote_function(
+                "tenant-a",
+                "echo",
+                expected_function_hash=manifest.function_hash,
+                promoted_by="release-manager",
+            )
+        self.assertEqual(str(raised.exception), "database is busy or unavailable")
+        self.assertEqual(calls, 1)
+        self.assertEqual(self._database_dump(), before)
 
     def test_verify_drafts_skips_policy_blocked_current_projection(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)

@@ -15,6 +15,17 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p41 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 a blocking clock vs a second default writer, outcome asserted; R2 a re-entrant clock through another `System`, outcome asserted; R3 measured lock duration recorded beside the ruling; R4 credit recorded. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `test_verify_drafts_holds_the_write_lock_while_a_blocking_clock_runs`: the second writer is still waiting after 0.5 s, finishes after the verify commits, both succeed. |
+| R2 | acceptance | pass | `test_promote_function_rolls_back_when_its_clock_reenters_the_ledger`: `StateError("database is busy or unavailable")`, one clock call, ledger dump unchanged. |
+| R3 | acceptance | pass | `.claude/rules/runtime.md`: a 1.0 s hold → the second writer waited 1.050 s; re-entry → StateError after 10.07 s (busy timeout). |
+| R4 | verification integrity | open → p110 | 963/1251 killed (`.agent/decisions/p41-mutate.txt`). |
+
 ## p67 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 one read-only leaf prints the promoted set as a guarded-branch listing with, per case, the confirmed proposals behind it (original `proposed_output` beside the change); R2 case values come from the rebuilt bundle, not a second ledger projection; R3 `--json` keeps the machine surface, both branches pinned; R4 two originals print both, none prints the case and names the absence, an empty set exits 3; R5 no grading check moves except the documented digest re-pin; R6 surface wording (advisor). MAIN + advisor.
