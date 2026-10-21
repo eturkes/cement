@@ -15,6 +15,14 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p43 (MAINTAIN queue run, owed) — target = the commit landing this section
+
+Check set: R1 the acceptance's classification inputs (error code + Store-owned provenance) can separate `VACUUM` from every other statement whose mapping a standing pin fixes. MAIN alone; no code.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | feasibility | owed | `VACUUM` in a transaction and `SELECT FROM schema_metadata` both raise `sqlite_errorcode` 1 (`SQLITE_ERROR`); B14 pins the malformed read to `StateError` ⇒ a code-based remap moves both B11 and B14 = a grading-check change for the owner. |
+
 ## p35 + p36 (MAINTAIN queue run, owed) — target = the commit landing this section
 
 Check set: R1 each row's funding is blocked by a binding ruling, named on the row. MAIN alone; no code.
