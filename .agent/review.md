@@ -17,6 +17,15 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p98 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
+
+Check set: R1 a measured decision (keep → the editor's load + save times on 0.12.3 recorded for the largest file); R2 the published claim matches the measurement. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | keep; largest file 573 / 690 ms medians (5 runs), all four files measured (max save 1,035 ms under gate load 4-9); record + rerunnable driver committed. The "thin files" branch needs no tests since it was not taken. |
+| R2 | correctness | fixed | the first README draft said "less than one second"; one save measured 1,035 ms → "about one second". |
+
 ## p80 close (MAINTAIN queue run, unit, tier `docs` — PROTOTYPE law) — target = the commit landing this section
 
 Check set (the row's acceptance): R1 reduced motion; R2 390×844 reach; R3 Tab focus ring; R4 contrast ≥ 4.5:1; R5 UI copy ruled against `Decisions`; R6 fixes captured. MAIN alone.
