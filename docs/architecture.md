@@ -186,7 +186,9 @@ snapshot, and it keeps the two anchors in separate number spaces. Historical mem
 reviewer counts are frozen at build time. Active evidence and policy state remain current, so
 complements or ratios across the two anchors are meaningless. The current-state half counts ready and
 blocked scopes, pending proposals, artifact statuses, and stale-revision anomalies. `projection_limit`
-bounds the returned detail. The report proves that every pending proposal in the partition keeps its
+bounds the returned detail. Each detail list keeps one fixed order, so a smaller limit returns a prefix
+of a larger one: members by ordinal, ready and blocked scopes by input hash, pending proposals in
+arrival order, and artifacts and stale-revision anomalies newest first. The report proves that every pending proposal in the partition keeps its
 internal binding. It validates the content of only the members that it returns. Use
 `reconstruct_function_receipt` to validate every member.
 

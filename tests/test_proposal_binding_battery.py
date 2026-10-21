@@ -1812,10 +1812,10 @@ class ProposalBindingBatteryTests(unittest.TestCase):
             )
 
     def test_b23_a13_order_preserved_not_fixed_the(self) -> None:
-        """B23. A13 order preserved not fixed: the exact lexicographic p.id page at two projection limits
+        """B23. A13 order, fixed by p07: the arrival-order (`status_sequence`) page at two projection limits
 
-        Reproduction: insert twelve proposals in reverse creation order and require
-        the baseline lexicographic id prefix at limits three and eleven.
+        Reproduction: insert twelve proposals whose ids sort against their creation order and
+        require the arrival-order prefix at limits three and eleven.
         """
         system, _, _ = self._make_system()
         provenance_json, provenance_hash = _canonical_json({"source": "order"})
@@ -1854,7 +1854,8 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                 proposal_rows,
             )
 
-        lexicographic = [f"prop_order_{index:02d}" for index in range(12)]
+        arrival = [str(row[0]) for row in proposal_rows]
+        self.assertNotEqual(arrival, sorted(arrival))
         for limit in (3, 11):
             with self.subTest(projection_limit=limit):
                 projected = system.function_report(
@@ -1864,7 +1865,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                 ).operation_now.pending_proposals
                 self.assertEqual(
                     [gap.proposal_id for gap in projected],
-                    lexicographic[:limit],
+                    arrival[:limit],
                 )
 
     def test_b24_y14_scalar_inventory_nullable_versus_non_1(self) -> None:

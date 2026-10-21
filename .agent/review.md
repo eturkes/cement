@@ -15,6 +15,18 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p07 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section, base `99b3734`
+
+Check set fixed before re-reading the diff: R1 each changed query keeps its WHERE + LIMIT + count check; R2 every pin the order change touched is re-targeted at the new key, none weakened; R3 red-first over the unfixed src; R4 publication (docstring + human-facing doc + law); R5 generated paste-ins regenerated. MAIN alone: two `ORDER BY` clauses, every consumer of both lists found by the split suite (7 tests red before re-targeting), each re-target an exact-equality pin.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | correctness | pass | `_proposal_bindings` `_PendingProposals` branch + the stale block in `function_report`: only `ORDER BY` changed; counts + `min(count, limit)` checks unchanged; one caller of `_PendingProposals`. |
+| R2 | correctness | pass | re-targeted: `test_b23_a13_order_preserved_not_fixed_the` (expected = arrival order, plus an anti-vacuity `assertNotEqual(arrival, sorted(arrival))`; was the baseline lexicographic page M3.4 kept "not fixed" for this row), `test_function_report_stale_anomalies_cover_three_active_statuses_at_revision_ten` (projected ids = the two newest by `sequence`), `test_function_report_pending_proposals_bind_partition_operation_request_and_revision` (`tuple(target)` = arrival), and the SQL-text matchers of `test_function_report_is_one_read_only_snapshot_with_exact_limit_materialization`, `test_function_report_pending_projection_validates_middle_and_last_but_not_tail`, `test_function_report_pending_rows_validate_middle_and_last_scalars_and_bindings`, `test_function_report_stale_validation_reaches_middle_and_last_rows` (the stale matcher now precedes the status-list matcher, both naming `ORDER BY sequence DESC`). |
+| R3 | acceptance | pass | the two new probes + re-targeted B23 red over src at `99b3734` (failures=4 with B23's two subtests), green at this commit. |
+| R4 | law + docs | pass | docstring lists all six families; `docs/architecture.md` sentence; `runtime.md` ordering bullet rewritten; register audit rc 0. |
+| R5 | correctness | pass | `generate.py` rerun → 4 paste-ins; `test_w1_every_paste_in_equals_the_generator_output` OK. |
+
 ## p06 partial (MAINTAIN queue run, unit, tier `data`; row stays open, owed: owner ruling on u4c1) — target = the commit landing this section
 
 Check set: R1 each ported row reproduces its driver's mutated bytes at the catalogue base; R2 each replay reproduces its recorded closure set; R3 the unported part is recorded as owed, unclaimed. MAIN alone.

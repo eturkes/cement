@@ -550,7 +550,7 @@ def _proposal_bindings(
             """
             SELECT * FROM proposals
             WHERE partition = ? AND operation = ? AND status = 'pending'
-            ORDER BY id LIMIT ?
+            ORDER BY status_sequence LIMIT ?
             """,
             (partition, selection.operation, selection.limit),
         ).fetchall()
@@ -2607,7 +2607,14 @@ class System:
         receipt_id: str | None = None,
         projection_limit: int = 100,
     ) -> FunctionReport:
-        """Report immutable function membership beside current operation state."""
+        """Report immutable function membership beside current operation state.
+
+        Every detail list keeps one fixed order, so the page at a smaller `projection_limit` is a
+        prefix of the page at a larger one: members by membership ordinal; ready and blocked
+        compile scopes by input hash; pending proposals in arrival order (`status_sequence`,
+        oldest first); each artifact status list and the stale-revision anomalies newest first
+        (`sequence` descending).
+        """
 
         partition = _name(partition, "partition")
         operation = _name(operation, "operation")
@@ -2863,7 +2870,7 @@ class System:
                 WHERE partition = ? AND operation = ?
                   AND status IN ('draft', 'verified', 'promoted')
                   AND operation_revision <> ?
-                ORDER BY id LIMIT ?
+                ORDER BY sequence DESC LIMIT ?
                 """,
                 (partition, operation, revision, projection_limit),
             ).fetchall()

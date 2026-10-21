@@ -14793,7 +14793,7 @@ class SystemTests(unittest.TestCase):
             projection_limit=10,
         )
         gaps = report.operation_now.pending_proposals
-        target_ids = tuple(sorted(target))
+        target_ids = tuple(target)  # arrival order
         self.assertEqual(report.operation_now.pending_proposal_count, 4)
         self.assertEqual(tuple(item.proposal_id for item in gaps), target_ids)
         # The gap no longer carries request identity, so the surviving projected
@@ -15198,7 +15198,15 @@ class SystemTests(unittest.TestCase):
             verified_id: "verified",
             promoted_id: "promoted",
         }
-        projected_ids = tuple(sorted(expected))[:2]
+        with self.system.store.transaction(write=False) as connection:
+            # Stale anomalies page newest first, so the limit keeps the two latest creations.
+            projected_ids = tuple(
+                str(row["id"])
+                for row in connection.execute(
+                    "SELECT id FROM artifacts WHERE id IN (?, ?, ?) ORDER BY sequence DESC",
+                    tuple(expected),
+                ).fetchall()
+            )[:2]
         self.assertEqual(now.stale_revision_anomaly_count, 3)
         self.assertEqual(len(now.stale_revision_anomalies), 2)
         self.assertGreater(
@@ -15228,6 +15236,71 @@ class SystemTests(unittest.TestCase):
             retired_id,
             {item.artifact_id for item in now.stale_revision_anomalies},
         )
+
+    def _forced_ids(self, prefix: str, digits: str):
+        """Patch `_new_id` so `prefix` ids arrive as `<prefix>_<digit * 32>`, in `digits` order."""
+        forced = iter(f"{prefix}_{digit * 32}" for digit in digits)
+        real = system_module._new_id
+        return mock.patch.object(
+            system_module,
+            "_new_id",
+            side_effect=lambda wanted: next(forced) if wanted == prefix else real(wanted),
+        )
+
+    def test_function_report_pages_pending_proposals_in_arrival_order(self) -> None:
+        # Ids sort AGAINST arrival, so an id-ordered page lists the queue backwards.
+        self.register()
+        with self._forced_ids("prop", "fed"):
+            arrived = tuple(self.system.propose("tenant-a", "echo", {"x": n}) for n in range(3))
+        self.assertEqual(arrived, tuple(f"prop_{digit * 32}" for digit in "fed"))
+        pages = {
+            limit: tuple(
+                gap.proposal_id
+                for gap in self.system.function_report(
+                    "tenant-a", "echo", projection_limit=limit
+                ).operation_now.pending_proposals
+            )
+            for limit in (1, 2, 3)
+        }
+        self.assertEqual(pages[3], arrived)
+        self.assertEqual(pages[1], pages[3][:1])
+        self.assertEqual(pages[2], pages[3][:2])
+
+    def test_function_report_pages_stale_anomalies_newest_first(self) -> None:
+        # Fabricated: no supported flow strands an artifact (`operation revise` retires them),
+        # so the revision moves under three drafts by a direct UPDATE. Ids sort WITH creation,
+        # so an id-ordered page lists the newest last.
+        self.register(confirmations=2, reviewers=1, span=0)
+        for value in range(3):
+            for reviewer in ("alice", "bob"):
+                self._confirm_scope("tenant-a", "echo", {"stale": value}, reviewer=reviewer)
+        with self._forced_ids("art", "def"):
+            self.assertEqual(len(self.system.compile("tenant-a", "echo").created), 3)
+        connection = sqlite3.connect(self.database)
+        try:
+            created = tuple(
+                row[0] for row in connection.execute("SELECT id FROM artifacts ORDER BY sequence")
+            )
+            connection.execute(
+                "UPDATE operations SET revision = 2 WHERE partition = ? AND name = ?",
+                ("tenant-a", "echo"),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        self.assertEqual(created, tuple(f"art_{digit * 32}" for digit in "def"))
+        pages = {
+            limit: tuple(
+                anomaly.artifact_id
+                for anomaly in self.system.function_report(
+                    "tenant-a", "echo", projection_limit=limit
+                ).operation_now.stale_revision_anomalies
+            )
+            for limit in (1, 2, 3)
+        }
+        self.assertEqual(pages[3], tuple(reversed(created)))
+        self.assertEqual(pages[1], pages[3][:1])
+        self.assertEqual(pages[2], pages[3][:2])
 
     def test_function_report_rejects_persisted_building_and_unknown_artifact_statuses(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
@@ -15349,15 +15422,15 @@ class SystemTests(unittest.TestCase):
                 label: str | None = None
                 if "FROM function_memberships AS m" in sql and "LIMIT ?" in sql:
                     label = "members"
-                elif "FROM proposals" in sql and "ORDER BY id LIMIT ?" in sql:
+                elif "FROM proposals" in sql and "ORDER BY status_sequence LIMIT ?" in sql:
                     label = "pending"
+                elif "ORDER BY sequence DESC LIMIT ?" in sql and "operation_revision <> ?" in sql:
+                    label = "stale"
                 elif (
                     "FROM artifacts" in sql
                     and "ORDER BY sequence DESC LIMIT ?" in sql
                 ):
                     label = f"status:{parameters[-2]}"
-                elif "ORDER BY id LIMIT ?" in sql and "operation_revision <> ?" in sql:
-                    label = "stale"
                 if label is not None:
                     return CursorProxy(
                         cursor,
@@ -15476,7 +15549,7 @@ class SystemTests(unittest.TestCase):
         connection = sqlite3.connect(self.database)
         try:
             rows = connection.execute(
-                "SELECT id, provenance_hash FROM proposals ORDER BY id"
+                "SELECT id, provenance_hash FROM proposals ORDER BY status_sequence"
             ).fetchall()
             self.assertEqual(len(rows), 3)
             for position in (1, 2):
@@ -16517,7 +16590,7 @@ class SystemTests(unittest.TestCase):
 
             def execute(self, sql: str, parameters=()):
                 cursor = self.connection.execute(sql, parameters)
-                if "FROM proposals" in sql and "ORDER BY id LIMIT ?" in sql:
+                if "FROM proposals" in sql and "ORDER BY status_sequence LIMIT ?" in sql:
                     return RowsCursor(cursor)
                 return cursor
 
@@ -16795,7 +16868,7 @@ class SystemTests(unittest.TestCase):
 
             def execute(self, sql: str, parameters=()):
                 cursor = self.connection.execute(sql, parameters)
-                if "ORDER BY id LIMIT ?" in sql and "operation_revision <> ?" in sql:
+                if "ORDER BY sequence DESC LIMIT ?" in sql and "operation_revision <> ?" in sql:
                     return RowsCursor(cursor)
                 return cursor
 

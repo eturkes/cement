@@ -19,8 +19,8 @@ from pydantic import BaseModel, Field
 # The embedded source keeps its own line breaks; one of its pragma comments runs past 100
 # columns inside the string, where ruff reads no pragma.
 # ruff: noqa: E501
-_CEMENT_PACKAGE = "_cement_runtime_c48848bcd2af0186"
-_CEMENT_DIGEST = "c48848bcd2af0186d9411393c56640ee158a31d4f36dd35dd1ec42c5a56d2f56"
+_CEMENT_PACKAGE = "_cement_runtime_f8534409cb072e61"
+_CEMENT_DIGEST = "f8534409cb072e619e2ca6aca1211451a5b16d79e377aa4e15812b68e21e3705"
 _CEMENT_SOURCES = {
     "__init__": r'''
 """Cement public API."""
@@ -2944,7 +2944,7 @@ def _proposal_bindings(
             """
             SELECT * FROM proposals
             WHERE partition = ? AND operation = ? AND status = 'pending'
-            ORDER BY id LIMIT ?
+            ORDER BY status_sequence LIMIT ?
             """,
             (partition, selection.operation, selection.limit),
         ).fetchall()
@@ -5001,7 +5001,14 @@ class System:
         receipt_id: str | None = None,
         projection_limit: int = 100,
     ) -> FunctionReport:
-        """Report immutable function membership beside current operation state."""
+        """Report immutable function membership beside current operation state.
+
+        Every detail list keeps one fixed order, so the page at a smaller `projection_limit` is a
+        prefix of the page at a larger one: members by membership ordinal; ready and blocked
+        compile scopes by input hash; pending proposals in arrival order (`status_sequence`,
+        oldest first); each artifact status list and the stale-revision anomalies newest first
+        (`sequence` descending).
+        """
 
         partition = _name(partition, "partition")
         operation = _name(operation, "operation")
@@ -5257,7 +5264,7 @@ class System:
                 WHERE partition = ? AND operation = ?
                   AND status IN ('draft', 'verified', 'promoted')
                   AND operation_revision <> ?
-                ORDER BY id LIMIT ?
+                ORDER BY sequence DESC LIMIT ?
                 """,
                 (partition, operation, revision, projection_limit),
             ).fetchall()
