@@ -151,6 +151,7 @@ class _Client:
         if self.token:
             request.add_header("Authorization", f"Bearer {self.token}")
         try:
+            # The same loopback request the launcher built above.
             with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310
                 text = response.read().decode()
                 return response.status, json.loads(text or "null")
@@ -260,6 +261,7 @@ def setup(directory: pathlib.Path) -> int:
         raise SystemExit("local: uv is not on PATH")
     directory.mkdir(parents=True, exist_ok=True)
     if not paths["python"].is_file():
+        # Fixed arguments: uv creates the instance venv on the pinned interpreter.
         subprocess.run([uv, "venv", "--python", PYTHON, str(paths["venv"])], check=True)  # noqa: S603
     subprocess.run(  # noqa: S603 — fixed arguments: uv installs one pinned package
         [uv, "pip", "install", "--python", str(paths["python"]), OPEN_WEBUI], check=True

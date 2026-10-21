@@ -15,6 +15,16 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p01 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section
+
+Check set: R1 each acceptance conjunct rerun at HEAD (selections, clean-checkout gate, inline + reasoned suppressions, RUF100 = 0, one seed per tool); R2 the fix changes no behavior; R3 no frozen file touched. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass after fix | 26 suppressions censused; 2 in `examples/open_webui/local.py` lacked their own reason → comment lines added; format/lint/RUF100/types seeds each rc 1; configured `ruff check` rc 0. |
+| R2 | correctness | pass | comment lines only; `tests.test_open_webui_local` OK. |
+| R3 | correctness | pass + register | a reason appended to `_command_supervisor.py:157` redded `test_r1_moved_modules_are_byte_identical_and_leave_the_package` (M3.7 freezes the relocated bytes) → reverted; that assert shares the comment above line 156. |
+
 ## p02 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section, base `784350c`
 
 Check set fixed before re-reading the diff: R1 the mechanics `.claude/rules/assurance.md` Mutation campaigns names (isolated clones, bytecode off + purge, loaded-module proof, byte-exact restore, control first at full worker count); R2 classification — superseded (`old` absent) vs anchor-miss (present off `line`) vs applied; R3 every rc branch fires; R4 p02's acceptance; R5 law + records. MAIN alone (a dev tool whose seeds are mechanical).
