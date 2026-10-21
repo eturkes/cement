@@ -15,6 +15,16 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p13 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 acceptance rerun (both hosts, exit 2 + `invalid`, messages unchanged); R2 the tests fire when the translation is undone; R3 law current. MAIN alone; no code changed.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | the two named tests OK; three `_input` messages unchanged in `src/cement_runtime/cli.py`. |
+| R2 | correctness | pass | translation removed → 4 errors (both hosts on `function eval`, the buffer host + the observation tuple on `resolve`). |
+| R3 | law | pass + register | `runtime.md` Known residue listed `_input` as untranslated after the fix landed → clause removed. |
+
 ## p07 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section, base `99b3734`
 
 Check set fixed before re-reading the diff: R1 each changed query keeps its WHERE + LIMIT + count check; R2 every pin the order change touched is re-targeted at the new key, none weakened; R3 red-first over the unfixed src; R4 publication (docstring + human-facing doc + law); R5 generated paste-ins regenerated. MAIN alone: two `ORDER BY` clauses, every consumer of both lists found by the split suite (7 tests red before re-targeting), each re-target an exact-equality pin.
