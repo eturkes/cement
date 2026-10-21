@@ -15,6 +15,17 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p39 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 each S3 KEEP row + source-docstring row carries a disposition + falsifier at HEAD; R2 a deterministic check rejects callback/runtime ACCESS-CONTROL ATTRIBUTION (not merely unclassified tokens); R3 each check is seen firing on planted text; R4 credit status stated. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `.agent/decisions/p39-dispositions.md`: S3-001 DELETE (superseded by the M3.9a README rewrite), S3-004/005 KEEP, S1-009/010/138 REWRITE→KEEP, each with falsifier + pin. |
+| R2 | acceptance | pass | `test_no_surface_attributes_access_control_to_cement`: sentence-level subject × access-verb × no-negation over README, `docs/*.md`, `examples/*/README.md` + every `src` docstring; in-test seeds both ways (2 flagged, 2 clean); 0 hits at HEAD. |
+| R3 | verification integrity | pass | planted `The runtime authorizes every reviewer before it records a review.` in `docs/architecture.md` → that test fails naming it; `recorded assertions` → `kept` in README → the presence test fails naming the S3-005 claim. |
+| R4 | verification integrity | pass (limit recorded) | both pins read prose (README + docstrings) and execute no `src` line ⇒ `.agent/mutate` scope = 0 mutants (p91's class); credit = the planted-text controls above. |
+
 ## p70 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
 
 Check set: R1 `.claude/rules/ops.md` names D28's per-revision 600 s limit as load-sensitive with both measurements; R2 a change to the limit is bound to an owner-approved unit recording this firing. MAIN alone.

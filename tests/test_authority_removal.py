@@ -7,6 +7,7 @@ undone, or when one deliberately preserved invariant disappears.
 
 from __future__ import annotations
 
+import ast
 import inspect
 import pathlib
 import re
@@ -56,6 +57,86 @@ ALLOWED_SURVIVORS = (
     "authorizer_removal",
     "Authorizer removal",
 )
+
+
+_SUBJECT = re.compile(
+    r"\b(?:(?-i:Cement|System)|the runtime|the library|the CLI|(?:an?|the) (?:authority )?(?:callback|hook))\b",
+    re.IGNORECASE,
+)
+_ACCESS_VERB = re.compile(r"\b(?:authenticat\w*|authoriz\w*|gates?|gated|gating|denies|deny|permits?|grants?)\b")
+_NEGATION = re.compile(r"\b(?:not|no|never|without|nor|cannot)\b")
+
+
+def _attributions(text: str) -> list[str]:
+    """Sentences crediting Cement, its CLI or a callback with an access-control decision."""
+
+    sentences = re.split(r"(?<=[.!?])\s+", " ".join(text.split()))
+    return [
+        sentence
+        for sentence in sentences
+        if _SUBJECT.search(sentence)
+        and _ACCESS_VERB.search(sentence)
+        and not _NEGATION.search(sentence)
+    ]
+
+
+def _docstrings(path: pathlib.Path) -> list[str]:
+    tree = ast.parse(path.read_text())
+    nodes = [tree, *ast.walk(tree)]
+    return [
+        doc
+        for node in nodes
+        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+        and (doc := ast.get_docstring(node)) is not None
+    ]
+
+
+class GoverningClaimTests(unittest.TestCase):
+    """p39: the KEEP claims of map-b S3 + the rewritten source contracts stay, unattributed."""
+
+    def test_the_governing_boundary_claims_survive(self) -> None:
+        readme = " ".join((ROOT / "README.md").read_text().split())
+        for claim in (
+            "This release is a local control plane, not a network service or an ACL system.",  # S3-004
+            "CLI actor names are recorded assertions, not authentication.",  # S3-005
+            "Cement makes no principal or permission decision.",
+        ):
+            with self.subTest(claim=claim):
+                self.assertIn(claim, readme)
+        contract = " ".join((inspect.getdoc(system.System) or "").split())
+        for claim in (
+            "A caller applies a resolved plan only after its own live authorization/policy gate.",  # S1-009
+            "Cement makes no principal or permission decision.",  # S1-010
+            "Actor and reviewer arguments are recorded assertions only.",
+        ):
+            with self.subTest(claim=claim):
+                self.assertIn(claim, contract)
+        self.assertEqual(  # S1-138
+            inspect.getdoc(system.System.promote_function),
+            "Promote the locked prospective union in one immediate transaction.",
+        )
+
+    def test_no_surface_attributes_access_control_to_cement(self) -> None:
+        for seed, flagged in (
+            ("Cement authorizes each reviewer before review.", True),
+            ("The callback gates operation registration and compilation.", True),
+            ("The CLI records identity strings but does not authenticate them.", False),
+            ("Authentication and authorization remain deployment responsibilities.", False),
+        ):
+            with self.subTest(seed=seed):
+                self.assertEqual(bool(_attributions(seed)), flagged)
+        surfaces = [
+            *(ROOT / "README.md", *sorted((ROOT / "docs").glob("*.md"))),
+            *sorted((ROOT / "examples").glob("*/README.md")),
+        ]
+        hits = [f"{path.relative_to(ROOT)}: {sentence}" for path in surfaces for sentence in _attributions(path.read_text())]
+        hits += [
+            f"{path.relative_to(ROOT)} docstring: {sentence}"
+            for path in SOURCES
+            for doc in _docstrings(path)
+            for sentence in _attributions(doc)
+        ]
+        self.assertEqual(hits, [])
 
 
 class ResidueTests(unittest.TestCase):
