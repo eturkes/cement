@@ -15,6 +15,16 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p18 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 one CLI probe per shape (empty, boundary accepted, boundary+1 rejected, illegal character) with exit + mapped message; R2 the accepted boundary value is read back from the promotion receipt; R3 credit recorded, survivors routed. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `test_function_promote_actor_bounds_are_adjacent_byte_pairs`: `""` → `promoted_by must be non-empty text`; `é`×128+`a` (257 bytes), BEL, U+200B → `promoted_by must be control-free and at most 256 UTF-8 bytes`; each rc 2, stdout empty, no receipt written. |
+| R2 | acceptance | pass | `é`×128 (256 bytes) → rc 0; `function receipts` → `promoted_by` = that value. |
+| R3 | verification integrity | open → p106 | killed 1662 / survived 1260 / invalid 70 of 2992 (`.agent/decisions/p18-mutate.txt`). |
+
 ## p32 + p33 plan review (MAINTAIN queue run, partial, tier `kernel`) — target = the commit landing this section
 
 Check set (the plan's own): A policy family, B bound-report family, C FunctionEntry construction, D decomposition, V verification, Q1-Q3. Reviewer = `consultant-1` (consultant), table `.agent/decisions/p32-plan-review.md`; MAIN re-verified each decisive anchor.

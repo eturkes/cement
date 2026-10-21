@@ -2800,6 +2800,41 @@ class CLITests(unittest.TestCase):
             self.assertEqual(run.stdout_bytes, b"")
             self.assertEqual(self.error(run), {"error": "invalid", "message": message})
 
+    def test_function_promote_actor_bounds_are_adjacent_byte_pairs(self) -> None:
+        # p18: `--actor` is persisted in the receipt as `promoted_by` (`_text`, 256 UTF-8 bytes,
+        # control-free). Two-byte characters put the byte bound away from the character count.
+        self.compile_drafts("promote-actor", (9, 20))
+        self.assertEqual(
+            self.run_cli("function", "verify-drafts", "promote-actor", "--actor", "verifier").status, 0
+        )
+        digest = self.payload(self.run_cli("function", "inspect", "promote-actor"))["function_hash"]
+        bounded = "promoted_by must be control-free and at most 256 UTF-8 bytes"
+        for actor, message in (
+            ("", "promoted_by must be non-empty text"),
+            ("é" * 128 + "a", bounded),
+            ("release\x07manager", bounded),
+            ("release\u200bmanager", bounded),
+        ):
+            with self.subTest(actor=actor):
+                run = self.run_cli(
+                    "function", "promote", "promote-actor",
+                    "--expected-function-hash", digest, "--actor", actor,
+                )
+                self.assertEqual((run.status, run.stdout_bytes), (2, b""))
+                self.assertEqual(self.error(run), {"error": "invalid", "message": message})
+        self.assertEqual(
+            self.payload(self.run_cli("function", "receipts", "promote-actor"))["receipts"], []
+        )
+        boundary = "é" * 128
+        self.assertEqual(len(boundary.encode("utf-8")), 256)
+        promoted = self.run_cli(
+            "function", "promote", "promote-actor",
+            "--expected-function-hash", digest, "--actor", boundary,
+        )
+        self.assertEqual(promoted.status, 0)
+        receipts = self.payload(self.run_cli("function", "receipts", "promote-actor"))["receipts"]
+        self.assertEqual([row["promoted_by"] for row in receipts], [boundary])
+
     def test_function_promote_scope_misses_are_not_found(self) -> None:
         self.register("promote-partitioned", partition="tenant_a")
         for run in (
