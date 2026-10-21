@@ -15,6 +15,15 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p71 + p72 close (MAINTAIN queue run, closures, tier `docs`) — target = the commit landing this section
+
+Check set: each row's acceptance rerun at HEAD. MAIN alone; no change.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| p71 | acceptance | pass | `rg -F 'a8109eb' .agent/spec.md` → rc 1; `Phase` = `MAINTAIN — whole product`, naming no gate baseline. Met at `e4e7016`. |
+| p72 | acceptance | pass | `rg -F -e 'Shipped for (' -e 'no longer eyeballed' .agent/spec.md` → rc 1; each paragraph of `e4e7016^:.agent/spec.md` (`Shipped for (2)`-(5) + `Capture heights are no longer eyeballed`) occurs byte-verbatim in `.agent/archive/iterate-rounds.md`. Met at `e4e7016`. |
+
 ## p54 + p85 close (MAINTAIN queue run, closures, tier `docs` / `kernel`) — target = the commit landing this section
 
 Check set: each row's acceptance rerun at HEAD with its seed. MAIN alone; no change.
