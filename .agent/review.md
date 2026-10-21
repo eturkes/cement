@@ -15,6 +15,16 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p40 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
+
+Check set: R1 the tracked register tool runs from the configured gate over every human-facing surface; R2 zero filler hits, sentence length reported and never capped; R3 a filler seed reds it. MAIN alone; no change (acceptance met at `629577d`).
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `.agent/gate` step `register` = `.agent/register-audit --gate` over `README.md` + `docs/*.md` + `examples/*/README.md` (`git ls-files`); present since `629577d`. |
+| R2 | acceptance | pass | rerun at `ee7ce62`: rc 0, `filler 0` per file, longest sentence printed (30 words, open_webui README), never graded. |
+| R3 | acceptance | pass | seed `Run the command simply to start.` appended to `docs/architecture.md` in a disposable worktree → rc 1 `FILLER docs/architecture.md:281: simply`. |
+
 ## p65 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 the unfilled test matches the stub's SHAPE (a cell that IS the placeholder), not a substring; R2 a row quoting the token in backticks grades clean (was red); R3 `--emit-stub` output still grades nonzero through the unfilled check; R4 every other seed fires as before; R5 the seed record names both new seeds. MAIN alone.
