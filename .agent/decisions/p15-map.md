@@ -2,7 +2,7 @@
 
 Baseline = `95f75b6fea26a0ecaeadfe0e0f1475348b1b172e`. Verdicts = 17 subsumed / 8 gap / 3 obsolete.
 
-Classification = behavioral conjuncts, not stale fixture syntax. All cited function bodies match HEAD byte-for-byte. Anchors = line numbers in the landing tree: re-anchored from `809e779` (where all 52 fenced anchors resolved) by an exact-line `difflib` map, 57 table + 52 fenced anchors, 0 misses; `uv run python .agent/validate-anchors .agent/decisions/p15-map.md` rc 0. `.scratch/` paths below = the mapping run's machine-local workspace; the 8 gap probes ship as `tests/test_cli.py` tests (MAINTAIN p15). Multiple shipped ids denote explicit compositional coverage; a gap names the uncovered conjunct, not a blanket absence of related tests.
+Classification = behavioral conjuncts, not stale fixture syntax. All cited function bodies match HEAD byte-for-byte. Anchors = line numbers in the landing tree: re-anchored from `809e779` (where all 52 fenced anchors resolved) by an exact-line `difflib` map, 57 table + 52 fenced anchors, 0 misses; `uv run python .agent/validate-anchors .agent/decisions/p15-map.md` rc 0. The 8 gap probes ship as `tests/test_cli.py` tests (MAINTAIN p15). Multiple shipped ids denote explicit compositional coverage; a gap names the uncovered conjunct, not a blanket absence of related tests.
 
 P18 display substitutes `[absent]` for its original lookup-miss token because the required unfinished-cell grep also matches that token in the source method name. Probe order + P18 id are unchanged.
 
@@ -101,3 +101,5 @@ tests/test_system.py	13258	("tenantXpublic", "tenant_public", "like-public"),
 ```
 
 general-purpose-1-DONE-1
+
+Machine-local: each `.scratch/` path in this file names a gitignored input or output of the session that wrote it; no clone retrieves it, and the file states the substance it relied on (p10).

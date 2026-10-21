@@ -8,7 +8,7 @@ Council rule applied: a finding confirmed by both reviewers is accepted outright
 accepted only after MAIN reproduced it or verified it by direct code inspection.
 
 MAIN's own replays, all reproduced against `.scratch/main-verify/tree` (worktree at `9e09f4c` +
-`.scratch/m2u3b1.patch`):
+`.scratch/m2u3b1.patch`; both deleted):
 
 | Mutation | Suite | Verdict |
 |---|---|---|
@@ -17,7 +17,7 @@ MAIN's own replays, all reproduced against `.scratch/main-verify/tree` (worktree
 | retired event projection replaced with `()` | 208 OK | survivor confirmed |
 | verified-row `ORDER BY` removed | 208 OK | survivor confirmed |
 
-MAIN's own probe of the empty-union authority bypass (`.scratch/main-verify/f1probe.py`), deny-all
+MAIN's own probe of the empty-union authority bypass (`.scratch/main-verify/f1probe.py`, deleted), deny-all
 callback after registration:
 
 ```text
@@ -153,3 +153,5 @@ both design records into a tracked `.agent/` path and repoints the roadmap.
   rev2's own equivalence analysis. The surviving inner comparison needs a pin (B9), not restoration.
 - **rev2's 13 equivalent survivors.** Each carries a proof in the report and sidecar; MAIN accepts them as
   equivalent and requires no pin.
+
+Machine-local: each `.scratch/` path in this file names a gitignored input or output of the session that wrote it; no clone retrieves it, and the file states the substance it relied on (p10).

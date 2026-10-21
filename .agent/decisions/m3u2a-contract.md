@@ -354,3 +354,5 @@ type and message:
 - `.agent/decisions/m3u2a-differential.py` grades the comparison and carries the ruled divergence set,
   so the claim reruns instead of resting on this paragraph.
 - `S7` cost agrees across implementations (0.995x, 1.002x), which is what closes C06.
+
+Machine-local: each `.scratch/` path in this file names a gitignored input or output of the session that wrote it; no clone retrieves it, and the file states the substance it relied on (p10).

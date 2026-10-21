@@ -148,3 +148,5 @@ quantifies over *all* rows. Therefore:
 ## Gates
 
 `uv run python -m unittest discover -s tests -t .` and `uv build`, both from the repo root.
+
+Machine-local: each `.scratch/` path in this file names a gitignored input or output of the session that wrote it; no clone retrieves it, and the file states the substance it relied on (p10).

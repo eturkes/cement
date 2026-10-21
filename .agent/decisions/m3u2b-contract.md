@@ -594,3 +594,5 @@ every caller would otherwise compose by hand, with the failed-verdict gate and t
 biconditional enforced in one place instead of at each call site. The cost claim in the same commit
 body stands; only the subject's causal clause is wrong. A scoped-commit subject is durable and
 unrewritable, so a later correction needs a tracked home and this section is it.
+
+Machine-local: each `.scratch/` path in this file names a gitignored input or output of the session that wrote it; no clone retrieves it, and the file states the substance it relied on (p10).

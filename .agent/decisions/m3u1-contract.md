@@ -310,3 +310,5 @@ are read here as contract questions, not as a suite. One row found a real undisc
   identity columns, per-producer event payloads, a frozen schema digest replacing MAIN's by-hand
   byte-identity check, both 1,001-member sentinels, and UTF-8 boundary probes -- is off-spine ->
   `.agent/polish.md`.
+
+Machine-local: each `.scratch/` path in this file names a gitignored input or output of the session that wrote it; no clone retrieves it, and the file states the substance it relied on (p10).

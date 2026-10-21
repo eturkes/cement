@@ -259,3 +259,5 @@ Ranked defects, most important first:
 Risks requiring explicit MAIN rulings: F018, F025, F033-F035, F037-F038, F050. Confirmed-sound results: F004-F005, F010, F014, F017, F043, F054.
 
 **Single most important correction:** make each removal unit fail when one real obligation remains or one preserved invariant disappears, independently of the broad suite. Without that, the plan can delete the pin beside the feature and report success.
+
+Machine-local: each `.scratch/` path in this file names a gitignored input or output of the session that wrote it; no clone retrieves it, and the file states the substance it relied on (p10).

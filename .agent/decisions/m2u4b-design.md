@@ -284,3 +284,5 @@ Binding, from `.agent/memory.md` and `m2u4-design.md`; each rule cost a prior un
   below 10 make base-10 and hex framing identical.
 - Mutation harnesses purge `__pycache__` and set `PYTHONDONTWRITEBYTECODE=1`, prove the mutant reached the
   interpreter, and target by line plus an asserted anchor string, never by occurrence index.
+
+Machine-local: each `.scratch/` path in this file names a gitignored input or output of the session that wrote it; no clone retrieves it, and the file states the substance it relied on (p10).

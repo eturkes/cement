@@ -127,3 +127,5 @@ Every batch writes `tests/test_system.py`, so fix passes run sequentially, never
 lands the sole production change (A1) plus the enumeration/read-only coverage; batch 2 lands the joined
 pins. `store.py` moves from byte-identical only if a pin genuinely requires it — B9/B10/B11 are test
 pins against the existing schema, not schema edits.
+
+Machine-local: each `.scratch/` path in this file names a gitignored input or output of the session that wrote it; no clone retrieves it, and the file states the substance it relied on (p10).

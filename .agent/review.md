@@ -17,6 +17,16 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p10 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
+
+Check set: R1 each of the 14 cited inputs inlined or marked expired, the 3 deleted included; R2 no tracked file presents a `.scratch/` path as retrievable; R3 the check fires. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | seven records' inputs: 11 present on this machine only → marked machine-local (each record already states the arbitration it drew from them); `m2u3b1.patch` + `main-verify/{tree,f1probe.py}` → `deleted` in place. Rescue by archiving the raw spike reports was weighed and declined: ≈ 0.5 MB of superseded agent drafts would enter every repo search, while the records hold the decisions. |
+| R2 | acceptance | pass | census over `git grep -F .scratch/` at this commit: 167 citations = 10 operational (conventions + capture output, reasons in the script) + 47 history/queue + 12 JSON (marked in the census) + 98 in marked files; 0 unmarked. |
+| R3 | integrity | pass | before the markers: rc 1, 84 `UNMARKED` lines over 13 files; after: rc 0. |
+
 ## p23 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 a child-process audit hook proves `function eval` opens no database file and no connection; R2 the probe can fire (control); R3 every offline claim states any `python -S` audit-hook gap; R4 preservation credit. MAIN alone.
@@ -1369,3 +1379,5 @@ Rulings that bind beyond this pass:
 - A generated artifact's header states the rule its generator implements, and a
   generator that refuses to overwrite cannot resync it ⇒ pin the header as a prefix or
   it drifts unnoticed by hand-edit alone.
+
+Machine-local: each `.scratch/` path in this file names a gitignored input or output of the session that wrote it; no clone retrieves it, and the file states the substance it relied on (p10).
