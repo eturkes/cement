@@ -17,6 +17,17 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p23 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 a child-process audit hook proves `function eval` opens no database file and no connection; R2 the probe can fire (control); R3 every offline claim states any `python -S` audit-hook gap; R4 preservation credit. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | probe runs `function eval` (A03 hit rc 0, C01 miss rc 6) through `python -c` with the hook installed before `cement_runtime` loads: 0 `sqlite3.connect`, no file open in the ledger directory other than the bundle. |
+| R2 | integrity | pass | control: the same probe over `function export` records `sqlite3.connect` on the ledger's `file:` URI; positive control: the bundle `open` is recorded for each eval. |
+| R3 | acceptance | pass | the hook is the child's own program, not `sitecustomize`, so `python -S` leaves no gap; residual coverage (startup before the hook, access outside Python audit events) stated once at the precise ledger-free claim (README `Deployment boundary`) and referenced from `docs/threat-model.md`'s offline bullet; the other offline sentences (README quick start + API table, architecture, example README) carry no gap to state. register-audit rc 0, article-audit 0 ungrounded. |
+| R4 | integrity | pass | `.agent/mutate` at `impl/p23` (tag `archive/p23-credit`): killed 2182 / survived 1483 / invalid 92 of 3757; survivors unruled → p112. |
+
 ## p78 close (MAINTAIN queue run, row closure at `1935f68`, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 the acceptance met at `1935f68` holds on recheck; R2 planted red reds twice, store unchanged; R3 the kept assertions. MAIN alone.

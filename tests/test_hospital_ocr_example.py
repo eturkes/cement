@@ -919,6 +919,107 @@ class ShippedCommandRoundTripTests(unittest.TestCase):
                 },
             )
 
+    # The child's own `-c` program installs the hook before `cement_runtime` loads, so no
+    # `sitecustomize` is involved and `python -S` cannot drop it; it records every Python-level
+    # `open` and `sqlite3.connect` from then on (interpreter startup precedes it).
+    AUDITED = r"""
+import json, os, runpy, sys
+record, events = sys.argv[1], []
+def hook(event, args):
+    if event in ("open", "sqlite3.connect"):
+        path = args[0]
+        events.append([event, os.fsdecode(path) if isinstance(path, (str, bytes, os.PathLike)) else path])
+sys.addaudithook(hook)
+sys.argv = ["cement_runtime", *sys.argv[2:]]
+try:
+    runpy.run_module("cement_runtime", run_name="__main__", alter_sys=True)
+finally:
+    seen = list(events)
+    with open(record, "w", encoding="utf-8") as stream:
+        json.dump(seen, stream)
+"""
+
+    def audited(self, record: str, *arguments: str) -> tuple[subprocess.CompletedProcess[str], list]:
+        run = subprocess.run(
+            [sys.executable, "-c", self.AUDITED, record, *arguments],
+            capture_output=True,
+            text=True,
+            env=self.environment(),
+        )
+        return run, json.loads(Path(record).read_text(encoding="utf-8"))
+
+    def test_the_eval_child_opens_no_database_file(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            database = os.path.join(directory, "cement.db")
+            function = _promoted_example_ledger(database)
+            System(database).set_switch(
+                run_demo.PARTITION, run_demo.OPERATION, mode="follow", actor="informatics-lead"
+            )
+            bundle = os.path.join(directory, "bundle.json")
+            record = os.path.join(directory, "events.json")
+            # Control: the same probe records a ledger leaf connecting to the database.
+            export, control = self.audited(
+                record,
+                "--db",
+                database,
+                "--partition",
+                run_demo.PARTITION,
+                "function",
+                "export",
+                run_demo.OPERATION,
+                "--out",
+                bundle,
+            )
+            self.assertEqual(export.returncode, 0, export.stderr)
+            ledger_uri = Path(database).absolute().as_uri()
+            self.assertTrue(
+                any(
+                    event[0] == "sqlite3.connect" and event[1].startswith(ledger_uri)
+                    for event in control
+                ),
+                control,
+            )
+
+            for filename, status in (
+                ("layout_a_progress_note_03.txt", 0),
+                ("layout_c_lab_slip_01.txt", 6),
+            ):
+                signature = json.dumps(
+                    {"document": _document(filename)},
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                    sort_keys=True,
+                )
+                with self.subTest(document=filename):
+                    run, events = self.audited(
+                        record,
+                        "function",
+                        "eval",
+                        "--bundle",
+                        bundle,
+                        "--input",
+                        signature,
+                        "--expected-function-hash",
+                        function.function_hash,
+                    )
+                    self.assertEqual(run.returncode, status, run.stderr)
+                    self.assertEqual(run.stderr, "")
+                    # Positive control: the hook saw this child read its bundle.
+                    self.assertIn(["open", bundle], [event[:2] for event in events])
+                    self.assertEqual(
+                        [event for event in events if event[0] == "sqlite3.connect"], []
+                    )
+                    self.assertEqual(
+                        [
+                            event
+                            for event in events
+                            if isinstance(event[1], str)
+                            and os.path.dirname(os.path.abspath(event[1])) == directory
+                            and event[1] != bundle
+                        ],
+                        [],
+                    )
+
 
 class DemoTranscriptTests(unittest.TestCase):
     def test_demo_refuses_to_run_where_python_removes_its_assertions(self) -> None:

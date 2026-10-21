@@ -566,7 +566,11 @@ Classify it with your other sensitive data. Apply the same retention and disclos
 `function export --out` writes atomically through a mode-0600 temporary file and refuses a non-regular
 destination. The reader accepts one strict UTF-8 regular file and bounds it at 64 MiB, independently
 from the 1 MiB bound on the evaluation input. `function eval` is ledger-free, not import-free: it opens
-and reads the bundle path, and importing `cement_runtime` still loads `sqlite3`.
+and reads the bundle path, and importing `cement_runtime` still loads `sqlite3`. A test runs
+`function eval` in a child process with an audit hook that the child installs before it imports
+`cement_runtime`. That hook records no database connection and no file open other than the bundle.
+`python -S` does not remove it, because the child installs it itself. It does not see interpreter
+startup, or file access that bypasses Python audit events.
 
 Every library call and every CLI command assumes that your service already authorized access to the
 exact partition. That applies to operation registration and revision, proposal review, compilation,

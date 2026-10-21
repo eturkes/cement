@@ -9,7 +9,8 @@
   them.
 - The provider adapter process as a credential-bearing transport. Its model output remains untrusted.
 - For offline evaluation, the host runtime and the channel that delivers an independently held function
-  hash. That path opens no database and starts no adapter.
+  hash. That path opens no database and starts no adapter. A child-process audit hook proves this
+  for `function eval`, and `python -S` does not remove it (README `Deployment boundary`).
 
 ## Untrusted
 
