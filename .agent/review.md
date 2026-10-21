@@ -15,6 +15,18 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p02 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section, base `784350c`
+
+Check set fixed before re-reading the diff: R1 the mechanics `.claude/rules/assurance.md` Mutation campaigns names (isolated clones, bytecode off + purge, loaded-module proof, byte-exact restore, control first at full worker count); R2 classification — superseded (`old` absent) vs anchor-miss (present off `line`) vs applied; R3 every rc branch fires; R4 p02's acceptance; R5 law + records. MAIN alone (a dev tool whose seeds are mechanical).
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | correctness | pass | clones = `git worktree add --detach <base>` in a temp dir, removed in `finally`; `_suite` purges every `__pycache__` with `PYTHONDONTWRITEBYTECODE=1`; the probe imports the module and requires its file = the clone's path holding the edit + 80 chars of context (deletions included); `finally` restores and compares sha256; each clone ends `git diff --quiet`; CONTROL runs in every clone before any mutant. |
+| R2 | correctness | pass | `_locate`: no occurrence → superseded; >1 occurrence with none starting on `line` → anchor-miss (rc 2, seeded); u4b's 8 rows the scratch run called ambiguous carry the line its re-anchored pass applied (`final-reanchored.jsonl`) and replay killed. |
+| R3 | correctness | pass | seeds: equal expect rc 0; expect mismatch rc 1; `ran` 5 → CONTROL red rc 2; anchor-miss rc 2; non-importing mutant → not-loaded rc 2. |
+| R4 | acceptance | pass | u4b at `62e6d09`: CONTROL ran 353 × 8 green; 58 killed, superseded [XMEM-001], survived [STALE-013, STALE-014] = the catalogue's `equivalent` (reviewer rulings carried verbatim); rc 0. |
+| R5 | law + records | pass | `ops.md` Static checks names the command + rc classes; `gate-checks.md` records the seeds, `paths:` covers the tool + catalogues. |
+
 ## p81 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section, base `d4746ef`
 
 Check set fixed before re-reading the diff: R1 no row can leave the queue unclosed (floor over both files' histories); R2 a closure SHA is admitted only when it resolves to an ancestor of HEAD; R3 `HEADER`, the queue header, `CLOSED_HEADER`, the ledger header + `--emit-stub` agree; R4 every pre-edit seed still fires; R5 p81 + p68 + p69 acceptance rerun; R6 law + records current. MAIN alone (a dev-tool grader whose seeds are mechanical; a teammate adds no assurance they miss).

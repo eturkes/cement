@@ -1,0 +1,249 @@
+#!/usr/bin/env python3
+"""replay-mutants — replay a closed unit's author-picked mutant catalogue (p02 + p06).
+
+A CLOSURE instrument, never a credential (`.claude/rules/assurance.md`): it reruns the mutants
+a unit's author or reviewer picked, at the revision they were picked for, so a recorded
+closure set ("58 killed, 1 superseded, 2 equivalent") reruns from a clean checkout. Pin credit
+stays with `.agent/mutate` (default operators).
+
+Catalogue = `.jsonl`: line 1 = the header object, every later line = one mutant.
+  header: {"catalogue": name, "base": <sha the rows target>, "unittest": [args after
+           `python -m unittest`], "ran": <tests that argv selects at base, or null>,
+           "expect": {"killed": n, "superseded": [ids], "equivalent": {id: ruling}}}
+  mutant: {"id", "file" (repo-relative), "line" (1-based start of `old` at base), "old", "new",
+           "intent"}
+`old` must occur once in `file`, or start exactly on `line` where it occurs more than once.
+Absent `old` = superseded (the code it targeted is gone); present but not at `line` =
+anchor-miss, a catalogue defect.
+
+Mechanics (`.claude/rules/assurance.md` Mutation campaigns): `--workers` detached worktrees of
+`base` in a temp dir, never the working tree; `PYTHONDONTWRITEBYTECODE=1` + every `__pycache__`
+purged before each run; per mutant a probe proves the interpreter resolves the mutated module
+to the clone's file and that file holds `new`; the selected suite decides (rc != 0 or timeout =
+killed); the original bytes are restored in `finally` and their sha256 compared, and each clone
+ends with `git diff --quiet`. A pristine CONTROL run per clone (full worker count, run first)
+must pass with exactly `ran` tests, or nothing is replayed.
+
+Usage: uv run python .agent/replay-mutants <catalogue.jsonl> [--workers N] [--only ID …]
+rc 0 = control green, every row applied or superseded, every clone restored, and the verdicts
+equal `expect` exactly (survivors = the `equivalent` ids); 1 = verdicts differ from `expect`;
+2 = setup failure, red control, anchor-miss or a failed restore.
+"""
+
+from __future__ import annotations
+
+import argparse
+import concurrent.futures
+import hashlib
+import json
+import os
+import pathlib
+import queue
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+PROBE = r"""
+import importlib, pathlib, sys
+module = importlib.import_module(sys.argv[1])
+path = pathlib.Path(module.__file__).resolve()
+expected = pathlib.Path(sys.argv[2]).resolve()
+sys.exit(0 if path == expected and sys.argv[3] in path.read_text(encoding="utf-8") else 1)
+"""
+
+
+def _git(*args: str, cwd: pathlib.Path = ROOT) -> str:
+    return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True).stdout
+
+
+def _environment(tree: pathlib.Path) -> dict[str, str]:
+    environment = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
+    environment["PYTHONPATH"] = os.pathsep.join([str(tree), str(tree / "src")])
+    return environment
+
+
+def _purge(tree: pathlib.Path) -> None:
+    for cache in tree.rglob("__pycache__"):
+        shutil.rmtree(cache, ignore_errors=True)
+
+
+def _suite(tree: pathlib.Path, argv: list[str], timeout: float | None) -> tuple[int | None, int, str]:
+    """(rc or None on timeout, tests ran, tail)."""
+    _purge(tree)
+    try:
+        done = subprocess.run([sys.executable, "-m", "unittest", *argv], cwd=tree,
+                              env=_environment(tree), capture_output=True, text=True,
+                              timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return None, 0, "timeout"
+    ran = re.findall(r"^Ran (\d+) tests? in", done.stderr, flags=re.MULTILINE)
+    return done.returncode, int(ran[-1]) if ran else 0, done.stderr[-600:]
+
+
+def _starts(text: str, needle: str) -> list[int]:
+    """1-based line of every occurrence's start."""
+    out, index = [], text.find(needle)
+    while index >= 0:
+        out.append(text.count("\n", 0, index) + 1)
+        index = text.find(needle, index + 1)
+    return out
+
+
+def _locate(text: str, row: dict[str, object]) -> tuple[str, int | None]:
+    """('apply', offset) | ('superseded', None) | ('anchor-miss', None)."""
+    old = str(row["old"])
+    starts = _starts(text, old)
+    if not starts:
+        return "superseded", None
+    if len(starts) > 1 and starts.count(int(str(row["line"]))) != 1:
+        return "anchor-miss", None
+    target = starts[0] if len(starts) == 1 else int(str(row["line"]))
+    index = text.find(old)
+    while text.count("\n", 0, index) + 1 != target:
+        index = text.find(old, index + 1)
+    return "apply", index
+
+
+def _module(file: str) -> str | None:
+    path = pathlib.PurePosixPath(file)
+    if path.parts[0] != "src" or path.suffix != ".py":
+        return None
+    return ".".join(path.with_suffix("").parts[1:])
+
+
+def _replay(tree: pathlib.Path, row: dict[str, object], argv: list[str],
+            timeout: float) -> dict[str, object]:
+    path = tree / str(row["file"])
+    original = path.read_bytes()
+    digest = hashlib.sha256(original).hexdigest()
+    text = original.decode("utf-8")
+    verdict, offset = _locate(text, row)
+    record: dict[str, object] = {"id": row["id"], "verdict": verdict, "seconds": 0.0}
+    if offset is None:
+        record["restored"] = True
+        return record
+    started = time.monotonic()
+    old, new = str(row["old"]), str(row["new"])
+    mutated = text[:offset] + new + text[offset + len(old):]
+    try:
+        if mutated == text:
+            record["verdict"] = "no-change"
+            return record
+        path.write_text(mutated, encoding="utf-8")
+        module = _module(str(row["file"]))
+        if module is not None:
+            _purge(tree)
+            # The witness = the edit plus its context, so a deletion (empty `new`) proves too.
+            witness = mutated[max(0, offset - 80) : offset + len(new) + 80]
+            probe = subprocess.run([sys.executable, "-c", PROBE, module, str(path), witness],
+                                   cwd=tree, env=_environment(tree), capture_output=True)
+            if probe.returncode != 0:
+                record["verdict"] = "not-loaded"
+                return record
+        rc, _ran, tail = _suite(tree, argv, timeout)
+        record["verdict"] = "killed" if rc != 0 else "survived"
+        record["tail"] = tail.strip().splitlines()[-1] if tail.strip() else ""
+    finally:
+        path.write_bytes(original)
+        record["restored"] = hashlib.sha256(path.read_bytes()).hexdigest() == digest
+        record["seconds"] = round(time.monotonic() - started, 1)
+    return record
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("catalogue", type=pathlib.Path)
+    parser.add_argument("--workers", type=int, default=os.cpu_count() or 2)
+    parser.add_argument("--only", nargs="+", help="replay these ids alone (expect is not graded)")
+    args = parser.parse_args()
+    lines = args.catalogue.read_text(encoding="utf-8").splitlines()
+    header = json.loads(lines[0])
+    rows = [json.loads(line) for line in lines[1:] if line.strip()]
+    ids = [row["id"] for row in rows]
+    if len(ids) != len(set(ids)):
+        print("replay: duplicate mutant ids", file=sys.stderr)
+        return 2
+    if args.only:
+        unknown = sorted(set(args.only) - set(ids))
+        if unknown:
+            print(f"replay: unknown ids {unknown}", file=sys.stderr)
+            return 2
+        rows = [row for row in rows if row["id"] in set(args.only)]
+    base = _git("rev-parse", "--verify", f"{header['base']}^{{commit}}").strip()
+    argv = list(header["unittest"])
+    workers = max(1, min(args.workers, len(rows)))
+    print(f"replay: {header['catalogue']} = {len(rows)} mutants @ {base[:12]}, "
+          f"`python -m unittest {' '.join(argv)}`, workers {workers}")
+    with tempfile.TemporaryDirectory(prefix="cement-replay-") as directory:
+        trees = [pathlib.Path(directory) / f"tree-{index}" for index in range(workers)]
+        try:
+            for tree in trees:
+                _git("worktree", "add", "--detach", str(tree), base)
+            started = time.monotonic()
+            with concurrent.futures.ThreadPoolExecutor(workers) as pool:
+                controls = list(pool.map(lambda tree: _suite(tree, argv, None), trees))
+            control_seconds = time.monotonic() - started
+            want = header.get("ran")
+            for index, (rc, ran, tail) in enumerate(controls):
+                if rc != 0 or (want is not None and ran != want):
+                    print(f"replay: CONTROL red in tree-{index}: rc {rc}, ran {ran} (want {want})\n"
+                          f"{tail}", file=sys.stderr)
+                    return 2
+            print(f"replay: CONTROL green in {workers} trees, ran {controls[0][1]} each, "
+                  f"{control_seconds:.1f}s")
+            timeout = max(60.0, control_seconds * 4)
+            pending: queue.Queue[pathlib.Path] = queue.Queue()
+            for tree in trees:
+                pending.put(tree)
+
+            def work(row: dict[str, object]) -> dict[str, object]:
+                tree = pending.get()
+                try:
+                    return _replay(tree, row, argv, timeout)
+                finally:
+                    pending.put(tree)
+
+            records: list[dict[str, object]] = []
+            with concurrent.futures.ThreadPoolExecutor(workers) as pool:
+                for count, record in enumerate(pool.map(work, rows), start=1):
+                    records.append(record)
+                    print(f"[{count:3}/{len(rows)}] {record['id']:<12} {record['verdict']:<11} "
+                          f"{record['seconds']:>6}s restored={record['restored']}", flush=True)
+            clean = all(subprocess.run(["git", "diff", "--quiet"], cwd=tree).returncode == 0
+                        for tree in trees)
+        finally:
+            for tree in trees:
+                subprocess.run(["git", "worktree", "remove", "--force", str(tree)], cwd=ROOT,
+                               capture_output=True)
+    by: dict[str, list[str]] = {}
+    for record in records:
+        by.setdefault(str(record["verdict"]), []).append(str(record["id"]))
+    print("TALLY " + json.dumps({key: len(value) for key, value in sorted(by.items())}))
+    for key in sorted(set(by) - {"killed"}):
+        print(f"  {key}: {sorted(by[key])}")
+    restored = all(record["restored"] for record in records) and clean
+    print(f"all restored: {restored}")
+    if not restored or set(by) - {"killed", "survived", "superseded"}:
+        return 2
+    if args.only:
+        return 0
+    expect = header.get("expect", {})
+    observed = {"killed": len(by.get("killed", [])),
+                "superseded": sorted(by.get("superseded", [])),
+                "equivalent": sorted(by.get("survived", []))}
+    expected = {"killed": expect.get("killed"), "superseded": sorted(expect.get("superseded", [])),
+                "equivalent": sorted(expect.get("equivalent", {}))}
+    if observed != expected:
+        print(f"replay: verdicts differ from expect\n  observed {observed}\n  expected {expected}")
+        return 1
+    print(f"replay: verdicts equal expect ({observed['killed']} killed, "
+          f"superseded {observed['superseded']}, equivalent {observed['equivalent']})")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
