@@ -3160,14 +3160,15 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         register = "\n".join([*changed_paragraphs, cement_cli._parser().description or ""])
         self.assertNotRegex(register.lower(), r"\b(?:simply|robust|seamlessly|leverage)\b")
 
-        # The full register audit this test approximates is scratch-local, so the
-        # obligation holds only while its port stays deferred: live state is the queue
-        # `.agent/deferred.md`, and a pin reading the
-        # frozen `.agent/archive/polish.md` would hold even after the row was dropped.
-        # Anchors are the row's own bytes -- the previous pin retyped the archive's p12
-        # wording instead of deriving it, so it asserted literals no live file contained.
-        # A queue entry = its row line plus the indented lines directly under it.
-        queue = (ROOT / ".agent/deferred.md").read_text(encoding="utf-8").splitlines()
+        # The full register audit this test approximates landed as the gate's `register`
+        # step (p12, closed), so the obligation now reads the CLOSED row: the closed ledger
+        # `.agent/archive/deferred-closed.md` keeps the entry verbatim, and the gate must keep
+        # running the ported audit. Anchors are the row's own bytes -- the previous pin retyped
+        # the archive's p12 wording instead of deriving it, so it asserted literals no live
+        # file contained. An entry = its row line plus the indented lines directly under it.
+        gate = (ROOT / ".agent/gate").read_text(encoding="utf-8")
+        self.assertIn("step register uv run python .agent/register-audit --gate", gate)
+        queue = (ROOT / ".agent/archive/deferred-closed.md").read_text(encoding="utf-8").splitlines()
         starts = [index for index, line in enumerate(queue) if line.startswith("- `p12` ")]
         self.assertEqual(len(starts), 1)
         entry = [queue[starts[0]]]

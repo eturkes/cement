@@ -15,6 +15,16 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p12 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section
+
+Check set: R1 acceptance rerun (register step over the four surfaces; filler red; long sentence, punctuation-free bullet, possessive, link target green); R2 the D25 pin repair re-targets the superseded claim without weakening it; R3 the repair fires. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | gate step `register` rc 0 at every gate this session; seeds as recorded in `gate-checks.md`. |
+| R2 | verification integrity | pass | repaired test id `tests.test_cli_removal_battery.RemovalObligationBatteryTests.test_d25_rewritten_human_facing_prose_holds_the_project_registe` (standing pin-repair approval): it read the p12 row from the live queue as "port deferred"; it now reads the same row bytes from the closed ledger (same 4 anchor assertions) and asserts the gate runs `.agent/register-audit --gate`. L23 compares this body at git objects `BASE_SHA` vs `adb0ab9`, so the working-tree edit leaves it unchanged; the frame is outside the tripwire pin census (`m3u6a2-tripwires.py` PASS). |
+| R3 | correctness | pass | seeds: register step deleted from `.agent/gate` → D25 FAILED; p12 row renamed in the ledger → D25 FAILED; restored → OK. |
+
 ## p08 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
 
 Check set: R1 the corruption-only claim re-derived from behavior; R2 the probe cites the contract; R3 register. MAIN alone.

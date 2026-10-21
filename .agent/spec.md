@@ -127,7 +127,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 
 - [ ] MAINTAIN queue run (owner body `auto/maintain.md` Queue): every `.agent/deferred.md` row in rank order (`pri`, then id; p81 first = the closure form every pruning needs), one unit + one scoped commit per row, gate green at every commit (full gate per commit, run from the committed tree), the row pruned into `.agent/archive/deferred-closed.md` in its closing commit; owner-needing parts → owed + one closing `AskUserQuestion`; finds born after p98 run after the session-start rows.
   - Met when: every row closed by its acceptance check in its own commit, recorded as blocked on the owner with what it owes, waiting on its re-open trigger, or routed (`route.md` `Met when`), and the full gate passes on a clean tree at the closing commit.
-  - Next: p09 (credit run pending).
+  - Next: p14.
 - Queue = `.agent/deferred.md` (`p<nn>`, one entry + acceptance each, unattached; p01-p61 keep full text + evidence + grounds in `.agent/archive/polish.md`, a born row's entry is its whole record; closed rows → `.agent/archive/deferred-closed.md`; grader `uv run python .agent/decisions/m3-deferred-validate.py`); a bare `p<nn>` in a row = that unit owns the queue row.
 
 ## Phase
