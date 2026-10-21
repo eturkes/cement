@@ -15,6 +15,17 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p29 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 the shipped `FUNCTION_MAX_ITEMS` is driven at exactly 1,000,000 (accepted) and 1,000,001 (rejected), build + parse; R2 the patched-limit fixtures stay; R3 "marked-slow" re-derived; R4 credit recorded. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `test_the_real_item_bound_accepts_one_million_and_rejects_one_more`: an 11-entry bundle at exactly `FUNCTION_MAX_ITEMS` validates + parses byte-identical; one more item rejected at build and at parse (`JSON exceeds maximum container item count`). |
+| R2 | acceptance | pass | the patched-limit fixtures in `FunctionTests` are unchanged. |
+| R3 | acceptance (re-derived) | pass | this unittest suite has no slow marker; a marker = a conditional skip, and the skip set is closed at three (owner approval) ⇒ the pin runs in the default suite (≈ 3-6 s measured). |
+| R4 | verification integrity | open → p108 | killed 323 / survived 170 of 493 (`.agent/decisions/p29-mutate.txt`). |
+
 ## p26 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 adjacent 256/257-byte + printable/control `--actor` pairs pin exit 0 vs invalid/2 with rejected stdout empty; R2 the accepted boundary value persists in the verification report; R3 credit recorded, survivors routed. MAIN alone.

@@ -647,6 +647,30 @@ print(json.dumps({"function_hash": bundle.function_hash, "text": bundle.text}, s
             with self.assertRaises(ValidationError):
                 validate_function(bundle.value)
 
+    def test_the_real_item_bound_accepts_one_million_and_rejects_one_more(self) -> None:
+        # p29: the patched-limit fixture above keeps the fast form; this drives the shipped
+        # `FUNCTION_MAX_ITEMS` itself (measured ~3 s, so it runs in the default suite).
+        count = 11  # each entry output stays inside its own 100,000-item value bound
+        probe = _build(tuple(_entry({"x": i}, {"answer": [0]}, label=f"items{i}") for i in range(count)))
+        need = FUNCTION_MAX_ITEMS - (_container_items(probe.value) - count)
+        sizes = [need // count + (index < need % count) for index in range(count)]
+
+        def bundle(lengths: list[int]):
+            return _build(tuple(
+                _entry({"x": i}, {"answer": [0] * lengths[i]}, label=f"items{i}") for i in range(count)
+            ))
+
+        exact = bundle(sizes)
+        self.assertEqual(_container_items(exact.value), FUNCTION_MAX_ITEMS)
+        self.assertEqual(validate_function(exact.value).text, exact.text)
+        self.assertEqual(parse_function(exact.text).text, exact.text)
+        with self.assertRaisesRegex(ValidationError, "^JSON exceeds maximum container item count$"):
+            bundle([sizes[0] + 1, *sizes[1:]])
+        over = exact.text.replace('"answer":[0,', '"answer":[0,0,', 1)
+        self.assertEqual(len(over), len(exact.text) + 2)
+        with self.assertRaisesRegex(ValidationError, "^JSON exceeds maximum container item count$"):
+            parse_function(over)
+
     def test_per_value_boundaries_and_depth_67_embedding(self) -> None:
         exact_bytes = "x" * (DEFAULT_MAX_BYTES - 2)
         accepted_bytes = _build((_entry(exact_bytes, None, label="bytes"),))
