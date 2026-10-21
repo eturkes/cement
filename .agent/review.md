@@ -15,6 +15,16 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p31 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section
+
+Check set: R1 every repo-local `TemporaryDirectory` fixture under `tests/` allocates in the system temp dir; R2 a deliberately interrupted run leaves `git status` clean (measured at the landing tree); R3 no frame depended on a repo-local temp path (full gate). MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | finding, fixed | The prepared tip converted the 8 `dir="."` sites but missed 10 `dir=ROOT` sites in `tests/test_lifecycle_removal_battery.py` (same leftover class); all converted. `rg 'TemporaryDirectory\(dir' tests/ examples/` → none. |
+| R2 | acceptance | pass | SIGKILL 6 s into `tests.test_cli` + `tests.test_lifecycle_removal_battery`: base `main` → plain `git status` shows `?? tmpk5camqhd/` (+ ignored `cli.db`); this tree → 0 `tmp*` entries in `git status --porcelain --ignored`. |
+| R3 | correctness | pass | Full gate at the landing commit (suite incl. L29 tripwire self-test + D28). |
+
 ## p27 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 the export path fsyncs the destination's directory after `os.replace`, and one probe pins the call order; R2 the durability claim is stated once where export durability is claimed; R3 the new failure window (flush failure after the rename) is published + pinned (runtime.md commit-then-raise law). MAIN alone.

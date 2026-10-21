@@ -129,7 +129,7 @@ class CommandCandidateSourceTests(unittest.TestCase):
         "Linux process-group recovery requires /proc",
     )
     def test_outer_watchdog_kills_adapter_if_supervisor_dies(self) -> None:
-        with tempfile.TemporaryDirectory(dir=".") as temporary:
+        with tempfile.TemporaryDirectory() as temporary:
             pid_file = pathlib.Path(temporary) / "adapter.pid"
             script = (
                 "import os,pathlib,signal,time;"

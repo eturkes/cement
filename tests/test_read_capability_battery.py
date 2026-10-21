@@ -22,7 +22,7 @@ from tests.test_read_capability_census import _sql_values
 
 class ReadCapabilityBatteryTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory(dir=".")
+        self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.path = pathlib.Path(self.temporary.name) / "ledger.db"
         self.store = store_module.Store(self.path)

@@ -359,7 +359,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
         )
 
     def test_l04_generation_lease_keyword_is_rejected(self) -> None:
-        with tempfile.TemporaryDirectory(dir=ROOT) as directory:
+        with tempfile.TemporaryDirectory() as directory:
             database = Path(directory) / "cement.db"
             with self.assertRaises(TypeError):
                 System(database, generation_lease_seconds=1)
@@ -432,7 +432,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
 
         message = "clock must return a signed 64-bit microsecond timestamp"
         maximum = system_module._MAX_SQLITE_INTEGER
-        with tempfile.TemporaryDirectory(dir=ROOT) as directory:
+        with tempfile.TemporaryDirectory() as directory:
             accepted_database = Path(directory) / "accepted.db"
             accepted = System(accepted_database, clock_us=lambda: maximum)
             accepted_error: Exception | None = None
@@ -476,7 +476,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
 
     def test_l07_fabricated_legacy_generating_row_survives_revision(self) -> None:
         """L07. v3 refuses a fabricated legacy-v2 ledger before revision can mutate its generating row."""
-        with tempfile.TemporaryDirectory(dir=ROOT) as directory:
+        with tempfile.TemporaryDirectory() as directory:
             database = Path(directory) / "cement.db"
             closed = ast.parse(_git_text(CLOSE_SHA, "src/cement_runtime/store.py"))
             schema = next(ast.literal_eval(node.value) for node in closed.body
@@ -508,7 +508,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
     def test_l08_the_operation_revised_event_payload_read_back_from_the(self) -> None:
         """L08. the `operation.revised` event payload, read back from the persisted `events.payload_json`, has EXACTLY the keys `previous_revision`, `policy_hash`, `revised_by` AND each key's VALUE is bound: `previous_revision` == the operation's pre-revision integer, `policy_hash` == the canonical policy digest, `revised_by` == the actor the caller supplied. Assert the whole key set, not the absence of one key, and assert the values, not just the keys: a three-key set assertion passes while all three values are wrong (A06), and `revise_operation` returns only the new revision, so the return value cannot evidence the payload. This payload had zero pins before this unit. `invalidated_generators` additionally reaches zero RAW occurrences across tracked `src/` — baseline 3, being one assignment, one payload key STRING and one value identifier, which is why the census's `2` (NAME tokens) is not the closure number (X04)."""
 
-        with tempfile.TemporaryDirectory(dir=ROOT) as directory:
+        with tempfile.TemporaryDirectory() as directory:
             database = Path(directory) / "cement.db"
             system = System(database, clock_us=iter((100, 200)).__next__)
             system.register_operation("partition", "operation", policy=CompilePolicy())
@@ -923,7 +923,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
                     provenance={"source": "lifecycle-battery"},
                 )
 
-        with tempfile.TemporaryDirectory(dir=ROOT) as directory:
+        with tempfile.TemporaryDirectory() as directory:
             system = System(
                 Path(directory) / "cement.db",
                 candidate_source=Source(),
@@ -962,7 +962,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
             def propose(self, request):
                 return Candidate(output=request.input, provenance={})
 
-        with tempfile.TemporaryDirectory(dir=ROOT) as directory:
+        with tempfile.TemporaryDirectory() as directory:
             system = System(
                 Path(directory) / "cement.db",
                 candidate_source=Source(),
@@ -1008,7 +1008,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
     def test_l17_revise_operation_still_bumps_the_revision_by_one_and_still(self) -> None:
         """L17. `revise_operation` still bumps the revision by one and still retires `draft`, `verified` and `promoted` artifacts at the previous revision with `status_reason = 'operation revised'`."""
 
-        with tempfile.TemporaryDirectory(dir=ROOT) as directory:
+        with tempfile.TemporaryDirectory() as directory:
             system = System(
                 Path(directory) / "cement.db",
                 clock_us=iter((100, 200)).__next__,
@@ -1123,14 +1123,14 @@ class LifecycleRemovalBattery(unittest.TestCase):
             "negative": lambda: -1,
         }
         for label, clock in invalid.items():
-            with self.subTest(label=label), tempfile.TemporaryDirectory(dir=ROOT) as directory:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
                 system = System(Path(directory) / "cement.db", clock_us=clock)
                 with self.assertRaises(StateError) as raised:
                     system.register_operation("partition", "operation")
                 self.assertEqual(str(raised.exception), message)
 
     def test_l18_non_callable_clock_keeps_exact_validation_error(self) -> None:
-        with tempfile.TemporaryDirectory(dir=ROOT) as directory:
+        with tempfile.TemporaryDirectory() as directory:
             with self.assertRaises(ValidationError) as raised:
                 System(Path(directory) / "cement.db", clock_us=7)
         self.assertEqual(str(raised.exception), "clock_us must be callable")
@@ -2072,7 +2072,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
                     provenance={"source": "ambiguity-battery"},
                 )
 
-        with tempfile.TemporaryDirectory(dir=ROOT) as directory:
+        with tempfile.TemporaryDirectory() as directory:
             database = Path(directory) / "cement.db"
             system = System(
                 database,

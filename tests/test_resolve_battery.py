@@ -48,7 +48,7 @@ class ResolveBatteryTests(unittest.TestCase):
         partition: str = "tenant_a",
         operation: str = "echo_1",
     ) -> tuple[System, pathlib.Path, _Source, _Clock]:
-        temporary = tempfile.TemporaryDirectory(dir=".")
+        temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         database = pathlib.Path(temporary.name) / "cement.db"
         source = _Source()
@@ -1301,7 +1301,7 @@ class ResolveBatteryTests(unittest.TestCase):
                     provenance={"model": "scope-battery"},
                 )
 
-        temporary = tempfile.TemporaryDirectory(dir=".")
+        temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         database = pathlib.Path(temporary.name) / "cement.db"
         system = System(database, candidate_source=ScopeSource(), clock_us=_Clock())

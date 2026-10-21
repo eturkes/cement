@@ -193,7 +193,7 @@ class _OverlayRow:
 
 class SystemTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory(dir=".")
+        self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.database = str(pathlib.Path(self.temporary.name) / "cement.db")
         self.clock = Clock()

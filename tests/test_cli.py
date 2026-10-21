@@ -167,7 +167,7 @@ def _decoded(text: str) -> object | None:
 
 class CLITests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory(dir=".")
+        self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.database = str(pathlib.Path(self.temporary.name) / "cli.db")
         System(self.database)

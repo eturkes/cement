@@ -107,7 +107,7 @@ class _Source:
 
 class SubmissionTests(unittest.TestCase):
     def _make_system(self, *, source: _Source | None = None) -> tuple[System, pathlib.Path, _Source]:
-        temporary = tempfile.TemporaryDirectory(dir=".")
+        temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         database = pathlib.Path(temporary.name) / "cement.db"
         source = _Source() if source is None else source

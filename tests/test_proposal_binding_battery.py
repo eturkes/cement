@@ -313,7 +313,7 @@ class ProposalBindingBatteryTests(unittest.TestCase):
         operation: str = "echo_1",
         clock: _Clock | None = None,
     ) -> tuple[System, Path, _Clock]:
-        temporary = tempfile.TemporaryDirectory(dir=".")
+        temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         database = Path(temporary.name) / "cement.db"
         clock = _Clock() if clock is None else clock
