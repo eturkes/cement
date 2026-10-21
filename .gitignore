@@ -26,3 +26,4 @@ CLAUDE.local.md
 
 # Local Open WebUI instance of examples/open_webui/local.py (venv, data, ledger)
 .open-webui/
+prototype/webui-demo/node_modules/

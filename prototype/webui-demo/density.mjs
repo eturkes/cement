@@ -4,18 +4,10 @@
 // scrolling ancestor; rendered = every laid-out text node, inner-scroll overflow included.
 // Closed <details> bodies count as hidden: Chrome lays them out (content-visibility), so
 // their rects alone would report them visible.
-// Needs CHROMIUMFISH_DIR = the `chromiumfish` package directory (README `Visual check`).
-import { join } from "node:path";
-import { pathToFileURL } from "node:url";
-
-const PACKAGE = process.env.CHROMIUMFISH_DIR;
-if (!PACKAGE) {
-  process.stderr.write("density.mjs: set CHROMIUMFISH_DIR (README `Visual check`)\n");
-  process.exit(2);
-}
-const { ChromiumFish } = await import(pathToFileURL(join(PACKAGE, "dist/index.js")).href);
+// Needs the demo's own browser: `pnpm --dir prototype/webui-demo install` (README `Visual check`).
+import { launch } from "./browser.mjs";
 const [url, settle = "2500"] = process.argv.slice(2);
-const browser = await ChromiumFish({ headless: true });
+const browser = await launch();
 const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
 try {
   await page.goto(url, { waitUntil: "load", timeout: 60000 });

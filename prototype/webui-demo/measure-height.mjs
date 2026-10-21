@@ -4,16 +4,8 @@
 //
 //   node measure-height.mjs <url> [right|card]
 //
-// Needs CHROMIUMFISH_DIR = the `chromiumfish` package directory (README `Visual check`).
-import { join } from "node:path";
-import { pathToFileURL } from "node:url";
-
-const PACKAGE = process.env.CHROMIUMFISH_DIR;
-if (!PACKAGE) {
-  process.stderr.write("measure-height.mjs: set CHROMIUMFISH_DIR (README `Visual check`)\n");
-  process.exit(2);
-}
-const { ChromiumFish } = await import(pathToFileURL(join(PACKAGE, "dist/index.js")).href);
+// Needs the demo's own browser: `pnpm --dir prototype/webui-demo install` (README `Visual check`).
+import { launch } from "./browser.mjs";
 
 const [url, which = "right"] = process.argv.slice(2);
 if (!url) {
@@ -21,7 +13,7 @@ if (!url) {
   process.exit(2);
 }
 
-const browser = await ChromiumFish({ headless: true });
+const browser = await launch();
 const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
 let height;
 try {

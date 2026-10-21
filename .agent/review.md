@@ -17,6 +17,18 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p79 close (MAINTAIN queue run, unit, tier `docs` — PROTOTYPE law) — target = the commit landing this section
+
+Check set: R1 the three tools drive a browser the prototype installs (one command, `node_modules/` gitignored); R2 the machine-bound grep is rc 1; R3 fresh clone → 10 PNGs + transcript + timings, no duplicate frame; R4 density grade at `?reset=1`; R5 Template rulings (4) retires. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | Playwright 1.64.1 pinned in `package.json` + `pnpm-lock.yaml`; Chromium headless shell lands in `node_modules/.pnpm/…/.local-browsers` (`PLAYWRIGHT_BROWSERS_PATH=0`); the home Playwright cache untouched. |
+| R2 | acceptance | pass | rg rc 1 over `prototype/ .claude/rules/ .agent/spec.md`. |
+| R3 | acceptance | pass | clone of `f489412`: install, server, `capture.sh` rc 0; 01-09 + story-full-page PNGs, `sha256sum … | uniq -d` empty; frames 01 + 06 inspected. Heights equal the last `webcap` run except 09 (5460 vs 5150 px, each measured by `measure-height.mjs`). |
+| R4 | acceptance | pass | 155 / 155 / 12 under both ChromiumFish and the new browser at `?reset=1` (twice each) — no recorded grade existed, so the old toolchain on the same state is the reference. |
+| R5 | acceptance | pass | `ops.md` ruling (4) → retired (p79); `prototype.md` names the browser + `browser.mjs`; README `Visual check` rewritten. |
+
 ## p11 close (MAINTAIN queue run, row closure at `02440b8`, tier `docs`) — target = the commit landing this section
 
 Check set: R1 zero `reportAttributeAccessIssue` under `uvx pyright tests/test_system.py`; R2 suite green. MAIN alone.

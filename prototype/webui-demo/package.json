@@ -1,0 +1,12 @@
+{
+  "name": "cement-webui-demo-qa",
+  "private": true,
+  "type": "module",
+  "description": "Visual QA for the prototype demo: a pinned Playwright and its Chromium, installed into node_modules.",
+  "scripts": {
+    "postinstall": "PLAYWRIGHT_BROWSERS_PATH=0 playwright install --only-shell chromium"
+  },
+  "devDependencies": {
+    "playwright": "1.64.1"
+  }
+}

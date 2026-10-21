@@ -183,14 +183,13 @@ lineage of its first entry, because a screenshot cannot select a disclosure.
 every frame from one ledger into `.scratch/webui-demo-capture/`, which git ignores. Set
 `OUT` to write to a different directory.
 
-The visual check needs two tools that this repository does not supply. `capture.sh` calls
-`webcap`, a command that captures a page in headless Chromium. Put `webcap` on `PATH`, or
-set `WEBCAP` to its path. `measure-height.mjs` and `density.mjs` load the `chromiumfish`
-Node package. Set `CHROMIUMFISH_DIR` to the package directory, which holds `dist/index.js`.
-The `.agent/deferred.md` row `p79` records the move to a browser that the demo installs.
+The visual check uses its own browser: a pinned Playwright and its headless Chromium.
+Install them once with the first command below. The command needs Node.js and pnpm. It
+writes only to `prototype/webui-demo/node_modules/`, which git ignores. `capture.sh`,
+`measure-height.mjs` and `density.mjs` all use that browser through `browser.mjs`.
 
 ```bash
-export CHROMIUMFISH_DIR=/path/to/node_modules/chromiumfish
+pnpm --dir prototype/webui-demo install
 uv run python prototype/webui-demo/app.py &
 prototype/webui-demo/capture.sh
 ```
