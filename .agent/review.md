@@ -15,6 +15,18 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p65 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 the unfilled test matches the stub's SHAPE (a cell that IS the placeholder), not a substring; R2 a row quoting the token in backticks grades clean (was red); R3 `--emit-stub` output still grades nonzero through the unfilled check; R4 every other seed fires as before; R5 the seed record names both new seeds. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `unfilled(parts)`: head before `Accept:`, the acceptance text, or a whole continuation line (`- ` stripped) equal to `unknown`/`unknown.` (case-folded). |
+| R2 | acceptance | pass | seed `quoted-token-in-backticks` at `21b7463`: pre-p65 grader rc 1 `UNKNOWN-ROWS: 1` (p62), this grader rc 0. |
+| R3 | acceptance | pass | seed `emit-stub-grades-nonzero`: rc 1 `UNKNOWN-ROWS: 61` (+ `MISSING: 44`) before and after. |
+| R4 | regression | pass | the other 18 seeds: identical rc + decisive line before/after (the foreign-commit SHA alone varies). |
+| R5 | acceptance | pass | `.claude/rules/gate-checks.md` grader bullet re-recorded at `21b7463` with both seeds; the stale `p99` never-queued seed moved to `p990` (p99 is a live born row). |
+
 ## p62 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 `examples()` rows carry `input_hash` + `output_hash` equal to the compiler's stored values; R2 each consumer that recomputed them stops; R3 the paste-ins embed the changed library (generator freshness); R4 the prototype's evidence view is unchanged. MAIN alone.

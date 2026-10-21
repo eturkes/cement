@@ -110,10 +110,27 @@ row's pruning commit from this file's history.
 """
 
 
+PLACEHOLDER = {"unknown", "unknown."}
+
+
+def unfilled(parts: list[str]) -> bool:
+    """True when a cell still holds the stub placeholder, judged by SHAPE, never by substring.
+
+    `--emit-stub` writes `unknown. Accept: unknown.`, so a cell is unfilled when the row text
+    before `Accept:`, the acceptance text, or a whole continuation line (`- ` stripped) IS the
+    placeholder. A row quoting the word inside a sentence is filled; a substring test redded it
+    and forced the row to reword away from the bytes it cites (p65).
+    """
+    head, _, accept = parts[0].partition("Accept: ")
+    cells = [head.strip(), accept.strip(), *(part.removeprefix("- ").strip() for part in parts[1:])]
+    return any(cell.lower() in PLACEHOLDER for cell in cells)
+
+
 def entries(
     text: str, unparsed: list[str], name: str, pattern: re.Pattern[str]
-) -> list[tuple[int, re.Match[str], str]]:
-    """Each `(lineno, row match, body)`; body joins the row line's body with its indented lines."""
+) -> list[tuple[int, re.Match[str], str, bool]]:
+    """Each `(lineno, row match, body, unfilled)`; body joins the row line's body with its
+    indented lines."""
     out: list[tuple[int, re.Match[str], list[str]]] = []
     current: list[str] | None = None
     for lineno, line in enumerate(text.splitlines(), start=1):
@@ -129,7 +146,7 @@ def entries(
             current.append(line.strip())
         else:
             current = None
-    return [(lineno, match, " ".join(parts)) for lineno, match, parts in out]
+    return [(lineno, match, " ".join(parts), unfilled(parts)) for lineno, match, parts in out]
 
 
 def archive_rows() -> tuple[dict[str, str], int]:
@@ -256,14 +273,14 @@ def main(argv: list[str]) -> int:
     if not text.startswith(HEADER):
         bad.append("queue header has drifted from this file's HEADER constant")
 
-    for lineno, match, body in entries(text, unparsed, "deferred.md", QUEUE_RE):
+    for lineno, match, body, stub in entries(text, unparsed, "deferred.md", QUEUE_RE):
         row_id = match.group("id")
         order.append(row_id)
         seen[row_id] = match.group("pri")
         if not ACCEPT_RE.search(body):
             bad.append(f"deferred.md:{lineno} {row_id} has no `Accept:` clause")
             continue
-        if "unknown" in body.lower():
+        if stub:
             unknown.append(f"deferred.md:{lineno} {row_id}")
 
     closed: dict[str, str] = {}
@@ -272,7 +289,7 @@ def main(argv: list[str]) -> int:
     closed_text = CLOSED.read_text(encoding="utf-8") if CLOSED.is_file() else None
     if closed_text is not None and not closed_text.startswith(CLOSED_HEADER):
         bad.append("closed ledger header has drifted from this file's CLOSED_HEADER constant")
-    for lineno, match, body in entries(closed_text or "", unparsed, "deferred-closed.md", CLOSED_RE):
+    for lineno, match, body, stub in entries(closed_text or "", unparsed, "deferred-closed.md", CLOSED_RE):
         row_id = match.group("id")
         closed_order.append(row_id)
         closed[row_id] = match.group("pri")
@@ -283,7 +300,7 @@ def main(argv: list[str]) -> int:
             bad.append(f"deferred-closed.md:{lineno} {row_id} has no `Accept:` clause")
         if not CLOSED_CLAUSE_RE.search(body):
             bad.append(f"deferred-closed.md:{lineno} {row_id} has no `Closed:` clause")
-        if "unknown" in body.lower():
+        if stub:
             unknown.append(f"deferred-closed.md:{lineno} {row_id}")
 
     if len(want) != loose:
