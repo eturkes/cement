@@ -17,6 +17,15 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p11 close (MAINTAIN queue run, row closure at `02440b8`, tier `docs`) — target = the commit landing this section
+
+Check set: R1 zero `reportAttributeAccessIssue` under `uvx pyright tests/test_system.py`; R2 suite green. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | pyright 1.1.414 at `02440b8`: 0 of that rule (44 other-rule diagnostics, listed in the ledger, outside the metric). No narrowing edit was needed: the region the row measured was rewritten by M3. |
+| R2 | acceptance | pass | the closing commit's full gate (`tests/test_system.py` unchanged since `af22d57`). |
+
 ## p76 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section
 
 Check set: R1 the census prints every row's working-tree anchor count; R2 count-0 rows carry a verified retired mark (or re-anchor); R3 seeding a fresh count-0 row reds it. MAIN alone.
