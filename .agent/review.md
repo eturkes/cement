@@ -15,6 +15,14 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p04 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section
+
+Check set: R1 acceptance rerun at HEAD (plans, page cost, control, version + fingerprint, reset doc). MAIN alone; no code changed.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | battery OK; dropping the index → 2 failures naming the temp sort; `SCHEMA_FINGERPRINT` derives from `SCHEMA`; `docs/architecture.md` names the v2 reset. |
+
 ## p01 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section
 
 Check set: R1 each acceptance conjunct rerun at HEAD (selections, clean-checkout gate, inline + reasoned suppressions, RUF100 = 0, one seed per tool); R2 the fix changes no behavior; R3 no frozen file touched. MAIN alone.
