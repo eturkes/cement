@@ -1149,10 +1149,13 @@ class CLITests(unittest.TestCase):
         # p25: SIGINT while a write waits on the ledger lock. The child's own `-c` program marks
         # `sqlite3.connect` in a file, so the signal lands after imports, once `main` holds the
         # ledger open (portable: no `/proc`). The interrupted revise must leave revision 1.
+        # Python installs `default_int_handler` only over an inherited SIG_DFL; a launcher's `&` job
+        # hands down SIG_IGN, the wait then times out → exit 4, so the probe installs it itself.
         System(self.database).register_operation("tenant", "echo")
         ready = pathlib.Path(self.temporary.name) / "connected"
         probe = (
-            "import runpy, sys\n"
+            "import runpy, signal, sys\n"
+            "signal.signal(signal.SIGINT, signal.default_int_handler)\n"
             "def hook(event, args):\n"
             "    if event == 'sqlite3.connect':\n"
             f"        open({str(ready)!r}, 'w').close()\n"

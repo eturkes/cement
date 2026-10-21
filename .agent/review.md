@@ -17,6 +17,16 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p25 probe repair (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 root cause of the gate red at `5b4e947` (`test_an_interrupt_exits_130_with_a_json_error_and_no_traceback`: `4 != 130`, 10.135 s) proven by experiment; R2 the probe holds in every launch mode; R3 README `## Outcomes` states the inherited-ignore case. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | correctness | fixed | not a race: an inherited SIG_IGN (`trap '' INT`, or an `&` job of `bash -c`) keeps SIGINT ignored in the child (Python installs `default_int_handler` only over SIG_DFL) ⇒ the lock wait times out → StateError → exit 4; unmodified probe at `929c7e3`: default OK, `trap '' INT` FAIL `4 != 130` (10.126 s), `&` FAIL (10.139 s). |
+| R2 | acceptance | pass | probe installs `signal.default_int_handler` first; default / `trap '' INT` / `&` = OK 10.175 / 10.171 / 10.176 s. |
+| R3 | acceptance | pass | README sentence: a process started with SIGINT ignored ignores the interrupt, the lock wait ends with exit 4 after 10 s; register-audit rc 0, article-audit 0 ungrounded. Law → `.claude/rules/runtime.md` (behavior) + `history-gates.md` (launch the gate at SIG_DFL: revisions `21b7463`.. keep the old probe for cold D28 replays). |
+
 ## p44 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 one setter per pair, pinned by readback; R2 the `hasattr(setconfig)` guard reassessed against `requires-python`; R3 B6 updated. MAIN alone.

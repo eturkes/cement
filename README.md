@@ -510,7 +510,9 @@ to `stderr` that is not JSON. An embedding host that calls `main` flushes its ow
 An interrupt (`SIGINT`, Ctrl-C) stops the `cement` command with exit 130 and an `interrupted` error
 on `stderr`. If the command waits for the ledger lock, the interrupt takes effect when that wait
 ends, after 10 seconds at most. A write that the interrupt stopped did not commit, so it leaves no
-row behind. A host that calls `main` itself receives the `KeyboardInterrupt`.
+row behind. A host that calls `main` itself receives the `KeyboardInterrupt`. If the process
+starts with `SIGINT` ignored, it ignores the interrupt, and a lock wait ends with exit 4 after 10
+seconds. A command that a shell script starts with `&` starts that way.
 
 The root `verify` command does not use exit 6. It reports a failed verification as exit 0 with
 `"passed": false` in its payload. Read the `passed` field to get the verdict from root `verify`. Read
