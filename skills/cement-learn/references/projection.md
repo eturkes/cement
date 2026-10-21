@@ -49,9 +49,11 @@ key, so a new document of a known layout reaches its case even when every value 
 
 ## Writing a program
 
-1. Collect the raw inputs of the pending proposals and the active examples.
-2. Write one layout for each distinct title and structure. Copy the title and the labels
-   exactly, including case.
+1. Derive the program: `cement learn cases "$OP" --projectable` writes one layout for each
+   distinct title and structure in the raw inputs of the pending proposals and the active
+   examples, and prints it as `program`. Save that object as `program.json`. To extend it by
+   hand, copy each title and label exactly, including case.
+2. Write nothing for an input whose text has no form layout: the command leaves it with the model.
 3. Group by the candidate before you review anything:
 
    ```sh

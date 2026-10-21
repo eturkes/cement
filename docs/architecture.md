@@ -135,7 +135,8 @@ distinction that the shared status 6 cannot. `false` is a verified absence insid
 
 `cement learn cases OPERATION` is the learning pass's read surface. It groups pending proposals and
 active examples by case key, under the stored program or a candidate one (`--program`), and it lists
-unfinished publication work.
+unfinished publication work. `--projectable` derives the candidate from the raw inputs, one layout
+for each form structure.
 
 The LLM proposes instance behavior. It never chooses scope or activates artifacts. The learning pass
 confirms examples, writes the program, compiles, verifies, and promotes. A person decides alone what

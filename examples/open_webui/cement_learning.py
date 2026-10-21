@@ -24,7 +24,7 @@ from cement_runtime import (
     ValidationError,
 )
 from cement_runtime.json_value import canonicalize
-from cement_runtime.projection import structure
+from cement_runtime.projection import draft_program
 
 REVIEWER = "learning-pass"
 PAGE = 1_000
@@ -93,53 +93,6 @@ def _inputs(system: System, partition: str, operation: str, *, pending: bool) ->
             break
         after = int(rows[-1]["sequence"])
     return found
-
-
-def draft_program(inputs: list[object]) -> dict[str, Any]:
-    """One cement-projection-v1 layout per distinct title + structure of the raw inputs.
-
-    The learning pass decides that an operation is projectable; the program itself is
-    mechanical, so the tool derives it and the model never copies a label.
-    """
-
-    fields = {
-        name
-        for value in inputs
-        if isinstance(value, dict)
-        for name, text in value.items()
-        if isinstance(text, str)
-    }
-    if (
-        not inputs
-        or len(fields) != 1
-        or any(
-            not isinstance(value, dict)
-            or set(value) != fields
-            or not all(isinstance(text, str) for text in value.values())
-            for value in inputs
-        )
-    ):
-        raise ValidationError("a projection needs inputs that hold exactly one text field")
-    (field,) = fields
-    layouts: dict[tuple[str, tuple[tuple[str, str], ...]], dict[str, Any]] = {}
-    for value in inputs:
-        parsed = structure(value[field])
-        if parsed is None or parsed in layouts:
-            continue
-        title, pairs = parsed
-        layouts[parsed] = {
-            "name": title.lower(),
-            "title": title,
-            "entries": [{kind: key} for kind, key in pairs],
-        }
-    if not layouts:
-        raise ValidationError("no input has a form layout that a projection can read")
-    return {
-        "abi": "cement-projection-v1",
-        "text": field,
-        "keep": [],
-        "layouts": [layouts[key] for key in sorted(layouts)],
-    }
 
 
 class Tools:

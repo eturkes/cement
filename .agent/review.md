@@ -15,6 +15,18 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p96 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 the CLI skill's step 1 carries the recovery rule (exact + support 1 → the projection decision); R2 a CLI read surface derives a candidate program (one layout per distinct `projection.structure`), with a test that two notes of one layout group into one case; R3 the skill + workflow text pins move with it (X3, LP0d hold); R4 replaying the L1 state through the CLI skill reaches a published version; R5 one owner for the derivation. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `skills/cement-learn/SKILL.md` step 1: `nothing_to_learn` + `grouped_by` `exact` + a support-1 case → step 2. |
+| R2 | acceptance | pass | `cement learn cases OPERATION --projectable` (exclusive with `--program`) → `program` + grouping; `test_two_notes_of_one_layout_group_into_one_case`: exact = 2 cases at support 1, derived = 1 case at support 2, program = one layout. |
+| R3 | acceptance | pass | step 2 + `references/projection.md` + `references/workflow.md` derive instead of hand-writing; X3 + LP0d phrases kept (both green). |
+| R4 | acceptance | pass | `test_the_l1_state_replays_through_the_cli_skill_to_a_published_version`: 5 exact support-1 answers → recovery → derive → merge (supersede the extended example) → projection test/set → compile/verify/inspect/promote → 1 version, 2 members, lab at support 1, switch off. Red at `e2082d7`. |
+| R5 | cleanup | pass | `draft_program` moved from the Open WebUI tool into `cement_runtime.projection` (outside `__all__`: the contract API pin keeps its seven names); the tool imports it; paste-ins regenerated. |
+
 ## p41 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 a blocking clock vs a second default writer, outcome asserted; R2 a re-entrant clock through another `System`, outcome asserted; R3 measured lock duration recorded beside the ruling; R4 credit recorded. MAIN alone.

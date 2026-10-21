@@ -18,8 +18,8 @@ from pydantic import BaseModel, Field
 # The embedded source keeps its own line breaks; one of its pragma comments runs past 100
 # columns inside the string, where ruff reads no pragma.
 # ruff: noqa: E501
-_CEMENT_PACKAGE = "_cement_runtime_d72ff6f932e1fb7b"
-_CEMENT_DIGEST = "d72ff6f932e1fb7b171da23122b38f7da9cd88e518a08616b21842aa873605cd"
+_CEMENT_PACKAGE = "_cement_runtime_0843832114aab618"
+_CEMENT_DIGEST = "0843832114aab61845f2a77629e665e942bb378b37af65061f23c3b7af16ff0a"
 _CEMENT_SOURCES = {
     "__init__": r'''
 """Cement public API."""
@@ -1368,7 +1368,7 @@ from __future__ import annotations
 
 import string
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, cast
 
 from .errors import ValidationError
 from .json_value import CanonicalJSON, JSONValue, canonicalize
@@ -1607,6 +1607,55 @@ def project(program: ProjectionProgram, value: JSONValue) -> Projection:
     except ValidationError:
         return Projection(matched=False, key=None, reason="key", work=work)
     return Projection(matched=True, key=key, reason=None, work=work)
+
+
+# Outside `__all__` on purpose: the two learning surfaces (CLI `learn cases --projectable`, the Open
+# WebUI learning tool) share it, while the projection contract API stays the seven pinned names.
+def draft_program(inputs: list[JSONValue]) -> dict[str, JSONValue]:
+    """One `cement-projection-v1` layout per distinct title + structure of the raw inputs.
+
+    The learning pass decides that an operation is projectable; the program itself is mechanical,
+    so it is derived here and nobody copies a label by hand.
+    """
+
+    fields = {
+        name
+        for value in inputs
+        if isinstance(value, dict)
+        for name, text in value.items()
+        if isinstance(text, str)
+    }
+    if (
+        not inputs
+        or len(fields) != 1
+        or any(
+            not isinstance(value, dict)
+            or set(value) != fields
+            or not all(isinstance(text, str) for text in value.values())
+            for value in inputs
+        )
+    ):
+        raise ValidationError("a projection needs inputs that hold exactly one text field")
+    (field,) = fields
+    layouts: dict[tuple[str, tuple[tuple[str, str], ...]], dict[str, JSONValue]] = {}
+    for value in inputs:
+        parsed = structure(str(cast(dict[str, JSONValue], value)[field]))
+        if parsed is None or parsed in layouts:
+            continue
+        title, pairs = parsed
+        layouts[parsed] = {
+            "name": title.lower(),
+            "title": title,
+            "entries": [{kind: key} for kind, key in pairs],
+        }
+    if not layouts:
+        raise ValidationError("no input has a form layout that a projection can read")
+    return {
+        "abi": PROJECTION_ABI,
+        "text": field,
+        "keep": [],
+        "layouts": [layouts[key] for key in sorted(layouts)],
+    }
 ''',
     "source": r'''
 """Provider-neutral candidate source boundary."""

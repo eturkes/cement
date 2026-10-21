@@ -334,8 +334,12 @@ Its read surface groups pending proposals and active examples by case key:
 
 ```bash
 uv run cement --db demo.db --partition acme learn cases support.reply
+uv run cement --db demo.db --partition acme learn cases form.plan --projectable
 uv run cement --db demo.db --partition acme learn cases form.plan --program - < program.json
 ```
+
+`--projectable` derives a program from the raw inputs: one layout for each form structure. The
+result shows that program as `program`.
 
 Two commands change earlier confirmations. `example supersede` replaces earlier examples with a
 re-merged output that extends them: one new example for each old one, with the same input. It

@@ -31,6 +31,7 @@ from .json_value import (
     parse_json,
 )
 from .models import Candidate, CompilePolicy
+from .projection import draft_program
 from .system import PROVENANCE_MAX_BYTES, SOURCE_ID_MAX_BYTES, System, _name, _text
 
 
@@ -298,8 +299,14 @@ def _parser() -> argparse.ArgumentParser:
     learn_commands = learn.add_subparsers(dest="learn_command", required=True)
     learn_cases = learn_commands.add_parser("cases", allow_abbrev=False)
     learn_cases.add_argument("operation")
-    learn_cases.add_argument(
+    candidate = learn_cases.add_mutually_exclusive_group()
+    candidate.add_argument(
         "--program", help="group by this candidate program (JSON text; '-' reads stdin)"
+    )
+    candidate.add_argument(
+        "--projectable",
+        action="store_true",
+        help="group by a program derived from the raw inputs: one layout per form structure",
     )
 
     events = commands.add_parser("events", help="read append-only audit projections")
@@ -752,6 +759,30 @@ def _render_listing(listing: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _learning_inputs(system: System, partition: str, operation: str) -> list[JSONValue]:
+    """Raw inputs of the current revision's active examples and pending proposals."""
+
+    revision = system.learning_cases(partition, operation)["operation_revision"]
+    inputs: list[JSONValue] = []
+    after = 0
+    while page := system.examples(partition, operation, after_sequence=after, limit=1000):
+        inputs += [
+            row["input"]
+            for row in page
+            if row["superseded_by"] is None and row["operation_revision"] == revision
+        ]
+        after = int(cast(int, page[-1]["sequence"]))
+    after = 0
+    while rows := system.proposals(partition, status="pending", after_sequence=after, limit=100):
+        inputs += [
+            row["input"]
+            for row in rows
+            if row["operation"] == operation and row["operation_revision"] == revision
+        ]
+        after = int(cast(int, rows[-1]["sequence"]))
+    return inputs
+
+
 def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
     if args.command == "function" and args.function_command == "eval":
         # Ahead of the ledger gate and constructing no System: the bundle is the
@@ -1105,6 +1136,10 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
             )
         return {"projection": system.projection(args.partition, args.operation)}
     if args.command == "learn":
+        if args.projectable:
+            program = draft_program(_learning_inputs(system, args.partition, args.operation))
+            cases = system.learning_cases(args.partition, args.operation, program=program)
+            return cases | {"program": program}
         return system.learning_cases(
             args.partition,
             args.operation,

@@ -43,7 +43,9 @@ and continue from what it shows. Stop and report any other code. The workflow re
    proposals or more than one active output (a merge stopped before its supersession), and
    continue with step 4.
 
-   Otherwise, if `nothing_to_learn` is `true`, report "nothing to learn" and stop. If no
+   Otherwise, if `nothing_to_learn` is `true`, check `grouped_by` first. If it is `exact` and a
+   case has support 1, an earlier pass confirmed answers without projection: go on to step 2,
+   because projection can join those cases. Otherwise report "nothing to learn" and stop. If no
    proposal is pending but `work` lists unfinished steps, an earlier pass was interrupted.
    Finish step 3 for each case in `work.merge_key_hashes` (its confirmed outputs differ), then
    continue with step 4 or step 5.
@@ -51,10 +53,16 @@ and continue from what it shows. Stop and report any other code. The workflow re
 2. Decide whether the operation is projectable. It is projectable only when every output is a
    procedure over the input (a plan or a script that reads values from the input) and no output
    contains a value copied from an input. Answers that interpret values are never projectable.
-   If it is projectable, write or extend a projection program from the layouts in the raw inputs
-   (`references/projection.md`). Save it as `program.json` and keep that file until step 4
-   finishes: the ledger holds no record of a program before `projection set`. Then group the
-   proposals by its keys before you review:
+   If it is projectable, derive the program from the raw inputs. The command groups the cases by
+   it and prints it as `program`:
+
+   ```sh
+   cement learn cases "$OP" --projectable
+   ```
+
+   Save that `program` object as `program.json` and keep that file until step 4 finishes: the
+   ledger holds no record of a program before `projection set`. From now on, group the cases by
+   the saved program (`references/projection.md`):
 
    ```sh
    cement learn cases "$OP" --program - < program.json

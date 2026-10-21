@@ -23,7 +23,8 @@ This reference expands the steps in `SKILL.md`. Read it when a field or an exit 
 
 | Field | Meaning |
 | --- | --- |
-| `grouped_by` | `exact`, `build-current` (the projection set for this revision) or `candidate` (the `--program` you passed) |
+| `grouped_by` | `exact`, `build-current` (the projection set for this revision) or `candidate` (the `--program` you passed, or the one `--projectable` derived) |
+| `program` | only with `--projectable`: the program derived from the raw inputs, one layout per form structure; save it as `program.json` |
 | `cases[]` | one entry per key: `key`, `key_hash`, `pending_proposal_ids`, `active_example_ids`, `outputs` (each distinct output with the proposal ids and example ids that carry it), `support` (active examples), `ready`, `blocked_reasons`, `artifact` (the build that already carries this case, with its status) |
 | `unprojected` | proposal ids and example ids that the grouping program does not recognize |
 | `stale_pending_proposal_ids` | pending proposals of an earlier operation revision; reject them, since they cannot be confirmed |

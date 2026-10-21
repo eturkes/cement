@@ -18,6 +18,7 @@ import pathlib
 import re
 import shlex
 import tempfile
+import typing
 import unittest
 import unittest.mock
 
@@ -668,6 +669,90 @@ class ProjectableResumeBattery(_Ledger):
         self.assertIn("keep that file until step 4 finishes", one_line)
         self.assertIn("If `program.json` exists from an earlier pass", one_line)
         self.assertIn('cement projection show "$OP"', one_line)
+
+
+class ProjectableDerivationBattery(_Ledger):
+    """p96: `learn cases --projectable` derives the program, and the CLI skill recovers a pass
+    that confirmed answers as exact support-1 cases (the Open WebUI live run's L1 state)."""
+
+    def _json(self, *argv: str, stdin: str = "") -> dict[str, typing.Any]:
+        code, out, err = self._cli(*argv, stdin=stdin)
+        self.assertEqual(code, 0, err)
+        return typing.cast(dict[str, typing.Any], json.loads(out))
+
+    def _forms(self, *names: str) -> dict[str, str]:
+        texts = {path.name: path.read_text(encoding="utf-8") for path in FORMS}
+        return {name: texts[name] for name in names}
+
+    def test_two_notes_of_one_layout_group_into_one_case(self) -> None:
+        notes = self._forms("layout_a_progress_note_01.txt", "layout_a_progress_note_02.txt")
+        for text in notes.values():
+            self._confirm({"plan": "progress"}, value={"document": text})
+        exact = self._json("learn", "cases", OP)
+        self.assertEqual(
+            (exact["grouped_by"], [case["support"] for case in exact["cases"]], exact["nothing_to_learn"]),
+            ("exact", [1, 1], True),
+        )
+        derived = self._json("learn", "cases", OP, "--projectable")
+        self.assertEqual(derived["grouped_by"], "candidate")
+        self.assertEqual(derived["program"], _program(list(notes.values())))
+        (case,) = derived["cases"]
+        self.assertEqual((case["support"], case["ready"]), (2, True))
+
+    def test_the_l1_state_replays_through_the_cli_skill_to_a_published_version(self) -> None:
+        # L1 (.agent/decisions/owui-live-e2e.md): five answers confirmed as exact support-1 cases,
+        # no program. Each command below is the CLI skill's, in its order.
+        plans = {
+            "layout_b_intake_form_01.txt": {"plan": ["name", "date_of_birth"]},
+            "layout_b_intake_form_02.txt": {"plan": ["name", "date_of_birth"]},
+            "layout_a_progress_note_01.txt": {"plan": ["patient"]},
+            "layout_a_progress_note_02.txt": {"plan": ["patient", "provider"]},
+            "layout_c_lab_slip_01.txt": {"plan": ["specimen"]},
+        }
+        forms = self._forms(*plans)
+        for name, plan in plans.items():
+            self._confirm(plan, value={"document": forms[name]})
+        # Step 1: idle under exact grouping, but exact support-1 cases send the pass to step 2.
+        first = self._json("learn", "cases", OP)
+        self.assertEqual((first["nothing_to_learn"], first["grouped_by"]), (True, "exact"))
+        self.assertEqual({case["support"] for case in first["cases"]}, {1})
+        # Step 2: projectable; derive the program and keep it as program.json.
+        program = json.dumps(self._json("learn", "cases", OP, "--projectable")["program"])
+        grouped = self._json("learn", "cases", OP, "--program", "-", stdin=program)
+        supports = sorted(case["support"] for case in grouped["cases"])
+        self.assertEqual(supports, [1, 2, 2])
+        # Step 3: merge the case whose confirmed outputs differ (the union of the rows); supersede
+        # each example the merge extends.
+        (split,) = [case for case in grouped["cases"] if len(case["outputs"]) > 1]
+        union = {"plan": ["patient", "provider"]}
+        extended = [
+            example
+            for output in split["outputs"]
+            if output["output"] != union
+            for example in output["example_ids"]
+        ]
+        self.assertEqual(len(extended), 1)
+        self._json(
+            "example", "supersede", OP, *extended, "--output", "-",
+            "--reviewer", "learning-pass", "--note", "run 1, replay", stdin=json.dumps(union),
+        )
+        # Step 4: test the program, then set it.
+        report = self._json("projection", "test", OP, "--program", "-", stdin=program)
+        self.assertEqual((report["projected"], report["unprojected"]), (5, []))
+        self.assertEqual(report["merged_outputs"], [])
+        self._json("projection", "set", OP, "--program", "-", "--actor", "learning-pass", stdin=program)
+        # Step 5: publish.
+        self._json("compile", OP, "--actor", "learning-pass")
+        self._json("function", "verify-drafts", OP, "--actor", "learning-pass")
+        prospective = self._json("function", "inspect", OP)["function_hash"]
+        self._json(
+            "function", "promote", OP, "--expected-function-hash", prospective,
+            "--actor", "learning-pass",
+        )
+        versions = self._json("function", "versions", OP)["versions"]
+        self.assertEqual([version["receipt"]["function_hash"] for version in versions], [prospective])
+        self.assertEqual(versions[0]["receipt"]["member_count"], 2)  # the lab slip stays at support 1
+        self.assertEqual(self.system.switch(P, OP).mode, "off")
 
 
 SKILL = pathlib.Path(__file__).resolve().parents[1] / "skills/cement-learn"
