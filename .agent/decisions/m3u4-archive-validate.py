@@ -79,10 +79,10 @@ PRUNED_NUMBERS: Final = {
     "now states 39",
 }
 PRUNED_IDENTIFIERS: Final = {
-    "wt/spike-m3u4-binding": "worktree path, retired; the tree is reachable as tag "
-    "m3u4-alt-binding and the archive names it",
-    "wt/spike-m3u4-projection": "worktree path, retired; the tree is reachable as tag "
-    "m3u4-alt-projection and the archive names it",
+    "wt/spike-m3u4-binding": "worktree path, retired; its diff is tracked at "
+    ".agent/archive/m3u4-alt-binding.diff and the archive names it",
+    "wt/spike-m3u4-projection": "worktree path, retired; its diff is tracked at "
+    ".agent/archive/m3u4-alt-projection.diff and the archive names it",
     "spike-m3u4-binding": "teammate name, dispatch state; the archive keeps the record",
     "spike-m3u4-projection": "teammate name, dispatch state; the archive keeps the record",
     ".agent/archive/": "superseded by the exact destination .agent/archive/m3u4-chronology.md, "

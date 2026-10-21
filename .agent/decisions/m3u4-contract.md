@@ -569,3 +569,5 @@ which competed with the binding obligations for a reader's attention. That narra
 `.agent/archive/m3u4-chronology.md`; every ruling, every interpretive ground and every measured number
 stayed here. `m3u4-archive-validate.py` is the gate: it proves each retained section still resolves
 every citation the six artifact tables make against it, and that no line left the pair.
+
+Expired (p47): M3.4's tags `m3u4-alt-binding` (`aa77d9f`), `m3u4-alt-projection` (`cb0ef3e`), `m3u4-map`, `m3u4-verdicts-wave2` and `m3u4-attack-wave2` were never published, so no clone resolves them. The two spike diffs are tracked: `.agent/archive/m3u4-alt-binding.diff` (`git diff e4b8f73 aa77d9f`) and `.agent/archive/m3u4-alt-projection.diff` (`git diff f251a09 cb0ef3e`); both bases are spike-branch commits, so each diff is the whole record. The other three tags held wave tables whose final state is tracked in `.agent/decisions/m3u4-*.json`.

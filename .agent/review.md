@@ -17,6 +17,17 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p47 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
+
+Check set: R1 the branch taken (publish vs expire); R2 every citation marked; R3 both `m3u4-alt-*` diffs tracked + reproducible from the tags here; R4 instruments still pass. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | publishing pushes tags to the remote, which the owner drives → expire + archive. |
+| R2 | acceptance | pass | `git grep` over the five tag names (minus `m3u4-map.json` file names): 5 citing files outside the row texts, each with the `Expired (p47)` sentence or the corrected reason. |
+| R3 | acceptance | pass | diffs = `git diff <parent> <tag>` here (stats equal the contract's +433/-147, +181/-117); bases are spike-branch commits, so each diff is self-contained; gitleaks dir clean. |
+| R4 | correctness | pass | `m3u4-archive-validate.py` RESULT: PASS; markers appended at file ends (no line-anchored content moves); deferred grader PASS. |
+
 ## p38 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 one `_entity_id(value, label)` owner; R2 every caller supplies its entity; R3 CLI + library messages update together; R4 request-lifecycle vocabulary absent; R5 pins the rename moves. MAIN alone.

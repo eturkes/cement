@@ -137,3 +137,5 @@ worktree during S1 and silently moved all three teammates' shells; one spike cau
 a batch of measurements. Anchors and line numbers taken that way look valid and resolve to the wrong
 bytes. Every located command runs as `(cd <path> && ...)` in a subshell or through `git -C`, and every
 brief carries a mandatory per-call `cd <worktree> &&` prefix.
+
+Expired (p47): M3.4's tags `m3u4-alt-binding` (`aa77d9f`), `m3u4-alt-projection` (`cb0ef3e`), `m3u4-map`, `m3u4-verdicts-wave2` and `m3u4-attack-wave2` were never published, so no clone resolves them. The two spike diffs are tracked: `.agent/archive/m3u4-alt-binding.diff` (`git diff e4b8f73 aa77d9f`) and `.agent/archive/m3u4-alt-projection.diff` (`git diff f251a09 cb0ef3e`); both bases are spike-branch commits, so each diff is the whole record. The other three tags held wave tables whose final state is tracked in `.agent/decisions/m3u4-*.json`.
