@@ -12073,6 +12073,73 @@ class SystemTests(unittest.TestCase):
             ].detail,
         )
 
+    def test_function_verification_pins_each_projected_document_field(self) -> None:
+        # Each field check is redundant with build_function today; deleting one lets the altered
+        # value reach validate_function, whose own message replaces the field-specific detail.
+        # The receipt rebuild calls the same patched constructor, so that check fails alongside.
+        self.register(confirmations=2, reviewers=1, span=0)
+        self._promote_three_as_function("projected-document-fields")
+        real_build = system_module.build_function
+        alterations = (
+            (
+                "abi",
+                lambda value: value.__setitem__("abi", function_module.FUNCTION_ABI_V2),
+                "function ABI changed during projection",
+                "function receipt rebuilt an invalid document",
+            ),
+            (
+                "canonicalizer",
+                lambda value: value.__setitem__("canonicalizer", "cement-json-v0"),
+                "function canonicalizer changed during projection",
+                "function receipt rebuilt an invalid document",
+            ),
+            (
+                "function_hash",
+                lambda value: value.__setitem__("function_hash", "0" * 64),
+                "function hash changed during projection",
+                "function hash mismatch",
+            ),
+            (
+                "scope",
+                lambda value: value.__setitem__(
+                    "scope", {**value["scope"], "operation_revision": 2}
+                ),
+                "function scope does not equal the promoted snapshot",
+                "function hash mismatch",
+            ),
+            (
+                "entries",
+                lambda value: value.__setitem__("entries", tuple(value["entries"])),
+                "function entries are not an array",
+                "function receipt rebuilt an invalid document",
+            ),
+        )
+
+        def altered_build(alter):
+            def build(**kwargs):
+                document = real_build(**kwargs)
+                value = dict(document.value)
+                alter(value)
+                return replace(document, value=value)
+
+            return build
+
+        for field, alter, detail, receipt_detail in alterations:
+            with self.subTest(field=field):
+                with mock.patch.object(
+                    system_module, "build_function", side_effect=altered_build(alter)
+                ):
+                    result = self.system.verify_function("tenant-a", "echo")
+                self._assert_function_checks(
+                    result, (True, True, True, True, False, False, True)
+                )
+                checks = self._function_checks(result)
+                self.assertEqual(checks["function-hash-matches-snapshot"].detail, detail)
+                self.assertEqual(
+                    checks["persisted-function-receipt"].detail,
+                    f"latest current-revision receipt is invalid: {receipt_detail}",
+                )
+
     def test_function_verification_rejects_last_future_revision_row(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
         self._promote_three_as_function("future-revision-retained")

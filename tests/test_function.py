@@ -374,6 +374,31 @@ class FunctionTests(unittest.TestCase):
             ):
                 validate_function(document)
 
+    def test_entry_digest_syntax_rejects_after_outer_rehash(self) -> None:
+        # Rehashed, a malformed digest reaches each field's own syntax check: without it three
+        # fields validate and `output_hash` turns its ValidationError into a digest mismatch.
+        bundle = _build((_entry({"x": 1}, {"answer": 1}, label="digest-syntax"),))
+        fields = (
+            (("evidence_snapshot_hash",), "evidence_snapshot_hash"),
+            (("output_hash",), "output_hash"),
+            (("entry_seal",), "entry_seal"),
+            (("report", "test_set_hash"), "report test_set_hash"),
+        )
+        for path, label in fields:
+            document: Any = deepcopy(bundle.value)
+            holder = document["entries"][0]
+            for key in path[:-1]:
+                holder = holder[key]
+            malformed = holder[path[-1]].upper()
+            self.assertNotEqual(malformed, holder[path[-1]])
+            holder[path[-1]] = malformed
+            _rehash(document)
+            with self.subTest(field=label), self.assertRaisesRegex(
+                ValidationError,
+                f"^function entry 0 {label} must be a SHA-256 hex digest$",
+            ):
+                validate_function(document)
+
     def test_revision_signed_64_boundaries_and_scope_precedence(self) -> None:
         minimum = _build((_entry(1, 1, label="revision-min"),), operation_revision=1)
         self.assertEqual(validate_function(minimum.value).function_hash, minimum.function_hash)
