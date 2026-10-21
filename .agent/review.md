@@ -15,6 +15,15 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p20 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
+
+Check set: R1 the model stated once in normative prose; R2 the existing pin asserts exactly +1 report / +1 event per failed run and cites the doc. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `docs/architecture.md` item 8; register + article audits rc 0. |
+| R2 | acceptance | pass | `second_counts == (first[0] + 1, first[1] + 1)` in the cited test. |
+
 ## p14 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 the chosen option (documented limit) is stated once in human-facing prose; R2 a custom buffered stream pins the no-flush behavior; R3 the closed-pipe claim measured (exit 120 + notice); R4 credit recorded, survivors routed. MAIN alone.

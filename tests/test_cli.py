@@ -1635,6 +1635,8 @@ class CLITests(unittest.TestCase):
         self.assertIsNotNone(payload["entries"][2]["entry_seal"])
 
     def test_function_verify_drafts_repeats_a_negative_verdict_for_the_same_corrupt_ledger(self) -> None:
+        # p20, `docs/architecture.md` item 8: a failed draft stays eligible, so each failed run adds
+        # exactly one report and one `artifact.verification_failed` event (the unbounded model).
         created = self.compile_drafts("drafts-rerun", (6, 17, 31))
         target = self.corrupt_middle_draft(created)
         first = self.run_cli(

@@ -34,6 +34,10 @@ exact deterministic lookups:
    evidence snapshot. It replays the finite scope and negative boundaries into a sealed,
    content-addressed test set. `verify_drafts` verifies every current-build draft of one operation in
    one locked write transaction. It reports superseded rows as benign skips.
+   A draft that fails verification stays a draft, so each later `verify_drafts` run verifies it
+   again and writes one more failed report and one more `artifact.verification_failed` event.
+   History therefore grows by one report and one event per failed run, until a revision or a
+   new build replaces the draft.
 9. `inspect_function_promotion` projects the prospective union of retained members and verified
    candidates and returns the prospective function hash. `promote_function` repeats that hash under a
    write lock. It retires predecessors, activates candidates, and writes one immutable receipt plus
