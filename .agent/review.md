@@ -15,6 +15,17 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p60 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 a committed checker reads every count-bearing contract line and resolves it against the named committed artifact, nonzero on divergence; R2 seeded both ways; R3 the shipped contract exits 0; R4 teammate output re-derived. MAIN + general-purpose-2.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `.agent/contract-claims`: coverage = every prose line holding a backticked token + an integer; each needs a fenced `claims` row (`count` / `lines` / `json` over `<rev>:<path>`, or `unchecked` + reason), anchored by line + fragment. |
+| R2 | acceptance | pass | fixtures: good rc 0; wrong count → `MISMATCH`; unclaimed → `UNCLAIMED`; moved fragment → `STALE`. |
+| R3 | acceptance | pass | `m3u6a1-contract.md` §15 (append-only, +7,702 bytes): 44 lines, 50 graded rows all matching at their historical revisions, 20 `unchecked` (context-gauge figures, identifiers, historical runs) → rc 0. |
+| R4 | verification integrity | pass | MAIN reran the validator (rc 0), proved the edit byte-append-only, read every `unchecked` reason; finding recorded: the contract cites `m3u6a1-verdicts.json`, absent at `dc4ab5e` (L557, L761 stay `unchecked`). |
+
 ## p96 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 the CLI skill's step 1 carries the recovery rule (exact + support 1 → the projection decision); R2 a CLI read surface derives a candidate program (one layout per distinct `projection.structure`), with a test that two notes of one layout group into one case; R3 the skill + workflow text pins move with it (X3, LP0d hold); R4 replaying the L1 state through the CLI skill reaches a published version; R5 one owner for the derivation. MAIN alone.

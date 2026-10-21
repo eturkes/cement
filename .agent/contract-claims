@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+"""contract-claims — grade a contract's count-bearing lines against the artifacts they name (p60).
+
+A contract restates numbers its instruments measured ("51 FACTORY sites", "29 obligations"), and
+nothing re-ran them: eight of M3.6a1's twenty-four corrections were the contract contradicting its own
+artifact. Each count-bearing line therefore carries a row in the contract's fenced ```claims block:
+
+    line<TAB>fragment<TAB>kind<TAB>spec<TAB>expected
+
+  line      1-based line of the claim in this contract; `fragment` = exact text on that line (the
+            anchor: an edit that moves the line or rewrites the fragment fails the row)
+  count     spec = `<rev>:<path> <regex>` → non-overlapping regex matches in that blob
+  lines     spec = `<rev>:<path>` → lines in that blob
+  json      spec = `<rev>:<path> <dotted.path>` → len() of the value there (`.` = the root)
+  unchecked spec = the reason no committed artifact reproduces the number (a timing, a historical
+            measurement, a count of the contract's own prose); expected = `-`; printed, never graded
+
+`<rev>` resolves in this clone (a SHA or tag; a committed artifact, so the grade reruns anywhere).
+
+Coverage: a count-bearing line = a prose line (outside fenced code, outside table rows) holding a
+backticked token and a standalone integer (`2`, `51`, `1,031`; section and obligation ids such as
+`D15`, `C05`, `§5` and SHAs are not integers). Every such line needs >= 1 row; each uncovered line is
+printed `UNCLAIMED <line>: <text>`.
+
+Usage: uv run python .agent/contract-claims <contract.md> [--list]   (--list prints the count-bearing
+lines and exits 0: the authoring worklist)
+rc 0 = every row resolves + matches and every count-bearing line is claimed; 1 = a mismatch, a stale
+anchor, an unresolvable artifact or an unclaimed line (each printed); 2 = usage or a malformed row.
+"""
+
+from __future__ import annotations
+
+import json
+import pathlib
+import re
+import subprocess
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+BACKTICKED = re.compile(r"`[^`]+`")
+INTEGER = re.compile(r"(?<![\w.:/#§@$-])\d{1,3}(?:,\d{3})+(?![\w.:/-])|(?<![\w.:/#§@$-])\d+(?![\w.:/,-])")
+FENCE = re.compile(r"^\s*```")
+
+
+def _blob(spec: str) -> str:
+    rev, _, path = spec.partition(":")
+    if not rev or not path:
+        raise ValueError(f"artifact `{spec}` is not <rev>:<path>")
+    result = subprocess.run(
+        ["git", "-C", str(ROOT), "show", f"{rev}:{path}"], capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        raise LookupError(f"artifact `{spec}` does not resolve: {result.stderr.strip()}")
+    return result.stdout
+
+
+def _measure(kind: str, spec: str) -> int:
+    if kind == "lines":
+        return len(_blob(spec).splitlines())
+    artifact, _, argument = spec.partition(" ")
+    if kind == "count":
+        return len(re.findall(argument, _blob(artifact)))
+    if kind == "json":
+        value: object = json.loads(_blob(artifact))
+        for key in [part for part in argument.split(".") if part]:
+            value = value[int(key)] if isinstance(value, list) else value[key]  # type: ignore[index]
+        return len(value)  # type: ignore[arg-type]
+    raise ValueError(f"unknown kind `{kind}`")
+
+
+def _scan(lines: list[str]) -> tuple[list[tuple[int, str]], list[list[str]]]:
+    """(count-bearing prose lines, claim rows) of one contract."""
+
+    bearing: list[tuple[int, str]] = []
+    rows: list[list[str]] = []
+    fenced: str | None = None
+    for number, line in enumerate(lines, start=1):
+        if FENCE.match(line):
+            fenced = None if fenced is not None else line.strip()[3:].strip()
+            continue
+        if fenced == "claims":
+            if line.strip():
+                rows.append([str(number), *line.split("\t")])
+            continue
+        if fenced is not None or line.lstrip().startswith("|"):
+            continue
+        prose = BACKTICKED.sub(" ", line)
+        if BACKTICKED.search(line) and INTEGER.search(prose):
+            bearing.append((number, line))
+    return bearing, rows
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) not in (1, 2) or (len(argv) == 2 and argv[1] != "--list"):
+        print(__doc__.split("\n\n")[-2], file=sys.stderr)
+        return 2
+    path = pathlib.Path(argv[0])
+    lines = path.read_text(encoding="utf-8").splitlines()
+    bearing, rows = _scan(lines)
+    if len(argv) == 2:
+        for number, line in bearing:
+            print(f"{number}\t{line.strip()}")
+        print(f"contract-claims: {len(bearing)} count-bearing lines", file=sys.stderr)
+        return 0
+    failures: list[str] = []
+    claimed: set[int] = set()
+    graded = unchecked = 0
+    for row in rows:
+        where = f"claims row at {path.name}:{row[0]}"
+        if len(row) != 6:
+            print(f"MALFORMED {where}: {len(row) - 1} TAB fields, want 5", file=sys.stderr)
+            return 2
+        _, line_text, fragment, kind, spec, expected = row
+        if not line_text.isdigit() or not 1 <= int(line_text) <= len(lines):
+            print(f"MALFORMED {where}: line `{line_text}`", file=sys.stderr)
+            return 2
+        number = int(line_text)
+        if fragment not in lines[number - 1]:
+            failures.append(f"STALE {where}: line {number} lacks `{fragment}`")
+            continue
+        claimed.add(number)
+        if kind == "unchecked":
+            unchecked += 1
+            print(f"UNCHECKED {path.name}:{number}: {spec}")
+            continue
+        try:
+            measured = _measure(kind, spec)
+        except (LookupError, ValueError, KeyError, IndexError, TypeError, re.error) as exc:
+            failures.append(f"UNRESOLVED {where}: {exc}")
+            continue
+        graded += 1
+        if not expected.isdigit() or measured != int(expected):
+            failures.append(
+                f"MISMATCH {path.name}:{number}: `{fragment}` claims {expected}, {kind} {spec} = {measured}"
+            )
+    failures += [
+        f"UNCLAIMED {number}: {line.strip()}" for number, line in bearing if number not in claimed
+    ]
+    for failure in failures:
+        print(failure, file=sys.stderr)
+    print(
+        f"contract-claims: {len(bearing)} count-bearing lines, {graded} graded rows, {unchecked} unchecked,"
+        f" {len(failures)} failures"
+    )
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

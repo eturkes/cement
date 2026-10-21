@@ -14,6 +14,7 @@ paths:
   - ".agent/replay-mutants"
   - ".agent/decisions/*-mutants.jsonl"
   - ".agent/validate-anchors"
+  - ".agent/contract-claims"
   - ".agent/fixtures/**"
   - ".agent/article-audit"
   - ".agent/article-glossary.txt"
@@ -41,5 +42,6 @@ Each purpose-built check below ships the seed that reds it; law → `.claude/rul
 - `.agent/register-audit --gate` (gate step `register`, p12 + p40): `Run the command simply …` → rc 1 `FILLER … simply`; a 30-word sentence + a punctuation-free bullet + `Cement's` + a link whose TARGET holds `simply` (`[guide](https://example.com/simply-start)`) → rc 0, prints `[30]` (length is printed for judgment, never graded).
 - `.agent/replay-mutants` (p02, closure tool, not a gate step): `.agent/decisions/replay-mutants-seeds.jsonl` at `d4746ef` (`tests.test_json_value`, `ran` 4) → rc 0, `SEED-DEAD` killed, `SEED-LIVE` (comment-only) survived = its `equivalent`, `SEED-GONE` superseded; copies of it → expect without the equivalent → rc 1 `verdicts differ from expect`; `ran` 5 → rc 2 `CONTROL red`; a row whose `old` occurs twice off its `line` → rc 2 `anchor-miss`; a mutant that cannot import → rc 2 `not-loaded`. Each run restores every clone (`all restored: True`) and leaves no worktree.
 - `.agent/validate-anchors` (p19, report validator, not a gate step): fixtures `.agent/fixtures/anchors/` — `good.md` → rc 0 (2 anchors); `bad-anchor.md` → rc 1 `ANCHOR-BAD report:5 .agent/fixtures/anchors/target.txt:1 want 'beta line', got 'alpha line'`; `todo-fill.md` → rc 1 `TODO-FILL report:5`.
+- `.agent/contract-claims` (p60, contract checker, not a gate step): fixtures `.agent/fixtures/contract-claims/` — `good.md` → rc 0 (1 graded row: 7 `^class` lines in `6fb4d92:src/cement_runtime/errors.py`); `wrong-count.md` (claims 8) → rc 1 `MISMATCH`; `unclaimed.md` → rc 1 `UNCLAIMED 3`; `stale-anchor.md` (fragment absent from its line) → rc 1 `STALE` (+ `UNCLAIMED`). Shipped `.agent/decisions/m3u6a1-contract.md` → rc 0: 44 count-bearing lines, 50 graded rows, 20 unchecked.
 - `.agent/article-audit` (p64, prose check, not a gate step): shipped surfaces → rc 0 (6 files, 380 grounded words); `docs/architecture.md` + the sentence `Cement withholds the cached output from \`follow\`.` → rc 1 `the cached`; the pre-p64 `docs/architecture.md` → rc 1 `:150 the cached` (the defect p64 named).
 - `.agent/mutate` (p74, credit tool, not a gate step): see `.agent/decisions/m3u10-gate-tooling.md` `## p74` — the pin's survivor count and the survivor count after deleting the pin's assertion (seed branch), both runs recorded there.

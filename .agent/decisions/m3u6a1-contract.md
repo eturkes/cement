@@ -963,3 +963,78 @@ measured fact.
 | `archive/m3u6a1-rev` (`wt/rev-m3u6a1-1`) | `82e1a2e` | `6fb4d92` | the 36-row attack table as filled, before MAIN's dispositions |
 | `archive/m3u6a1-gate` (`wt/gate-m3u6a1-1`) | `96d155d` | `915c91e` | the 92-row catalogue as filled, plus its 22 fill commits |
 | `archive/m3u6a2-scout` (`wt/scout-m3u6a2`) | `03b5da9` | `915c91e` | M3.6a2's re-measured deletion burden and the repaired `m3u6a-burden.py` |
+
+## 15. Count claims (p60)
+
+```claims
+96	`suspended` (541, 608, 827) or `retired` (867)	unchecked	Source-line identifiers, not cardinalities; historical tests/test_system.py locations.	-
+169	0 failed	count	dc4ab5e:.agent/decisions/m3u6a1-fallback.json "failed": [1-9]\d*	0
+169	and 0	count	dc4ab5e:.agent/decisions/m3u6a1-fallback.json "errors": [1-9]\d*	0
+194	41 times	count	6fb4d92:tests/test_system.py \bself\.confirm\s*\(	41
+221	Acts 2 and 3	unchecked	Act identifiers, not cardinalities; demo headings label narrative order.	-
+251	12,866 B `1182130a2b3a`, 12,867 B `cd60036faf5c`, 12,862 B	unchecked	Lengths require AST byte slices plus PROVENANCE_MAX_BYTES -> 65_536 substitution; no committed extracted-span artifact; count/lines/json cannot apply this transform.	-
+285	gate 4's	unchecked	Gate identifier, not a cardinality; contract-local prose reference.	-
+359	90% 216K/240K	unchecked	Context-gauge snapshot; no committed gauge output reproduces the session occupancy.	-
+367	83% 200K/240K	unchecked	Context-gauge snapshots (83% and 73%); no committed gauge output reproduces either occupancy.	-
+374	85% 205K/240K	unchecked	Context-gauge snapshot; no committed gauge output reproduces the session occupancy.	-
+379	98% 236K/240K, `mate=` 73% 174K/240K	unchecked	Context-gauge snapshots; no committed gauge output reproduces either occupancy; section 12 is an identifier.	-
+383	88%	unchecked	Context-gauge snapshot; no committed gauge output reproduces the session occupancy.	-
+385	29-row seed	json	88e18c9:.agent/decisions/m3u6a1-mutants.json rows	29
+386	12 controls	count	88e18c9:.agent/decisions/m3u6a1-mutants.py (?m)^        \("[^"\n]+", "[A-Z-]+", _\w+\),$	12
+386	87%	unchecked	Context-gauge snapshot; no committed gauge output reproduces the session occupancy; control count graded separately.	-
+407	`OBLIGATIONS: 30`	count	dc4ab5e:.agent/decisions/m3u6a1-mutants.json "obligation": "(D\d+[a-z]?)"(?!(?s:.*)"obligation": "\1")	30
+407	`TESTS: 30`	count	dc4ab5e:tests/test_migration_battery.py (?m)^    def test_	30
+487	README 18 lines, `docs/architecture.md` 7	unchecked	Historical library-API hit census; dc4ab5e:.agent/roadmap.md repeats 18/7 without its selector or a committed per-hit list; direct handle/request_status search measures a different population.	-
+488	`docs/adapter-protocol.md` 8, `docs/threat-model.md` 4	unchecked	Historical library-API hit census; dc4ab5e:.agent/roadmap.md repeats 8/4 without its selector or a committed per-hit list; direct handle/request_status search measures a different population.	-
+496	23 descriptive openers	unchecked	Added-set cardinality requires comparing the baseline/tip descriptive literals; measured 62 minus 39 = 23, but count/lines/json cannot express a cross-blob set difference and no committed delta list exists.	-
+501	D19 makes it 4	unchecked	Historical run counts 1 -> 4; tests/test_hospital_ocr_example.py records expected values, not executed verification records; no committed run output reproduces the measurement; Act 6 is an identifier.	-
+519	26 sites	count	6fb4d92:.agent/decisions/m3u6a1-census.json "verdict": "MIGRATE(?:-RESOLVE)?"	26
+522	25 definitions	count	6fb4d92:.agent/decisions/m3u6a1-census.json "verdict": "MIGRATE"	25
+522	28 `handle` CALL SITES	count	6fb4d92:.agent/decisions/m3u6a1-census.json (?m)^        \d+,?$(?=[^{}]*"verdict": "MIGRATE")	28
+522	`SITES` has 28	count	dc4ab5e:.agent/decisions/m3u6a1-surgery.py (?m)^    \("tests/[^"\n]+", "[^"\n]+", \d+, (?:True|False)\),$	28
+531	41 at	count	6fb4d92:tests/test_system.py \bself\.confirm\s*\(	41
+531	40 at	count	dc4ab5e:tests/test_system.py \bself\.confirm\s*\(	40
+549	41,	count	6fb4d92:tests/test_system.py \bself\.confirm\s*\(	41
+549	65,	count	6fb4d92:tests/test_system.py \bself\._confirm_scope\s*\(	65
+549	14).	count	6fb4d92:tests/test_system.py \bself\._promote_scope\s*\(	14
+550	7 for	count	6fb4d92:tests/test_proposal_binding_battery.py \b_promoted_conflict_fixture\s*\(	7
+550	for 6	count	6fb4d92:tests/test_proposal_binding_battery.py (?<!def )\b_promoted_conflict_fixture\s*\(	6
+551	4 for	count	6fb4d92:tests/test_hospital_ocr_example.py \b_promoted_example_ledger\s*\(	4
+551	for 3,	count	6fb4d92:tests/test_hospital_ocr_example.py (?<!def )\b_promoted_example_ledger\s*\(	3
+551	2 for	count	6fb4d92:tests/test_resolve_battery.py \b_confirm\s*\(	2
+551	for 1.	count	6fb4d92:tests/test_resolve_battery.py (?<!def )\b_confirm\s*\(	1
+557	23	unchecked	Historical baseline red-test count; dc4ab5e has no m3u6a1-verdicts.json or committed run log; contract prose alone records the red/green split.	-
+574	23 RETAIN	count	8592c34:.agent/decisions/m3u6a1-census.json "verdict": "RETAIN"	23
+574	44 sites	count	8592c34:.agent/decisions/m3u6a1-census.json (?m)^        \d+,?$(?=[^{}]*"verdict": "RETAIN")	44
+577	6 sites	json	8592c34:.agent/decisions/m3u6a1-census.json definitions.34.lines	6
+577	7,	json	dc4ab5e:.agent/decisions/m3u6a1-census.json definitions.16.lines	7
+596	7 /	count	dc4ab5e:.agent/decisions/m3u6a1-fallback.json "shape": "HIT"	7
+596	2 at	count	dc4ab5e:.agent/decisions/m3u6a1-fallback.json "shape": "AMBIGUOUS"	2
+603	section 3's	unchecked	Section identifier, not a cardinality; contract-local prose reference.	-
+606	2 sites relabelled	count	dc4ab5e:.agent/decisions/m3u6a1-fallback.json "shape": "AMBIGUOUS"	2
+610	exited 0	unchecked	Historical executable exit status, not a stored count; no committed pre-repair invocation output; gate 5 is an identifier.	-
+639	29 rows	json	88e18c9:.agent/decisions/m3u6a1-mutants.json rows	29
+643	29 clauses	count	dc4ab5e:.agent/decisions/m3u6a1-mutants.json "id": "M\d+",\s+"obligation": "(D\d+[a-z]?)"(?!(?s:.*)"obligation": "\1")	29
+643	53 `reversion`	count	dc4ab5e:.agent/decisions/m3u6a1-mutants.json "kind": "reversion"	53
+643	39 `sensitivity`	count	dc4ab5e:.agent/decisions/m3u6a1-mutants.json "kind": "sensitivity"	39
+670	23	json	dc4ab5e:.agent/decisions/m3u6a1-census.json definitions	23
+671	Gate 2's	unchecked	Gate identifier, not a cardinality; contract-local prose reference.	-
+711	979 tests	unchecked	Historical full-suite executed-test count and duration; no committed machine-readable test-run record; gate 1 is an identifier.	-
+753	29 tests	count	f548f88:tests/test_migration_battery.py (?m)^    def test_	29
+761	23 red, 6 green	unchecked	Historical baseline execution split and timing; dc4ab5e has no m3u6a1-verdicts.json or committed run log; declarations alone cannot establish the recorded outcomes.	-
+804	36 rows	json	dc4ab5e:.agent/decisions/m3u6a1-attack.json rows	36
+804	30 seeded	json	364d62b:.agent/decisions/m3u6a1-attack.json rows	30
+804	, 6	count	dc4ab5e:.agent/decisions/m3u6a1-attack.json "id": "(?:A(?:19|2[01])|Y1[3-5])"	6
+829	6 sites	json	8592c34:.agent/decisions/m3u6a1-census.json definitions.34.lines	6
+829	7.	json	dc4ab5e:.agent/decisions/m3u6a1-census.json definitions.16.lines	7
+834	41	count	6fb4d92:tests/test_system.py \bself\.confirm\s*\(	41
+834	40	count	dc4ab5e:tests/test_system.py \bself\.confirm\s*\(	40
+834	44	count	8592c34:.agent/decisions/m3u6a1-census.json (?m)^        \d+,?$(?=[^{}]*"verdict": "RETAIN")	44
+834	45	count	dc4ab5e:.agent/decisions/m3u6a1-census.json (?m)^        \d+,?$(?=[^{}]*"verdict": "RETAIN")	45
+874	92 rows	json	dc4ab5e:.agent/decisions/m3u6a1-mutants.json rows	92
+874	29 clauses	count	dc4ab5e:.agent/decisions/m3u6a1-mutants.json "id": "M\d+",\s+"obligation": "(D\d+[a-z]?)"(?!(?s:.*)"obligation": "\1")	29
+875	53 `reversion`	count	dc4ab5e:.agent/decisions/m3u6a1-mutants.json "kind": "reversion"	53
+875	39 `sensitivity`	count	dc4ab5e:.agent/decisions/m3u6a1-mutants.json "kind": "sensitivity"	39
+875	29	json	88e18c9:.agent/decisions/m3u6a1-mutants.json rows	29
+876	92	json	96d155d:.agent/decisions/m3u6a1-mutants.json rows	92
+```
