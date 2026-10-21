@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""article-audit — flag a definite reference to a thing no shipped surface defines (p64).
+
+`the <word>` in human-facing prose presupposes a referent the reader already knows. A sentence
+whose subject left with the code (`the cached output` after the cache was gone) still reads as a
+guarantee, and no vocabulary census sees it because no deleted token appears. This audit grounds
+the first word after every `the` / `The` in the prose the register audit reads (`README.md`,
+`docs/*.md`, `examples/*/README.md`; code + link targets blanked): the word is grounded when it
+is a part of a public `src/cement_runtime` symbol (a name without a leading underscore, split at
+`_` and camel case) or a glossary entry (`.agent/article-glossary.txt`, one word per line; `#`
+starts a comment), plural `-s`/`-es` stripped either way. A new definite reference therefore
+names a shipped symbol or earns a glossary line in review.
+
+Usage: uv run python .agent/article-audit [FILE …]   (default: the register audit's surfaces)
+rc 0 = every definite reference grounded; 1 = one or more not (each printed `path:line the <word>`).
+"""
+
+from __future__ import annotations
+
+import ast
+import pathlib
+import re
+import runpy
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+GLOSSARY = ROOT / ".agent" / "article-glossary.txt"
+REGISTER = runpy.run_path(str(ROOT / ".agent" / "register-audit"))
+DEFINITE = re.compile(r"\b[Tt]he ([a-z][a-z-]*)")
+PART = re.compile(r"[A-Z]?[a-z]+")
+
+
+def _stem(word: str) -> set[str]:
+    return {word, word.removesuffix("s"), word.removesuffix("es")}
+
+
+def grounded() -> set[str]:
+    words: set[str] = set()
+    # Module + class scope alone: a local inside a function body is no published name.
+    pending = [
+        node
+        for path in sorted((ROOT / "src" / "cement_runtime").glob("*.py"))
+        for node in ast.parse(path.read_text(encoding="utf-8")).body
+    ]
+    while pending:
+        node = pending.pop()
+        names: list[str] = []
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+            names.append(node.name)
+        elif isinstance(node, ast.ClassDef):
+            names.append(node.name)
+            pending.extend(node.body)
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            names.append(node.target.id)
+        elif isinstance(node, ast.Assign):
+            names.extend(target.id for target in node.targets if isinstance(target, ast.Name))
+        for name in names:
+            if not name.startswith("_"):
+                words.update(part.lower() for part in PART.findall(name))
+    for line in GLOSSARY.read_text(encoding="utf-8").splitlines():
+        entry = line.split("#", 1)[0].strip().lower()
+        if entry:
+            words.add(entry)
+    return words
+
+
+def main(argv: list[str]) -> int:
+    targets = [pathlib.Path(name) for name in argv[1:]] or REGISTER["surfaces"]()
+    vocabulary = grounded()
+    misses: list[str] = []
+    for path in targets:
+        for line, block in REGISTER["blocks"](path.read_text(encoding="utf-8")):
+            for match in DEFINITE.finditer(REGISTER["prose"](block)):
+                word = match.group(1).strip("-")
+                if not _stem(word) & vocabulary:
+                    misses.append(f"{path}:{line} the {word}")
+    for miss in misses:
+        print(miss)
+    print(f"article-audit: {len(targets)} files, {len(vocabulary)} grounded words, "
+          f"{len(misses)} ungrounded")
+    return 1 if misses else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

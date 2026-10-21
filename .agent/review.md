@@ -15,6 +15,16 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p64 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
+
+Check set: R1 each repaired sentence re-derived from behavior, not retyped; R2 the checker grounds against published names only and fires both ways; R3 records. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | claim soundness | pass | library probe across a revision: `follow` → miss with verification passing; pinned `v1` → still answers; the threat-model sentence names `resolve` + the caller. |
+| R2 | correctness | pass | grounding walks module + class bodies only (a function-local `cached` grounded the seed until scoped out); seed + pre-p64 text rc 1, shipped rc 0. |
+| R3 | records | pass + register | `human-facing.md` + `gate-checks.md` record the tool and seeds; register audit rc 0. Register: the glossary snapshots today's 199 ungrounded words, so it catches NEW definite references only. |
+
 ## p53 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 the re-derivation is grounded (Gate 4 grades a git object); R2 every facet the row names is in the live digest and moves it; R3 the frozen D02 digest + census stay untouched; R4 credit recorded, its first run's survivors acted on, the rest routed. MAIN alone.

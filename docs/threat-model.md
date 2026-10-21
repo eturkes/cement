@@ -32,8 +32,8 @@
   containers, and signed-64-bit overflow fail closed. Decimal quantities use application-defined
   strings. Cement preserves Unicode without case folding or normalization.
 - Partition, operation revision, and byte-stable canonical equality of the case key control scope.
-  Unknown or near-match input falls back. Offline function evaluation has no fallback path: an
-  unknown input returns an inert miss.
+  For unknown or near-match input, `resolve` returns a miss, and the caller gives that input to the
+  LLM. Offline function evaluation has no fallback path: an unknown input returns an inert miss.
 - A projection program is a closed recognizer, not code: no regular expression runs on input, no
   expression is evaluated, and the work is linear in the input. A program is stored only after it
   parses, after an active example witnesses every layout, after no key merges different outputs, and
