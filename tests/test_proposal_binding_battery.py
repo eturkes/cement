@@ -2623,10 +2623,10 @@ class ProposalBindingBatteryTests(unittest.TestCase):
 
         Requests statements = zero. The pending adapter keeps an unbounded count and bounded detail."""
         expected = {
-            "get_proposal": (7, 1, 0, 1),
-            "proposal": (7, 1, 0, 1),
-            "proposals": (7, 1, 0, 1),
-            "function_report": (19, 13, 0, 1),
+            "get_proposal": (6, 1, 0, 1),
+            "proposal": (6, 1, 0, 1),
+            "proposals": (6, 1, 0, 1),
+            "function_report": (18, 13, 0, 1),
         }
         request_statements_per_path = {
             "get_proposal": 0,
@@ -2679,9 +2679,9 @@ class ProposalBindingBatteryTests(unittest.TestCase):
     def test_b35_y11_statement_cardinality_one_statement_per_2(self) -> None:
         """B35. Exact review statement counts; one binding read and one matching decision event, no request writes."""
         expected = {
-            "accept": (13, 7, 0),
-            "correct": (13, 7, 0),
-            "reject": (11, 5, 0),
+            "accept": (12, 7, 0),
+            "correct": (12, 7, 0),
+            "reject": (10, 5, 0),
         }
         real_reader = system_module._proposal_bindings
         real_writer = system_module._event

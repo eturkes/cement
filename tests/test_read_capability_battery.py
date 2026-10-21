@@ -262,13 +262,12 @@ class ReadCapabilityBatteryTests(unittest.TestCase):
         )
 
     def test_b06_five_pragmas_run_in_exact_order(self):
-        """B6: The five setup pragmas run in exact order."""
+        """B6: The four setup pragmas run in exact order (p44: the busy timeout is set by `connect`)."""
         _, events = self._record_read_setup()
         self.assertEqual(
             [event[1] for event in events if event[:1] == ("execute",) and str(event[1]).startswith("PRAGMA ")],
             [
                 "PRAGMA foreign_keys = ON",
-                "PRAGMA busy_timeout = 10000",
                 "PRAGMA synchronous = EXTRA",
                 "PRAGMA temp_store = MEMORY",
                 "PRAGMA trusted_schema = OFF",
@@ -276,13 +275,12 @@ class ReadCapabilityBatteryTests(unittest.TestCase):
         )
 
     def test_b06_setconfig_calls_are_exact(self):
-        """B6: Both setconfig calls carry their exact arguments."""
+        """B6: The one setconfig call carries its exact arguments (p44: trusted_schema = the PRAGMA)."""
         _, events = self._record_read_setup()
         self.assertEqual(
             [event[1:] for event in events if event[:1] == ("setconfig",)],
             [
                 (sqlite3.SQLITE_DBCONFIG_DEFENSIVE, True),
-                (sqlite3.SQLITE_DBCONFIG_TRUSTED_SCHEMA, False),
             ],
         )
 
@@ -299,8 +297,6 @@ class ReadCapabilityBatteryTests(unittest.TestCase):
                 "execute",
                 "execute",
                 "execute",
-                "execute",
-                "setconfig",
                 "setconfig",
                 "set_authorizer",
                 "execute",

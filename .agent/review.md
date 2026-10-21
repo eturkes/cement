@@ -17,6 +17,17 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p44 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 one setter per pair, pinned by readback; R2 the `hasattr(setconfig)` guard reassessed against `requires-python`; R3 B6 updated. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | busy timeout = `connect(timeout=10.0)`; trusted_schema = the PRAGMA; B5 readbacks 10000 / 0 green. |
+| R2 | acceptance | pass | kept: Python 3.11 lacks `Connection.setconfig`; DEFENSIVE applies on 3.12+. |
+| R3 | acceptance | pass | B6 pragma list (4), setconfig list (DEFENSIVE), authorizer-last sequence updated; `tests.test_read_capability_battery` 49 + paste-in OK. |
+| R4 | correctness | fixed | full gate at the first p44 tree red on B35 (`test_b35_y11_statement_cardinality_one_statement_per_1` ×4 paths, `_per_2` ×3 decisions): its TOTAL statement counts included the removed `PRAGMA busy_timeout`; application + request counts unchanged ⇒ each total −1 (B35 not named by the row; a direct consequence of its removal); `tests.test_proposal_binding_battery` 55 OK. |
+
 ## p84 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
 
 Check set: R1 `docs/architecture.md` names, per proof, what it binds, what makes it stale and whether it gates promotion; R2 `.agent/review.md`'s preamble uses the same three names. MAIN alone.
