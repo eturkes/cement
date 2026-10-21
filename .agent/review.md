@@ -15,6 +15,16 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p74 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section
+
+Check set: R1 the command runs from clean clones with default operators; R2 the seed raises the survivor count on the same scope; R3 records + the p02 ruling. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | 258 in-scope mutants, both runs; worktrees removed after each. |
+| R2 | acceptance | pass | 126 → 133 survivors with the assertion swallowed (`38387c8`). |
+| R3 | records | pass | `ops.md` Static checks names the command; p02 closed with its tool. |
+
 ## p12 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section
 
 Check set: R1 acceptance rerun (register step over the four surfaces; filler red; long sentence, punctuation-free bullet, possessive, link target green); R2 the D25 pin repair re-targets the superseded claim without weakening it; R3 the repair fires. MAIN alone.
