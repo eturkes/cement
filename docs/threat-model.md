@@ -56,7 +56,9 @@
   export emits bytes only after full receipt reconstruction.
 - `function export --out` writes atomically through a mode-0600 temporary file and refuses a
   non-regular destination. The destination is old or new, never partial, if no other process mutates
-  it. The write performs no directory fsync, and a final target race remains possible.
+  it. After the rename, the write flushes the destination's directory, so a completed export survives a
+  power loss. If that flush fails, the command reports a failure while the destination already holds
+  the new bundle. A final target race remains possible.
 - Function receipt and membership rows are database-immutable. Historical receipt reconstruction
   survives member supersession, operation-revision retirement, and evidence revocation. An audit of a
   past promotion therefore does not depend on current artifact status.

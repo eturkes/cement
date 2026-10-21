@@ -3677,6 +3677,74 @@ class CLITests(unittest.TestCase):
         self.assertEqual(observed, [b"previous-bundle"])
         self.assertEqual(destination.read_bytes(), expected)
 
+    def test_function_export_out_flushes_the_directory_after_the_rename(self) -> None:
+        # p27: rename(2) is durable only once the directory entry reaches the disk, so the
+        # writer fsyncs a descriptor of the destination's directory after `os.replace`.
+        self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
+        destination = pathlib.Path(self.temporary.name) / "bundle.json"
+        events: list[tuple[str, object]] = []
+        real_open, real_fsync, real_replace = os.open, os.fsync, os.replace
+        opened: dict[int, str] = {}
+
+        def recording_open(path: typing.Any, *args: typing.Any, **kwargs: typing.Any) -> int:
+            descriptor = real_open(path, *args, **kwargs)
+            opened[descriptor] = os.path.realpath(path)
+            return descriptor
+
+        def recording_fsync(descriptor: int) -> None:
+            events.append(("fsync", opened.get(descriptor, "file")))
+            real_fsync(descriptor)
+
+        def recording_replace(source: typing.Any, target: typing.Any) -> None:
+            events.append(("replace", os.path.realpath(target)))
+            real_replace(source, target)
+
+        with mock.patch("cement_runtime.cli.os.open", recording_open), mock.patch(
+            "cement_runtime.cli.os.fsync", recording_fsync
+        ), mock.patch("cement_runtime.cli.os.replace", recording_replace):
+            run = self.run_cli("function", "export", "echo", "--out", str(destination))
+        self.assertEqual(run.status, 0)
+        directory = os.path.realpath(destination.parent)
+        self.assertEqual(
+            [event for event in events if event[0] == "replace" or event[1] == directory],
+            [("replace", os.path.realpath(destination)), ("fsync", directory)],
+        )
+
+    def test_function_export_out_reports_a_failed_directory_flush_after_the_rename(self) -> None:
+        # p27, docs/threat-model.md: the directory flush follows the rename, so its failure is
+        # reported (exit 2) while the destination already holds the new bundle.
+        self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
+        destination = pathlib.Path(self.temporary.name) / "bundle.json"
+        directory = os.path.realpath(destination.parent)
+        real_open, real_fsync = os.open, os.fsync
+        directories: set[int] = set()
+
+        def recording_open(path: typing.Any, *args: typing.Any, **kwargs: typing.Any) -> int:
+            descriptor = real_open(path, *args, **kwargs)
+            if os.path.realpath(path) == directory:
+                directories.add(descriptor)
+            return descriptor
+
+        def failing_fsync(descriptor: int) -> None:
+            if descriptor in directories:
+                raise OSError(errno.EIO, "directory flush failed")
+            real_fsync(descriptor)
+
+        with mock.patch("cement_runtime.cli.os.open", recording_open), mock.patch(
+            "cement_runtime.cli.os.fsync", failing_fsync
+        ):
+            run = self.run_cli("function", "export", "echo", "--out", str(destination))
+        self.assertEqual(run.status, 2)
+        self.assertEqual(run.stdout_bytes, b"")
+        self.assertEqual(
+            run.stderr_json,
+            {"error": "invalid", "message": "export output could not be written safely"},
+        )
+        exported = self.run_cli("function", "export", "echo")
+        self.assertEqual(destination.read_bytes(), exported.stdout_bytes)
+
     def test_function_export_out_never_writes_through_the_destination_name(self) -> None:
         self.promoted_operation("echo", 2)
         System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")

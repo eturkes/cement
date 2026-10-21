@@ -513,6 +513,12 @@ def _write_export(target: pathlib.Path, document: FunctionDocument) -> dict[str,
             _reject_export_target(target)
             os.replace(temporary, target)
             temporary = None
+            # rename(2) is durable only once the directory entry reaches the disk.
+            directory = os.open(target.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
     finally:
         if temporary is not None:
             with contextlib.suppress(OSError):

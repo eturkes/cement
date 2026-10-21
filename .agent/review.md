@@ -15,6 +15,16 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p27 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 the export path fsyncs the destination's directory after `os.replace`, and one probe pins the call order; R2 the durability claim is stated once where export durability is claimed; R3 the new failure window (flush failure after the rename) is published + pinned (runtime.md commit-then-raise law). MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `test_function_export_out_flushes_the_directory_after_the_rename`: events = `[replace(target), fsync(directory)]`; red at `286b014` (no directory fsync). |
+| R2 | acceptance | pass | `docs/threat-model.md` export bullet: a completed export survives a power loss; README claims atomicity only. |
+| R3 | claim soundness | finding, fixed | The prepared change left a directory-flush failure unpublished: exit 2 `export output could not be written safely` while the destination already holds the new bundle. Threat model states it; `test_function_export_out_reports_a_failed_directory_flush_after_the_rename` pins rc 2 + stdout empty + the destination's bytes = the bundle; red at `286b014` (`0 != 2`). |
+
 ## p25 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 a committed blocked-database SIGINT probe pins the chosen status + no traceback; R2 the probe's write is real (no-commit claim non-vacuous); R3 README states the interrupt contract once, incl. the lock-wait latency; R4 `main` stays embeddable (host keeps `KeyboardInterrupt`); R5 runtime.md residue retired + law added. MAIN alone.
