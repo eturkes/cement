@@ -15,6 +15,15 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p54 + p85 close (MAINTAIN queue run, closures, tier `docs` / `kernel`) — target = the commit landing this section
+
+Check set: each row's acceptance rerun at HEAD with its seed. MAIN alone; no change.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| p54 | acceptance (relocated doc) | pass | `docs/adapter-protocol.md` relocated to `examples/command_source/README.md` (M3.7); R5 (`tests.test_relocation_battery`) runs its one Python block (the bundled `example_adapter.py` through `source.propose`), asserts the stated echo and requires every operator-facing module named; seed `example_adapter` → `stub_adapter` in that README → R5 fails naming `example_adapter.py`. Met at `635a473`. |
+| p85 | acceptance | pass | `.agent/skip-census`: each allowlist member carries a reason class (`platform` ×2, `replay-pruned` ×1), printed per hit; a seeded skip outside the allowlist prints `UNLISTED` and fails rc 1. Met at `629577d`. |
+
 ## p28 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section (pins landed in `286b014`)
 
 Check set: R1 outer-rehashed malformed values make all four `function.py` digest fields raise `ValidationError`; R2 altered `build_function` results fail `function-hash-matches-snapshot` with field-specific detail (complete vector asserted); R3 all nine deletion mutants die, by a committed catalogue rerun from a clean checkout; R4 the M2 premise re-derived at HEAD; R5 credit recorded. MAIN alone.
