@@ -232,8 +232,12 @@ def _function_entry_seal(
     )
 
 
+def _is_digest(value: object) -> bool:
+    return type(value) is str and re.fullmatch(r"[0-9a-f]{64}", value) is not None
+
+
 def _digest(value: str, label: str) -> str:
-    if type(value) is not str or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+    if not _is_digest(value):
         raise ValidationError(f"{label} must be a SHA-256 hex digest")
     return value
 
@@ -2965,10 +2969,7 @@ class System:
 
         partition = _name(partition, "partition")
         operation = _name(operation, "operation")
-        if expected_function_hash is not None and (
-            type(expected_function_hash) is not str
-            or re.fullmatch(r"[0-9a-f]{64}", expected_function_hash) is None
-        ):
+        if expected_function_hash is not None and not _is_digest(expected_function_hash):
             raise ValidationError("expected_function_hash must be a SHA-256 hex digest")
 
         with self.store.transaction(write=False) as connection:
@@ -5204,7 +5205,7 @@ class System:
         partition = _name(partition, "partition")
         artifact_id = _request_id(artifact_id)
         promoted_by = _text(promoted_by, "promoted_by", maximum=256)
-        if type(scope_hash) is not str or not re.fullmatch(r"[0-9a-f]{64}", scope_hash):
+        if not _is_digest(scope_hash):
             raise ValidationError("scope_hash must be a SHA-256 hex digest")
         now = self._now()
         with self.store.transaction(write=True) as connection:
@@ -6299,7 +6300,7 @@ class System:
             stored_count, test_set_hash = System._test_snapshot(connection, str(row["id"]))
             if stored_count != test_count or test_set_hash != row["test_set_hash"]:
                 raise IntegrityError("verification report test set mismatch")
-        elif re.fullmatch(r"[0-9a-f]{64}", str(row["test_set_hash"])) is None:
+        elif not _is_digest(str(row["test_set_hash"])):
             raise IntegrityError("verification report test set digest is invalid")
         failures = details.value.get("failures")
         if (

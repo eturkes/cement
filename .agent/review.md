@@ -15,6 +15,16 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p45 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 one 64-hex predicate in `system.py`; R2 each replaced site keeps its message + raise/verdict behavior; R3 suite green (gate). MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `command grep -c '\[0-9a-f\]{64}' src/cement_runtime/system.py` → 1 (`_is_digest`). |
+| R2 | acceptance | pass | `_digest` (ValidationError `{label} must be …`), `verify_function` precheck (`expected_function_hash must be …`), `promote` (`scope_hash must be …`), `_validate_report` (IntegrityError `… test set digest is invalid`): each keeps its class, message and its type check (`_is_digest` includes `type(value) is str`; the report site still stringifies first). |
+| R3 | regression | pass | full gate at the landing commit. |
+
 ## p82 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
 
 Check set: R1 the README names the Ctrl+C-only cleanup (the row's documented option). MAIN alone; prototype law (no suite owed).
