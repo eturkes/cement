@@ -928,6 +928,23 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
     raise AssertionError("argparse accepted an unknown command")
 
 
+def entry() -> int:
+    """The process entry (`cement`, `python -m cement_runtime`): `main` plus interrupt handling.
+
+    SIGINT surfaces as `KeyboardInterrupt` from wherever the command waits; a host embedding
+    `main` keeps it, while the process reports it as JSON with the shell's status. A write the
+    interrupt stopped never committed: `Store.transaction` closes its connection uncommitted.
+    """
+    try:
+        return main()
+    except KeyboardInterrupt:
+        _emit(
+            {"error": "interrupted", "message": "interrupted before completion"},
+            stream=sys.stderr,
+        )
+        return 130
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _parser()
     try:

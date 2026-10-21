@@ -11,7 +11,9 @@ import pathlib
 import socket
 import stat
 import sqlite3
+import signal
 import subprocess
+import time
 import sys
 import tempfile
 import types
@@ -1142,6 +1144,54 @@ class CLITests(unittest.TestCase):
             os.close(write_end)
         self.assertEqual(child.returncode, 120)
         self.assertIn(b"BrokenPipeError", child.stderr)
+
+    def test_an_interrupt_exits_130_with_a_json_error_and_no_traceback(self) -> None:
+        # p25: SIGINT while a write waits on the ledger lock. The child's own `-c` program marks
+        # `sqlite3.connect` in a file, so the signal lands after imports, once `main` holds the
+        # ledger open (portable: no `/proc`). The interrupted revise must leave revision 1.
+        System(self.database).register_operation("tenant", "echo")
+        ready = pathlib.Path(self.temporary.name) / "connected"
+        probe = (
+            "import runpy, sys\n"
+            "def hook(event, args):\n"
+            "    if event == 'sqlite3.connect':\n"
+            f"        open({str(ready)!r}, 'w').close()\n"
+            "sys.addaudithook(hook)\n"
+            "sys.argv = ['cement_runtime', *sys.argv[1:]]\n"
+            "runpy.run_module('cement_runtime', run_name='__main__', alter_sys=True)\n"
+        )
+        revise = ("operation", "revise", "echo", "--actor", "operator")
+        holder = sqlite3.connect(self.database, isolation_level=None)
+        holder.execute("BEGIN IMMEDIATE")
+        try:
+            child = subprocess.Popen(
+                [sys.executable, "-c", probe, *self.base, *revise],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env={**os.environ, "PYTHONPATH": str(pathlib.Path(__file__).resolve().parents[1] / "src")},
+            )
+            for _ in range(600):
+                if ready.exists() or child.poll() is not None:
+                    break
+                time.sleep(0.05)
+            self.assertTrue(ready.exists(), "the child never connected to the ledger")
+            time.sleep(0.2)
+            child.send_signal(signal.SIGINT)
+            stdout, stderr = child.communicate(timeout=60)
+        finally:
+            holder.rollback()
+            holder.close()
+        self.assertEqual(child.returncode, 130)
+        self.assertEqual(stdout, b"")
+        self.assertNotIn(b"Traceback", stderr)
+        self.assertEqual(
+            json.loads(stderr),
+            {"error": "interrupted", "message": "interrupted before completion"},
+        )
+        self.assertEqual(System(self.database).operations("tenant")[0]["revision"], 1)
+        # Control: the same command, uninterrupted, is a write.
+        self.assertEqual(self.run_cli(*revise).status, 0)
+        self.assertEqual(System(self.database).operations("tenant")[0]["revision"], 2)
 
     def test_function_show_and_receipts_take_the_last_of_a_repeated_flag(self) -> None:
         for leaf, method, arguments, expected in (

@@ -497,6 +497,11 @@ The CLI writes `stdout` without an explicit flush, and Python flushes it when th
 the reader closes the pipe first, the process exits 120, and Python writes a `BrokenPipeError` notice
 to `stderr` that is not JSON. An embedding host that calls `main` flushes its own `stdout`.
 
+An interrupt (`SIGINT`, Ctrl-C) stops the `cement` command with exit 130 and an `interrupted` error
+on `stderr`. If the command waits for the ledger lock, the interrupt takes effect when that wait
+ends, after 10 seconds at most. A write that the interrupt stopped did not commit, so it leaves no
+row behind. A host that calls `main` itself receives the `KeyboardInterrupt`.
+
 The root `verify` command does not use exit 6. It reports a failed verification as exit 0 with
 `"passed": false` in its payload. Read the `passed` field to get the verdict from root `verify`. Read
 the exit status to get the verdict from the `function` commands in the table above. A script that

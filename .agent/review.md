@@ -15,6 +15,18 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p25 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 a committed blocked-database SIGINT probe pins the chosen status + no traceback; R2 the probe's write is real (no-commit claim non-vacuous); R3 README states the interrupt contract once, incl. the lock-wait latency; R4 `main` stays embeddable (host keeps `KeyboardInterrupt`); R5 runtime.md residue retired + law added. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `test_an_interrupt_exits_130_with_a_json_error_and_no_traceback`: rc 130, stdout empty, stderr = the exact JSON, no `Traceback`; red at `286b014` (`-2 != 130`). |
+| R2 | correctness | finding, fixed | Prepared probe revised an UNREGISTERED operation, so `operations == []` held with or without the interrupt; now `echo` is registered, revision stays 1 after the interrupt and becomes 2 under the same command uninterrupted (control). |
+| R3 | acceptance + claim soundness | finding, fixed | SIGINT during the lock wait lands only when SQLite's busy wait returns (measured 9.86 s); README now says so beside exit 130. |
+| R4 | correctness | pass | `entry` wraps `main`; `__main__` + `[project.scripts]` route through it; a host calling `main` receives the exception. |
+| R5 | portability | finding, fixed | Readiness via a `/proc/<pid>/fd` poll errored (not skipped) on `/proc`-less hosts; now an audit hook in the child's `-c` program marks `sqlite3.connect`. |
+
 ## p20 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
 
 Check set: R1 the model stated once in normative prose; R2 the existing pin asserts exactly +1 report / +1 event per failed run and cites the doc. MAIN alone.
