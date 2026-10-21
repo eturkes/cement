@@ -15,6 +15,18 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p28 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section (pins landed in `286b014`)
+
+Check set: R1 outer-rehashed malformed values make all four `function.py` digest fields raise `ValidationError`; R2 altered `build_function` results fail `function-hash-matches-snapshot` with field-specific detail (complete vector asserted); R3 all nine deletion mutants die, by a committed catalogue rerun from a clean checkout; R4 the M2 premise re-derived at HEAD; R5 credit recorded. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `test_entry_digest_syntax_rejects_after_outer_rehash`: uppercased digest + rehash → `^function entry 0 <field> must be a SHA-256 hex digest$` for each of the four. |
+| R2 | acceptance (re-derived) | pass | `test_function_verification_pins_each_projected_document_field`: vector (T,T,T,T,F,F,T) + per-field hash detail + the receipt check's derivative detail (the receipt rebuild calls the same patched constructor; the row's "only" predates that check). |
+| R3 | acceptance | pass | `.agent/decisions/p28-mutants.jsonl` (base `286b014`, generator `p28-catalogue.py`) → `replay-mutants`: CONTROL green, 9/9 killed, all restored, rc 0. |
+| R4 | claim soundness | recorded | at `b937a3b` (pins absent) the whole suite minus D28 already killed 9/9: the M2 premise expired; the pins still owe the acceptance's specific assertions. |
+| R5 | verification integrity | open → p109 | 263/1678 killed, 161/1185 survived (`.agent/decisions/p28-mutate.txt`). |
+
 ## p29 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 the shipped `FUNCTION_MAX_ITEMS` is driven at exactly 1,000,000 (accepted) and 1,000,001 (rejected), build + parse; R2 the patched-limit fixtures stay; R3 "marked-slow" re-derived; R4 credit recorded. MAIN alone.
