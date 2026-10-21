@@ -90,7 +90,7 @@ from .source import CandidateSource
 from .store import Store
 
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}\Z")
-_REQUEST_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}\Z")
+_ENTITY_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}\Z")
 _UNSET = object()
 _RECEIPT_MAX_BYTES = 3 * DEFAULT_MAX_BYTES
 _CASE_KEY_MEMO_MAX = 65_536
@@ -162,9 +162,9 @@ def _name(value: str, label: str) -> str:
     return value
 
 
-def _request_id(value: str) -> str:
-    if type(value) is not str or _REQUEST_ID.fullmatch(value) is None:
-        raise ValidationError("request_id must be a bounded ASCII identifier")
+def _entity_id(value: str, label: str) -> str:
+    if type(value) is not str or _ENTITY_ID.fullmatch(value) is None:
+        raise ValidationError(f"{label} must be a bounded ASCII identifier")
     return value
 
 
@@ -296,7 +296,7 @@ def _function_receipt_from_row(
     row: sqlite3.Row | Mapping[str, Any],
 ) -> FunctionReceipt:
     try:
-        receipt_id = _request_id(row["id"])
+        receipt_id = _entity_id(row["id"], "receipt_id")
         partition = _name(row["partition"], "stored function receipt partition")
         operation = _name(row["operation"], "stored function receipt operation")
         promoted_by = _text(
@@ -477,7 +477,7 @@ class _ProposalBindingSet:
 
 def _proposal_binding_from_row(row: sqlite3.Row, *, partition: str) -> _ProposalBinding:
     try:
-        proposal_id = _request_id(row["id"])
+        proposal_id = _entity_id(row["id"], "proposal_id")
         operation = _name(row["operation"], "operation")
         operation_revision = _stored_int(
             row["operation_revision"],
@@ -1004,7 +1004,7 @@ class System:
 
     def get_proposal(self, partition: str, proposal_id: str) -> ProposalView:
         partition = _name(partition, "partition")
-        proposal_id = _request_id(proposal_id)
+        proposal_id = _entity_id(proposal_id, "proposal_id")
         with self.store.transaction() as connection:
             binding = _proposal_binding(
                 connection,
@@ -1033,7 +1033,7 @@ class System:
         """Inspect pending or historical proposal state and bound provenance."""
 
         partition = _name(partition, "partition")
-        proposal_id = _request_id(proposal_id)
+        proposal_id = _entity_id(proposal_id, "proposal_id")
         with self.store.transaction() as connection:
             binding = _proposal_binding(
                 connection,
@@ -1125,7 +1125,7 @@ class System:
         note: str = "",
     ) -> ReviewResult:
         partition = _name(partition, "partition")
-        proposal_id = _request_id(proposal_id)
+        proposal_id = _entity_id(proposal_id, "proposal_id")
         reviewer = _text(reviewer, "reviewer", maximum=256)
         note = _text(note, "note", maximum=2_048, allow_empty=True)
         if type(decision) is not str or decision not in {"accept", "correct", "reject"}:
@@ -2079,8 +2079,8 @@ class System:
             if membership["ordinal"] != ordinal:
                 raise IntegrityError("function receipt membership ordinals are not contiguous")
             try:
-                _request_id(membership["artifact_id"])
-                _request_id(membership["report_id"])
+                _entity_id(membership["artifact_id"], "artifact_id")
+                _entity_id(membership["report_id"], "report_id")
                 membership_function_hash = _digest(
                     membership["function_hash"],
                     "stored membership function_hash",
@@ -2411,8 +2411,8 @@ class System:
                 "function report member ordinal",
                 maximum=receipt.member_count - 1,
             )
-            artifact_id = _request_id(row["membership_artifact_id"])
-            report_id = _request_id(row["membership_report_id"])
+            artifact_id = _entity_id(row["membership_artifact_id"], "artifact_id")
+            report_id = _entity_id(row["membership_report_id"], "report_id")
             function_hash = _digest(
                 row["membership_function_hash"],
                 "function report member function_hash",
@@ -2476,9 +2476,9 @@ class System:
             "test_set_hash": row["bound_report_test_set_hash"],
         }
         try:
-            if _request_id(report_row["id"]) != report_id:
+            if _entity_id(report_row["id"], "report_id") != report_id:
                 raise IntegrityError("bound report identity mismatch")
-            if _request_id(report_row["artifact_id"]) != artifact_id:
+            if _entity_id(report_row["artifact_id"], "artifact_id") != artifact_id:
                 raise IntegrityError("bound report artifact mismatch")
             if report_row["passed"] != 1:
                 raise IntegrityError("bound report is not passing")
@@ -2560,7 +2560,7 @@ class System:
                 "operation artifact sequence",
                 minimum=1,
             )
-            artifact_id = _request_id(row["id"])
+            artifact_id = _entity_id(row["id"], "artifact_id")
             operation_revision = _stored_int(
                 row["operation_revision"],
                 "operation artifact revision",
@@ -2633,7 +2633,7 @@ class System:
         partition = _name(partition, "partition")
         operation = _name(operation, "operation")
         if receipt_id is not None:
-            receipt_id = _request_id(receipt_id)
+            receipt_id = _entity_id(receipt_id, "receipt_id")
         _bounded_int(
             projection_limit,
             "projection_limit",
@@ -2946,7 +2946,7 @@ class System:
         """Validate and rebuild one historical function by immutable receipt ID."""
 
         partition = _name(partition, "partition")
-        receipt_id = _request_id(receipt_id)
+        receipt_id = _entity_id(receipt_id, "receipt_id")
         with self.store.transaction(write=False) as connection:
             receipt_row = connection.execute(
                 """
@@ -4464,7 +4464,7 @@ class System:
         verified_by: str = "local-system",
     ) -> VerificationReport:
         partition = _name(partition, "partition")
-        artifact_id = _request_id(artifact_id)
+        artifact_id = _entity_id(artifact_id, "artifact_id")
         verified_by = _text(verified_by, "verified_by", maximum=256)
         now = self._now()
         with self.store.transaction(write=True) as connection:
@@ -5218,7 +5218,7 @@ class System:
         promoted_by: str,
     ) -> Promotion:
         partition = _name(partition, "partition")
-        artifact_id = _request_id(artifact_id)
+        artifact_id = _entity_id(artifact_id, "artifact_id")
         promoted_by = _text(promoted_by, "promoted_by", maximum=256)
         if not _is_digest(scope_hash):
             raise ValidationError("scope_hash must be a SHA-256 hex digest")
@@ -5790,7 +5790,7 @@ class System:
         operation = _name(operation, "operation")
         reviewer = _text(reviewer, "reviewer", maximum=256)
         note = _text(note, "note", maximum=2_048, allow_empty=True)
-        ids = tuple(_request_id(value) for value in example_ids)
+        ids = tuple(_entity_id(value, "example_id") for value in example_ids)
         if not ids or len(set(ids)) != len(ids):
             raise ValidationError("example_ids must be a non-empty list of distinct ids")
         final = canonicalize(output)
@@ -5886,7 +5886,7 @@ class System:
         reason: str,
     ) -> tuple[str, ...]:
         partition = _name(partition, "partition")
-        example_id = _request_id(example_id)
+        example_id = _entity_id(example_id, "example_id")
         revoked_by = _text(revoked_by, "revoked_by", maximum=256)
         reason = _text(reason, "reason", maximum=2_048)
         now = self._now()
@@ -5953,7 +5953,7 @@ class System:
         reason: str,
     ) -> None:
         partition = _name(partition, "partition")
-        artifact_id = _request_id(artifact_id)
+        artifact_id = _entity_id(artifact_id, "artifact_id")
         suspended_by = _text(suspended_by, "suspended_by", maximum=256)
         reason = _text(reason, "reason", maximum=2_048)
         now = self._now()
@@ -6118,7 +6118,7 @@ class System:
 
     def artifact(self, partition: str, artifact_id: str) -> dict[str, JSONValue]:
         partition = _name(partition, "partition")
-        artifact_id = _request_id(artifact_id)
+        artifact_id = _entity_id(artifact_id, "artifact_id")
         with self.store.transaction() as connection:
             row = connection.execute(
                 "SELECT * FROM artifacts WHERE id = ? AND partition = ?",
@@ -6156,7 +6156,7 @@ class System:
         """Inspect immutable verification bindings and a stable test page."""
 
         partition = _name(partition, "partition")
-        report_id = _request_id(report_id)
+        report_id = _entity_id(report_id, "report_id")
         after_test_key = _text(after_test_key, "after_test_key", maximum=256, allow_empty=True)
         _bounded_int(test_limit, "test_limit", minimum=1, maximum=10_000)
         with self.store.transaction() as connection:
@@ -6220,7 +6220,7 @@ class System:
 
         partition = _name(partition, "partition")
         if artifact_id is not None:
-            artifact_id = _request_id(artifact_id)
+            artifact_id = _entity_id(artifact_id, "artifact_id")
         _bounded_int(
             after_sequence,
             "after_sequence",

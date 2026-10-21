@@ -17,6 +17,18 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p38 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 one `_entity_id(value, label)` owner; R2 every caller supplies its entity; R3 CLI + library messages update together; R4 request-lifecycle vocabulary absent; R5 pins the rename moves. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `_request_id` + `_REQUEST_ID` → `_entity_id` + `_ENTITY_ID`; grammar unchanged (bounded ASCII, 192 chars). |
+| R2 | acceptance | pass | 22 call sites, labels per parameter/stored column; stored-row reads keep their `IntegrityError` translation (the label only reaches `__cause__`). |
+| R3 | acceptance | pass | the CLI has no copy of the grammar; `function export --receipt-id` bad values now print `receipt_id must be a bounded ASCII identifier` (test red at the unfixed source). |
+| R4 | acceptance | pass | `rg request_id src/` rc 1; the requests-residue battery's survivor set drops the retired message, so a reappearance reds it. |
+| R5 | correctness | pass | pin edits named: `test_function_export_bounds_the_receipt_id_grammar` message (re-targeted), `RequestsResidueBattery.test_s4_no_requests_table_and_no_query_names_one` survivors (one entry fewer = stricter), a `test_cli.py` comment. |
+
 ## p10 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
 
 Check set: R1 each of the 14 cited inputs inlined or marked expired, the 3 deleted included; R2 no tracked file presents a `.scratch/` path as retrievable; R3 the check fires. MAIN alone.

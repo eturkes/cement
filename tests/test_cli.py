@@ -757,7 +757,7 @@ class CLITests(unittest.TestCase):
             ("echo", ("--projection-limit", "1_0"), 10, None),
             # An unsupplied `--receipt-id` forwards the library's own `None`
             # rather than being dropped, and a supplied one travels verbatim:
-            # `_request_id` stays the sole validator, never a CLI copy of it.
+            # `_entity_id` stays the sole validator, never a CLI copy of it.
             ("echo", ("--receipt-id", "fpr_1"), 100, "fpr_1"),
             ("echo", ("--receipt-id", "a b"), 100, "a b"),
             ("echo", ("--receipt-id", "fpr_2", "--projection-limit", "7"), 7, "fpr_2"),
@@ -3618,7 +3618,7 @@ class CLITests(unittest.TestCase):
                     self.error(run),
                     {
                         "error": "invalid",
-                        "message": "request_id must be a bounded ASCII identifier",
+                        "message": "receipt_id must be a bounded ASCII identifier",
                     },
                 )
         # Adjacent accept side: the maximum-length id is grammar-valid and

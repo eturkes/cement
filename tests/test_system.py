@@ -17143,5 +17143,35 @@ class SystemTests(unittest.TestCase):
                         planted = ""
 
 
+    def test_each_public_identifier_parameter_names_its_own_entity(self) -> None:
+        # p38: one grammar owner, `_entity_id(value, label)`; a malformed id names the parameter
+        # it arrived through, never the retired request vocabulary.
+        self.register()
+        bad = "not an id!"
+        cases = (
+            ("proposal_id", lambda: self.system.get_proposal("tenant-a", bad)),
+            ("proposal_id", lambda: self.system.proposal("tenant-a", bad)),
+            ("proposal_id", lambda: self.system.review("tenant-a", bad, reviewer="alice", decision="reject")),
+            ("artifact_id", lambda: self.system.artifact("tenant-a", bad)),
+            ("artifact_id", lambda: self.system.verify("tenant-a", bad)),
+            ("artifact_id", lambda: self.system.promote("tenant-a", bad, scope_hash="0" * 64, promoted_by="alice")),
+            ("artifact_id", lambda: self.system.reports("tenant-a", artifact_id=bad)),
+            ("report_id", lambda: self.system.report("tenant-a", bad)),
+            ("example_id", lambda: self.system.revoke_example("tenant-a", bad, revoked_by="alice", reason="r")),
+            (
+                "example_id",
+                lambda: self.system.supersede_examples(
+                    "tenant-a", "echo", example_ids=[bad], output={"x": 1}, reviewer="alice"
+                ),
+            ),
+            ("receipt_id", lambda: self.system.function_report("tenant-a", "echo", receipt_id=bad)),
+            ("receipt_id", lambda: self.system.reconstruct_function_receipt("tenant-a", bad)),
+        )
+        for label, call in cases:
+            with self.subTest(label=label, call=cases.index((label, call))):
+                with self.assertRaisesRegex(ValidationError, f"^{label} must be a bounded ASCII identifier$"):
+                    call()
+
+
 if __name__ == "__main__":
     unittest.main()

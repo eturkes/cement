@@ -275,7 +275,6 @@ class RequestsResidueBattery(_Ledger):
         self.assertFalse({name for name in names if name.startswith("requests")})
         sql = re.compile(r"(?i)\b(from|join|into|update|table|exists|on)\s+requests\b")
         survivors = {
-            ("system.py", '"request_id must be a bounded ASCII identifier"'),
             ("json_value.py", '"""Conservative, versioned JSON boundary used by requests and artifacts."""'),
         }
         hits: set[tuple[str, str]] = set()
