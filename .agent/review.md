@@ -15,6 +15,14 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p49 (MAINTAIN queue run, owed) — target = the commit landing this section
+
+Check set: R1 the acceptance's grammar change is compatible with the standing pins. MAIN alone; no code.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | gate safety | owed | X23 (`tests/test_cli_channels.py`) + the channel battery's shared-path abbreviation map deliberately pin legacy abbreviation as accepted (M3.5a); a global `allow_abbrev=False` breaks the public CLI and inverts both ⇒ owner ruling. |
+
 ## p43 (MAINTAIN queue run, owed) — target = the commit landing this section
 
 Check set: R1 the acceptance's classification inputs (error code + Store-owned provenance) can separate `VACUUM` from every other statement whose mapping a standing pin fixes. MAIN alone; no code.
