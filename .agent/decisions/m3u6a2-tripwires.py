@@ -173,7 +173,7 @@ def _pins() -> list[dict[str, object]]:
                 continue
             rows.append(
                 {
-                    "locus": f"tests/{path.name}:{node.lineno}",
+                    "locus": f"tests/{path.name}:{node.name}",
                     "test": node.name,
                     "scope": _frame_scope(segment),
                     "vocabulary": sorted(set(VOCAB.findall(segment))),
@@ -199,7 +199,7 @@ def _freezes() -> list[dict[str, object]]:
                 continue
             rows.append(
                 {
-                    "locus": f"tests/{path.name}:{node.lineno}",
+                    "locus": f"tests/{path.name}:{node.name}",
                     "test": node.name,
                     "scope": _frame_scope(segment),
                     "lines": len(segment.splitlines()),
@@ -212,16 +212,17 @@ def _prose() -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for relative in DOCS:
         text = (ROOT / relative).read_text(encoding="utf-8")
+        # Keyed on the hit line's TEXT, never its number: an edit elsewhere in the document
+        # moves every later number and reds the census against correct work (p63).
         hits = [
-            {"line": index, "tokens": sorted(set(VOCAB.findall(line)))}
-            for index, line in enumerate(text.splitlines(), start=1)
+            {"text": line.strip(), "tokens": sorted(set(VOCAB.findall(line)))}
+            for line in text.splitlines()
             if VOCAB.search(line)
         ]
         owner, grounds = OWNERS[relative]
         rows.append(
             {
                 "document": relative,
-                "total_lines": len(text.splitlines()),
                 "hit_lines": len(hits),
                 "owner": owner,
                 "grounds": grounds,

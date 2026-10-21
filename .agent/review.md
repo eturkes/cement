@@ -15,6 +15,17 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p63 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section
+
+Check set: R1 no row carries a line number; R2 every consumer of the table still parses it (L23 splits `locus` on `:`, `instrument_pruned()` matches `<file>:`); R3 the three seeds fire as the row specifies; R4 the re-emit changes nothing but keys + the measured prose delta. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | correctness | pass | `rg -n 'lineno|"line"|total_lines' .agent/decisions/m3u6a2-tripwires.py` → no hit. |
+| R2 | correctness | pass | lifecycle removal battery 59 OK against the new table. |
+| R3 | acceptance | pass | blank line above → PASS; rename → DRIFT; span +1 → DRIFT; self-test 8/8. |
+| R4 | claim soundness | pass + register | pins/freezes: 15 + 4, same tests + spans; prose: +3 generic `request` lines in the Open WebUI README, grounded by L24's live scan. Register: the emit + self-test take ~1 + ~3 min under load (`ast.get_source_segment` per function over 15k-line modules). |
+
 ## p21 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 each acceptance class pinned with an exact expectation; R2 pins mock the library boundary, never the CLI's own dispatch; R3 no existing test touched; R4 preservation credit recorded, survivors routed. MAIN alone (CLI grammar pins).

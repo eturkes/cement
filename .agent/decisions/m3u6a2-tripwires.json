@@ -6,34 +6,34 @@
   "freezes": [
     {
       "lines": 34,
-      "locus": "tests/test_cli_removal_battery.py:1150",
+      "locus": "tests/test_cli_removal_battery.py:test_d15a_the_six_runtime_modules_stay_byte_identical_to_their_3",
       "scope": "GIT-RANGE",
       "test": "test_d15a_the_six_runtime_modules_stay_byte_identical_to_their_3"
     },
     {
       "lines": 41,
-      "locus": "tests/test_cli_removal_battery.py:1185",
+      "locus": "tests/test_cli_removal_battery.py:test_d15b_the_twelve_examples_files_stay_byte_identical_to_their",
       "scope": "GIT-RANGE",
       "test": "test_d15b_the_twelve_examples_files_stay_byte_identical_to_their"
     },
     {
       "lines": 108,
-      "locus": "tests/test_cli_removal_battery.py:2813",
+      "locus": "tests/test_cli_removal_battery.py:test_d22b_direction_library_route_every_library_api_locus_is_byt",
       "scope": "GIT-RANGE",
       "test": "test_d22b_direction_library_route_every_library_api_locus_is_byt"
     },
     {
       "lines": 63,
-      "locus": "tests/test_cli_removal_battery.py:2922",
+      "locus": "tests/test_cli_removal_battery.py:test_d22c_the_opening_text_handle_request_fence_is_protected_and",
       "scope": "GIT-RANGE",
       "test": "test_d22c_the_opening_text_handle_request_fence_is_protected_and"
     }
   ],
-  "head": "3c39ac8c1e4a677553333ad62a998c5cbb09cdc7",
+  "head": "52a846be0c8a4c86c20f851974571582b978f225",
   "pins": [
     {
       "lines": 76,
-      "locus": "tests/test_cli_channels.py:2439",
+      "locus": "tests/test_cli_channels.py:test_x20_new_command_help_and_publication_prohibit_retry_advice_and",
       "scope": "WORKING-TREE",
       "test": "test_x20_new_command_help_and_publication_prohibit_retry_advice_and",
       "vocabulary": [
@@ -43,7 +43,7 @@
     },
     {
       "lines": 49,
-      "locus": "tests/test_cli_channels.py:2891",
+      "locus": "tests/test_cli_channels.py:test_x29_the_publication_grep_scope_is_ambiguous_between_a_document",
       "scope": "WORKING-TREE",
       "test": "test_x29_the_publication_grep_scope_is_ambiguous_between_a_document",
       "vocabulary": [
@@ -54,7 +54,7 @@
     },
     {
       "lines": 81,
-      "locus": "tests/test_cli_channels.py:2941",
+      "locus": "tests/test_cli_channels.py:test_x30_every_placeholder_in_each_shipped_shell_block_is_produced",
       "scope": "WORKING-TREE",
       "test": "test_x30_every_placeholder_in_each_shipped_shell_block_is_produced",
       "vocabulary": [
@@ -63,7 +63,7 @@
     },
     {
       "lines": 111,
-      "locus": "tests/test_cli_channels_battery.py:2423",
+      "locus": "tests/test_cli_channels_battery.py:test_d23_there_is_no_idempotency_two_byte_identical_submissions_ret",
       "scope": "WORKING-TREE",
       "test": "test_d23_there_is_no_idempotency_two_byte_identical_submissions_ret",
       "vocabulary": [
@@ -74,7 +74,7 @@
     },
     {
       "lines": 82,
-      "locus": "tests/test_cli_removal_battery.py:2730",
+      "locus": "tests/test_cli_removal_battery.py:test_d22a_direction_cli_route_every_cli_route_locus_was_rewritte",
       "scope": "WORKING-TREE",
       "test": "test_d22a_direction_cli_route_every_cli_route_locus_was_rewritte",
       "vocabulary": [
@@ -88,7 +88,7 @@
     },
     {
       "lines": 108,
-      "locus": "tests/test_cli_removal_battery.py:2813",
+      "locus": "tests/test_cli_removal_battery.py:test_d22b_direction_library_route_every_library_api_locus_is_byt",
       "scope": "GIT-RANGE",
       "test": "test_d22b_direction_library_route_every_library_api_locus_is_byt",
       "vocabulary": [
@@ -103,7 +103,7 @@
     },
     {
       "lines": 63,
-      "locus": "tests/test_cli_removal_battery.py:2922",
+      "locus": "tests/test_cli_removal_battery.py:test_d22c_the_opening_text_handle_request_fence_is_protected_and",
       "scope": "GIT-RANGE",
       "test": "test_d22c_the_opening_text_handle_request_fence_is_protected_and",
       "vocabulary": [
@@ -117,7 +117,7 @@
     },
     {
       "lines": 25,
-      "locus": "tests/test_migration_battery.py:1433",
+      "locus": "tests/test_migration_battery.py:test_d23_examples_hospital_ocr_readme_md_208_and_216_name_the",
       "scope": "WORKING-TREE",
       "test": "test_d23_examples_hospital_ocr_readme_md_208_and_216_name_the",
       "vocabulary": [
@@ -127,7 +127,7 @@
     },
     {
       "lines": 34,
-      "locus": "tests/test_proposal_binding_battery.py:2031",
+      "locus": "tests/test_proposal_binding_battery.py:test_b25_prose_alone_teaches_reviewresult_and_the",
       "scope": "WORKING-TREE",
       "test": "test_b25_prose_alone_teaches_reviewresult_and_the",
       "vocabulary": [
@@ -136,7 +136,7 @@
     },
     {
       "lines": 52,
-      "locus": "tests/test_proposal_binding_battery.py:2066",
+      "locus": "tests/test_proposal_binding_battery.py:test_b26_a15_prose_outside_code_fences_names",
       "scope": "WORKING-TREE",
       "test": "test_b26_a15_prose_outside_code_fences_names",
       "vocabulary": [
@@ -145,7 +145,7 @@
     },
     {
       "lines": 33,
-      "locus": "tests/test_proposal_binding_battery.py:2119",
+      "locus": "tests/test_proposal_binding_battery.py:test_b27_no_public_surface_retains_the_unqualified",
       "scope": "WORKING-TREE",
       "test": "test_b27_no_public_surface_retains_the_unqualified",
       "vocabulary": [
@@ -154,7 +154,7 @@
     },
     {
       "lines": 29,
-      "locus": "tests/test_submission_battery.py:1518",
+      "locus": "tests/test_submission_battery.py:test_d25_shipped_prose_says_schema_v2_retains",
       "scope": "GIT-RANGE",
       "test": "test_d25_shipped_prose_says_schema_v2_retains",
       "vocabulary": [
@@ -163,7 +163,7 @@
     },
     {
       "lines": 16,
-      "locus": "tests/test_submission_battery.py:1762",
+      "locus": "tests/test_submission_battery.py:test_d33_no_shipped_surface_calls_submission_cheap",
       "scope": "WORKING-TREE",
       "test": "test_d33_no_shipped_surface_calls_submission_cheap",
       "vocabulary": [
@@ -172,7 +172,7 @@
     },
     {
       "lines": 32,
-      "locus": "tests/test_submission_battery.py:1779",
+      "locus": "tests/test_submission_battery.py:test_d34_readme_and_the_three_normative_docs",
       "scope": "WORKING-TREE",
       "test": "test_d34_readme_and_the_three_normative_docs",
       "vocabulary": [
@@ -181,7 +181,7 @@
     },
     {
       "lines": 28,
-      "locus": "tests/test_submission_battery.py:2213",
+      "locus": "tests/test_submission_battery.py:test_d41_readme_and_the_normative_docs_name",
       "scope": "WORKING-TREE",
       "test": "test_d41_readme_and_the_normative_docs_name",
       "vocabulary": [
@@ -196,32 +196,31 @@
       "hit_lines": 4,
       "hits": [
         {
-          "line": 82,
+          "text": "- Every verification result is one committed snapshot. It is not a lease and states nothing about",
           "tokens": [
             "lease"
           ]
         },
         {
-          "line": 169,
+          "text": "on set growth and on any other drift. That result is one read snapshot, not a lease. A later export can",
           "tokens": [
             "lease"
           ]
         },
         {
-          "line": 405,
+          "text": "`System.review` returns a `ReviewResult`. It carries four fields and no request identity:",
           "tokens": [
             "request"
           ]
         },
         {
-          "line": 422,
+          "text": "request identifier. Use `proposal_id` to name a proposal on every surface.",
           "tokens": [
             "request"
           ]
         }
       ],
-      "owner": "M3.6a2",
-      "total_lines": 523
+      "owner": "M3.6a2"
     },
     {
       "document": "docs/architecture.md",
@@ -229,26 +228,25 @@
       "hit_lines": 3,
       "hits": [
         {
-          "line": 17,
+          "text": "output. It carries no request identifier, and neither does any proposal read or report value.",
           "tokens": [
             "request"
           ]
         },
         {
-          "line": 18,
+          "text": "The event payload of a proposal or a review action also carries no request identifier. The",
           "tokens": [
             "request"
           ]
         },
         {
-          "line": 177,
+          "text": "Every verification result and every report is one committed read snapshot. It is not a lease, a",
           "tokens": [
             "lease"
           ]
         }
       ],
-      "owner": "M3.6a2",
-      "total_lines": 267
+      "owner": "M3.6a2"
     },
     {
       "document": "examples/command_source/README.md",
@@ -256,76 +254,90 @@
       "hit_lines": 1,
       "hits": [
         {
-          "line": 86,
+          "text": "calls must create no external effects. The request carries no per-call identifier, so an adapter",
           "tokens": [
             "request"
           ]
         }
       ],
-      "owner": "M3.6a2",
-      "total_lines": 87
+      "owner": "M3.6a2"
     },
     {
       "document": "docs/threat-model.md",
       "grounds": "`handle` request ID as an idempotency key, and lease recovery, both cease to exist",
       "hit_lines": 0,
       "hits": [],
-      "owner": "M3.6a2",
-      "total_lines": 134
+      "owner": "M3.6a2"
     },
     {
       "document": "examples/hospital_ocr/README.md",
       "grounds": "already rewritten by M3.6a1's D22-D23 transcript regeneration; the surviving hit is the demo's own prose and names no deleted surface",
       "hit_lines": 0,
       "hits": [],
-      "owner": "M3.6a1",
-      "total_lines": 153
+      "owner": "M3.6a1"
     },
     {
       "document": "examples/open_webui/README.md",
       "grounds": "tool/filter chat requests describe the new example, not the deleted lifecycle",
-      "hit_lines": 5,
+      "hit_lines": 8,
       "hits": [
         {
-          "line": 5,
+          "text": "request that no learned function covered. A learning pass runs inside Open WebUI and turns",
           "tokens": [
             "request"
           ]
         },
         {
-          "line": 11,
+          "text": "- The `cement` tool has two functions. `use_learned_function` answers a request from the",
           "tokens": [
             "request"
           ]
         },
         {
-          "line": 12,
+          "text": "that it used when no function covered the request. Neither function writes to the ledger.",
           "tokens": [
             "request"
           ]
         },
         {
-          "line": 20,
+          "text": "When a switched-on function covers a request, the tool result is the function's output. The",
           "tokens": [
             "request"
           ]
         },
         {
-          "line": 24,
+          "text": "A request that no function covers goes to the model, as before. The model's answer reaches the",
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "text": "tells the chat model which requests the operation covers and the exact input object. Write the",
+          "tokens": [
+            "requests"
+          ]
+        },
+        {
+          "text": "- `Switch <operation> off` sends every request of that kind to the model again.",
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "text": "API key. Open WebUI sends it to the endpoint in each request:",
           "tokens": [
             "request"
           ]
         }
       ],
-      "owner": "M5.3",
-      "total_lines": 92
+      "owner": "M5.3"
     }
   ],
   "totals": {
     "pins": 15,
     "pins_working_tree": 12,
     "prose_documents_owned": 4,
-    "prose_hit_lines": 13
+    "prose_hit_lines": 16
   },
   "unit": "M3.6a2",
   "vocabulary": "\\bhandle\\b|request_status|retry_failed|invalidated_generators|resolved_by_artifact|\\brequests?\\b|\\blease\\b|in_progress|fallback_failed|reconciliation_required|[Aa]mbigu\\w*"
