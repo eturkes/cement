@@ -15,6 +15,16 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p19 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section
+
+Check set: R1 acceptance from a clean checkout (good rc 0; bad anchor + `TODO-FILL` rc 1, each printing its line); R2 fixtures cannot drift with source edits; R3 records. MAIN alone (a dev validator with mechanical fixtures).
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | three fixtures rerun from the gate worktree checkout at this commit, outputs as in the closed row. |
+| R2 | correctness | pass | every fixture row anchors `.agent/fixtures/anchors/target.txt`, a committed 3-line file no unit edits. |
+| R3 | records | pass | `ops.md` names the command; `gate-checks.md` records the fixtures, `paths:` covers the tool + fixtures. |
+
 ## p13 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 acceptance rerun (both hosts, exit 2 + `invalid`, messages unchanged); R2 the tests fire when the translation is undone; R3 law current. MAIN alone; no code changed.

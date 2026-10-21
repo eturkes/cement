@@ -1,0 +1,81 @@
+#!/usr/bin/env python3
+"""validate-anchors — grade the `path:line` anchors an agent report claims (p19).
+
+A report states each factual `path:line` claim as one row of a fenced block opened with
+```anchors, TAB-separated:
+
+    <path><TAB><line><TAB><exact fragment that line must contain>
+
+Paths resolve against `--root` (default: the repo root). A `TODO-FILL` cell anywhere in the
+report = unfinished work.
+
+Usage: uv run python .agent/validate-anchors REPORT.md [--root DIR]
+Prints every bad anchor and every `TODO-FILL` line with its report line number.
+rc 0 = every anchor resolves and no `TODO-FILL` remains; 1 = a bad anchor or a `TODO-FILL`;
+3 = a malformed row; 4 = the report holds no ```anchors block.
+"""
+
+from __future__ import annotations
+
+import argparse
+import pathlib
+import re
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+FENCE = re.compile(r"^```anchors[^\n]*\n(.*?)^```", re.MULTILINE | re.DOTALL)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("report", type=pathlib.Path)
+    parser.add_argument("--root", type=pathlib.Path, default=ROOT)
+    args = parser.parse_args()
+    root = args.root.resolve()
+    text = args.report.read_text(encoding="utf-8")
+
+    rows: list[tuple[int, str, str, str]] = []
+    for block in FENCE.finditer(text):
+        first = text.count("\n", 0, block.start(1)) + 1
+        for offset, raw in enumerate(block.group(1).splitlines()):
+            if not raw.strip() or raw.lstrip().startswith("#"):
+                continue
+            parts = raw.split("\t")
+            if len(parts) < 3:
+                print(f"MALFORMED\treport:{first + offset}\t{raw!r}")
+                return 3
+            rows.append((first + offset, parts[0].strip(), parts[1].strip(),
+                         "\t".join(parts[2:]).strip()))
+
+    bad = 0
+    cache: dict[pathlib.Path, list[str]] = {}
+    for at, path, line, fragment in rows:
+        target = (root / path).resolve()
+        try:
+            lines = cache.setdefault(target, target.read_text(encoding="utf-8").splitlines())
+        except OSError as exc:
+            print(f"ANCHOR-BAD\treport:{at}\t{path}:{line}\tunreadable: {exc.strerror}")
+            bad += 1
+            continue
+        if not line.isdecimal() or not 1 <= int(line) <= len(lines):
+            print(f"ANCHOR-BAD\treport:{at}\t{path}:{line}\tno such line ({len(lines)} lines)")
+            bad += 1
+            continue
+        actual = lines[int(line) - 1]
+        if fragment not in actual:
+            print(f"ANCHOR-BAD\treport:{at}\t{path}:{line}\twant {fragment!r}, got {actual.strip()!r}")
+            bad += 1
+
+    unfilled = [(number, raw) for number, raw in enumerate(text.splitlines(), start=1)
+                if "TODO-FILL" in raw]
+    for number, raw in unfilled:
+        print(f"TODO-FILL\treport:{number}\t{raw.strip()}")
+    print(f"ANCHORS-CHECKED: {len(rows)}\nANCHORS-BAD: {bad}\nUNFILLED-CELLS: {len(unfilled)}")
+    if not rows:
+        print("VALIDATOR-FAIL: report carries no ```anchors block")
+        return 4
+    return 1 if bad or unfilled else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

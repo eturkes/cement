@@ -13,6 +13,8 @@ paths:
   - ".agent/mutate"
   - ".agent/replay-mutants"
   - ".agent/decisions/*-mutants.jsonl"
+  - ".agent/validate-anchors"
+  - ".agent/fixtures/**"
   - ".agent/suite"
   - "pyproject.toml"
   - ".github/workflows/gate.yml"
@@ -36,4 +38,5 @@ Each purpose-built check below ships the seed that reds it; law → `.claude/rul
 - `.agent/skip-census` (gate step `skips`, p66 + p85): a copy of `tests/` plus a fourth skip → rc 1 naming its `SeededSkip` id, once per shape — `self.skipTest("seed")` flat, the same in a nested `tests/nested/` package (discovery recurses), `@not_ready` after `from unittest import skip as not_ready`, and `@soon` re-imported from a helper module binding `later = unittest.skip`; the shipped tree → rc 0, 3 members (2 `platform`, 1 `replay-pruned`).
 - `.agent/register-audit --gate` (gate step `register`, p12 + p40): `Run the command simply …` → rc 1 `FILLER … simply`; a 30-word sentence + a punctuation-free bullet + `Cement's` + a link whose TARGET holds `simply` (`[guide](https://example.com/simply-start)`) → rc 0, prints `[30]` (length is printed for judgment, never graded).
 - `.agent/replay-mutants` (p02, closure tool, not a gate step): `.agent/decisions/replay-mutants-seeds.jsonl` at `d4746ef` (`tests.test_json_value`, `ran` 4) → rc 0, `SEED-DEAD` killed, `SEED-LIVE` (comment-only) survived = its `equivalent`, `SEED-GONE` superseded; copies of it → expect without the equivalent → rc 1 `verdicts differ from expect`; `ran` 5 → rc 2 `CONTROL red`; a row whose `old` occurs twice off its `line` → rc 2 `anchor-miss`; a mutant that cannot import → rc 2 `not-loaded`. Each run restores every clone (`all restored: True`) and leaves no worktree.
+- `.agent/validate-anchors` (p19, report validator, not a gate step): fixtures `.agent/fixtures/anchors/` — `good.md` → rc 0 (2 anchors); `bad-anchor.md` → rc 1 `ANCHOR-BAD report:5 .agent/fixtures/anchors/target.txt:1 want 'beta line', got 'alpha line'`; `todo-fill.md` → rc 1 `TODO-FILL report:5`.
 - `.agent/mutate` (p74, credit tool, not a gate step): see `.agent/decisions/m3u10-gate-tooling.md` `## p74` — the pin's survivor count and the survivor count after deleting the pin's assertion (seed branch), both runs recorded there.
