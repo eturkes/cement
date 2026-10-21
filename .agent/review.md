@@ -17,6 +17,16 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p76 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section
+
+Check set: R1 the census prints every row's working-tree anchor count; R2 count-0 rows carry a verified retired mark (or re-anchor); R3 seeding a fresh count-0 row reds it. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | 268 rows over the three catalogues carrying `anchor` + `path`/`file`; one line each. |
+| R2 | acceptance | pass | 118 count-0 at HEAD (the row's 26 was measured at the refresh tree); every mark lives in `p76-retired.json` (catalogue schemas and their validators untouched) and is re-verified on each run against `<commit>^` / `<commit>`. Re-anchoring onto surviving loci was not chosen: those units are closed and their harnesses grade the trees they were written for. |
+| R3 | integrity | pass | appended seed row → `UNMARKED … P76SEED`, rc 1; wrong-commit mark → `UNVERIFIED`, rc 1; restored → rc 0. |
+
 ## p94 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
 
 Check set: R1 every instrument's named revisions on `main` or recorded with a restore command; R2 the census exits 1 on an unreachable unrecorded SHA; R3 instruments unchanged in behavior. MAIN alone.

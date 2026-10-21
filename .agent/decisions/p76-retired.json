@@ -1,0 +1,474 @@
+{
+  "m3u5a-mutants.json:M01": {
+    "retired": "92a162e263fd31f587a66f293f06aef73dd1b607",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M03": {
+    "retired": "92a162e263fd31f587a66f293f06aef73dd1b607",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M06": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M07": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M10": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M103": {
+    "retired": "90324c5b33f498ed2d8fe6f65b34ebf93fe618c9",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M104": {
+    "retired": "629577d57156115b8de28c28bfec6cedf10ba46b",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M105": {
+    "retired": "629577d57156115b8de28c28bfec6cedf10ba46b",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M106": {
+    "retired": "629577d57156115b8de28c28bfec6cedf10ba46b",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M107": {
+    "retired": "629577d57156115b8de28c28bfec6cedf10ba46b",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M108": {
+    "retired": "629577d57156115b8de28c28bfec6cedf10ba46b",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M109": {
+    "retired": "629577d57156115b8de28c28bfec6cedf10ba46b",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M11": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M110": {
+    "retired": "12897974219c0ca1aa71f474d9c7f5522b330953",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M111": {
+    "retired": "12897974219c0ca1aa71f474d9c7f5522b330953",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M112": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M118": {
+    "retired": "629577d57156115b8de28c28bfec6cedf10ba46b",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M12": {
+    "retired": "629577d57156115b8de28c28bfec6cedf10ba46b",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M121": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M133": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M134": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M138": {
+    "retired": "90324c5b33f498ed2d8fe6f65b34ebf93fe618c9",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M139": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M140": {
+    "retired": "90324c5b33f498ed2d8fe6f65b34ebf93fe618c9",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M141": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M142": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M143": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M146": {
+    "retired": "12897974219c0ca1aa71f474d9c7f5522b330953",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M147": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M15": {
+    "retired": "629577d57156115b8de28c28bfec6cedf10ba46b",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M150": {
+    "retired": "90324c5b33f498ed2d8fe6f65b34ebf93fe618c9",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M151": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M152": {
+    "retired": "92a162e263fd31f587a66f293f06aef73dd1b607",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M153": {
+    "retired": "92a162e263fd31f587a66f293f06aef73dd1b607",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M157": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M159": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M160": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M163": {
+    "retired": "92a162e263fd31f587a66f293f06aef73dd1b607",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M164": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M167": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M20": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M27": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M28": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M29": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M30": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M31": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M34": {
+    "retired": "629577d57156115b8de28c28bfec6cedf10ba46b",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M35": {
+    "retired": "629577d57156115b8de28c28bfec6cedf10ba46b",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M36": {
+    "retired": "629577d57156115b8de28c28bfec6cedf10ba46b",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M37": {
+    "retired": "629577d57156115b8de28c28bfec6cedf10ba46b",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M38": {
+    "retired": "12897974219c0ca1aa71f474d9c7f5522b330953",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M39": {
+    "retired": "12897974219c0ca1aa71f474d9c7f5522b330953",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M40": {
+    "retired": "629577d57156115b8de28c28bfec6cedf10ba46b",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M42": {
+    "retired": "12897974219c0ca1aa71f474d9c7f5522b330953",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M43": {
+    "retired": "629577d57156115b8de28c28bfec6cedf10ba46b",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M90": {
+    "retired": "ffe9848bbe98f9ca4d7515e0fb69bd0ddeef8b80",
+    "path": "src/cement_runtime/system.py"
+  },
+  "m3u5a-mutants.json:M95": {
+    "retired": "629577d57156115b8de28c28bfec6cedf10ba46b",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5a-mutants.json:M96": {
+    "retired": "92a162e263fd31f587a66f293f06aef73dd1b607",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5b-mutants.json:M01": {
+    "retired": "ffe9848bbe98f9ca4d7515e0fb69bd0ddeef8b80",
+    "path": "src/cement_runtime/system.py"
+  },
+  "m3u5b-mutants.json:M08": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5b-mutants.json:M09": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5b-mutants.json:M25": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5b-mutants.json:M28": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5b-mutants.json:M29": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5b-mutants.json:M30": {
+    "retired": "629577d57156115b8de28c28bfec6cedf10ba46b",
+    "path": "tests/test_cli_channels_battery.py"
+  },
+  "m3u5b-mutants.json:M31": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5b-mutants.json:M32": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5b-mutants.json:M33": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5b-mutants.json:M37": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u5b-mutants.json:M41": {
+    "retired": "ffe9848bbe98f9ca4d7515e0fb69bd0ddeef8b80",
+    "path": "README.md"
+  },
+  "m3u5b-mutants.json:M42": {
+    "retired": "ffe9848bbe98f9ca4d7515e0fb69bd0ddeef8b80",
+    "path": "README.md"
+  },
+  "m3u5b-mutants.json:M44": {
+    "retired": "92a162e263fd31f587a66f293f06aef73dd1b607",
+    "path": "README.md"
+  },
+  "m3u5b-mutants.json:M46": {
+    "retired": "629577d57156115b8de28c28bfec6cedf10ba46b",
+    "path": "src/cement_runtime/cli.py"
+  },
+  "m3u6a1-mutants.json:M02": {
+    "retired": "17896ebd2d854b807fee24ef2a04f09f8881c762",
+    "path": "tests/test_cli.py"
+  },
+  "m3u6a1-mutants.json:M03": {
+    "retired": "ffe9848bbe98f9ca4d7515e0fb69bd0ddeef8b80",
+    "path": "tests/test_system.py"
+  },
+  "m3u6a1-mutants.json:M04": {
+    "retired": "ffe9848bbe98f9ca4d7515e0fb69bd0ddeef8b80",
+    "path": "src/cement_runtime/system.py"
+  },
+  "m3u6a1-mutants.json:M05": {
+    "retired": "ffe9848bbe98f9ca4d7515e0fb69bd0ddeef8b80",
+    "path": "tests/test_system.py"
+  },
+  "m3u6a1-mutants.json:M06": {
+    "retired": "12897974219c0ca1aa71f474d9c7f5522b330953",
+    "path": "tests/test_system.py"
+  },
+  "m3u6a1-mutants.json:M19": {
+    "retired": "ef06a256ffdb4005222aa23107585c7db40e8cbe",
+    "path": "examples/hospital_ocr/run_demo.py"
+  },
+  "m3u6a1-mutants.json:M20": {
+    "retired": "629577d57156115b8de28c28bfec6cedf10ba46b",
+    "path": "examples/hospital_ocr/run_demo.py"
+  },
+  "m3u6a1-mutants.json:M21": {
+    "retired": "629577d57156115b8de28c28bfec6cedf10ba46b",
+    "path": "examples/hospital_ocr/run_demo.py"
+  },
+  "m3u6a1-mutants.json:M22": {
+    "retired": "ef06a256ffdb4005222aa23107585c7db40e8cbe",
+    "path": "tests/test_hospital_ocr_example.py"
+  },
+  "m3u6a1-mutants.json:M23": {
+    "retired": "ef06a256ffdb4005222aa23107585c7db40e8cbe",
+    "path": "examples/hospital_ocr/README.md"
+  },
+  "m3u6a1-mutants.json:M24": {
+    "retired": "ef06a256ffdb4005222aa23107585c7db40e8cbe",
+    "path": "examples/hospital_ocr/README.md"
+  },
+  "m3u6a1-mutants.json:M25": {
+    "retired": "ffe9848bbe98f9ca4d7515e0fb69bd0ddeef8b80",
+    "path": "src/cement_runtime/system.py"
+  },
+  "m3u6a1-mutants.json:M26": {
+    "retired": "ffe9848bbe98f9ca4d7515e0fb69bd0ddeef8b80",
+    "path": "src/cement_runtime/system.py"
+  },
+  "m3u6a1-mutants.json:M27": {
+    "retired": "ffe9848bbe98f9ca4d7515e0fb69bd0ddeef8b80",
+    "path": "src/cement_runtime/system.py"
+  },
+  "m3u6a1-mutants.json:M30": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "tests/test_system.py"
+  },
+  "m3u6a1-mutants.json:M31": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "tests/test_system.py"
+  },
+  "m3u6a1-mutants.json:M32": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "tests/test_system.py"
+  },
+  "m3u6a1-mutants.json:M33": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "src/cement_runtime/system.py"
+  },
+  "m3u6a1-mutants.json:M34": {
+    "retired": "93007ace99556c13b82c7f8d418a9e1082cb7170",
+    "path": "tests/test_system.py"
+  },
+  "m3u6a1-mutants.json:M35": {
+    "retired": "ffe9848bbe98f9ca4d7515e0fb69bd0ddeef8b80",
+    "path": "tests/test_system.py"
+  },
+  "m3u6a1-mutants.json:M36": {
+    "retired": "ffe9848bbe98f9ca4d7515e0fb69bd0ddeef8b80",
+    "path": "tests/test_system.py"
+  },
+  "m3u6a1-mutants.json:M37": {
+    "retired": "ffe9848bbe98f9ca4d7515e0fb69bd0ddeef8b80",
+    "path": "src/cement_runtime/system.py"
+  },
+  "m3u6a1-mutants.json:M41": {
+    "retired": "ffe9848bbe98f9ca4d7515e0fb69bd0ddeef8b80",
+    "path": "src/cement_runtime/system.py"
+  },
+  "m3u6a1-mutants.json:M42": {
+    "retired": "12897974219c0ca1aa71f474d9c7f5522b330953",
+    "path": "tests/test_system.py"
+  },
+  "m3u6a1-mutants.json:M43": {
+    "retired": "12897974219c0ca1aa71f474d9c7f5522b330953",
+    "path": "tests/test_system.py"
+  },
+  "m3u6a1-mutants.json:M44": {
+    "retired": "12897974219c0ca1aa71f474d9c7f5522b330953",
+    "path": "tests/test_system.py"
+  },
+  "m3u6a1-mutants.json:M45": {
+    "retired": "12897974219c0ca1aa71f474d9c7f5522b330953",
+    "path": "tests/test_system.py"
+  },
+  "m3u6a1-mutants.json:M46": {
+    "retired": "12897974219c0ca1aa71f474d9c7f5522b330953",
+    "path": "tests/test_system.py"
+  },
+  "m3u6a1-mutants.json:M51": {
+    "retired": "ffe9848bbe98f9ca4d7515e0fb69bd0ddeef8b80",
+    "path": "tests/test_system.py"
+  },
+  "m3u6a1-mutants.json:M55": {
+    "retired": "ef06a256ffdb4005222aa23107585c7db40e8cbe",
+    "path": "tests/test_hospital_ocr_example.py"
+  },
+  "m3u6a1-mutants.json:M61": {
+    "retired": "ffe9848bbe98f9ca4d7515e0fb69bd0ddeef8b80",
+    "path": "tests/test_system.py"
+  },
+  "m3u6a1-mutants.json:M69": {
+    "retired": "629577d57156115b8de28c28bfec6cedf10ba46b",
+    "path": "examples/hospital_ocr/run_demo.py"
+  },
+  "m3u6a1-mutants.json:M70": {
+    "retired": "629577d57156115b8de28c28bfec6cedf10ba46b",
+    "path": "examples/hospital_ocr/run_demo.py"
+  },
+  "m3u6a1-mutants.json:M72": {
+    "retired": "629577d57156115b8de28c28bfec6cedf10ba46b",
+    "path": "examples/hospital_ocr/run_demo.py"
+  },
+  "m3u6a1-mutants.json:M73": {
+    "retired": "12897974219c0ca1aa71f474d9c7f5522b330953",
+    "path": "examples/hospital_ocr/run_demo.py"
+  },
+  "m3u6a1-mutants.json:M74": {
+    "retired": "ef06a256ffdb4005222aa23107585c7db40e8cbe",
+    "path": "examples/hospital_ocr/run_demo.py"
+  },
+  "m3u6a1-mutants.json:M76": {
+    "retired": "629577d57156115b8de28c28bfec6cedf10ba46b",
+    "path": "examples/hospital_ocr/run_demo.py"
+  },
+  "m3u6a1-mutants.json:M80": {
+    "retired": "ffe9848bbe98f9ca4d7515e0fb69bd0ddeef8b80",
+    "path": "tests/test_proposal_binding_battery.py"
+  },
+  "m3u6a1-mutants.json:M81": {
+    "retired": "ffe9848bbe98f9ca4d7515e0fb69bd0ddeef8b80",
+    "path": "tests/test_submission_battery.py"
+  },
+  "m3u6a1-mutants.json:M82": {
+    "retired": "ffe9848bbe98f9ca4d7515e0fb69bd0ddeef8b80",
+    "path": "tests/test_submission.py"
+  },
+  "m3u6a1-mutants.json:M83": {
+    "retired": "ffe9848bbe98f9ca4d7515e0fb69bd0ddeef8b80",
+    "path": "tests/test_submission_battery.py"
+  },
+  "m3u6a1-mutants.json:M84": {
+    "retired": "ffe9848bbe98f9ca4d7515e0fb69bd0ddeef8b80",
+    "path": "tests/test_submission_battery.py"
+  },
+  "m3u6a1-mutants.json:M85": {
+    "retired": "ffe9848bbe98f9ca4d7515e0fb69bd0ddeef8b80",
+    "path": "src/cement_runtime/system.py"
+  },
+  "m3u6a1-mutants.json:M89": {
+    "retired": "635a47387c247c06338411c352d7bef17c931c06",
+    "path": "src/cement_runtime/_command_supervisor.py"
+  },
+  "m3u6a1-mutants.json:M90": {
+    "retired": "635a47387c247c06338411c352d7bef17c931c06",
+    "path": "src/cement_runtime/example_adapter.py"
+  }
+}
