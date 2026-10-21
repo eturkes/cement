@@ -15,6 +15,14 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p51 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 acceptance rerun at HEAD (one ruling for every write leaf; per-leaf typo-path + malformed-value probes create nothing and name the cause). MAIN alone; no code changed.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `ExistingOnlyBattery` p51 ×2 OK; the leaf census is derived from `_parser()` at run time, so a new leaf enters it. |
+
 ## p17 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 the re-derivation is grounded (the quoted message + pre-call probe left with the authority callback); R2 the successor acceptance holds on a real ledger through supported calls; R3 the no-write assertion is non-vacuous; R4 preservation credit recorded, survivors routed. MAIN alone (a test-only change to an existing CLI race test).
