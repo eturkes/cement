@@ -15,6 +15,16 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p66 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 a committed census enumerates every `skipTest` call + `skip*` decorator under `tests/` and EQUALS a three-member allowlist with each condition; R2 it excludes itself + prints every unmatched hit; R3 a seeded fourth skip reds it naming the test id; the shipped tree exits 0. MAIN alone; no change (acceptance met at `629577d`).
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `.agent/skip-census` (gate step `skips` since `629577d`): `32 modules, 3 skip sites, 3 allowed`, each printed with its condition + reason class. |
+| R2 | acceptance | pass | the census lives in `.agent/`, outside its `tests/` domain; every hit printed, an unlisted one tagged `UNLISTED`. |
+| R3 | acceptance | pass | seeded `SeededSkip.test_seed` (`self.skipTest("seed")`) in a disposable worktree → `UNLISTED tests/test_json_value.py::SeededSkip.test_seed`, `FAIL (unlisted 1, missing 0)`, rc 1. |
+
 ## p40 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
 
 Check set: R1 the tracked register tool runs from the configured gate over every human-facing surface; R2 zero filler hits, sentence length reported and never capped; R3 a filler seed reds it. MAIN alone; no change (acceptance met at `629577d`).
