@@ -3253,6 +3253,148 @@ class CLITests(unittest.TestCase):
         self.assertEqual(text_host.stdout_bytes, expected)
         self.assertEqual(text_host.status, 0)
 
+    # p15: the M2.4c5a diff-blind export probes no shipped test subsumed, ported.
+    def test_function_export_requires_db_and_partition(self) -> None:
+        cases = (
+            (["--partition", "tenant"], "--db or CEMENT_DB is required"),
+            (["--db", self.database], "--partition or CEMENT_PARTITION is required"),
+        )
+        original = self.base
+        try:
+            with mock.patch.dict(os.environ, {"CEMENT_DB": "", "CEMENT_PARTITION": ""}):
+                for base, message in cases:
+                    with self.subTest(message=message):
+                        self.base = base
+                        run = self.run_cli("function", "export", "echo")
+                        self.assertEqual((run.status, run.stdout_bytes), (2, b""))
+                        self.assertEqual(self.error(run), {"error": "invalid", "message": message})
+        finally:
+            self.base = original
+
+    def test_function_export_unicode_is_exact_on_binary_and_text_hosts(self) -> None:
+        from cement_runtime import evaluate, parse_function
+
+        self.register("unicode")
+        self.confirm_text("unicode", "Grüße 日本語", "p15-unicode")
+        self.payload(self.run_cli("compile", "unicode"))
+        self.promote_set("unicode")
+        system = System(self.database)
+        system.set_switch("tenant", "unicode", mode="follow", actor="operator")
+        verification = system.verify_function("tenant", "unicode")
+        self.assertIsNotNone(verification.document)
+        expected = verification.document.text.encode("utf-8")
+        self.assertNotIn(b"\\u", expected)
+        self.assertGreater(len(expected), len(verification.document.text))
+        outputs = []
+        for text_only in (False, True):
+            with self.subTest(text_only=text_only):
+                run = self.run_cli("function", "export", "unicode", text_only=text_only)
+                self.assertEqual((run.status, run.stderr_text), (0, ""))
+                self.assertEqual(run.stdout_bytes, expected)
+                parsed = parse_function(run.stdout_text)
+                self.assertEqual(parsed.function_hash, verification.function_hash)
+                match = evaluate(parsed, input_json=canonicalize({"x": "Grüße 日本語"}))
+                self.assertTrue(match.matched)
+                self.assertEqual(match.output, {"kind": "echo", "value": {"x": "Grüße 日本語"}})
+                outputs.append(run.stdout_bytes)
+        self.assertEqual(outputs[0], outputs[1])
+
+    def test_function_export_drift_preserves_the_ordered_verdict_and_stderr_bytes(self) -> None:
+        self.promoted_operation("drift", 3)
+        system = System(self.database)
+        system.set_switch("tenant", "drift", mode="follow", actor="operator")
+        members = self.payload(self.run_cli("function", "show", "drift"))["function_anchor"]["members"]
+        system.suspend_artifact("tenant", members[1]["artifact_id"], suspended_by="operator", reason="drift")
+        verification = system.verify_function("tenant", "drift")
+        self.assertFalse(verification.passed)
+        self.assertEqual([check.passed for check in verification.checks], [True] * 5 + [False, True])
+        expected = {
+            "error": "unverified",
+            "message": "function verification failed; no bundle exported: "
+            + "; ".join(f"{check.key}: {check.detail}" for check in verification.checks if not check.passed),
+            "checks": [dataclasses.asdict(check) for check in verification.checks],
+        }
+        run = self.run_cli("function", "export", "drift")
+        self.assertEqual((run.status, run.stdout_bytes), (6, b""))
+        self.assertEqual(self.error(run), expected)
+        self.assertEqual(list(self.error(run)), ["checks", "error", "message"])
+        self.assertEqual(run.stderr_text, json.dumps(expected, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
+
+    def test_function_export_multi_failure_keeps_every_check_field(self) -> None:
+        checks = (
+            FunctionCheck(key="first", passed=False, detail="alpha"),
+            FunctionCheck(key="middle", passed=True, detail="kept in vector"),
+            FunctionCheck(key="last", passed=False, detail="omega"),
+        )
+        verification = FunctionVerification(passed=False, entries=3, document=None, function_hash="d" * 64, checks=checks)
+        with mock.patch.object(System, "serving", autospec=True, return_value=(mock.sentinel.switch, verification)):
+            run = self.run_cli("function", "export", "echo")
+        self.assertEqual((run.status, run.stdout_bytes), (6, b""))
+        self.assertEqual(self.error(run), {
+            "error": "unverified",
+            "message": "function verification failed; no bundle exported: first: alpha; last: omega",
+            "checks": [dataclasses.asdict(check) for check in checks],
+        })
+
+    def test_function_export_history_reconstructs_once_with_exact_scope(self) -> None:
+        receipt = self.promoted_operation("echo_1", 2)
+        reconstruction = System(self.database).reconstruct_function_receipt("tenant", receipt)
+        with (
+            mock.patch.object(System, "reconstruct_function_receipt", autospec=True, return_value=reconstruction) as reconstruct,
+            mock.patch.object(System, "serving", autospec=True, side_effect=AssertionError("live source used for history")) as serving,
+            mock.patch.object(System, "verify_function", autospec=True, side_effect=AssertionError("live verification used for history")) as verify,
+        ):
+            run = self.run_cli("function", "export", "echo_1", "--receipt-id", receipt)
+        self.assertEqual(run.status, 0)
+        self.assertEqual(reconstruct.call_count, 1)
+        self.assertEqual(reconstruct.call_args.args[1:], ("tenant", receipt))
+        self.assertEqual(reconstruct.call_args.kwargs, {})
+        serving.assert_not_called()
+        verify.assert_not_called()
+
+    def test_function_export_never_inspects_a_prospective_union(self) -> None:
+        receipt = self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
+        with mock.patch.object(System, "inspect_function_promotion", autospec=True, side_effect=AssertionError("prospective export source")) as inspect:
+            live = self.run_cli("function", "export", "echo")
+            historical = self.run_cli("function", "export", "echo", "--receipt-id", receipt)
+        self.assertEqual((live.status, historical.status), (0, 0))
+        inspect.assert_not_called()
+
+    def test_function_export_live_lookup_is_case_and_like_exact(self) -> None:
+        self.register("scope_1", partition="tenant_a")
+        self.register("scopeX1", partition="tenantXa")
+        self.payload(self.run_cli("--partition", "tenantXa", "operation", "revise", "scopeX1", "--actor", "owner"))
+        self.register("Scope_1", partition="tenant_a")
+        System(self.database).set_switch("tenant_a", "scope_1", mode="follow", actor="operator")
+        for partition, operation in (
+            ("tenant", "absent"),
+            ("tenantXa", "scope_1"),
+            ("tenant_a", "scopeX1"),
+            ("tenant_a", "SCOPE_1"),
+        ):
+            with self.subTest(partition=partition, operation=operation):
+                run = self.run_cli("--partition", partition, "function", "export", operation)
+                self.assertEqual((run.status, run.stdout_bytes), (3, b""))
+                self.assertEqual(self.error(run), {"error": "not_found", "message": "operation is not registered in this partition"})
+        positive = self.run_cli("--partition", "tenant_a", "function", "export", "scope_1")
+        self.assertEqual(positive.status, 0)
+
+    def test_function_export_both_sources_preserve_every_error_payload(self) -> None:
+        cases = (
+            (ValidationError("invalid probe"), 2, "invalid"),
+            (NotFoundError("missing probe"), 3, "not_found"),
+            (StateError("state probe"), 4, "conflict"),
+            (IntegrityError("integrity probe"), 5, "integrity"),
+        )
+        for method, suffix in (("serving", ()), ("reconstruct_function_receipt", ("--receipt-id", "fpr_" + "0" * 32))):
+            for exception, status, token in cases:
+                with self.subTest(method=method, status=status):
+                    with mock.patch.object(System, method, autospec=True, side_effect=exception):
+                        run = self.run_cli("function", "export", "echo", *suffix)
+                    self.assertEqual((run.status, run.stdout_bytes), (status, b""))
+                    self.assertEqual(self.error(run), {"error": token, "message": str(exception)})
+
     def test_function_export_round_trips_through_parse_function(self) -> None:
         from cement_runtime import evaluate, parse_function
         from cement_runtime.json_value import canonicalize

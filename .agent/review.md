@@ -17,6 +17,18 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p15 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 each of the 28 probes mapped to a subsuming shipped test or merged; R2 merged count recorded; R3 scratch suite removed; R4 the merged probes earn preservation credit; R5 the map's anchors resolve in the landed tree. MAIN + general-purpose-1 (map author).
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `.agent/decisions/p15-map.md`: 17 subsumed (shipped ids per row), 8 gap (ported), 3 obsolete (retired grammar: export leaf order, `--out` now the atomic-file channel); verdict counts recounted from the table (17/8/3 of 28). |
+| R2 | acceptance | pass | merged = 8 `tests.test_cli.CLITests.test_function_export_*` tests (cherry-picked from `48fe736`, conflict-free); fast gate test_cli + lifecycle_removal + authority_removal Ran 284 OK. |
+| R3 | acceptance | pass | `.scratch/agents/test-m2u4c5a-suite.py` deleted (machine-local, untracked). |
+| R4 | integrity | pass | 8 `.agent/mutate` runs at `impl/p15` (tag `archive/p15-credit`), all rc 0: killed 9716 / survived 7594 / invalid 410 summed; survivors unruled → p111. |
+| R5 | correctness | fixed | the map's anchors were written against `809e779` (52/52 resolve there; 8/52 at `48fe736`) → re-anchored by exact-line difflib map to the landed tree, 0 misses; `.agent/validate-anchors` rc 0. |
+
 ## p61 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section
 
 Check set: R1 runner + output committed; R2 each pre-battery verdict in a dedicated field, never `note`; R3 the contract states how many rows the pre-existing suite already catches; R4 the output cannot drift from its transcript unseen. MAIN alone.
