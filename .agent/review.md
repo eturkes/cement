@@ -15,6 +15,17 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p62 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 `examples()` rows carry `input_hash` + `output_hash` equal to the compiler's stored values; R2 each consumer that recomputed them stops; R3 the paste-ins embed the changed library (generator freshness); R4 the prototype's evidence view is unchanged. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `test_example_rows_carry_the_compiler_s_input_and_output_digests`: each row's pair = `canonicalize(...)` digests = the compiled artifact's stored pair; red at `972ba2e` (`KeyError: 'input_hash'`). |
+| R2 | acceptance (re-derived) | pass | `run_demo.py` held no such helper at HEAD; `prototype/webui-demo/demo.py`'s `examples()` consumer uses the stored digests, while `_digest` stays for values not yet in the ledger (`:421`, `:1005`, `:1238`). |
+| R3 | correctness | pass | `tests.test_open_webui_paste_in` W1 (paste-ins = generator output) green with the regenerated files. |
+| R4 | correctness | pass | Prototype driven headless (every request twice, `fast=True`, then `learn`): `_evidence()` before vs after = equal after masking per-run example ids (9 groups, 40 entries). |
+
 ## p31 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section
 
 Check set: R1 every repo-local `TemporaryDirectory` fixture under `tests/` allocates in the system temp dir; R2 a deliberately interrupted run leaves `git status` clean (measured at the landing tree); R3 no frame depended on a repo-local temp path (full gate). MAIN alone.

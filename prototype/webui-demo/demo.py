@@ -2150,13 +2150,13 @@ class Session:
                     continue
                 # `examples` returns the values, not their digests; the ledger groups
                 # by the same canonical-JSON digest the compiler uses for a scope.
-                key = f"{operation}|{_digest(row['input'])}"
+                key = f"{operation}|{row['input_hash']}"
                 grouped.setdefault(key, []).append(
                     {
                         "example_id": row["id"],
                         "reviewer": row["reviewer"],
                         "origin": row["origin"],
-                        "output_hash": _digest(row["output"])[:12],
+                        "output_hash": str(row["output_hash"])[:12],
                     }
                 )
         return grouped

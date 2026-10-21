@@ -740,6 +740,23 @@ class SystemTests(unittest.TestCase):
             )
         self.assertEqual(self.system.artifacts("tenant-a", "echo")[-1]["status"], "suspended")
 
+    def test_example_rows_carry_the_compiler_s_input_and_output_digests(self) -> None:
+        # p62: consumers stop recomputing canonical digests; each row carries the stored ones.
+        self.register(confirmations=2, reviewers=1, span=0)
+        self.confirm(reviewer="alice")
+        self.confirm(reviewer="bob")
+        artifact = self.system.compile("tenant-a", "echo").created[0]
+        with self.system.store.transaction() as connection:
+            stored = connection.execute(
+                "SELECT input_hash, output_hash FROM artifacts WHERE id = ?", (artifact,)
+            ).fetchone()
+        rows = self.system.examples("tenant-a", "echo")
+        self.assertEqual(len(rows), 2)
+        for row in rows:
+            self.assertEqual(row["input_hash"], canonicalize(row["input"]).digest)
+            self.assertEqual(row["output_hash"], canonicalize(row["output"]).digest)
+            self.assertEqual((row["input_hash"], row["output_hash"]), tuple(stored))
+
     def test_operation_revision_retires_old_artifacts(self) -> None:
         self.register()
         self.system.set_switch("tenant-a", "echo", mode="follow", actor="operator")

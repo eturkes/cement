@@ -19,8 +19,8 @@ from pydantic import BaseModel, Field
 # The embedded source keeps its own line breaks; one of its pragma comments runs past 100
 # columns inside the string, where ruff reads no pragma.
 # ruff: noqa: E501
-_CEMENT_PACKAGE = "_cement_runtime_f8534409cb072e61"
-_CEMENT_DIGEST = "f8534409cb072e619e2ca6aca1211451a5b16d79e377aa4e15812b68e21e3705"
+_CEMENT_PACKAGE = "_cement_runtime_d72ff6f932e1fb7b"
+_CEMENT_DIGEST = "d72ff6f932e1fb7b171da23122b38f7da9cd88e518a08616b21842aa873605cd"
 _CEMENT_SOURCES = {
     "__init__": r'''
 """Cement public API."""
@@ -8411,9 +8411,11 @@ class System:
                     "confirmed_at_us": int(row["confirmed_at_us"]),
                     "id": str(row["id"]),
                     "input": parse_json(str(row["input_json"])).value,
+                    "input_hash": str(row["input_hash"]),
                     "operation_revision": int(row["operation_revision"]),
                     "origin": str(row["origin"]),
                     "output": parse_json(str(row["output_json"])).value,
+                    "output_hash": str(row["output_hash"]),
                     "receipt_hash": str(row["receipt_hash"]),
                     "reviewer": str(row["reviewer"]),
                     "sequence": int(row["sequence"]),
