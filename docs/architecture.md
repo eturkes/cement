@@ -186,7 +186,9 @@ leave the ledger.
 snapshot, and it keeps the two anchors in separate number spaces. Historical member support and
 reviewer counts are frozen at build time. Active evidence and policy state remain current, so
 complements or ratios across the two anchors are meaningless. The current-state half counts ready and
-blocked scopes, pending proposals, artifact statuses, and stale-revision anomalies. `projection_limit`
+blocked scopes, pending proposals, artifact statuses, and stale-revision anomalies. No supported command
+leaves a stale-revision anomaly, because `operation revise` retires every active build of the older
+revision. A nonzero count therefore means a direct edit of the ledger. `projection_limit`
 bounds the returned detail. Each detail list keeps one fixed order, so a smaller limit returns a prefix
 of a larger one: members by ordinal, ready and blocked scopes by input hash, pending proposals in
 arrival order, and artifacts and stale-revision anomalies newest first. The report proves that every pending proposal in the partition keeps its

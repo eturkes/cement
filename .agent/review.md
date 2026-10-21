@@ -15,6 +15,16 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p08 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
+
+Check set: R1 the corruption-only claim re-derived from behavior; R2 the probe cites the contract; R3 register. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | claim soundness | pass | library probe across a revision: every active build retired, stale count 0, pinned version answering. |
+| R2 | acceptance | pass | the CLI probe's comment names `docs/architecture.md` and its fabrication. |
+| R3 | records | pass | register audit + article audit rc 0 on the new sentences. |
+
 ## p05 partial (MAINTAIN queue run, unit, tier `data`; owed: owner approval to wire `--all` into the gate) — target = the commit landing this section
 
 Check set: R1 `--rev` reads git objects for every anchor and `owns` path; R2 `--all` grades each record at its adding commit; R3 the fixture fires both ways; R4 the unwired half is recorded as owed. MAIN alone.

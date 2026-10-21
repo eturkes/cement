@@ -711,8 +711,9 @@ class CLITests(unittest.TestCase):
         self.assertEqual(
             len(self.payload(self.run_cli("compile", "echo"))["created"]), 2
         )
-        # `operation revise` retires artifacts it strands, so this family only
-        # ever reports out-of-band ledger state; bump the revision directly.
+        # Corruption-only family (`docs/architecture.md`: no supported command leaves a stale-
+        # revision anomaly, `operation revise` retires every active build), so the probe
+        # fabricates out-of-band ledger state: bump the revision directly.
         connection = sqlite3.connect(self.database)
         with connection:
             connection.execute(
