@@ -158,6 +158,16 @@ def _is_freeze(segment: str) -> bool:
     return module_shape or span_shape
 
 
+def _segment(lines: list[bytes], node: ast.AST) -> str:
+    """`ast.get_source_segment` over lines split ONCE per file: the stdlib call re-splits the
+    whole source per node, which made each census pass quadratic in a 16k-line module (p103)."""
+    first, last = node.lineno - 1, node.end_lineno - 1
+    if first == last:
+        return lines[first][node.col_offset : node.end_col_offset].decode("utf-8")
+    body = [lines[first][node.col_offset :], *lines[first + 1 : last], lines[last][: node.end_col_offset]]
+    return b"".join(body).decode("utf-8")
+
+
 def _pins() -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for path in sorted((ROOT / "tests").glob("*.py")):
@@ -165,10 +175,11 @@ def _pins() -> list[dict[str, object]]:
             continue
         source = path.read_text(encoding="utf-8")
         tree = ast.parse(source)
+        lines = [line.encode("utf-8") for line in source.splitlines(keepends=True)]
         for node in ast.walk(tree):
             if not isinstance(node, ast.FunctionDef):
                 continue
-            segment = ast.get_source_segment(source, node) or ""
+            segment = _segment(lines, node)
             if not (READS_DOC.search(segment) and VOCAB.search(segment)):
                 continue
             rows.append(
@@ -191,10 +202,11 @@ def _freezes() -> list[dict[str, object]]:
             continue
         source = path.read_text(encoding="utf-8")
         tree = ast.parse(source)
+        lines = [line.encode("utf-8") for line in source.splitlines(keepends=True)]
         for node in ast.walk(tree):
             if not isinstance(node, ast.FunctionDef):
                 continue
-            segment = ast.get_source_segment(source, node) or ""
+            segment = _segment(lines, node)
             if not _is_freeze(segment):
                 continue
             rows.append(

@@ -15,6 +15,16 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p103 close (MAINTAIN queue run, born row pulled forward as an enabler, tier `data`) — target = the commit landing this section
+
+Check set: R1 equal strength (identical emitted table, all self-test controls fire); R2 the speed-up measured; R3 scope (only the segment source changed). MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | correctness | pass | pre/post `--emit` → `cmp` identical; `--self-test` 8/8. |
+| R2 | acceptance | pass | emit 59.2 → 2.0 s, self-test ~200 → 13.4 s, L29 16 s. |
+| R3 | correctness | pass | one helper + two call sites; scans, regexes and table shape untouched. |
+
 ## p64 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
 
 Check set: R1 each repaired sentence re-derived from behavior, not retyped; R2 the checker grounds against published names only and fires both ways; R3 records. MAIN alone.
