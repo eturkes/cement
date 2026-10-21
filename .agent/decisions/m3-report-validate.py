@@ -1,7 +1,15 @@
 #!/usr/bin/env python3
 """Structural validator for M3 planning-wave reports.
 
-Usage: uv run python .scratch/m3-report-validate.py .scratch/agents/<name>.md
+Usage:
+  uv run python .agent/decisions/m3-report-validate.py <report.md> [--rev SHA]
+  uv run python .agent/decisions/m3-report-validate.py --all
+
+`--rev` resolves every anchor in git object `SHA` instead of the working tree. `--all` grades
+every tracked `.agent/decisions/*.md` holding a recognized table AT THE COMMIT THAT ADDED IT
+(p05): a record's anchors describe the tree it was written against, so grading it against a
+later tree reds correct history, while grading it at its own base still catches an anchor that
+was false when written.
 
 Validates every pipe table whose header matches a known shape:
 
@@ -22,6 +30,7 @@ UNKNOWN-CELLS=0.
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -55,11 +64,54 @@ def cells(line: str) -> list[str]:
     return parts
 
 
+def _git(*args: str) -> str | None:
+    done = subprocess.run(("git", "-C", str(ROOT), *args), capture_output=True, check=False)
+    return done.stdout.decode("utf-8", errors="replace") if done.returncode == 0 else None
+
+
+def _lines(rel: str, rev: str | None) -> list[str]:
+    """The file's lines in the working tree, or in git object `rev`; [] when absent."""
+    if rev is not None:
+        text = _git("show", f"{rev}:{rel}")
+        return [] if text is None else text.splitlines()
+    target = (ROOT / rel).resolve()
+    return target.read_text(encoding="utf-8", errors="replace").splitlines() if target.is_file() else []
+
+
+def _exists(rel: str, rev: str | None) -> bool:
+    if rev is None:
+        return (ROOT / rel).exists()
+    return _git("cat-file", "-e", f"{rev}:{rel}") is not None
+
+
 def main(argv: list[str]) -> int:
+    if argv[1:] == ["--all"]:
+        return grade_all()
+    if len(argv) == 4 and argv[2] == "--rev":
+        return grade(Path(argv[1]), argv[3])
     if len(argv) != 2:
-        print("usage: m3-report-validate.py <report.md>", file=sys.stderr)
+        print("usage: m3-report-validate.py <report.md> [--rev SHA] | --all", file=sys.stderr)
         return 2
-    report = Path(argv[1])
+    return grade(Path(argv[1]), None)
+
+
+def grade_all() -> int:
+    listed = (_git("ls-files", "--", ".agent/decisions/*.md") or "").split()
+    failed = graded = 0
+    for rel in listed:
+        if not any(tuple(c.lower() for c in cells(line)) in SHAPES
+                   for line in (ROOT / rel).read_text(encoding="utf-8").splitlines()):
+            continue
+        added = (_git("log", "--diff-filter=A", "--format=%H", "--", rel) or "").split()
+        base = added[-1] if added else None
+        print(f"== {rel} @ {base[:9] if base else 'working tree'}", flush=True)
+        graded += 1
+        failed += grade(ROOT / rel, base) != 0
+    print(f"RECORDS: {graded} graded, {failed} failed")
+    return 1 if failed or not graded else 0
+
+
+def grade(report: Path, rev: str | None) -> int:
     if not report.is_file():
         print(f"MISSING-REPORT: {report}", file=sys.stderr)
         return 2
@@ -111,9 +163,9 @@ def main(argv: list[str]) -> int:
                 anchors_bad.append(f"{report.name}:{lineno} tier {tier!r} not in {sorted(TIERS)}")
             for path in TICK_RE.findall(row[3]):
                 probe = path.rstrip("/")
-                if not (ROOT / probe).exists() and not probe.endswith("/"):
-                    parent = (ROOT / probe).parent
-                    if not parent.is_dir():
+                if not _exists(probe, rev) and not probe.endswith("/"):
+                    parent = str(Path(probe).parent)
+                    if not _exists(parent, rev):
                         anchors_bad.append(f"{report.name}:{lineno} owns {path!r} has no parent dir")
                         continue
                 anchors_ok += 1
@@ -131,12 +183,8 @@ def main(argv: list[str]) -> int:
             anchors_bad.append(f"{report.name}:{lineno} bad anchor {anchor!r}")
             continue
         rel, num = match.group(1), int(match.group(2))
-        target = (ROOT / rel).resolve()
         if rel not in cache:
-            if not target.is_file():
-                cache[rel] = []
-            else:
-                cache[rel] = target.read_text(encoding="utf-8", errors="replace").splitlines()
+            cache[rel] = _lines(rel, rev)
         src_lines = cache[rel]
         if not src_lines:
             anchors_bad.append(f"{report.name}:{lineno} no such file {rel}")

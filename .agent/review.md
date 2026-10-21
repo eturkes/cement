@@ -15,6 +15,17 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p05 partial (MAINTAIN queue run, unit, tier `data`; owed: owner approval to wire `--all` into the gate) — target = the commit landing this section
+
+Check set: R1 `--rev` reads git objects for every anchor and `owns` path; R2 `--all` grades each record at its adding commit; R3 the fixture fires both ways; R4 the unwired half is recorded as owed. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | correctness | pass | `_lines` / `_exists` route through `git show` / `git cat-file -e` when `rev` is set. |
+| R2 | correctness | pass | the M3 maps: 207 / 212 / 294 bad at HEAD → 0 at `3a53389`. |
+| R3 | acceptance (partial) | pass | `one-stale.md` rc 1 naming the stale anchor; `resolving.md` rc 0. |
+| R4 | claim soundness | pass + register | gate wiring owed; `m3-plan-review.md` fails at its base on scratch-only anchors (p10). |
+
 ## p97 partial (MAINTAIN queue run, unit, tier `kernel`; owed: owner ruling on the separator set + ABI) — target = the commit landing this section
 
 Check set: R1 the defect reproduced at HEAD; R2 the design input states what each option changes for already-promoted versions; R3 nothing implemented ahead of the ruling. MAIN alone.
