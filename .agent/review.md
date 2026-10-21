@@ -15,6 +15,14 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p24 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
+
+Check set: R1 the arm is documented as deliberate breadth over schema-fixed inputs, with no claim of a real-ledger repro. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | comment at `_verify_row`'s `except (IntegrityError, ValidationError)`: callees normalize reachable failures to `IntegrityError`; the `ValidationError` breadth keeps a value-shape failure a failed report. No test added (the documented option). |
+
 ## pri-4 owner-gated rows (MAINTAIN queue run, owed / waiting) — target = the commit landing this section
 
 Check set: R1 each row names what it owes or the trigger it waits on. MAIN alone; no code.

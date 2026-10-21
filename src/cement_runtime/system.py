@@ -4285,6 +4285,9 @@ class System:
                 connection, row, record_test=record_test
             )
             flush_tests()
+        # `ValidationError` is deliberate breadth (p24): the callees normalize every reachable
+        # failure to `IntegrityError` today, but a value-shape failure in replayed evidence must
+        # still end as a failed report, never as an exception escaping the locked batch.
         except (IntegrityError, ValidationError) as exc:
             pending_tests.clear()
             connection.execute("ROLLBACK TO verification_run")

@@ -20,8 +20,8 @@ from pydantic import BaseModel, Field
 # The embedded source keeps its own line breaks; one of its pragma comments runs past 100
 # columns inside the string, where ruff reads no pragma.
 # ruff: noqa: E501
-_CEMENT_PACKAGE = "_cement_runtime_0843832114aab618"
-_CEMENT_DIGEST = "0843832114aab61845f2a77629e665e942bb378b37af65061f23c3b7af16ff0a"
+_CEMENT_PACKAGE = "_cement_runtime_f5ae780caf650122"
+_CEMENT_DIGEST = "f5ae780caf650122373b84fed0793e3cdee31929e5dd04f1a4fbd3a38b8190f4"
 _CEMENT_SOURCES = {
     "__init__": r'''
 """Cement public API."""
@@ -6729,6 +6729,9 @@ class System:
                 connection, row, record_test=record_test
             )
             flush_tests()
+        # `ValidationError` is deliberate breadth (p24): the callees normalize every reachable
+        # failure to `IntegrityError` today, but a value-shape failure in replayed evidence must
+        # still end as a failed report, never as an exception escaping the locked batch.
         except (IntegrityError, ValidationError) as exc:
             pending_tests.clear()
             connection.execute("ROLLBACK TO verification_run")
