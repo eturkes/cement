@@ -1,0 +1,84 @@
+{
+  "campaign": "p56 assertion strength",
+  "oracle_module": "tests.test_assertion_strength",
+  "scope": "the three weakening families p56 names, at every HEAD site each still has; the request-id payload pin left with the request lifecycle, so its family lands on the empty-payload pins that replaced it (B30, submission D03)",
+  "rows": [
+    {
+      "id": "W1",
+      "family": "assertFalse(matched) -> assertIsNotNone(match)",
+      "file": "tests/test_system.py",
+      "function": "test_counterexample_and_revocation_quarantine",
+      "occurrence": 0,
+      "old": "        self.assertFalse(resolution.match.matched)\n",
+      "new": "",
+      "oracle": "tests.test_assertion_strength.AssertionStrengthTests.test_a_quarantined_case_misses_by_its_matched_flag",
+      "intent": "drop the matched check; the assertIsNotNone(resolution.match) line above it is the weakened form"
+    },
+    {
+      "id": "W2",
+      "family": "assertFalse(matched) -> assertIsNotNone(match)",
+      "file": "tests/test_system.py",
+      "function": "test_runtime_integrity_failure_quarantines_then_falls_back",
+      "occurrence": 0,
+      "old": "        self.assertFalse(resolution.match.matched)\n",
+      "new": "",
+      "oracle": "tests.test_assertion_strength.AssertionStrengthTests.test_a_quarantined_case_misses_by_its_matched_flag",
+      "intent": "drop the matched check; the assertIsNotNone(resolution.match) line above it is the weakened form"
+    },
+    {
+      "id": "W3",
+      "family": "assertFalse(matched) -> assertIsNotNone(match)",
+      "file": "tests/test_system.py",
+      "function": "test_operation_revision_retires_old_artifacts",
+      "occurrence": 0,
+      "old": "        self.assertFalse(resolution.match.matched)\n",
+      "new": "",
+      "oracle": "tests.test_assertion_strength.AssertionStrengthTests.test_a_quarantined_case_misses_by_its_matched_flag",
+      "intent": "drop the matched check; the assertIsNotNone(resolution.match) line above it is the weakened form"
+    },
+    {
+      "id": "W4",
+      "family": "payload equality -> key membership",
+      "file": "tests/test_proposal_binding_battery.py",
+      "function": "test_b30_the_six_owned_event_payloads_are_2",
+      "occurrence": 0,
+      "old": "self.assertEqual(json.loads(event[\"payload_json\"]), {})",
+      "new": "self.assertNotIn(\"request_id\", json.loads(event[\"payload_json\"]))",
+      "oracle": "tests.test_assertion_strength.AssertionStrengthTests.test_the_proposal_created_payload_is_pinned_empty_by_equality",
+      "intent": "empty-payload equality loosened to one key's absence"
+    },
+    {
+      "id": "W5",
+      "family": "payload equality -> key membership",
+      "file": "tests/test_submission_battery.py",
+      "function": "test_d03_the_event_is_proposal_created_with",
+      "occurrence": 0,
+      "old": "self.assertEqual(json.loads(row[3]), {})",
+      "new": "self.assertNotIn(\"request_id\", json.loads(row[3]))",
+      "oracle": "tests.test_assertion_strength.AssertionStrengthTests.test_the_proposal_created_payload_is_pinned_empty_by_equality",
+      "intent": "empty-payload equality loosened to one key's absence"
+    },
+    {
+      "id": "W6",
+      "family": "call-count equality -> >=",
+      "file": "examples/hospital_ocr/run_demo.py",
+      "function": "main",
+      "occurrence": 0,
+      "old": "assert source.calls == before",
+      "new": "assert source.calls >= before",
+      "oracle": "tests.test_assertion_strength.AssertionStrengthTests.test_the_demo_pins_flat_model_calls_by_equality_on_each_hit",
+      "intent": "Act 3 (A03 under follow): flat model calls loosened to non-decreasing"
+    },
+    {
+      "id": "W7",
+      "family": "call-count equality -> >=",
+      "file": "examples/hospital_ocr/run_demo.py",
+      "function": "main",
+      "occurrence": 1,
+      "old": "assert source.calls == before",
+      "new": "assert source.calls >= before",
+      "oracle": "tests.test_assertion_strength.AssertionStrengthTests.test_the_demo_pins_flat_model_calls_by_equality_on_each_hit",
+      "intent": "Act 5 (C01 restored under follow): flat model calls loosened to non-decreasing"
+    }
+  ]
+}
