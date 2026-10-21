@@ -11,6 +11,7 @@ import pathlib
 import socket
 import stat
 import sqlite3
+import subprocess
 import sys
 import tempfile
 import types
@@ -1112,6 +1113,35 @@ class CLITests(unittest.TestCase):
             result = _run(arguments, parser)
         self.assertIs(result, spy.return_value)
         self.assertNotIsInstance(result, _Outcome)
+
+    def test_main_returns_with_stdout_still_buffered(self) -> None:
+        # p14, README `Outcomes`: no explicit flush — the payload waits in the host's buffer
+        # until the host (or interpreter exit) flushes it.
+        raw = io.BytesIO()
+        host = io.TextIOWrapper(io.BufferedWriter(raw, buffer_size=1 << 16), encoding="utf-8")
+        with mock.patch.object(sys, "stdout", host):
+            status = main([*self.base, "operation", "list"])
+        self.assertEqual((status, raw.getvalue()), (0, b""))
+        host.flush()
+        self.assertEqual(json.loads(raw.getvalue()), [])
+
+    def test_a_closed_stdout_exits_120_with_python_s_notice(self) -> None:
+        # p14, README `Outcomes`: the read end is closed before the child starts, so its exit-
+        # time flush meets EPIPE; Python reports it outside the JSON channel and exits 120.
+        read_end, write_end = os.pipe()
+        os.close(read_end)
+        try:
+            child = subprocess.run(
+                [sys.executable, "-m", "cement_runtime", *self.base, "operation", "list"],
+                stdout=write_end,
+                stderr=subprocess.PIPE,
+                env={**os.environ, "PYTHONPATH": str(pathlib.Path(__file__).resolve().parents[1] / "src")},
+                check=False,
+            )
+        finally:
+            os.close(write_end)
+        self.assertEqual(child.returncode, 120)
+        self.assertIn(b"BrokenPipeError", child.stderr)
 
     def test_function_show_and_receipts_take_the_last_of_a_repeated_flag(self) -> None:
         for leaf, method, arguments, expected in (

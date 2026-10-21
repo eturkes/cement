@@ -493,6 +493,10 @@ is negative. The leaf names the object, and the object selects the payload chann
 Every other nonzero exit reports a failure to complete. Exit 2 covers usage and validation. Exit 3
 means an absent object, exit 4 a state conflict, and exit 5 an integrity failure.
 
+The CLI writes `stdout` without an explicit flush, and Python flushes it when the process exits. If
+the reader closes the pipe first, the process exits 120, and Python writes a `BrokenPipeError` notice
+to `stderr` that is not JSON. An embedding host that calls `main` flushes its own `stdout`.
+
 The root `verify` command does not use exit 6. It reports a failed verification as exit 0 with
 `"passed": false` in its payload. Read the `passed` field to get the verdict from root `verify`. Read
 the exit status to get the verdict from the `function` commands in the table above. A script that

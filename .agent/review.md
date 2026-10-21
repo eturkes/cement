@@ -15,6 +15,17 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p14 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 the chosen option (documented limit) is stated once in human-facing prose; R2 a custom buffered stream pins the no-flush behavior; R3 the closed-pipe claim measured (exit 120 + notice); R4 credit recorded, survivors routed. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | README `## Outcomes` paragraph; register audit rc 0. |
+| R2 | acceptance | pass | raw stream empty after `main` returns; JSON after the host's flush. |
+| R3 | acceptance | pass | read end closed before spawn → rc 120 + `BrokenPipeError` (manual probe and the pin). |
+| R4 | verification integrity | open → p105 | 217 / 89 killed (`.agent/decisions/p14-mutate.txt`). |
+
 ## p16 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
 
 Check set: R1 README names the four meanings + the disambiguation; R2 each leaf's exit-6 test pins its channel. MAIN alone; no change.

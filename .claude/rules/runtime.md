@@ -52,7 +52,8 @@ paths:
 - A CLI-owned bound over an unclamped library projection makes state CLI-unreachable and buys nothing: the bound belongs to whichever layer owns the query. An unsliced payload takes no count field.
 - Linux refuses an exec argument well below 1 MiB here (~120 KB launches, ~140 KB is E2BIG) while in-process `main([...])` has no wall, so any adjacent-pair test at `DEFAULT_MAX_BYTES` travels through `--input -`.
 - Ledger creation: `operation register` alone constructs `System(create=True)`, after grading partition, operation, actor and policy; every other leaf opens existing-only (`create=False`), so a typo'd `--db` exits 5 and creates nothing (p50 + p51).
-- Known residue, each owning a `.agent/deferred.md` row: `_emit` performs no explicit flush; `main` does not handle `KeyboardInterrupt`; `_request_id` reports the label `request_id` for proposal, artifact, example, report and receipt ids; `system.py` re-implements the 64-hex predicate at three sites beside `_digest`.
+- `stdout` is never flushed by `main` (documented limit, README `## Outcomes`, p14): the interpreter flushes at exit, a reader-closed pipe = Python's exit 120 + `BrokenPipeError` notice outside JSON, an embedding host flushes its own stream.
+- Known residue, each owning a `.agent/deferred.md` row: `main` does not handle `KeyboardInterrupt`; `_request_id` reports the label `request_id` for proposal, artifact, example, report and receipt ids; `system.py` re-implements the 64-hex predicate at three sites beside `_digest`.
 
 ## Events
 
