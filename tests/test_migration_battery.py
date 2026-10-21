@@ -37,6 +37,7 @@ from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 BASELINE = "6fb4d92"
+OPENING_CENSUS = "4db71a9"  # p57: the ruled census before the landing pruned its MIGRATE rows
 M3U6A1_TIP = "dc4ab5e"  # M3.6a1's DONE commit — the closed endpoint every D16 claim reads against
 SURGERY = pathlib.Path(".agent") / "decisions" / "m3u6a1-surgery.py"
 LIFECYCLE = frozenset({"handle", "request_status"})
@@ -1212,9 +1213,22 @@ class MigrationBatteryTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0, _result(second))
             self.assertIn("no-op", second.stdout + second.stderr)
 
-            for row in _census(self.root)["definitions"]:
-                if row["verdict"] not in {"MIGRATE", "MIGRATE-RESOLVE"}:
-                    continue
+            # p57: the closed census keeps the 23 RETAIN rows alone, so it lists no site to
+            # check. The work list is the ruled OPENING census instead (`4db71a9`, the last
+            # revision before the landing pruned its MIGRATE rows), read from git.
+            opening = _run(
+                ["git", "show", f"{OPENING_CENSUS}:.agent/decisions/m3u6a1-census.json"],
+                cwd=self.root,
+                root=self.root,
+            )
+            self.assertEqual(opening.returncode, 0, _result(opening))
+            migrated = [
+                row
+                for row in json.loads(opening.stdout)["definitions"]
+                if row["verdict"] in {"MIGRATE", "MIGRATE-RESOLVE"}
+            ]
+            self.assertEqual(len(migrated), 26)
+            for row in migrated:
                 path, name = row["site"].split("::", 1)
                 definition = _top_definition(shifted, path, name)
                 self.assertEqual(

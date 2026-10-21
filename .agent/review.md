@@ -15,6 +15,16 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p57 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 the work list is drawn from a frozen, main-reachable source and asserted non-empty; R2 the seed reds the new frame and leaves the old one green; R3 D30 holds (the frame reads git objects, never the working tree). MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | correctness | pass | `4db71a9` is an ancestor of main; 26 rows asserted; read through `_run(["git", "show", …], cwd=self.root, root=self.root)`. |
+| R2 | acceptance | pass | seed: one `SITES` rule deleted → new D17 RED naming the missed site; old D17 GREEN on that seed. |
+| R3 | correctness | pass | migration battery minus D28 green at the commit's full gate; D30 unchanged. |
+
 ## p55 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section, base `546f6e7`
 
 Check set: R1 the cleanup touches only dead-PID run directories; R2 D30 structure holds (helpers take `root`, git via `_run`); R3 no census locus above the L23 pin moved; R4 red-first; R5 records. MAIN alone (test infrastructure; the killed-child tests are the seeds).
