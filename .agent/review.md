@@ -15,6 +15,18 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p55 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section, base `546f6e7`
+
+Check set: R1 the cleanup touches only dead-PID run directories; R2 D30 structure holds (helpers take `root`, git via `_run`); R3 no census locus above the L23 pin moved; R4 red-first; R5 records. MAIN alone (test infrastructure; the killed-child tests are the seeds).
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | correctness | pass | `_clean_stale_worktrees` skips a live PID (`os.kill(pid, 0)`), skips non-numeric names + `PermissionError`; a reused PID only delays cleanup. |
+| R2 | correctness | pass | new helpers take `root` with no default and call `_run`; `test_lifecycle_removal_battery` (59 OK) + migration battery minus D28 (37 OK). |
+| R3 | correctness | pass | `_detached_worktree` keeps its line count (one `with` line swapped); helpers + tests sit after line 1426; `m3u6a2-tripwires.py` output identical to HEAD's. |
+| R4 | acceptance | pass | 3 tests red over base's helper (`546f6e7`, detached worktree), green here. |
+| R5 | records | pass | `history-gates.md` names the directory, the cleanup and `--clean`. |
+
 ## p51 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 acceptance rerun at HEAD (one ruling for every write leaf; per-leaf typo-path + malformed-value probes create nothing and name the cause). MAIN alone; no code changed.

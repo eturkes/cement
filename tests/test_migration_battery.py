@@ -471,7 +471,7 @@ def _detached_worktree(
     root: pathlib.Path,
     revision: str,
 ) -> Iterator[pathlib.Path]:
-    with tempfile.TemporaryDirectory(prefix="cement-m3u6a1-") as directory:
+    with _run_scoped_directory(root) as directory:
         path = pathlib.Path(directory) / "tree"
         added = _run(
             ["git", "worktree", "add", "--detach", str(path), revision],
@@ -1987,5 +1987,126 @@ class D28VerdictCacheTests(unittest.TestCase):
         self.assertGreater(lines["_d28_record"][0], max(replay_asserts[:2]))
 
 
+# p55: every detached worktree lives under one run-scoped directory named for its owner's PID,
+# inside the git common dir (shared by every worktree, inside none, so no tree census sees it).
+# A run that dies before its `finally` leaves that directory + its registration behind; the next
+# run (or `--clean`) removes every run directory whose PID is gone.
+def _worktree_runs(root: pathlib.Path) -> pathlib.Path:
+    common = _run(["git", "rev-parse", "--git-common-dir"], cwd=root, root=root)
+    if common.returncode != 0:
+        raise AssertionError(_result(common))
+    return (root / common.stdout.strip()).resolve() / "cement-test-worktrees"
+
+
+def _clean_stale_worktrees(root: pathlib.Path) -> list[pathlib.Path]:
+    removed: list[pathlib.Path] = []
+    runs = _worktree_runs(root)
+    for run in sorted(runs.glob("*-*")) if runs.is_dir() else []:
+        try:
+            os.kill(int(run.name.split("-", 1)[0]), 0)
+            continue
+        except ProcessLookupError:
+            pass
+        except (PermissionError, ValueError):
+            continue
+        for tree in run.iterdir():
+            _run(["git", "worktree", "remove", "--force", str(tree)], cwd=root, root=root)
+        shutil.rmtree(run, ignore_errors=True)
+        removed.append(run)
+    pruned = _run(["git", "worktree", "prune"], cwd=root, root=root)
+    if pruned.returncode != 0:
+        raise AssertionError(_result(pruned))
+    return removed
+
+
+@contextlib.contextmanager
+def _run_scoped_directory(root: pathlib.Path) -> Iterator[pathlib.Path]:
+    _clean_stale_worktrees(root)
+    runs = _worktree_runs(root)
+    runs.mkdir(parents=True, exist_ok=True)
+    directory = pathlib.Path(tempfile.mkdtemp(prefix=f"{os.getpid()}-", dir=runs))
+    try:
+        yield directory
+    finally:
+        shutil.rmtree(directory, ignore_errors=True)
+
+
+class WorktreeOrphanTests(unittest.TestCase):
+    """p55: a run killed before `_detached_worktree`'s `finally` leaves no orphan behind it."""
+
+    KILLED_CHILD = """
+import os, pathlib, signal, sys
+sys.path.insert(0, sys.argv[1])
+from tests import test_migration_battery as battery
+with battery._detached_worktree(pathlib.Path(sys.argv[1]), battery.BASELINE) as tree:
+    print(tree, flush=True)
+    os.kill(os.getpid(), signal.SIGKILL)
+"""
+
+    # Mid-checkout: the registration and the directory exist, the checkout never finished.
+    KILLED_MID_CHECKOUT = """
+import os, pathlib, signal, sys
+sys.path.insert(0, sys.argv[1])
+from tests import test_migration_battery as battery
+real = battery._run
+def interrupted(command, **keywords):
+    if command[:3] == ["git", "worktree", "add"]:
+        real([*command[:4], "--no-checkout", *command[4:]], **keywords)
+        print(command[4], flush=True)
+        os.kill(os.getpid(), signal.SIGKILL)
+    return real(command, **keywords)
+battery._run = interrupted
+with battery._detached_worktree(pathlib.Path(sys.argv[1]), battery.BASELINE):
+    pass
+"""
+
+    def worktrees(self) -> set[str]:
+        listed = _run(["git", "worktree", "list", "--porcelain"], cwd=ROOT, root=ROOT)
+        self.assertEqual(listed.returncode, 0, _result(listed))
+        return {line[len("worktree "):] for line in listed.stdout.splitlines() if line.startswith("worktree ")}
+
+    def killed_run(self, child_source: str = KILLED_CHILD) -> pathlib.Path:
+        before = self.worktrees()
+        child = _run([sys.executable, "-c", child_source, str(ROOT)], cwd=ROOT, root=ROOT)
+        self.assertEqual(child.returncode, -9, _result(child))
+        orphan = pathlib.Path(child.stdout.strip())
+        self.assertTrue(orphan.is_dir())
+        self.assertEqual(self.worktrees() - before, {str(orphan)})
+        return orphan
+
+    def test_the_next_run_removes_a_killed_run_s_worktree(self) -> None:
+        before = self.worktrees()
+        orphan = self.killed_run()
+        with _detached_worktree(ROOT, BASELINE) as tree:
+            self.assertTrue(tree.is_dir())
+        self.assertEqual(self.worktrees(), before - {str(orphan)})
+        self.assertFalse(orphan.exists())
+        self.assertFalse(orphan.parent.exists())
+
+    def test_the_next_run_removes_a_run_killed_mid_checkout(self) -> None:
+        before = self.worktrees()
+        orphan = self.killed_run(self.KILLED_MID_CHECKOUT)
+        self.assertEqual(list(orphan.iterdir()), [pathlib.Path(orphan, ".git")])
+        with _detached_worktree(ROOT, BASELINE):
+            pass
+        self.assertEqual(self.worktrees(), before)
+        self.assertFalse(orphan.parent.exists())
+
+    def test_clean_reports_and_removes_a_killed_run_s_worktree(self) -> None:
+        before = self.worktrees()
+        orphan = self.killed_run()
+        cleaned = _run(
+            [sys.executable, "-m", "tests.test_migration_battery", "--clean"], cwd=ROOT, root=ROOT
+        )
+        self.assertEqual(cleaned.returncode, 0, _result(cleaned))
+        self.assertIn(str(orphan.parent), cleaned.stdout)
+        self.assertEqual(self.worktrees(), before)
+        self.assertFalse(orphan.parent.exists())
+
+
 if __name__ == "__main__":
-    unittest.main()
+    if sys.argv[1:] == ["--clean"]:
+        for run in _clean_stale_worktrees(ROOT):
+            print(f"removed {run}")
+    else:
+        unittest.main()
