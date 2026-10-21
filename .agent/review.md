@@ -15,6 +15,18 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## pri-4 owner-gated rows (MAINTAIN queue run, owed / waiting) — target = the commit landing this section
+
+Check set: R1 each row names what it owes or the trigger it waits on. MAIN alone; no code.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| p34 p37 p87 p88 p89 p90 | scope | owed | owner's scope-expansion disposition (`Decisions` `Dispositions`). |
+| p73 p75 p83 p86 | scope | owed | each acceptance opens on an owner ruling. |
+| p92 | gate | owed | widening the `register` step = a gate change (owner approval). |
+| p52 | trigger | waiting | binds only when a map row is about to become a durable claim. |
+| p99-p102 p104-p110 | verification integrity | owed | per-survivor non-author rulings at 77-1,689 survivors a row = the open survivor-scale question. |
+
 ## p93 + p95 (MAINTAIN queue run, owed) — target = the commit landing this section
 
 Check set: R1 each row's remaining part needs the owner, named on the row. MAIN alone; no code.
