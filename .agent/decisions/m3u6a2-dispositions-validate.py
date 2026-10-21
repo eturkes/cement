@@ -8,6 +8,8 @@ proves that answer against the tree rather than accepting the word.
 
     uv run python .agent/decisions/m3u6a2-dispositions-validate.py
     uv run python .agent/decisions/m3u6a2-dispositions-validate.py --self-test
+
+Tag dependency: 27658c4 = BASELINE, the seeded table's commit; kept only by the local, unpublished tag `archive/m3u6a2-impl-1`; restore in a clone = `git fetch <authoring clone> 'refs/tags/archive/m3u6a2-impl-1:refs/tags/archive/m3u6a2-impl-1'`.
 """
 
 from __future__ import annotations

@@ -12,6 +12,8 @@ Baseline for every count below is `27658c4`, the seeded table's own commit.
 
     uv run python .agent/decisions/m3u6a2-rule-dispositions.py          # apply
     uv run python .agent/decisions/m3u6a2-rule-dispositions.py --check  # gate 9's ruling half
+
+Tag dependency: 27658c4 = the seeded table's commit; kept only by the local, unpublished tag `archive/m3u6a2-impl-1`; restore in a clone = `git fetch <authoring clone> 'refs/tags/archive/m3u6a2-impl-1:refs/tags/archive/m3u6a2-impl-1'`.
 """
 
 from __future__ import annotations

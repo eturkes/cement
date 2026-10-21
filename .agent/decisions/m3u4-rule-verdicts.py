@@ -14,6 +14,8 @@ Verdict prefixes:
   SCOPED     the row overreaches; the ruling narrows its domain before the battery sees it
   CORRECTED  the row is WRONG against shipped code or a section 14 amendment
   ACCEPTED   the row found a real gap outside the shipped code
+
+Tag dependency: 975bb98 = the teammate table's commit; kept only by the local, unpublished tag `m3u4-verdicts-wave2`; restore in a clone = `git fetch <authoring clone> 'refs/tags/m3u4-verdicts-wave2:refs/tags/m3u4-verdicts-wave2'`.
 """
 
 from __future__ import annotations

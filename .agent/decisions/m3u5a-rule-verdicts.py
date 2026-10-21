@@ -36,6 +36,8 @@ Measurements this ruling rests on, all re-derived by MAIN from the primary tree:
   existing ledger + `!` partition -> exit 2 partition-shape message
   publication cells (`cement resolve`, `cement proposal submit`): README (1,1),
     architecture (1,1), threat-model (1,2), adapter-protocol (0,0)
+
+Tag dependency: f87c8a2 = the teammate table's commit; expired: no ref keeps it (an unreferenced object here, gone at the next gc); this patcher's committed output is the record.
 """
 
 from __future__ import annotations

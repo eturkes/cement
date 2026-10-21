@@ -25,6 +25,8 @@ Measurements this ruling rests on, derived by MAIN in the primary tree at 087093
     names cli.py, and post-removal cli.py holds no lifecycle or source residue
   gate 4 = 19 CHECK lines; gate 5 = 18 invocations over 5 surfaces, mutation-tested
   the seven EDITS delete five predicates and add none: a final-tree mutant set is EMPTY
+
+Tag dependency: 23935a2 = the teammate table's commit; kept only by the local, unpublished tag `archive/m3u5b-rev-1`; restore in a clone = `git fetch <authoring clone> 'refs/tags/archive/m3u5b-rev-1:refs/tags/archive/m3u5b-rev-1'`.
 """
 
 from __future__ import annotations

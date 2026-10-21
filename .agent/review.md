@@ -17,6 +17,16 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p94 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
+
+Check set: R1 every instrument's named revisions on `main` or recorded with a restore command; R2 the census exits 1 on an unreachable unrecorded SHA; R3 instruments unchanged in behavior. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | 9 recorded `Tag dependency:` lines over 8 instruments: 6 with their tag + fetch command, 3 expired (no ref keeps `3f9a053`, `f87c8a2`, `1880241`; `git for-each-ref --contains` empty) — a restore command cannot exist for those, so the line says so. |
+| R2 | integrity | pass | census before the docstring lines: rc 1 (9 `UNREACHABLE`); after: rc 0 (63 on main + 9 recorded). Digest hex (e.g. `m3u5a-s2-probe.py`'s parser-shape digest) is excluded by resolution, a stated limit. |
+| R3 | correctness | pass | the 7 patchers' `--check` rc identical before/after; `m3u6a2-dispositions-validate.py` output byte-equal (RESULT: PASS, 0 findings); no test reads these files. |
+
 ## p47 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
 
 Check set: R1 the branch taken (publish vs expire); R2 every citation marked; R3 both `m3u4-alt-*` diffs tracked + reproducible from the tags here; R4 instruments still pass. MAIN alone.

@@ -32,6 +32,9 @@ Measurements this ruling rests on, all derived by MAIN in the primary tree at 75
   help/choices/type mutants leave 151/ebd2ac811bd9776d unmoved: the digest omits all three
   cli.py holds 0 bare `65_536`; one submit_proposal call site, cli.py:627
   suite 901 tests OK rc 0
+
+Tag dependency: 1880241 = a landing commit a ruling cites; expired: no ref keeps it (an unreferenced object here, gone at the next gc); this patcher's committed output is the record.
+Tag dependency: 1f0ce30 = the teammate table's commit; kept only by the local, unpublished tag `archive/m3u5b-test-1`; restore in a clone = `git fetch <authoring clone> 'refs/tags/archive/m3u5b-test-1:refs/tags/archive/m3u5b-test-1'`.
 """
 
 from __future__ import annotations

@@ -13,6 +13,8 @@ Verdict prefixes:
   CHANGED    the ruling altered shipped code
   ACCEPTED   the row found a real gap outside the code
   OPEN       ruled, discharge deferred to the S3 battery with a named obligation
+
+Tag dependency: 3f9a053 = the teammate table's commit; expired: no ref keeps it (an unreferenced object here, gone at the next gc); this patcher's committed output is the record.
 """
 
 from __future__ import annotations

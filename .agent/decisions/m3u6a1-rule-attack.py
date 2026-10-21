@@ -39,6 +39,8 @@ Measurements this ruling rests on, derived by MAIN in the primary tree at 48649d
     six-module allowlist D27 describes
   battery D05 asserts `_consumer_map(ROOT) == retained`, a qualified-name -> count map
   battery D06 orders resolve before propose by `call.lineno` alone
+
+Tag dependency: 82e1a2e = the teammate table's commit; kept only by the local, unpublished tag `archive/m3u6a1-rev`; restore in a clone = `git fetch <authoring clone> 'refs/tags/archive/m3u6a1-rev:refs/tags/archive/m3u6a1-rev'`.
 """
 
 from __future__ import annotations
