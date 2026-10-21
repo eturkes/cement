@@ -15,6 +15,19 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p81 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section, base `d4746ef`
+
+Check set fixed before re-reading the diff: R1 no row can leave the queue unclosed (floor over both files' histories); R2 a closure SHA is admitted only when it resolves to an ancestor of HEAD; R3 `HEADER`, the queue header, `CLOSED_HEADER`, the ledger header + `--emit-stub` agree; R4 every pre-edit seed still fires; R5 p81 + p68 + p69 acceptance rerun; R6 law + records current. MAIN alone (a dev-tool grader whose seeds are mechanical; a teammate adds no assurance they miss).
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | correctness | pass | seeds: drop a born row → `MISSING ['p62']`, the same drop committed → `MISSING ['p62']`, a closed row dropped from the ledger → `MISSING ['p68']`, a closed row back in the queue → `open AND closed`, a closed `p99` never queued → red. |
+| R2 | correctness | pass | `closed=0000000`, `closed=HEAD`, a commit off HEAD's history → rc 1 each (`closure_sha_errors`: hex shape, `cat-file -e`, `merge-base --is-ancestor`). |
+| R3 | correctness | pass | header drift seeds red for both files; `--emit-stub` refuses the live queue byte-identically and writes `HEADER` alone. |
+| R4 | correctness | pass | `d4746ef` grader seeds vs the new grader's: same verdicts for drop, committed drop, header, `Accept:` on a continuation line, `unknown`, `Accept:` removed, git 127, shallowness stub. |
+| R5 | acceptance | pass | p81: the seeds above; p68: `rg -F 'last committed queue' .claude/rules/` rc 1 beside 3 hits in the ledger (positive control); p69: `claude -p` context-only question → 0 `tool_use` + the spec's answer from the root, 0 `tool_use` + `NOT LOADED` with `CLAUDE.md` line 1 deleted outside the repo. |
+| R6 | law + records | pass + register | `ops.md` Layout names the closure form + floor; `gate-checks.md` re-records the grader seeds; the queue header's stale gate line (`unittest discover` + `uv build` + `spec-lint`) → `.agent/gate`. Register: `ops.md` said `.agent/**` revisions owe no suite run, while D25 reads `.agent/deferred.md`'s p12 row and the batteries read or run `.agent/decisions/` files — fixed in place (census command named). |
+
 ## MAINTAIN Open WebUI live testing (ad-hoc request close) — target `3188ba3..c832287`, fixes in `6fdbb26`
 
 Check set fixed before the diff was read: correctness C1-C8 + cleanup K1 (reviewer-35, raw table `.scratch/review/owui/reviewer-35.md`), security S1-S6 (MAIN). Every finding was reproduced red by MAIN at `88ab4c2` (tag `archive/owui-w6-red`) before its fix.
