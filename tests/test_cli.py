@@ -22,7 +22,7 @@ import unittest
 from dataclasses import dataclass
 from unittest import mock
 
-from cement_runtime import System
+from cement_runtime import Candidate, CompilePolicy, System
 from cement_runtime import cli as cement_cli
 from cement_runtime.cli import main
 from cement_runtime.errors import IntegrityError, NotFoundError, StateError, ValidationError
@@ -3804,6 +3804,157 @@ class CLITests(unittest.TestCase):
         exported = self.run_cli("function", "export", "echo")
         self.assertEqual(destination.read_bytes(), exported.stdout_bytes)
 
+    def _read_fixture(self) -> tuple[System, dict[str, list[str]]]:
+        # Version 1: every case from reviewed requests (x1: one corrected, one accepted; x2: two
+        # later superseded). Version 2 rebuilds x3 from two agreeing challenges once its request
+        # examples are revoked, so that case has no request behind it at all.
+        system = System(self.database)
+        system.register_operation("tenant", "read-me", policy=CompilePolicy(2, 1, 0))
+        proposals: dict[str, list[str]] = {"x1": [], "x2": [], "x3": []}
+
+        def request(case: str, reviewer: str, proposed: object, decision: str = "accept") -> None:
+            proposal = system.submit_proposal(
+                "tenant",
+                "read-me",
+                {"x": int(case[1])},
+                candidate=Candidate(output=proposed, provenance={}),
+            )
+            extra = {"corrected_output": {"y": 1}} if decision == "correct" else {}
+            system.review("tenant", proposal, reviewer=reviewer, decision=decision, **extra)
+            proposals[case].append(proposal)
+
+        def promote() -> None:
+            system.compile("tenant", "read-me")
+            self.assertTrue(
+                system.verify_drafts("tenant", "read-me", verified_by="learning-pass").passed
+            )
+            manifest = system.inspect_function_promotion("tenant", "read-me")
+            system.promote_function(
+                "tenant",
+                "read-me",
+                expected_function_hash=manifest.function_hash,
+                promoted_by="learning-pass",
+            )
+
+        request("x1", "r1", {"y": 0}, "correct")
+        request("x1", "r2", {"y": 1})
+        for reviewer in ("r1", "r2"):
+            request("x2", reviewer, {"y": 5})
+        replaced = [
+            row["id"] for row in system.examples("tenant", "read-me") if row["input"] == {"x": 2}
+        ]
+        system.supersede_examples(
+            "tenant", "read-me", example_ids=replaced, output={"y": 2}, reviewer="learning-pass"
+        )
+        for reviewer in ("r1", "r2"):
+            request("x3", reviewer, {"y": 3})
+        promote()
+        requested = [
+            row["id"] for row in system.examples("tenant", "read-me") if row["input"] == {"x": 3}
+        ]
+        for reviewer in ("r3", "r4"):
+            system.challenge("tenant", "read-me", {"x": 3}, {"y": 3}, reviewer=reviewer)
+        for example_id in requested:
+            system.revoke_example("tenant", example_id, revoked_by="learning-pass", reason="probe")
+        promote()
+        return system, proposals
+
+    def test_function_read_lists_each_case_with_the_proposals_behind_it(self) -> None:
+        # p67: the promoted set as guarded branches, each case with the proposals behind it.
+        system, proposals = self._read_fixture()
+        receipt = system.latest_function_receipt("tenant", "read-me")
+        listing = self.payload(self.run_cli("function", "read", "read-me", "--json"))
+        self.assertEqual(
+            {
+                key: listing[key]
+                for key in ("operation", "receipt_id", "function_hash", "switch", "answers", "newest")
+            },
+            {
+                "operation": "read-me",
+                "receipt_id": receipt.id,
+                "function_hash": receipt.function_hash,
+                "switch": "off",
+                "answers": False,
+                "newest": True,
+            },
+        )
+        by_case = {canonicalize(case["case"]).text: case for case in listing["cases"]}
+        self.assertEqual(set(by_case), {'{"x":1}', '{"x":2}', '{"x":3}'})
+        # Arrival order: the corrected proposal was submitted first.
+        self.assertEqual(
+            [(r["proposal_id"], r["decision"], r["proposed_output"]) for r in by_case['{"x":1}']["proposals"]],
+            list(zip(proposals["x1"], ("corrected", "accepted"), ({"y": 0}, {"y": 1}))),
+        )
+        superseded = by_case['{"x":2}']["proposals"]
+        self.assertEqual([r["proposal_id"] for r in superseded], proposals["x2"])
+        self.assertTrue(all(r["superseded_by"] is not None for r in superseded))
+        self.assertEqual(by_case['{"x":3}']["proposals"], [])
+        self.assertEqual(
+            [e["origin"] for e in by_case['{"x":3}']["examples_without_proposal"]], ["challenge"] * 2
+        )
+
+        run = self.run_cli("function", "read", "read-me")
+        self.assertEqual((run.status, run.stderr_text), (0, ""))
+        text = run.stdout_text
+        self.assertTrue(text.startswith(f"# function read-me, version {receipt.function_hash}\n"))
+        self.assertIn("# switch off: no version answers yet; this is the newest version\n", text)
+        for case, output in (('{"x":1}', '{"y":1}'), ('{"x":2}', '{"y":2}'), ('{"x":3}', '{"y":3}')):
+            self.assertIn(f"if case == {case}:\n    answer {output}\n", text)
+        corrected, accepted = proposals["x1"]
+        self.assertIn(
+            f'    # proposal {corrected}: proposed {{"y":0}}, corrected to {{"y":1}}\n'
+            f'    # proposal {accepted}: proposed {{"y":1}}, accepted\n',
+            text,
+        )
+        for proposal in proposals["x2"]:
+            self.assertRegex(text, rf"    # proposal {proposal}: proposed {{\"y\":5}}, accepted, later superseded by example ex_\w+\n")
+        self.assertEqual(text.count(": from a challenge, no proposal\n"), 2)
+        self.assertTrue(text.endswith("otherwise:\n    ask the LLM\n"))
+
+    def test_function_read_names_cases_past_the_member_projection(self) -> None:
+        self._read_fixture()
+        with mock.patch.object(cement_cli, "_LISTING_MEMBERS", 1):
+            listing = self.payload(self.run_cli("function", "read", "read-me", "--json"))
+            text = self.run_cli("function", "read", "read-me").stdout_text
+        self.assertEqual([case["artifact_id"] is None for case in listing["cases"]], [False, True, True])
+        self.assertEqual([case["proposals"] for case in listing["cases"][1:]], [[], []])
+        self.assertEqual(text.count("    # proposals not listed: past the first 1 cases\n"), 2)
+
+    def test_function_read_names_the_version_it_reads(self) -> None:
+        system, _ = self._read_fixture()
+        newest, first = (
+            version.receipt for version in system.function_versions("tenant", "read-me").versions
+        )
+        self.assertEqual(newest, system.latest_function_receipt("tenant", "read-me"))
+        system.set_switch("tenant", "read-me", mode="follow", actor="person")
+        self.assertTrue(self.payload(self.run_cli("function", "read", "read-me", "--json"))["answers"])
+        self.assertIn(
+            "# switch follow: this version answers matching inputs\n",
+            self.run_cli("function", "read", "read-me").stdout_text,
+        )
+        system.set_switch(
+            "tenant", "read-me", mode="pinned", actor="person", function_hash=first.function_hash
+        )
+        pinned = self.payload(self.run_cli("function", "read", "read-me", "--json"))
+        self.assertEqual((pinned["receipt_id"], pinned["answers"]), (first.id, True))
+        by_id = self.payload(
+            self.run_cli("function", "read", "read-me", "--receipt-id", first.id, "--json")
+        )
+        self.assertEqual(by_id["receipt_id"], first.id)
+        missing = self.run_cli("function", "read", "read-me", "--receipt-id", "fpr_absent")
+        self.assertEqual((missing.status, missing.stdout_bytes), (3, b""))
+
+    def test_function_read_exits_3_without_a_promoted_version(self) -> None:
+        System(self.database).register_operation("tenant", "unread")
+        for flags in ((), ("--json",)):
+            with self.subTest(flags=flags):
+                run = self.run_cli("function", "read", "unread", *flags)
+                self.assertEqual((run.status, run.stdout_bytes), (3, b""))
+                self.assertEqual(
+                    self.error(run),
+                    {"error": "not_found", "message": "the operation has no promoted version to read"},
+                )
+
     def test_function_export_out_never_writes_through_the_destination_name(self) -> None:
         self.promoted_operation("echo", 2)
         System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
@@ -5128,7 +5279,7 @@ class ParserShapeTests(unittest.TestCase):
     grammar or help change re-pins it.
     """
 
-    SHAPE = (218, "9efacf438f50f647")
+    SHAPE = (224, "b5247aa170972257")
 
     @staticmethod
     def shape(parser: argparse.ArgumentParser) -> tuple[int, str]:

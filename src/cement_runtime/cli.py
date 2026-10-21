@@ -265,6 +265,14 @@ def _parser() -> argparse.ArgumentParser:
     function_diff.add_argument("operation")
     function_diff.add_argument("--from", dest="from_hash", required=True)
     function_diff.add_argument("--to", dest="to_hash", required=True)
+    function_read = function_commands.add_parser(
+        "read",
+        help="read one version as its cases and the proposals behind each case",
+        allow_abbrev=False,
+    )
+    function_read.add_argument("operation")
+    function_read.add_argument("--receipt-id", help="read one historical version instead")
+    function_read.add_argument("--json", action="store_true", help="print the listing as JSON")
     function_eval = function_commands.add_parser("eval")
     function_eval.add_argument("--bundle", required=True, help="path of an exported bundle file")
     function_eval.add_argument("--input", required=True, help="JSON text; '-' reads stdin")
@@ -576,6 +584,174 @@ def _policy(args: argparse.Namespace) -> CompilePolicy:
     )
 
 
+# The function report projects at most this many members; a larger version lists its later
+# cases without their proposals and says so.
+_LISTING_MEMBERS = 10_000
+
+
+def _function_listing(
+    system: System, partition: str, operation: str, *, receipt_id: str | None
+) -> dict[str, Any]:
+    """One version's cases with the confirmed proposals behind each, from public reads alone.
+
+    The version is always an immutable receipt: `--receipt-id`, else the pinned one, else the
+    newest, so a person reads a version before switching it on. Case values come from the rebuilt
+    bundle; each case's proposals come from its artifact's evidence, joined to proposals through
+    their review events.
+    """
+    _name(operation, "operation")
+    state = system.switch(partition, operation)
+    newest: str | None
+    try:
+        newest = system.latest_function_receipt(partition, operation).id
+    except NotFoundError:
+        newest = None
+    if receipt_id is None:
+        receipt_id = state.receipt_id if state.mode == "pinned" else newest
+        if receipt_id is None:
+            raise NotFoundError("the operation has no promoted version to read")
+    reconstruction = system.reconstruct_function_receipt(partition, receipt_id)
+    receipt = reconstruction.receipt
+    if receipt.operation != operation:
+        raise NotFoundError("function receipt does not exist for this operation")
+    report = system.function_report(
+        partition, operation, receipt_id=receipt.id, projection_limit=_LISTING_MEMBERS
+    )
+    anchor = report.function_anchor
+    members = {
+        member.input_hash: member.artifact_id for member in (anchor.members if anchor else ())
+    }
+    examples: dict[str, dict[str, Any]] = {}
+    after = 0
+    while page := system.examples(
+        partition, operation, include_revoked=True, after_sequence=after, limit=1000
+    ):
+        examples.update((str(row["id"]), row) for row in page)
+        after = int(cast(int, page[-1]["sequence"]))
+    proposal_of: dict[str, str] = {}
+    after = 0
+    while events := system.events(partition, after=after, limit=1000):
+        for event in events:
+            if event["kind"] in ("proposal.accepted", "proposal.corrected"):
+                payload = cast(dict[str, Any], event["payload"])
+                proposal_of[str(payload["example_id"])] = str(event["subject_id"])
+        after = int(cast(int, events[-1]["sequence"]))
+    cases: list[dict[str, Any]] = []
+    for entry in cast(list[dict[str, Any]], reconstruction.document.value["entries"]):
+        artifact_id = members.get(str(entry["input_hash"]))
+        behind: list[dict[str, Any]] = []
+        unproposed: list[dict[str, Any]] = []
+        if artifact_id is not None:
+            for example_id in cast(
+                list[str], system.artifact(partition, artifact_id)["evidence_ids"]
+            ):
+                # A superseding example carries no proposal; the one it replaced may.
+                source, seen = example_id, {example_id}
+                while source not in proposal_of:
+                    replaced = examples.get(source, {}).get("supersedes_example_id")
+                    if replaced is None or replaced in seen:
+                        break
+                    source = str(replaced)
+                    seen.add(source)
+                proposal_id = proposal_of.get(source)
+                if proposal_id is None:
+                    row = examples.get(example_id, {})
+                    unproposed.append(
+                        {"example_id": example_id, "origin": row.get("origin")}
+                        | {"sequence": row.get("sequence", 0)}
+                    )
+                    continue
+                proposal = system.proposal(partition, proposal_id)
+                behind.append(
+                    {
+                        "proposal_id": proposal_id,
+                        "decision": proposal["status"],
+                        "proposed_output": proposal["proposed_output"],
+                        "final_output": proposal["final_output"],
+                        "superseded_by": None if source == example_id else example_id,
+                        "sequence": proposal["sequence"],
+                    }
+                )
+        # Arrival order, whatever order the artifact's evidence lists them in.
+        for listed in (behind, unproposed):
+            listed.sort(key=lambda item: int(item.pop("sequence")))
+        cases.append(
+            {
+                "case": entry["input"],
+                "output": entry["output"],
+                "artifact_id": artifact_id,
+                "proposals": behind,
+                "examples_without_proposal": unproposed,
+            }
+        )
+    answers = receipt.id == (state.receipt_id if state.mode == "pinned" else newest)
+    return {
+        "operation": operation,
+        "operation_revision": receipt.operation_revision,
+        "receipt_id": receipt.id,
+        "function_hash": receipt.function_hash,
+        "projection_hash": reconstruction.document.projection_hash,
+        "switch": state.mode,
+        "answers": answers and state.mode != "off",
+        "newest": receipt.id == newest,
+        "cases": cases,
+    }
+
+
+def _render_listing(listing: dict[str, Any]) -> str:
+    """The human reading of `_function_listing`: one guarded branch per case, then the miss."""
+
+    def text(value: Any) -> str:
+        return canonicalize(value).text
+
+    if listing["answers"]:
+        serving = "this version answers matching inputs"
+    elif listing["switch"] == "off":
+        serving = "no version answers yet" + (
+            "; this is the newest version" if listing["newest"] else ""
+        )
+    else:
+        serving = "a different version answers"
+    lines = [
+        f"# function {listing['operation']}, version {listing['function_hash']}",
+        f"# receipt {listing['receipt_id']}, operation revision {listing['operation_revision']}",
+        f"# switch {listing['switch']}: {serving}",
+        "# Cement seals exact cases and runs no code; this listing renders them.",
+    ]
+    if listing["projection_hash"] is not None:
+        lines.append(
+            f"# Each input maps to its case through projection {listing['projection_hash']}."
+        )
+    lines.append("")
+    for case in listing["cases"]:
+        lines += [f"if case == {text(case['case'])}:", f"    answer {text(case['output'])}"]
+        for proposal in case["proposals"]:
+            if proposal["decision"] == "corrected":
+                outcome = f"corrected to {text(proposal['final_output'])}"
+            else:
+                outcome = str(proposal["decision"])
+            if proposal["superseded_by"] is not None:
+                outcome += f", later superseded by example {proposal['superseded_by']}"
+            lines.append(
+                f"    # proposal {proposal['proposal_id']}: proposed "
+                f"{text(proposal['proposed_output'])}, {outcome}"
+            )
+        for example in case["examples_without_proposal"]:
+            lines.append(
+                f"    # example {example['example_id']}: "
+                + (
+                    "from a challenge"
+                    if example["origin"] == "challenge"
+                    else f"origin {example['origin']}"
+                )
+                + ", no proposal"
+            )
+        if case["artifact_id"] is None:
+            lines.append(f"    # proposals not listed: past the first {_LISTING_MEMBERS} cases")
+    lines += ["otherwise:", "    ask the LLM", ""]
+    return "\n".join(lines)
+
+
 def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
     if args.command == "function" and args.function_command == "eval":
         # Ahead of the ledger gate and constructing no System: the bundle is the
@@ -834,6 +1010,11 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
                     check=args.check,
                 )
             )
+        if args.function_command == "read":
+            listing = _function_listing(
+                system, args.partition, args.operation, receipt_id=args.receipt_id
+            )
+            return listing if args.json else _Outcome(raw=_render_listing(listing))
         if args.function_command == "diff":
             return asdict(
                 system.diff_versions(

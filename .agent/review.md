@@ -15,6 +15,19 @@ survivor its unit left unruled, open until the closing-diff `reviewer` rules it 
 contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone.
 
+## p67 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 one read-only leaf prints the promoted set as a guarded-branch listing with, per case, the confirmed proposals behind it (original `proposed_output` beside the change); R2 case values come from the rebuilt bundle, not a second ledger projection; R3 `--json` keeps the machine surface, both branches pinned; R4 two originals print both, none prints the case and names the absence, an empty set exits 3; R5 no grading check moves except the documented digest re-pin; R6 surface wording (advisor). MAIN + advisor.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `cement function read OPERATION`: one `if case == …:` / `answer …` branch per case, each proposal as `# proposal <id>: proposed <out>, accepted | corrected to <out>`, supersession walked back to the original proposal, `otherwise: ask the LLM` tail. |
+| R2 | acceptance | pass | values from `reconstruct_function_receipt`'s document; originals via `function_report` members → artifact `evidence_ids` → review events → `proposal`, all public reads (B20's read-site set unchanged). |
+| R3 | acceptance | pass | `test_function_read_lists_each_case_with_the_proposals_behind_it` pins the JSON fields + order and the text lines. |
+| R4 | acceptance | pass | x1: 2 proposals in arrival order; x3 (rebuilt from 2 challenges): `from a challenge, no proposal` ×2; `test_function_read_exits_3_without_a_promoted_version` rc 3 both branches; overflow past the member projection named (`_LISTING_MEMBERS` test). |
+| R5 | gate safety | pass | `ParserShapeTests.SHAPE` (218 → 224 rows) re-pinned as its docstring prescribes for a deliberate grammar change; census batteries + `test_cli` 487 OK; tripwires PASS; register + article audits rc 0. |
+| R6 | surface | finding, fixed | advisor: proposal order was evidence order (nondeterministic) → arrival order; header + tail wording aligned with the ruled `Read` view (`seals … runs no code`, `ask the LLM`); over-limit branch tested. |
+
 ## p71 + p72 close (MAINTAIN queue run, closures, tier `docs`) — target = the commit landing this section
 
 Check set: each row's acceptance rerun at HEAD. MAIN alone; no change.

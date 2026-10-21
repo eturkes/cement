@@ -133,7 +133,7 @@ uv run cement --db demo.db --partition acme function promote support.reply \
 The new version answers nothing yet. A person reads it and switches it on:
 
 ```bash
-uv run cement --db demo.db --partition acme function show support.reply
+uv run cement --db demo.db --partition acme function read support.reply
 uv run cement --db demo.db --partition acme function switch support.reply \
   --mode follow --actor ops-lead
 ```
@@ -161,6 +161,7 @@ these commands: see [The learning pass](#the-learning-pass).
 | `inspect` | Preview the prospective set and return its function hash. |
 | `promote` | Promote the whole set atomically against a repeated hash. |
 | `export` | Emit bundle bytes for the live set or for a historical receipt. |
+| `read` | Show one version as code: its cases, and the proposals behind each case. |
 | `switch` | Turn the function off, make it follow the newest version, or pin one version. |
 | `versions` | List the promoted versions, newest first. `--check` also reports whether each one can serve now. |
 | `diff` | Compare two versions: the cases that the second one adds, removes, or changes. |
@@ -175,6 +176,11 @@ A newly registered operation starts with its switch `off`, so `resolve` answers 
 person turns the function on. `function switch OPERATION --mode follow --actor NAME` serves the newest
 promoted version. `--mode pinned --function-hash HASH` serves one version, and a later promotion does
 not change it. To roll back, pin an earlier version that `function versions` lists.
+
+`function read OPERATION` shows a version as code before you switch it on. Each case is one branch,
+with the proposals that the learning pass confirmed for it. The command reads the version that the
+switch pins, or else the newest version. `--receipt-id` reads any version, and `--json` prints the same
+listing as JSON. An operation that has no promoted version exits 3.
 
 Verify the set and export it. Then answer inputs where no ledger exists:
 
