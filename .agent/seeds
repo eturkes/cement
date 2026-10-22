@@ -8,8 +8,11 @@ Every recorded recipe has an S01–S18 group, with a result per constituent case
 rc 0 = every selected expectation matched and every worktree restored; 1 = a
 verdict differs; 2 = setup/restoration failure. --self-test repeats the selected
 set after neutralizing skip-census: exactly S12's four red seeds must change.
-Slow commands acquire a local `heavy` slot. Network is required by uv audit and
-an uncached gitleaks download. A private mirror keeps test commits, worktrees,
+CPU-heavy (suites, D28 replays, a mutation run) ⇒ run the whole runner in one
+offload slot: `offload run -- uv run python .agent/seeds …` (nixbox first, else a
+local heavy slot); it acquires no slot itself, since `heavy` is absent on the pool
+host and a nested `heavy` waits on a second local slot. Network is required by uv
+audit and an uncached gitleaks download. A private mirror keeps test commits, worktrees,
 and D28 cache writes out of the calling repository. Existing GREEN D28 records
 are copied as a cache only; D28 itself validates their content keys.
 """
@@ -61,7 +64,7 @@ GROUPS = [
 ]
 
 
-def run(argv, cwd, *, env=None, slow=False, timeout=None):
+def run(argv, cwd, *, env=None, timeout=None):
     environment = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
     for key in ("VIRTUAL_ENV", "UV_PROJECT_ENVIRONMENT", "CEMENT_D28_INNER_REPLAY"):
         environment.pop(key, None)
@@ -73,8 +76,6 @@ def run(argv, cwd, *, env=None, slow=False, timeout=None):
             else:
                 environment[key] = value
     command = [str(arg) for arg in argv]
-    if slow:
-        command = ["heavy", *command]
     # Noninteractive background shells can pass SIG_IGN; the historical p25
     # interrupt probe requires the ordinary executable signal dispositions.
     def signals():
@@ -207,8 +208,8 @@ class Runner:
             print(f"TREE-RESTORED {root.name} {len(before)} files sha256-equal git-diff=0", flush=True)
             git(self.repo, "worktree", "remove", "--force", str(root))
 
-    def case(self, sid, name, root, argv, rc, tokens=(), *, env=None, slow=False, timeout=None):
-        actual, output, seconds = run(argv, root, env=env, slow=slow, timeout=timeout)
+    def case(self, sid, name, root, argv, rc, tokens=(), *, env=None, timeout=None):
+        actual, output, seconds = run(argv, root, env=env, timeout=timeout)
         return self.observe(sid, name, actual, output, rc, tokens, seconds=seconds)
 
     def observe(self, sid, name, actual, output, rc, tokens=(), *, seconds=0):
@@ -274,7 +275,7 @@ class Runner:
             self.case(sid, "full-table", root, [".agent/gate"], 0,
                       [r"^unittest\s+0\s", r"^build\s+0\s", r"^spec-lint\s+0\s",
                        r"D28: \d+ revisions, \d+ replayed, \d+ from green verdicts",
-                       r"^Ran \d+ tests? in [^\n]+"], slow=True)
+                       r"^Ran \d+ tests? in [^\n]+"])
 
     def S02(self):
         with self.tree() as root:
@@ -396,7 +397,7 @@ class Runner:
             self.suite(sid, "damaged-records", root, ["tests.test_migration_battery.D28VerdictCacheTests"], 0,
                        [r"Ran 5 tests", r"^OK$"])
             test = [f"tests.test_migration_battery.MigrationBatteryTests.{D28}"]
-            self.suite(sid, "warm-control", root, test, 0, [r"D28: 12 revisions, \d+ replayed", r"^OK$"], slow=True)
+            self.suite(sid, "warm-control", root, test, 0, [r"D28: 12 revisions, \d+ replayed", r"^OK$"])
             path = root / "tests/test_json_value.py"
             text = path.read_text() + '\nclass PlantedRed(unittest.TestCase):\n    def test_planted_red(self):\n        self.fail("p77 planted red")\n'
             with changed(path, text):
@@ -407,7 +408,7 @@ class Runner:
                     before = {p.name: digest(p) for p in store.glob("*.json")}
                     self.suite(sid, f"red-{index}", root, test, 1,
                                [r"FAILED \(failures=1\)", "PlantedRed.test_planted_red",
-                                "D28: 13 revisions, 1 replayed, 12 from green verdicts"], slow=True)
+                                "D28: 13 revisions, 1 replayed, 12 from green verdicts"])
                     after = {p.name: digest(p) for p in store.glob("*.json")}
                     self.observe(sid, f"uncached-{index}", 0,
                                  f"verdicts {len(before)} -> {len(after)} unchanged={before == after}", 0,
@@ -456,13 +457,13 @@ unittest.main()
             tests = ["tests.test_lifecycle_removal_battery.LifecycleRemovalBattery." + name for name in names]
             self.suite(sid, "announced-present", root, tests, 1,
                        [r"FAILED \(failures=5\)", "set=True contradicts .*present=True"],
-                       env={"CEMENT_D28_INNER_REPLAY": "1"}, slow=True)
+                       env={"CEMENT_D28_INNER_REPLAY": "1"})
             with changed(path):
                 self.suite(sid, "absent-unannounced", root, tests, 1,
-                           [r"FAILED \(failures=5\)", "set=False contradicts .*present=False"], slow=True)
+                           [r"FAILED \(failures=5\)", "set=False contradicts .*present=False"])
                 self.suite(sid, "announced-pruned", root, tests, 0, [r"OK \(skipped=1\)"],
-                           env={"CEMENT_D28_INNER_REPLAY": "1"}, slow=True)
-            self.suite(sid, "ordinary", root, tests, 0, [r"^OK$"], slow=True)
+                           env={"CEMENT_D28_INNER_REPLAY": "1"})
+            self.suite(sid, "ordinary", root, tests, 0, [r"^OK$"])
 
     def S08(self):
         sid = "S08"
@@ -650,8 +651,7 @@ unittest.main()
                 revision = git(root, "rev-parse", "HEAD")
                 _, output = self.case(sid, name, root,
                                       [sys.executable, ".agent/mutate", PIN, "--rev", revision, "--workers", "1"],
-                                      0, [r"mutate: killed \d+, survived \d+, incompetent 0, invalid \d+, no-test 0, error 0"],
-                                      slow=True)
+                                      0, [r"mutate: killed \d+, survived \d+, incompetent 0, invalid \d+, no-test 0, error 0"])
                 match = re.search(r"mutate: killed (\d+), survived (\d+),", output)
                 if match:
                     counts.append(int(match.group(2)))

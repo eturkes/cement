@@ -27,7 +27,7 @@ paths:
 
 # Gate-check firing records
 
-Firing command (p77) = `uv run python .agent/seeds` [`--only S01 …`] [`--list`] [`--self-test`]: every bullet below is one group (`S01`-`S20`, bullet order; the runner refuses a bullet count that differs from its group count, so a new bullet ships with its group), fired in disposable detached worktrees with byte-restoration proof; per case it prints rc + this file's line + the decisive token, rc nonzero on any DIFF; `--list` marks slow groups (gate, D28, mutation); `--self-test` repeats the selection with S12 neutralized and requires exactly S12's four planted-skip cases to flip.
+Firing command (p77) = `uv run python .agent/seeds` [`--only S01 …`] [`--list`] [`--self-test`], run whole inside one offload slot (`offload run -- …`; the runner acquires no slot itself, so it runs on a pool host that has no `heavy`; its D28 groups replay cold there, `history-gates.md`): every bullet below is one group (`S01`-`S20`, bullet order; the runner refuses a bullet count that differs from its group count, so a new bullet ships with its group), fired in disposable detached worktrees with byte-restoration proof; per case it prints rc + this file's line + the decisive token, rc nonzero on any DIFF; `--list` marks slow groups (gate, D28, mutation); `--self-test` repeats the selection with S12 neutralized and requires exactly S12's four planted-skip cases to flip.
 
 Each purpose-built check below ships the seed that reds it; law → `.claude/rules/ops.md` Purpose-built gate checks. An edit to a check reruns its seeds before + after, and this record follows the after run. Seeds rerun by hand from these descriptions; their committed firing script = `.agent/deferred.md` p77.
 

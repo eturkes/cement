@@ -137,7 +137,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 
 ## Tasks
 
-- [ ] nucllei skill (MAINTAIN): jail command + generator + 3 skills + README + battery (contract `.agent/decisions/nucllei-contract.md`, gates 1-4).
+- [x] e325bdc nucllei skill (MAINTAIN): jail command + generator + 3 skills + README + battery (contract `.agent/decisions/nucllei-contract.md`, gates 1-4).
 - [ ] offload audit (offload-22 relay): `.claude/rules/ops.md` pool form of the gate, `.agent/seeds` `heavy` wrapping.
 - [ ] nucllei live run (contract gate 6): published images under podman + `gpt-6-luna` → `.agent/decisions/nucllei-live-e2e.md` (blocked on `read:packages` scope).
 - [ ] close: closing-diff `reviewer` (command + skill text), `.agent/review.md` row, full gate, rules upkeep, deferred rows.
