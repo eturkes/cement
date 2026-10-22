@@ -21,6 +21,16 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p30 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 the wrap asserts the transaction state before delegation; R2 one successful result; R3 credential. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `observed == [True]`, recorded before the real call. |
+| R2 | acceptance | pass | `result.passed` + `function_hash` equals the promotion. |
+| R3 | integrity | pass | `.agent/mutate` at `impl/p30` (tag `archive/p30-credit`): killed 1702 / survived 1218 / invalid 50 of 2970; survivors → p116 (routed with the survivor backlog). |
+
 ## p49 close (MAINTAIN queue run, owner ruling, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 no node abbreviates; R2 the three examples exit 2 `unrecognized arguments`; R3 README states the break; R4 every moved pin named + re-targeted, none weakened. MAIN alone.

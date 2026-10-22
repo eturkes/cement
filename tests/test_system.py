@@ -12239,6 +12239,24 @@ class SystemTests(unittest.TestCase):
                     f"latest current-revision receipt is invalid: {receipt_detail}",
                 )
 
+    def test_function_verification_enumerates_members_inside_its_read_transaction(self) -> None:
+        # p30: the member enumeration runs inside verify_function's one read snapshot, asserted on
+        # the connection itself rather than inferred from lock timing.
+        self.register(confirmations=2, reviewers=1, span=0)
+        _, promotion = self._promote_three_as_function("member-enumeration-snapshot")
+        real = System._promoted_function_rows
+        observed: list[bool] = []
+
+        def wrapped(connection, **kwargs):
+            observed.append(connection.in_transaction)
+            return real(connection, **kwargs)
+
+        with mock.patch.object(System, "_promoted_function_rows", side_effect=wrapped):
+            result = self.system.verify_function("tenant-a", "echo")
+        self.assertEqual(observed, [True])
+        self.assertTrue(result.passed)
+        self.assertEqual(result.function_hash, promotion.function_hash)
+
     def test_function_verification_rejects_last_future_revision_row(self) -> None:
         self.register(confirmations=2, reviewers=1, span=0)
         self._promote_three_as_function("future-revision-retained")
