@@ -142,6 +142,30 @@ The LLM proposes instance behavior. It never chooses scope or activates artifact
 confirms examples, writes the program, compiles, verifies, and promotes. A person decides alone what
 production serves.
 
+### What `resolve` returns to an adapter
+
+An adapter that calls `resolve` for an operation must know three things before it relies on the answer.
+
+- The policy. `cement operation list` (or `System.operations`) shows the `revision` and the `policy`
+  of each operation: the confirmations, reviewers and span that a case needs before it compiles.
+- The key. Cement canonicalizes the input under `cement-json-v1` and looks up that exact key. Under
+  a projection program, the key is the layout and its field names, plus the values that `keep` names.
+- Each outcome. `cement resolve` prints one object with the same keys for every outcome. Read
+  `switch`, then `passed`, then `matched`:
+
+| Outcome | `switch` | `passed` | `matched` | Exit |
+|---|---|---|---|---|
+| The switch is off, so the function answers nothing. | `off` | `null` | `null` | 6 |
+| The selected version failed verification, so it gives no answer. | `follow` or `pinned` | `false` | `null` | 6 |
+| Verified miss: the version holds no case for this key. | `follow` or `pinned` | `true` | `false` | 6 |
+| Answer: `output` holds the stored answer for this key. | `follow` or `pinned` | `true` | `true` | 0 |
+
+A near-match input gets a verified miss. In exact mode, one changed byte of canonical input gives a
+different key. Under a projection, a value outside `keep` does not change the key, but a changed
+label, an unknown layout or a changed `keep` value does. For each exit 6, the adapter sends the input
+to the LLM. Exit 2, 3, 4 and 5 mean that the call itself failed: `## Outcomes` in the README names
+each class.
+
 ## Isolation and revisioning
 
 Scope identity is:

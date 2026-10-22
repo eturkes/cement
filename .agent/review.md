@@ -21,6 +21,16 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p83 close (MAINTAIN queue run, owner ruling, tier `docs`) — target = the commit landing this section
+
+Check set: R1 the ruled surface; R2 a fresh agent answers the near-match question from it alone; R3 each stated fact matches shipped code. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | one architecture section, no new CLI surface. |
+| R2 | acceptance | pass | the near-match paragraph states both modes and the adapter action (exit 6 → send to the LLM). |
+| R3 | correctness | pass | outcome rows = `cli.py` resolve branch (fixed key set, exit 0 iff matched); key rule = `### Projection` + `## Isolation and revisioning`; `operation list` leaf exists. |
+
 ## p73 close (MAINTAIN queue run, owner ruling) — target = the commit landing this section
 
 Check set: R1 the ruled branch (b); R2 the script prints nothing over `a8109eb..HEAD`; R3 it can fire. MAIN alone.
