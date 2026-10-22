@@ -17,6 +17,15 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p43 close (MAINTAIN queue run, owner ruling) — target = the commit landing this section
+
+Check set: R1 the owner ruling; R2 the pins it keeps. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | owner: keep current behavior; close as ruled. |
+| R2 | acceptance | pass | B11 (`VACUUM` parity) + B14 (`test_b14_malformed_read_keeps_state_error`) unchanged and green in the suite. |
+
 ## p06 close (MAINTAIN queue run, owner ruling) — target = the commit landing this section
 
 Check set: R1 the owner ruling; R2 the replayable catalogues. MAIN alone.
