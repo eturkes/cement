@@ -485,8 +485,13 @@ class LearningToolBattery(_Example):
         self.assertEqual(public, LEARNING_FUNCTIONS)
         import ast
 
-        tree = ast.parse((ROOT / "examples/open_webui/cement_learning.py").read_text(encoding="utf-8"))
-        called = {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
+        # The tool's merge + publish steps run in `cement_runtime.learning` (p118): census both.
+        called = {
+            node.attr
+            for path in ("examples/open_webui/cement_learning.py", "src/cement_runtime/learning.py")
+            for node in ast.walk(ast.parse((ROOT / path).read_text(encoding="utf-8")))
+            if isinstance(node, ast.Attribute)
+        }
         self.assertTrue({"set_switch", "register_operation", "revise_operation"}.isdisjoint(called))
         self.assertIn("promote_function", called)
 
@@ -768,6 +773,24 @@ class SwitchActionBattery(_Example):
                 self._click(forged, True)
                 self.assertEqual(self.notes[-1]["data"]["content"], "Nothing changed.")
         self.assertEqual(self._counts(), before)
+
+
+class LearningLibraryBattery(_Example):
+    """p118: the learning tool runs `cement_runtime.learning`, so a projectable publish before any
+    merge reports the nucllei command's empty reason instead of the projection's input rule."""
+
+    def test_a_projectable_publish_before_any_confirmation_publishes_nothing_and_writes_nothing(self) -> None:
+        module = _load("cement_learning")
+        learning = module.Tools()
+        learning.valves = module.Tools.Valves(ledger_path=self.db, partition=P, operations=GUIDE)
+        for value in (NOTE_A, NOTE_B):
+            self.system.submit_proposal(P, OP, value, candidate=Candidate(output=PLAN, provenance={}))
+        before = self._counts()
+        result = asyncio.run(learning.publish_version(OP, True, __user__=ADMIN))
+        self.assertNotIn("error", result)
+        self.assertEqual((result["published"], result["reason"]), (False, "no case has enough confirmations"))
+        self.assertEqual(self._counts(), before)
+        self.assertIsNone(self.system.projection(P, OP))
 
 
 if __name__ == "__main__":

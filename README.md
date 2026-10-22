@@ -347,6 +347,38 @@ uv run cement --db demo.db --partition acme learn cases form.plan --program - < 
 `--projectable` derives a program from the raw inputs: one layout for each form structure. The
 result shows that program as `program`.
 
+Two commands make the changes of a pass. They act as `learning-pass` unless you pass
+`--reviewer` or `--actor`:
+
+```bash
+uv run cement --db demo.db --partition acme proposal list --status pending
+uv run cement --db demo.db --partition acme learn cases support.reply
+cat > merged.json <<'JSON'
+{"kind": "reply", "text": "Your invoice is in the billing portal."}
+JSON
+uv run cement --db demo.db --partition acme learn merge support.reply --output - \
+  --note "run 7, model X" --proposals prop_REPLACE_ME < merged.json
+uv run cement --db demo.db --partition acme learn publish support.reply
+```
+
+`learn merge` confirms one merged output for one case. `learn cases` groups the pending proposals
+that `proposal list` shows into cases. Name the pending proposals of one case with `--proposals`
+and its active examples with `--examples`; a flag without ids names none. The
+command accepts each proposal that equals the merge and corrects the others to it. Then it
+supersedes each named example whose output differs. Pass `--projectable` to group the cases as
+`learn cases --projectable` does. An empty or repeated id list, or ids of more than one case, is
+refused before any write (exit 2). Each write commits alone. If a write fails, stdout lists the
+writes that returned, stderr shows the error, and the exit code is its class. The write that
+failed can also have committed. A merge is not idempotent, so run `learn cases` again before you
+repeat a step.
+
+`learn publish` compiles, verifies, and promotes a new version. With `--projectable`, it first
+sets the program that it derives from the confirmed inputs. When it promotes nothing, `reason`
+names why: `failed` (a draft failed verification, exit 6), `empty` (no case has enough
+confirmations), or `same` (the newest version already holds the set). A publication leaves the
+switch as it is. Under `off`, the new version answers nothing. Under `follow`, it answers at once.
+A pinned switch keeps its version.
+
 Two commands change earlier confirmations. `example supersede` replaces earlier examples with a
 re-merged output that extends them: one new example for each old one, with the same input. It
 writes nothing and refuses an empty or repeated id, an example of another operation, or an output
@@ -395,6 +427,12 @@ refusal writes nothing:
 | Build | `compile`, `verify_drafts`, `inspect_function_promotion`, `promote_function` (repeats the inspected hash or raises `ConflictError`) |
 | Versions + switch | `function_receipts`, `function_versions`, `diff_versions`, `set_switch` (`off`, `follow`, `pinned`), `switch`, `serving` |
 | Answer | `resolve`, `verify_function`, `function_report`, `reconstruct_function_receipt`; `evaluate` + `parse_function` answer from a bundle with no ledger |
+
+`cement_runtime.learning` makes the changes of a learning pass over these methods. `merge_case`
+and `publish` do what `learn merge` and `learn publish` do, and they return a `Merge` and a
+`Publication`. `cases` and `raw_inputs` read what they group by. A merge whose write fails after
+it starts raises `MergeInterruptedError`, which holds the error and the writes that returned.
+The write that raised can also have committed, so read the cases again before you retry.
 
 ### Explicit proposal submission
 

@@ -21,6 +21,22 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p118 close (MAINTAIN queue row, tier `kernel`) — target = `3586dc4..30062c8` (`archive/p118-impl`), squashed in the commit that lands this section
+
+Check set = reviewer-1's 9 rows, seeded before it read `3586dc4..1c6a9f7`; round 2 = F1-F5 against their own acceptances on `1c6a9f7..a8daf43`, + R2-F1 fixed in `30062c8`. Contract = `.agent/decisions/p118-contract.md` L1-L8. Teammate verdicts re-derived here.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | `learning.py` vs L1-L5 | fixed F1 F2 | F1: a string id list raised plain `ValidationError` → `MergeRefusedError("not_a_list")` via public `check_merge_ids`; F2: a `System.proposal` read sat inside the write phase → every compared output comes from the case snapshot. Both red at `1c6a9f7` (`test_merge_refuses_before_any_write`, `test_merge_reads_each_output_from_its_case_and_wraps_a_failing_first_write`, `test_learn_merge_reads_no_proposal_row_so_no_read_fails_between_writes`) |
+| R2 | example parity (L7) | fixed F5 | nucllei graded the output before the id lists → `check_merge_ids` first; `LibraryOrderBattery` (2 tests) red at `1c6a9f7`; the base precedence also restores no ids + no ledger = exit 2 |
+| R3 | CLI leaves (L6) | fixed F2 | interrupted stdout now lists returned writes only; `learn cases --projectable` stdout `cmp`-identical on the fixture ledger (MAIN + reviewer, independently) |
+| R4 | classic pitfalls | fixed F1 F2 | as R1 |
+| R5 | new tests | pass | 18 tests red at `3586dc4` (16 errors `No module named 'cement_runtime.learning'`, 3 failures) |
+| R6 | prose claims (L8) | fixed F3 F4 R2-F1 | "the writes that committed" → the writes that returned + the commit-then-raise window (README, architecture, docstrings, CLI comment, open-webui rule); "answers nothing until switched on" → the switch stays as it is |
+| R7 | generated files | pass | both generators `--check` rc 0; `tests.test_open_webui_paste_in` OK |
+| R8 | owner item | pass → owner-approved | the re-targeted census is strictly stronger (a planted library `set_switch` reds it; the base census is blind); owner approved the re-target at the queue run's question |
+| R9 | scope | fixed F5 | no change outside the contract besides p120's birth row |
+
 ## nucllei skill request close (MAINTAIN, tier `kernel`) — target = `e325bdc` + the commit landing this section
 
 Check set = reviewer-1's 12 rows, seeded before it read `00dc010..e325bdc` (`.scratch/nucllei/review/verdicts.md`), + R13 live re-check + R14 full gate at the closing commit. Contract = `.agent/decisions/nucllei-contract.md` N1-N8. Teammate verdicts re-derived here.

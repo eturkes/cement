@@ -143,6 +143,16 @@ active examples by case key, under the stored program or a candidate one (`--pro
 unfinished publication work. `--projectable` derives the candidate from the raw inputs, one layout
 for each form structure.
 
+`cement learn merge OPERATION` and `cement learn publish OPERATION` make the changes of a pass.
+Both call `cement_runtime.learning`, which the Open WebUI and nucllei examples also call. A merge
+reviews the pending proposals of one case against one merged output and supersedes the examples
+that differ. It refuses ids that are not the pending or active ids of one case, before any write.
+Each write commits alone, so a failure after the writes start reports the writes that returned,
+and the failed write can also have committed.
+A publication sets a program derived from the confirmed inputs (`--projectable`), compiles, verifies the drafts, and
+promotes the verified set. It leaves the switch as it is: under `follow`, the new version answers
+at once.
+
 The LLM proposes instance behavior. It never chooses scope or activates artifacts. The learning pass
 confirms examples, writes the program, compiles, verifies, and promotes. A person decides alone what
 production serves.

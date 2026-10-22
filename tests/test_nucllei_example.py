@@ -728,5 +728,24 @@ class SkillBattery(unittest.TestCase):
         self.assertIn(OP, chat)
 
 
+class LibraryOrderBattery(_Jail):
+    """p118 review F5: `merge` grades its id lists before it reads the output or opens the ledger,
+    the order the command kept before the bookkeeping moved into `cement_runtime.learning`."""
+
+    def test_no_ids_is_refused_before_the_output_is_read(self) -> None:
+        self.answer(NOTE_A)
+        before = self.counts()
+        status, text = self.run_cement("merge", OP, "--projectable", "no", "--note", "n", stdin="{bad")
+        self.assertEqual(status, 2, text)
+        self.assertIn("1 つの場合の id を渡していない", text)
+        self.assertEqual(self.counts(), before)
+
+    def test_no_ids_without_a_ledger_is_a_usage_refusal_that_creates_nothing(self) -> None:
+        status, text = self.run_cement("merge", OP, "--projectable", "no", "--note", "n", stdin=json.dumps(PLAN))
+        self.assertEqual(status, 2, text)
+        self.assertIn("1 つの場合の id を渡していない", text)
+        self.assertFalse((self.home / "ledger.db").exists())
+
+
 if __name__ == "__main__":
     unittest.main()

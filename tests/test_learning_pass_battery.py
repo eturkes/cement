@@ -9,8 +9,10 @@ often it is re-merged.
 from __future__ import annotations
 
 import argparse
+import ast
 import contextlib
 import dataclasses
+import importlib
 import inspect
 import io
 import json
@@ -25,14 +27,16 @@ import unittest.mock
 from cement_runtime import (
     Candidate,
     CompilePolicy,
+    IntegrityError,
     NotFoundError,
     StateError,
     System,
     ValidationError,
 )
+from cement_runtime.models import DraftVerification
 from cement_runtime.cli import _parser, _UsageError, main
 from cement_runtime.json_value import canonicalize
-from cement_runtime.projection import structure
+from cement_runtime.projection import draft_program, structure
 
 P, OP = "tenant_a", "plan"
 NARROW = {"fields": ["patient"]}
@@ -899,6 +903,373 @@ class PolicyDefaultsBattery(unittest.TestCase):
             self.assertEqual(
                 (args.min_confirmations, args.min_reviewers, args.min_span_seconds), (2, 1, 0)
             )
+
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+PROGRESS = [path for path in FORMS if path.name.startswith("layout_a_progress_note")]
+
+
+def _learning() -> typing.Any:
+    # Imported per test: the module is the subject, so its absence reds each test alone.
+    return importlib.import_module("cement_runtime.learning")
+
+
+class LearningModuleBattery(_Ledger):
+    """p118: `cement_runtime.learning` owns the pass's merge + publish bookkeeping, which the CLI,
+    the Open WebUI learning tool and the nucllei command each carried before."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.learning = _learning()
+
+    def _ask(self, output: object, value: object = DOC, operation: str = OP) -> str:
+        return self.system.submit_proposal(
+            P, operation, value, candidate=Candidate(output=output, provenance={})
+        )
+
+    def _forms(self, paths: list[pathlib.Path]) -> list[dict[str, str]]:
+        return [{"document": path.read_text(encoding="utf-8")} for path in paths]
+
+    def test_merge_reviews_each_proposal_against_the_merge_and_supersedes_what_differs(self) -> None:
+        self._confirm(NARROW)
+        self._confirm(MERGED)
+        narrow, equal = self._example_ids()
+        corrected, accepted = self._ask(NARROW), self._ask(MERGED)
+        (case,) = self.system.learning_cases(P, OP)["cases"]
+        merged = self.learning.merge_case(
+            self.system, P, OP, MERGED, note="run 1, model m",
+            proposal_ids=[corrected, accepted], example_ids=[narrow, equal],
+        )
+        self.assertIs(type(merged), self.learning.Merge)
+        self.assertEqual(merged.key_hash, case["key_hash"])
+        self.assertEqual(
+            merged.reviewed,
+            (self.learning.ReviewedProposal(corrected, "corrected"),
+             self.learning.ReviewedProposal(accepted, "accepted")),
+        )
+        self.assertEqual(merged.superseded_example_ids, (narrow,))
+        self.assertEqual(len(merged.new_example_ids), 1)
+        for proposal in (corrected, accepted):
+            record = self.system.proposal(P, proposal)
+            self.assertEqual((record["reviewer"], record["review_note"], record["final_output"]),
+                             ("learning-pass", "run 1, model m", MERGED))
+        (after,) = self.system.learning_cases(P, OP)["cases"]
+        self.assertEqual([entry["output"] for entry in after["outputs"]], [MERGED])
+        active = set(after["active_example_ids"])
+        self.assertNotIn(narrow, active)
+        self.assertLessEqual({equal, *merged.new_example_ids}, active)
+        self.assertEqual(len(active), 4)  # equal, its superseding twin, one per reviewed proposal
+
+    def test_merge_refuses_before_any_write(self) -> None:
+        mine, other = self._ask(NARROW), self._ask(NARROW, value={"doc": "lab slip"})
+        before = self._counts()
+        for kwargs, reason in (
+            ({"proposal_ids": mine}, "not_a_list"),
+            ({"example_ids": "ex_1"}, "not_a_list"),
+            ({}, "no_ids"),
+            ({"proposal_ids": [], "example_ids": []}, "no_ids"),
+            ({"proposal_ids": [mine, mine]}, "repeated_ids"),
+            ({"proposal_ids": [mine, other]}, "not_one_case"),
+            ({"proposal_ids": ["prop_" + "0" * 32]}, "not_one_case"),
+        ):
+            with self.subTest(kwargs=kwargs):
+                with self.assertRaises(self.learning.MergeRefusedError) as raised:
+                    self.learning.merge_case(self.system, P, OP, NARROW, note="n", **kwargs)
+                self.assertIs(type(raised.exception), self.learning.MergeRefusedError)
+                self.assertEqual(raised.exception.reason, reason)
+                self.assertIsInstance(raised.exception, ValidationError)
+                ids = (kwargs.get("proposal_ids", ()), kwargs.get("example_ids", ()))
+                if reason != "not_one_case":
+                    with self.assertRaises(self.learning.MergeRefusedError) as checked:
+                        self.learning.check_merge_ids(*ids)
+                    self.assertEqual(checked.exception.reason, reason)
+        self.assertEqual(self.learning.check_merge_ids((mine,), ["ex_1"]), ([mine], ["ex_1"]))
+        for kwargs, error in (
+            ({"proposal_ids": [mine], "output": {"bad": float("nan")}}, ValidationError),
+            ({"proposal_ids": [mine], "operation": "absent"}, NotFoundError),
+        ):
+            with self.subTest(kwargs=kwargs):
+                arguments = {"output": NARROW, "operation": OP} | kwargs
+                with self.assertRaises(error):
+                    self.learning.merge_case(
+                        self.system, P, arguments.pop("operation"), arguments.pop("output"),
+                        note="n", **arguments,
+                    )
+        self.assertEqual(self._counts(), before)
+        self.assertEqual(self.system.proposal(P, mine)["status"], "pending")
+
+    def test_a_failure_after_the_writes_begin_names_the_writes_that_committed(self) -> None:
+        first, second = self._ask(NARROW), self._ask(NARROW)
+        real, calls = System.review, []
+
+        def review(system: System, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+            calls.append(args[1])
+            if len(calls) == 2:
+                raise StateError("ledger busy")
+            return real(system, *args, **kwargs)
+
+        with unittest.mock.patch.object(System, "review", review):
+            with self.assertRaises(self.learning.MergeInterruptedError) as raised:
+                self.learning.merge_case(
+                    self.system, P, OP, NARROW, note="n", proposal_ids=[first, second]
+                )
+        self.assertIs(type(raised.exception.cause), StateError)
+        self.assertEqual(str(raised.exception.cause), "ledger busy")
+        self.assertEqual(raised.exception.completed.reviewed,
+                         (self.learning.ReviewedProposal(calls[0], "accepted"),))
+        self.assertEqual(self.system.proposal(P, calls[0])["status"], "accepted")
+        self.assertEqual(self.system.proposal(P, calls[1])["status"], "pending")
+        # A supersession that fails after every review still names the reviews.
+        self._confirm(NARROW)
+        (old,) = [e for e in self._example_ids() if e not in {self.system.proposal(P, calls[0])["id"]}][-1:]
+        third = self._ask(MERGED)
+        with unittest.mock.patch.object(System, "supersede_examples", side_effect=StateError("busy")):
+            with self.assertRaises(self.learning.MergeInterruptedError) as raised:
+                self.learning.merge_case(
+                    self.system, P, OP, MERGED, note="n", proposal_ids=[third, calls[1]],
+                    example_ids=[old],
+                )
+        self.assertEqual([r.status for r in raised.exception.completed.reviewed], ["accepted", "corrected"])
+        self.assertEqual(raised.exception.completed.superseded_example_ids, ())
+
+    def test_merge_reads_each_output_from_its_case_and_wraps_a_failing_first_write(self) -> None:
+        corrected, accepted = self._ask(NARROW), self._ask(MERGED)
+        with unittest.mock.patch.object(System, "proposal", side_effect=AssertionError("row read")):
+            merged = self.learning.merge_case(
+                self.system, P, OP, MERGED, note="n", proposal_ids=[corrected, accepted]
+            )
+        self.assertEqual([r.status for r in merged.reviewed], ["corrected", "accepted"])
+        waiting = self._ask(NARROW)
+        with unittest.mock.patch.object(System, "review", side_effect=StateError("busy")):
+            with self.assertRaises(self.learning.MergeInterruptedError) as raised:
+                self.learning.merge_case(self.system, P, OP, MERGED, note="n", proposal_ids=[waiting])
+        self.assertEqual((raised.exception.completed.reviewed, type(raised.exception.cause)), ((), StateError))
+
+    def test_publish_names_why_it_promoted_nothing_and_never_switches(self) -> None:
+        empty = self.learning.publish(self.system, P, OP)
+        self.assertEqual((empty.published, empty.reason, empty.entries, empty.promotion),
+                         (False, "empty", 0, None))
+        self.assertIsNotNone(empty.compiled)
+        self._confirm(NARROW)
+        self._confirm(NARROW)
+        published = self.learning.publish(self.system, P, OP)
+        self.assertEqual((published.published, published.reason, published.entries), (True, None, 1))
+        (newest,) = self.system.function_versions(P, OP).versions
+        self.assertEqual(published.function_hash, newest.receipt.function_hash)
+        self.assertEqual(published.promotion.function_hash, published.function_hash)
+        self.assertEqual(self.system.switch(P, OP).mode, "off")
+        again = self.learning.publish(self.system, P, OP)
+        self.assertEqual((again.published, again.reason, again.promotion), (False, "same", None))
+        self.assertEqual(again.function_hash, published.function_hash)
+        self.assertEqual(len(self.system.function_versions(P, OP).versions), 1)
+
+    def test_a_projectable_publish_before_any_confirmation_writes_nothing(self) -> None:
+        for value in self._forms(PROGRESS[:2]):
+            self._ask({"plan": ["patient"]}, value=value)
+        before = self._counts()
+        result = self.learning.publish(self.system, P, OP, projectable=True)
+        self.assertEqual((result.published, result.reason, result.layouts, result.compiled),
+                         (False, "empty", (), None))
+        self.assertEqual(self._counts(), before)
+        self.assertIsNone(self.system.projection(P, OP))
+
+    def test_a_projectable_publish_sets_the_program_of_the_confirmed_inputs_first(self) -> None:
+        values = self._forms(PROGRESS[:2])
+        for value in values:
+            self._confirm({"plan": ["patient"]}, value=value)
+        self._ask({"plan": ["specimen"]}, value=self._forms([FORMS[-1]])[0])  # pending: no layout
+        result = self.learning.publish(self.system, P, OP, projectable=True)
+        program = _program([value["document"] for value in values])
+        self.assertEqual(self.system.projection(P, OP)["program"], program)
+        self.assertEqual((result.published, result.layouts, result.entries),
+                         (True, ("PHYSICIAN PROGRESS NOTE",), 1))
+        self.assertIsNotNone(result.projection)
+
+    def test_publish_stops_at_a_failed_draft_verification(self) -> None:
+        self._confirm(NARROW)
+        self._confirm(NARROW)
+        failed = DraftVerification(passed=False, operation_revision=1, entries=(), skipped=())
+        with (
+            unittest.mock.patch.object(System, "verify_drafts", return_value=failed),
+            unittest.mock.patch.object(
+                System, "inspect_function_promotion", side_effect=AssertionError("inspected")
+            ),
+        ):
+            result = self.learning.publish(self.system, P, OP)
+        self.assertEqual((result.published, result.reason, result.drafts, result.function_hash),
+                         (False, "failed", failed, None))
+        self.assertEqual(self.system.function_versions(P, OP).versions, ())
+
+    def test_raw_inputs_are_the_current_revisions_active_examples_then_its_pending_proposals(self) -> None:
+        old = {"doc": "old revision"}
+        self._confirm(NARROW, value=old)
+        self.system.revise_operation(P, OP, policy=CompilePolicy(), revised_by="operator")
+        kept, superseded, revoked = ({"doc": name} for name in ("kept", "superseded", "revoked"))
+        for value in (kept, superseded, revoked):
+            self._confirm(NARROW, value=value)
+        ids = dict(zip(("kept", "superseded", "revoked"), self._example_ids()[1:]))
+        self.system.supersede_examples(P, OP, example_ids=[ids["superseded"]], output=MERGED,
+                                       reviewer="learning-pass")
+        self.system.revoke_example(P, ids["revoked"], revoked_by="learning-pass", reason="wrong")
+        waiting = [{"doc": f"pending {n}"} for n in range(3)]
+        for value in waiting:
+            self._ask(NARROW, value=value)
+        self._ask(NARROW, value={"doc": "elsewhere"}, operation="other")
+        examples = [kept, superseded]
+        self.assertEqual(self.learning.raw_inputs(self.system, P, OP, pending=False), examples)
+        self.assertEqual(self.learning.raw_inputs(self.system, P, OP, pending=True), examples + waiting)
+        with unittest.mock.patch.object(self.learning, "_PAGE", 2):
+            self.assertEqual(self.learning.raw_inputs(self.system, P, OP, pending=True), examples + waiting)
+
+    def test_cases_groups_by_the_program_derived_from_every_raw_input(self) -> None:
+        values = self._forms([PROGRESS[0], FORMS[-1]])
+        self._confirm({"plan": ["patient"]}, value=values[0])
+        self._ask({"plan": ["specimen"]}, value=values[1])
+        self.assertEqual(self.learning.cases(self.system, P, OP), self.system.learning_cases(P, OP))
+        grouped = self.learning.cases(self.system, P, OP, projectable=True)
+        program = draft_program(values)  # examples first, then pending: both layouts
+        self.assertEqual([layout["title"] for layout in program["layouts"]],
+                         ["LAB RESULT SLIP", "PHYSICIAN PROGRESS NOTE"])
+        self.assertEqual(grouped["program"], program)
+        self.assertEqual(grouped, self.system.learning_cases(P, OP, program=program) | {"program": program})
+        self._ask(NARROW, value={"text": "no form"})
+        with self.assertRaises(ValidationError):
+            self.learning.cases(self.system, P, OP, projectable=True)
+
+    def test_the_module_promotes_and_never_switches_or_registers(self) -> None:
+        tree = ast.parse((ROOT / "src/cement_runtime/learning.py").read_text(encoding="utf-8"))
+        named = {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
+        self.assertTrue({"set_switch", "register_operation", "revise_operation"}.isdisjoint(named))
+        self.assertIn("promote_function", named)
+
+
+class LearnCommandsBattery(_Ledger):
+    """p118: `cement learn merge` + `cement learn publish` run the library's bookkeeping."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.learning = _learning()
+
+    def _ask(self, output: object) -> str:
+        return self.system.submit_proposal(P, OP, DOC, candidate=Candidate(output=output, provenance={}))
+
+    def test_learn_merge_prints_its_writes_and_reads_a_bare_flag_as_no_ids(self) -> None:
+        narrow, wide = self._ask(NARROW), self._ask(MERGED)
+        code, out, err = self._cli(
+            "learn", "merge", OP, "--output", "-", "--note", "run 2", "--proposals", narrow, wide,
+            "--examples", stdin=json.dumps(MERGED),
+        )
+        self.assertEqual((code, err), (0, ""))
+        printed = json.loads(out)
+        self.assertEqual(printed["reviewed"], [{"proposal_id": narrow, "status": "corrected"},
+                                               {"proposal_id": wide, "status": "accepted"}])
+        self.assertEqual((printed["superseded_example_ids"], printed["new_example_ids"]), ([], []))
+        self.assertEqual(self.system.proposal(P, narrow)["reviewer"], "learning-pass")
+
+    def test_learn_merge_refusals_exit_with_their_class_and_print_nothing(self) -> None:
+        proposal = self._ask(NARROW)
+        before = self._counts()
+        for argv, code in (
+            (("--proposals", "--examples"), 2),
+            (("--proposals", proposal, proposal), 2),
+        ):
+            with self.subTest(argv=argv):
+                status, out, err = self._cli("learn", "merge", OP, "--output", "-", "--note", "n",
+                                             *argv, stdin=json.dumps(NARROW))
+                self.assertEqual((status, out, json.loads(err)["error"]), (code, "", "invalid"))
+        status, out, err = self._cli("learn", "merge", "absent", "--output", "{}", "--note", "n",
+                                     "--proposals", proposal)
+        self.assertEqual((status, out, json.loads(err)["error"]), (3, "", "not_found"))
+        self.assertEqual(self._counts(), before)
+
+    def test_learn_merge_interrupted_prints_the_committed_writes_and_exits_with_the_cause(self) -> None:
+        first, second = self._ask(NARROW), self._ask(NARROW)
+        real, calls = System.review, []
+
+        def review(system: System, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+            calls.append(args[1])
+            if len(calls) == 2:
+                raise StateError("ledger busy")
+            return real(system, *args, **kwargs)
+
+        with unittest.mock.patch.object(System, "review", review):
+            code, out, err = self._cli("learn", "merge", OP, "--output", "-", "--note", "n",
+                                       "--proposals", first, second, stdin=json.dumps(NARROW))
+        self.assertEqual(code, 4)
+        self.assertEqual(json.loads(out)["reviewed"], [{"proposal_id": calls[0], "status": "accepted"}])
+        self.assertEqual(json.loads(err), {"error": "conflict", "message": "ledger busy"})
+
+    def test_learn_merge_reads_no_proposal_row_so_no_read_fails_between_writes(self) -> None:
+        proposal = self._ask(NARROW)
+        with unittest.mock.patch.object(System, "proposal", side_effect=IntegrityError("damaged")):
+            code, out, err = self._cli("learn", "merge", OP, "--output", "-", "--note", "n",
+                                       "--proposals", proposal, stdin=json.dumps(NARROW))
+        self.assertEqual((code, err), (0, ""))
+        self.assertEqual(json.loads(out)["reviewed"], [{"proposal_id": proposal, "status": "accepted"}])
+
+    def test_learn_publish_exits_6_on_a_failed_verification_and_0_otherwise(self) -> None:
+        code, out, _ = self._cli("learn", "publish", OP)
+        self.assertEqual((code, json.loads(out)["published"], json.loads(out)["reason"]), (0, False, "empty"))
+        self._confirm(NARROW)
+        self._confirm(NARROW)
+        failed = DraftVerification(passed=False, operation_revision=1, entries=(), skipped=())
+        with unittest.mock.patch.object(System, "verify_drafts", return_value=failed):
+            code, out, _ = self._cli("learn", "publish", OP)
+        self.assertEqual((code, json.loads(out)["reason"]), (6, "failed"))
+        code, out, _ = self._cli("learn", "publish", OP, "--actor", "nightly-pass")
+        printed = json.loads(out)
+        self.assertEqual((code, printed["published"], printed["reason"]), (0, True, None))
+        (newest,) = self.system.function_versions(P, OP).versions
+        self.assertEqual(printed["promotion"]["function_hash"], newest.receipt.function_hash)
+        self.assertEqual(newest.receipt.promoted_by, "nightly-pass")
+        code, out, _ = self._cli("learn", "publish", OP)
+        self.assertEqual((code, json.loads(out)["reason"]), (0, "same"))
+        self.assertEqual(self.system.switch(P, OP).mode, "off")
+
+    def test_learn_publish_projectable_sets_the_derived_program(self) -> None:
+        texts = [path.read_text(encoding="utf-8") for path in PROGRESS[:2]]
+        for text in texts:
+            self._confirm({"plan": ["patient"]}, value={"document": text})
+        code, out, err = self._cli("learn", "publish", OP, "--projectable")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(json.loads(out)["layouts"], ["PHYSICIAN PROGRESS NOTE"])
+        self.assertEqual(self.system.projection(P, OP)["program"], _program(texts))
+
+    def test_learn_cases_projectable_runs_the_library_view(self) -> None:
+        from cement_runtime import cli
+
+        self.assertFalse(hasattr(cli, "_learning_inputs"))
+        self._confirm({"plan": ["patient"]}, value={"document": PROGRESS[0].read_text(encoding="utf-8")})
+        with unittest.mock.patch.object(self.learning, "cases", wraps=self.learning.cases) as spy:
+            code, out, _ = self._cli("learn", "cases", OP, "--projectable")
+        self.assertEqual(code, 0)
+        self.assertEqual(spy.call_count, 1)
+        self.assertEqual(json.loads(out), json.loads(json.dumps(
+            self.learning.cases(self.system, P, OP, projectable=True), sort_keys=True)))
+
+
+class ExampleLearningBattery(unittest.TestCase):
+    """p118: both chat examples run the library's merge + publish and copy none of its steps."""
+
+    SOURCES = ("examples/open_webui/cement_learning.py", "examples/nucllei/cement_nucllei.py")
+
+    def test_each_example_imports_the_steps_and_names_no_publication_write(self) -> None:
+        for source in self.SOURCES:
+            with self.subTest(source=source):
+                tree = ast.parse((ROOT / source).read_text(encoding="utf-8"))
+                defined = {node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)}
+                self.assertTrue({"_inputs", "_cases"}.isdisjoint(defined), defined)
+                named = {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
+                writes = {"set_projection", "supersede_examples", "verify_drafts",
+                          "inspect_function_promotion", "promote_function"}
+                self.assertEqual(named & writes, set())
+                imported = {
+                    alias.name
+                    for node in ast.walk(tree)
+                    if isinstance(node, ast.ImportFrom) and node.module == "cement_runtime.learning"
+                    for alias in node.names
+                }
+                self.assertLessEqual({"cases", "merge_case", "publish"}, imported)
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ next step after `次の手:`. `generate.py` embeds `cement_runtime` and writes `
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import datetime
 import json
 import os
@@ -33,6 +34,16 @@ from cement_runtime import (
 )
 from cement_runtime.function import evaluate
 from cement_runtime.json_value import canonicalize, parse_json
+from cement_runtime.learning import (
+    REVIEWER,
+    MergeInterruptedError,
+    MergeRefusedError,
+    cases,
+    check_merge_ids,
+    merge_case,
+    publish,
+    raw_inputs,
+)
 from cement_runtime.projection import draft_program
 from cement_runtime.system import PROVENANCE_MAX_BYTES
 
@@ -40,7 +51,6 @@ COMMAND = "/ext/bin/cement"
 HOME = "/workspace/.cement"
 PARTITION = "nucllei"
 CHAT = "nucllei-chat"
-REVIEWER = "learning-pass"
 PERSON = "nucllei-user"
 PAGE = 1_000
 TICKET = re.compile(r"t_[0-9a-f]{16}")
@@ -53,6 +63,12 @@ REASONS = {
     "off": "関数がオフ",
     "failed": "関数の検証が通らなかった",
     "unrecognized": "関数にこの入力の場合が無い",
+}
+MERGE_REFUSALS = {
+    "not_a_list": "id は一覧で渡す。",
+    "no_ids": "--proposals か --examples で 1 つの場合の id を渡していない。",
+    "repeated_ids": "同じ id を 2 回渡している。",
+    "not_one_case": "渡した id は 1 つの場合の未確認の提案・確認済みの例ではない。",
 }
 PUBLISH_REASONS = {
     "failed": "下書きの検証が通らなかった",
@@ -238,43 +254,6 @@ def _suspects(system: System, operation: str) -> set[str]:
     return suspects
 
 
-def _inputs(system: System, operation: str, *, pending: bool) -> list[object]:
-    """Raw inputs of the active examples, plus the current pending proposals when asked."""
-
-    revision = system.learning_cases(PARTITION, operation)["operation_revision"]
-    found: list[object] = []
-    after = 0
-    while True:
-        page = system.examples(PARTITION, operation, after_sequence=after, limit=PAGE)
-        found += [
-            row["input"]
-            for row in page
-            if row["superseded_by"] is None and row["operation_revision"] == revision
-        ]
-        if len(page) < PAGE:
-            break
-        after = int(page[-1]["sequence"])
-    after = 0
-    while pending:
-        rows = system.proposals(PARTITION, status="pending", after_sequence=after, limit=PAGE)
-        found += [
-            row["input"]
-            for row in rows
-            if row["operation"] == operation and row["operation_revision"] == revision
-        ]
-        if len(rows) < PAGE:
-            break
-        after = int(rows[-1]["sequence"])
-    return found
-
-
-def _cases(system: System, operation: str, projectable: bool) -> dict[str, Any]:
-    if not projectable:
-        return system.learning_cases(PARTITION, operation)
-    program = draft_program(_inputs(system, operation, pending=True))
-    return system.learning_cases(PARTITION, operation, program=program) | {"program": program}
-
-
 def _newest(system: System, operation: str) -> Any:
     versions = _versions(system, operation)
     if not versions:
@@ -299,7 +278,7 @@ def _learnable(system: System, operation: str, proposal_id: str, output: object)
     groupings: list[object] = [None]
     if _projectable_state(operation) is not False:
         try:
-            groupings.append(draft_program(_inputs(system, operation, pending=True)))
+            groupings.append(draft_program(raw_inputs(system, PARTITION, operation, pending=True)))
         except ValidationError:
             pass
     for program in groupings:
@@ -501,7 +480,7 @@ def _learn(args: argparse.Namespace) -> int:
     system = _system()
     projectable = _flag(args.projectable)
     try:
-        work = _cases(system, args.operation, projectable)
+        work = cases(system, PARTITION, args.operation, projectable=projectable)
     except ValidationError as exc:
         raise _RefusalError(
             2,
@@ -509,7 +488,7 @@ def _learn(args: argparse.Namespace) -> int:
             "次の手: --projectable no で一覧を出し直す。",
         ) from None
     suspects = _suspects(system, args.operation)
-    cases = [
+    listed = [
         {
             "key": case["key"],
             "key_hash": case["key_hash"],
@@ -525,7 +504,7 @@ def _learn(args: argparse.Namespace) -> int:
         "operation": args.operation,
         "grouped_by": work["grouped_by"],
         "nothing_to_learn": work["nothing_to_learn"],
-        "cases": cases,
+        "cases": listed,
         "unprojected": work["unprojected"],
         "stale_pending_proposal_ids": work["stale_pending_proposal_ids"],
     }
@@ -551,69 +530,36 @@ def _ids(text: str | None) -> list[str]:
 
 
 def _merge(args: argparse.Namespace) -> int:
-    proposals, examples = _ids(args.proposals), _ids(args.examples)
-    if not proposals and not examples:
-        raise _RefusalError(2, "--proposals か --examples で 1 つの場合の id を渡していない。")
-    if len(set(proposals)) != len(proposals) or len(set(examples)) != len(examples):
-        raise _RefusalError(2, "同じ id を 2 回渡している。")
-    output = _parse(_read(args.output_file), "まとめた出力")
     projectable = _flag(args.projectable)
-    system = _system()
-    cases = _cases(system, args.operation, projectable)["cases"]
-    owner = [
-        case
-        for case in cases
-        if set(proposals) <= set(case["pending_proposal_ids"])
-        and set(examples) <= set(case["active_example_ids"])
-    ]
-    if len(owner) != 1:
-        raise _RefusalError(2, "渡した id は 1 つの場合の未確認の提案・確認済みの例ではない。")
-    # The case already lists every output with its examples; a paged read could miss one.
-    outputs = {
-        example: entry["output"]
-        for entry in owner[0]["outputs"]
-        for example in entry["example_ids"]
-    }
-    note = f"{args.note} (nucllei)"
-    done: dict[str, Any] = {
-        "key_hash": owner[0]["key_hash"],
-        "reviewed": [],
-        "superseded_example_ids": [],
-        "new_example_ids": [],
-    }
     try:
-        for proposal_id in proposals:
-            proposed = system.proposal(PARTITION, proposal_id)["proposed_output"]
-            extra = {} if _same(proposed, output) else {"corrected_output": output}
-            result = system.review(
-                PARTITION,
-                proposal_id,
-                reviewer=REVIEWER,
-                decision="correct" if extra else "accept",
-                note=note,
-                **extra,
-            )
-            done["reviewed"].append({"proposal_id": proposal_id, "status": result.status})
-        differing = [example for example in examples if not _same(outputs[example], output)]
-        if differing:
-            created = system.supersede_examples(
-                PARTITION,
-                args.operation,
-                example_ids=differing,
-                output=output,
-                reviewer=REVIEWER,
-                note=note,
-            )
-            done["superseded_example_ids"] = differing
-            done["new_example_ids"] = list(created)
-    except CementError as exc:
-        # Each write commits alone, so a later refusal must not hide the earlier ones.
-        _say(
-            f"中止: 途中で止まった ({exc})。ここまでに書いたもの:", _json(done), NEXT[_status(exc)]
+        # The id rules come first, before the output or the ledger is read.
+        proposals, examples = check_merge_ids(_ids(args.proposals), _ids(args.examples))
+        output = _parse(_read(args.output_file), "まとめた出力")
+        done = merge_case(
+            _system(),
+            PARTITION,
+            args.operation,
+            output,
+            note=f"{args.note} (nucllei)",
+            proposal_ids=proposals,
+            example_ids=examples,
+            projectable=projectable,
         )
-        return _status(exc)
+    except MergeRefusedError as exc:
+        raise _RefusalError(2, MERGE_REFUSALS[exc.reason]) from None
+    except MergeInterruptedError as exc:
+        # Each write commits alone, so a later refusal must not hide the earlier ones.
+        status = _status(exc.cause)
+        _say(
+            f"中止: 途中で止まった ({exc.cause})。ここまでに書いたもの:",
+            _json(dataclasses.asdict(exc.completed)),
+            NEXT[status],
+        )
+        return status
     # Only a pass that wrote rules on projectability; a refused or confused one rules nothing.
-    _say("場合をまとめた。", _json(done), *_remember(args.operation, projectable))
+    _say(
+        "場合をまとめた。", _json(dataclasses.asdict(done)), *_remember(args.operation, projectable)
+    )
     return 0
 
 
@@ -644,54 +590,27 @@ def _publish(args: argparse.Namespace) -> int:
     projectable = _flag(args.projectable)
     system = _system()
     operation = args.operation
-    layouts: list[str] = []
-    confirmed = _inputs(system, operation, pending=False) if projectable else []
-    if projectable and not confirmed:
-        # No merge confirmed anything yet: a program over no documents would only be refused.
+    result = publish(system, PARTITION, operation, projectable=projectable)
+    notes = _remember(operation, projectable) if result.published or result.reason == "same" else []
+    if result.reason is not None:
         _say(
-            f"版を作らなかった ({PUBLISH_REASONS['empty']})。",
-            "次の手: 学習の結果をそのまま報告する。",
-        )
-        return 0
-    if projectable:
-        program = draft_program(confirmed)
-        system.set_projection(PARTITION, operation, program, actor=REVIEWER)
-        layouts = [str(layout["title"]) for layout in program["layouts"]]
-    system.compile(PARTITION, operation, compiled_by=REVIEWER)
-    drafts = system.verify_drafts(PARTITION, operation, verified_by=REVIEWER)
-    manifest = system.inspect_function_promotion(PARTITION, operation)
-    before = _versions(system, operation)
-    reason = (
-        "failed"
-        if not drafts.passed
-        else "empty"
-        if not manifest.entries
-        else "same"
-        if before and manifest.function_hash == before[0].receipt.function_hash
-        else None
-    )
-    notes = _remember(operation, projectable) if reason == "same" else []
-    if reason is not None:
-        _say(
-            f"版を作らなかった ({PUBLISH_REASONS[reason]})。",
+            f"版を作らなかった ({PUBLISH_REASONS[result.reason]})。",
             *notes,
             "次の手: 学習の結果をそのまま報告する。",
         )
         return 0
-    system.promote_function(
-        PARTITION, operation, expected_function_hash=manifest.function_hash, promoted_by=REVIEWER
-    )
-    notes = _remember(operation, projectable)
     versions = _versions(system, operation)
     serving = versions[0].selected
     lines = [
         (
-            f"新しい版を作った: {operation} の版 {len(versions)} (場合 {len(manifest.entries)} 件、"
-            f"{manifest.function_hash[:12]})。"
+            f"新しい版を作った: {operation} の版 {len(versions)} (場合 {result.entries} 件、"
+            f"{str(result.function_hash)[:12]})。"
         )
     ]
-    if layouts:
-        lines.append(f"用紙の形: {'、'.join(layouts)} (同じ形なら同じ手順で読める、という前提)。")
+    if result.layouts:
+        lines.append(
+            f"用紙の形: {'、'.join(result.layouts)} (同じ形なら同じ手順で読める、という前提)。"
+        )
     lines.append(
         "スイッチが最新の版に追従しているので、この版がすぐに答える。"
         if serving

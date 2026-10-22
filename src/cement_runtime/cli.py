@@ -13,6 +13,7 @@ from collections.abc import Iterator
 from dataclasses import asdict, dataclass, field, is_dataclass
 from typing import Any, Never, cast
 
+from . import learning
 from .errors import (
     CementError,
     ConflictError,
@@ -31,7 +32,6 @@ from .json_value import (
     parse_json,
 )
 from .models import Candidate, CompilePolicy
-from .projection import draft_program
 from .system import PROVENANCE_MAX_BYTES, SOURCE_ID_MAX_BYTES, System, _name, _text
 
 
@@ -295,7 +295,9 @@ def _parser() -> argparse.ArgumentParser:
     projection_show = projection_commands.add_parser("show", allow_abbrev=False)
     projection_show.add_argument("operation")
 
-    learn = commands.add_parser("learn", help="read what the learning pass has to do")
+    learn = commands.add_parser(
+        "learn", help="run the learning pass: read its work, merge one case, publish a version"
+    )
     learn_commands = learn.add_subparsers(dest="learn_command", required=True)
     learn_cases = learn_commands.add_parser("cases", allow_abbrev=False)
     learn_cases.add_argument("operation")
@@ -308,6 +310,41 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="group by a program derived from the raw inputs: one layout per form structure",
     )
+    learn_merge = learn_commands.add_parser(
+        "merge",
+        help="confirm the merged output of one case: review its proposals, supersede its examples",
+        allow_abbrev=False,
+    )
+    learn_merge.add_argument("operation")
+    learn_merge.add_argument(
+        "--output", required=True, help="the merged output (JSON text; '-' reads stdin)"
+    )
+    learn_merge.add_argument("--note", required=True, help="what the merge kept or added")
+    # A bare flag means no ids: a case without examples still has a flag a model copies.
+    learn_merge.add_argument(
+        "--proposals", nargs="*", default=[], help="the case's pending proposal ids"
+    )
+    learn_merge.add_argument(
+        "--examples", nargs="*", default=[], help="the case's active example ids"
+    )
+    learn_merge.add_argument(
+        "--projectable",
+        action="store_true",
+        help="group the cases as `learn cases --projectable` does",
+    )
+    learn_merge.add_argument("--reviewer", default=learning.REVIEWER)
+    learn_publish = learn_commands.add_parser(
+        "publish",
+        help="compile, verify and promote a new version; the switch decides whether it answers",
+        allow_abbrev=False,
+    )
+    learn_publish.add_argument("operation")
+    learn_publish.add_argument(
+        "--projectable",
+        action="store_true",
+        help="first set the program derived from the confirmed inputs",
+    )
+    learn_publish.add_argument("--actor", default=learning.REVIEWER)
 
     events = commands.add_parser("events", help="read append-only audit projections")
     events.add_argument("--after", type=int, default=0)
@@ -770,30 +807,6 @@ def _render_listing(listing: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _learning_inputs(system: System, partition: str, operation: str) -> list[JSONValue]:
-    """Raw inputs of the current revision's active examples and pending proposals."""
-
-    revision = system.learning_cases(partition, operation)["operation_revision"]
-    inputs: list[JSONValue] = []
-    after = 0
-    while page := system.examples(partition, operation, after_sequence=after, limit=1000):
-        inputs += [
-            row["input"]
-            for row in page
-            if row["superseded_by"] is None and row["operation_revision"] == revision
-        ]
-        after = int(cast(int, page[-1]["sequence"]))
-    after = 0
-    while rows := system.proposals(partition, status="pending", after_sequence=after, limit=100):
-        inputs += [
-            row["input"]
-            for row in rows
-            if row["operation"] == operation and row["operation_revision"] == revision
-        ]
-        after = int(cast(int, rows[-1]["sequence"]))
-    return inputs
-
-
 def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
     if args.command == "function" and args.function_command == "eval":
         # Ahead of the ledger gate and constructing no System: the bundle is the
@@ -1147,10 +1160,34 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
             )
         return {"projection": system.projection(args.partition, args.operation)}
     if args.command == "learn":
+        if args.learn_command == "merge":
+            try:
+                return learning.merge_case(
+                    system,
+                    args.partition,
+                    args.operation,
+                    _input(args.output),
+                    note=args.note,
+                    proposal_ids=args.proposals,
+                    example_ids=args.examples,
+                    projectable=args.projectable,
+                    reviewer=args.reviewer,
+                )
+            except learning.MergeInterruptedError as exc:
+                # stdout lists the writes that returned; `main` reports the cause on stderr.
+                _emit(exc.completed)
+                raise exc.cause from None
+        if args.learn_command == "publish":
+            publication = learning.publish(
+                system,
+                args.partition,
+                args.operation,
+                projectable=args.projectable,
+                actor=args.actor,
+            )
+            return _Outcome(publication, status=6 if publication.reason == "failed" else 0)
         if args.projectable:
-            program = draft_program(_learning_inputs(system, args.partition, args.operation))
-            cases = system.learning_cases(args.partition, args.operation, program=program)
-            return cases | {"program": program}
+            return learning.cases(system, args.partition, args.operation, projectable=True)
         return system.learning_cases(
             args.partition,
             args.operation,
