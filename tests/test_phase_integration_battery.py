@@ -141,7 +141,8 @@ class SkillResumeBattery(unittest.TestCase):
         root = pathlib.Path(__file__).resolve().parents[1] / "skills/cement-learn"
         skill = " ".join((root / "SKILL.md").read_text(encoding="utf-8").split())
         workflow = " ".join((root / "references/workflow.md").read_text(encoding="utf-8").split())
-        rule = skill[skill.index("If `program.json` exists"):]
+        # p120 re-target (standing pin-repair approval): the resume rule moved with the derived program.
+        rule = skill[skill.index("a pass that stops resumes from step 1"):]
         rule = rule[: rule.index("continue with step 4")]
         self.assertIn("pending proposals or more than one active output", rule)
         self.assertIn("a case with more than one active output stopped during the merge step", workflow)

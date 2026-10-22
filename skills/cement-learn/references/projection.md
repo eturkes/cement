@@ -55,20 +55,18 @@ key, so a new document of a known layout reaches its case even when every value 
 
 1. Derive the program: `cement learn cases "$OP" --projectable` writes one layout for each
    distinct title and structure in the raw inputs of the pending proposals and the active
-   examples, and prints it as `program`. Save that object as `program.json`. To extend it by
-   hand, copy each title and label exactly, including case.
+   examples, and prints it as `program`. `cement learn merge --projectable` groups by the same
+   program, and `cement learn publish --projectable` sets the program derived from the confirmed
+   inputs. Each command derives it again, so nothing needs a saved copy.
 2. Write nothing for an input whose text has no form layout: the command leaves it with the model.
-3. Group by the candidate before you review anything:
+3. Check `unprojected` in the work list: an input there has a layout that the program does not
+   list, and it stays with the model.
+4. To extend the program by hand, save the derived `program` as `program.json`, copy each title
+   and label exactly, including case, and follow the manual route (`workflow.md`). Group by the
+   candidate before you review anything, and test it before you set it:
 
    ```sh
    cement learn cases "$OP" --program - < program.json
-   ```
-
-   Check `unprojected`: an input there has a layout that the program does not list. Add the
-   layout, or leave the input with the model.
-4. After the reviews, test the program, then set it:
-
-   ```sh
    cement projection test "$OP" --program - < program.json
    cement projection set "$OP" --program - --actor learning-pass < program.json
    ```

@@ -21,6 +21,17 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p120 close (MAINTAIN queue row, tier `docs`: skill text + its replay) — target = the commit that lands this section
+
+MAIN alone; check set = the row's acceptance + the standing pin-repair approval.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| P1 | pin repair (standing approval: prose pin re-targeted at the new claim) | re-targeted | `tests.test_learning_pass_battery.ProjectableResumeBattery.test_lp0d_the_skill_keeps_the_candidate_until_projection_set`: superseded claims (keep `program.json` until step 4; check `projection show`) → the step-1 recovery rule + `cement learn cases "$OP" --projectable` + "a pass that stops resumes from step 1 with no saved copy" + workflow.md's manual-route "Keep `program.json` until `projection set` succeeds"; red at `a8daf43`, green here; nothing deleted, skipped or weakened |
+| P2 | skill commands parse; LP3 leaf floor | pass | `SkillBattery` green, its ten-leaf floor unchanged (per-id leaves live in workflow.md `Manual route`) |
+| P3 | replay of the skill's own commands | pass | `SkillReplayBattery` red at `a8daf43` (skill commands differ), green here: L1 → 1 version, 2 members, switch off |
+| P4 | pin repair (standing approval) | re-targeted | `tests.test_phase_integration_battery.SkillResumeBattery.test_x3_the_saved_program_resume_covers_cases_with_differing_active_outputs` errored in this unit's first full gate (its anchor `If program.json exists` left with the saved-program rule); the property (a resumed pass finishes step 3 for cases with pending proposals or more than one active output) is restated in SKILL.md step 2 and the anchor re-targeted to `a pass that stops resumes from step 1`; the workflow half unchanged |
+
 ## p118 close (MAINTAIN queue row, tier `kernel`) — target = `3586dc4..30062c8` (`archive/p118-impl`), squashed in the commit that lands this section
 
 Check set = reviewer-1's 9 rows, seeded before it read `3586dc4..1c6a9f7`; round 2 = F1-F5 against their own acceptances on `1c6a9f7..a8daf43`, + R2-F1 fixed in `30062c8`. Contract = `.agent/decisions/p118-contract.md` L1-L8. Teammate verdicts re-derived here.

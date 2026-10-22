@@ -519,10 +519,11 @@ class LearningCasesBattery(_Ledger):
 
 
 class ScriptedPassBattery(_Ledger):
-    """LP1 + LP0: the skill's workflow run through the CLI, with reference merges for the LLM.
+    """LP1 + LP0: the skill's per-id route run through the CLI, with reference merges for the LLM.
 
-    `_pass` follows `skills/cement-learn/SKILL.md` step by step and reads nothing but `learn
-    cases`; `stop_after` interrupts it at a named step to prove the rerun resumes.
+    `_pass` follows the manual route of `skills/cement-learn/references/workflow.md` step by step
+    and reads nothing but `learn cases`; `stop_after` interrupts it at a named step to prove the
+    rerun resumes. `SkillReplayBattery` drives the skill's own steps.
     """
 
     def _json(self, *argv: str, stdin: str = "") -> object:
@@ -668,11 +669,16 @@ class ProjectableResumeBattery(_Ledger):
         self.assertEqual(self.system.switch(P, OP).mode, "off")
 
     def test_lp0d_the_skill_keeps_the_candidate_until_projection_set(self) -> None:
+        # p120 re-target (standing pin-repair approval): the derived candidate is derived again
+        # by every `--projectable` command, so the resume path needs no saved copy; a
+        # hand-extended candidate (manual route) still lives in program.json until set.
         text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
         one_line = " ".join(text.split())
-        self.assertIn("keep that file until step 4 finishes", one_line)
-        self.assertIn("If `program.json` exists from an earlier pass", one_line)
-        self.assertIn('cement projection show "$OP"', one_line)
+        self.assertIn("If it is `exact` and a case has support 1", one_line)
+        self.assertIn('cement learn cases "$OP" --projectable', one_line)
+        self.assertIn("a pass that stops resumes from step 1 with no saved copy", one_line)
+        manual = " ".join((SKILL / "references/workflow.md").read_text(encoding="utf-8").split())
+        self.assertIn("Keep `program.json` until `projection set` succeeds", manual)
 
 
 class ProjectableDerivationBattery(_Ledger):
@@ -878,6 +884,77 @@ class SkillBattery(unittest.TestCase):
                 self.assertEqual(len(_command_failures(seeded)), 1)
         self.assertEqual(_command_failures("Never run `cement function switch`.\n"), [])
 
+
+class SkillReplayBattery(_Ledger):
+    """p120: the CLI skill's own step commands (`learn cases`, `learn cases --projectable`,
+    `learn merge`, `learn publish`) replayed from the L1 state of the Open WebUI live run (five
+    answers confirmed as exact support-1 cases over three layouts) to one published version."""
+
+    def _json(self, argv: list[str], stdin: str = "") -> dict[str, typing.Any]:
+        code, out, err = self._cli(*argv, stdin=stdin)
+        self.assertEqual(code, 0, (argv, err))
+        return typing.cast(dict[str, typing.Any], json.loads(out))
+
+    def _skill(self, *leaf: str) -> list[list[str]]:
+        """Every fenced command of SKILL.md naming this leaf, shell syntax cut, `$OP` filled."""
+
+        fenced, _ = _commands((SKILL / "SKILL.md").read_text(encoding="utf-8"))
+        found = []
+        for command in fenced:
+            tokens = shlex.split(command)[1:]
+            cut = next((i for i, token in enumerate(tokens) if token in SHELL_STOPS), len(tokens))
+            if tuple(tokens[: len(leaf)]) == leaf:
+                found.append([OP if token == "$OP" else token for token in tokens[:cut]])
+        return found
+
+    def test_the_l1_state_publishes_through_the_skills_merge_and_publish(self) -> None:
+        plans = {
+            "layout_b_intake_form_01.txt": {"plan": ["name", "date_of_birth"]},
+            "layout_b_intake_form_02.txt": {"plan": ["name", "date_of_birth"]},
+            "layout_a_progress_note_01.txt": {"plan": ["patient"]},
+            "layout_a_progress_note_02.txt": {"plan": ["patient", "provider"]},
+            "layout_c_lab_slip_01.txt": {"plan": ["specimen"]},
+        }
+        texts = {path.name: path.read_text(encoding="utf-8") for path in FORMS}
+        for name, plan in plans.items():
+            self._confirm(plan, value={"document": texts[name]})
+        reads = self._skill("learn", "cases")
+        self.assertEqual(reads, [["learn", "cases", OP], ["learn", "cases", OP, "--projectable"]])
+        (merge,) = self._skill("learn", "merge")
+        self.assertEqual(merge[:7], ["learn", "merge", OP, "--output", "-", "--note", "run 7, model X"])
+        self.assertEqual([token for token in merge if token.startswith("--")],
+                         ["--output", "--note", "--proposals", "--examples"])
+        (publish,) = self._skill("learn", "publish")
+        self.assertEqual(publish, ["learn", "publish", OP])
+        # Step 1: idle under exact grouping, but support-1 cases send the pass to step 2.
+        first = self._json(reads[0])
+        self.assertEqual((first["nothing_to_learn"], first["grouped_by"]), (True, "exact"))
+        self.assertEqual({case["support"] for case in first["cases"]}, {1})
+        # Step 2: projectable; the derived grouping joins the forms of one layout.
+        grouped = self._json(reads[1])
+        self.assertEqual(sorted(case["support"] for case in grouped["cases"]), [1, 2, 2])
+        (split,) = [case for case in grouped["cases"] if len(case["outputs"]) > 1]
+        union = {"plan": ["patient", "provider"]}
+        # Step 3: the skill's merge, its ids replaced by the case's own, plus `--projectable`.
+        argv = merge[: merge.index("--proposals")]
+        merged = self._json(
+            [*argv, "--proposals", *split["pending_proposal_ids"], "--examples",
+             *split["active_example_ids"], "--projectable"],
+            stdin=json.dumps(union),
+        )
+        narrower = [e for o in split["outputs"] if o["output"] != union for e in o["example_ids"]]
+        self.assertEqual((merged["reviewed"], merged["superseded_example_ids"]), ([], narrower))
+        # Step 4: the skill's publish with `--projectable`.
+        published = self._json([*publish, "--projectable"])
+        self.assertEqual((published["published"], published["entries"]), (True, 2))
+        self.assertEqual(published["layouts"],
+                         ["LAB RESULT SLIP", "PATIENT INTAKE FORM", "PHYSICIAN PROGRESS NOTE"])
+        (version,) = self.system.function_versions(P, OP).versions
+        self.assertEqual(version.receipt.member_count, 2)  # the lab slip stays at support 1
+        self.assertEqual(version.receipt.function_hash, published["function_hash"])
+        self.assertEqual(self.system.switch(P, OP).mode, "off")
+        after = self._json(reads[0])
+        self.assertEqual((after["grouped_by"], after["nothing_to_learn"]), ("build-current", True))
 
 class PolicyDefaultsBattery(unittest.TestCase):
     """LP4: owner ruling O2 — the defaults are 2 confirmations / 1 reviewer / 0 s, CLI included."""

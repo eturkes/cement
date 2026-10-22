@@ -37,75 +37,65 @@ and continue from what it shows. Stop and report any other code. The workflow re
    cement learn cases "$OP"
    ```
 
-   If `program.json` exists from an earlier pass and `cement projection show "$OP"` does not
-   show that program, the earlier pass stopped before step 4. Run `cement learn cases "$OP"
-   --program - < program.json` instead, finish step 3 for any case that still lists pending
-   proposals or more than one active output (a merge stopped before its supersession), and
-   continue with step 4.
-
-   Otherwise, if `nothing_to_learn` is `true`, check `grouped_by` first. If it is `exact` and a
-   case has support 1, an earlier pass confirmed answers without projection: go on to step 2,
-   because projection can join those cases. Otherwise report "nothing to learn" and stop. If no
-   proposal is pending but `work` lists unfinished steps, an earlier pass was interrupted.
-   Finish step 3 for each case in `work.merge_key_hashes` (its confirmed outputs differ), then
-   continue with step 4 or step 5.
+   If `nothing_to_learn` is `true`, check `grouped_by` first. If it is `exact` and a case has
+   support 1, an earlier pass confirmed answers without projection: go on to step 2, because
+   projection can join those cases. Otherwise report "nothing to learn" and stop. If no proposal
+   is pending but `work` lists unfinished steps, an earlier pass was interrupted. Finish step 3
+   for each case in `work.merge_key_hashes` (its confirmed outputs differ), then continue with
+   step 4.
 
 2. Decide whether the operation is projectable. It is projectable only when every output is a
    procedure over the input (a plan or a script that reads values from the input) and no output
    contains a value copied from an input. Answers that interpret values are never projectable.
-   If it is projectable, derive the program from the raw inputs. The command groups the cases by
-   it and prints it as `program`:
+   If it is projectable, read the work list again, grouped by the program that Cement derives
+   from the raw inputs (one layout per form structure, printed as `program`):
 
    ```sh
    cement learn cases "$OP" --projectable
    ```
 
-   Save that `program` object as `program.json` and keep that file until step 4 finishes: the
-   ledger holds no record of a program before `projection set`. From now on, group the cases by
-   the saved program (`references/projection.md`):
-
-   ```sh
-   cement learn cases "$OP" --program - < program.json
-   ```
+   Then pass `--projectable` to `learn merge` and `learn publish` too. Cement derives the same
+   program again for each command, so a pass that stops resumes from step 1 with no saved copy
+   (`references/projection.md`). On such a resumed pass, finish step 3 for each case that still
+   lists pending proposals or more than one active output (a merge that stopped before its
+   supersession), then continue with step 4.
 
 3. For each case, merge the scripts into one output that covers what every request in the case
    needed. Keep the union of the rows. Keep a difference when a request asked for it. Put no
-   input value into a projectable output. Then review each pending proposal of the case with
-   reviewer `learning-pass` and a note that names this run and your model:
+   input value into a projectable output. First reject each pending proposal of the case that is
+   unusable, and revoke each active example that the merge contradicts, with a note or a reason
+   that names this run and your model:
 
    ```sh
-   cement proposal review prop_1 --reviewer learning-pass --decision accept --note "run 7, model X"
-   cement proposal review prop_2 --reviewer learning-pass --decision correct --output - --note "run 7, model X" < merged.json
    cement proposal review prop_3 --reviewer learning-pass --decision reject --note "run 7, model X: not a plan"
-   ```
-
-   Use `accept` when the proposal equals the merge, `correct` when it differs, and `reject` when
-   it is unusable. Then compare the case's earlier active examples with the merge. If the merge
-   extends an example, supersede the example to the merge. If the merge contradicts an example,
-   revoke the example and give the reason:
-
-   ```sh
-   cement example supersede "$OP" ex_1 ex_2 --output - --reviewer learning-pass --note "run 7, model X" < merged.json
    cement example revoke ex_3 --actor learning-pass --reason "run 7: contradicts the merged plan"
    ```
 
-4. If the operation is projectable, test the program and then set it:
+   Then save the merge as `merged.json` and confirm it for the remaining pending proposals and
+   active examples of the case:
 
    ```sh
-   cement projection test "$OP" --program - < program.json
-   cement projection set "$OP" --program - --actor learning-pass < program.json
+   cement learn merge "$OP" --output - --note "run 7, model X" --proposals prop_1 prop_2 --examples ex_1 < merged.json
    ```
 
-5. Publish the new version:
+   The command accepts each proposal that equals the merge, corrects the others to it, and
+   supersedes each named example whose output differs, all as `learning-pass`. A flag without ids
+   names none. It refuses ids of more than one case and writes nothing (exit 2). If it fails after
+   it starts writing, stdout lists the writes that returned: run `cement learn cases` again and
+   continue from what it shows.
+
+4. Publish the new version:
 
    ```sh
-   cement compile "$OP" --actor learning-pass
-   cement function verify-drafts "$OP" --actor learning-pass
-   cement function inspect "$OP"
-   cement function promote "$OP" --expected-function-hash "$NEW_HASH" --actor learning-pass
+   cement learn publish "$OP"
    ```
 
-6. Report the new function hash, the difference from the previous version, what the pass
+   With `--projectable`, the command first sets the program that it derives from the confirmed
+   inputs. Read `published`. When it is `false`, `reason` names why: `empty` (no case has enough
+   confirmations), `same` (the newest version already holds the set), or `failed` (a draft failed
+   verification, exit 6: stop and report).
+
+5. Report the new function hash, the difference from the previous version, what the pass
    learned, and, for a projectable operation, the assumption that the projection makes:
 
    ```sh
