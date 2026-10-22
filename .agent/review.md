@@ -21,6 +21,17 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p49 close (MAINTAIN queue run, owner ruling, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 no node abbreviates; R2 the three examples exit 2 `unrecognized arguments`; R3 README states the break; R4 every moved pin named + re-targeted, none weakened. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | one walk at the end of `_parser()`; X23 censuses every node (red at `2b35f42`: all nodes listed). |
+| R2 | acceptance | pass | `--part=p`, `--bun x`, `--in 0` → `unrecognized arguments` (single-token `--part=p`: a split `--part p` lets argparse report `p` as an invalid command first, also exit 2). |
+| R3 | acceptance | pass | README Quick start sentence; register-audit rc 0, article-audit 0 ungrounded. |
+| R4 | correctness | pass | X23 inverted (M3.5a kept abbreviation on purpose; owner overruled), D06 asserts the refusal, D10 asserts no claimed prefix (stricter), grammar digest re-pinned (allow_abbrev facet only, same 225 rows); D06/D10 keep their names (m3u5b catalogue targets). |
+
 ## p05 + p92 close (MAINTAIN queue run, owner-approved gate changes, one boundary) — target = the commit landing this section
 
 Check set: R1 the gate runs each check; R2 each check fires on its seed; R3 the shipped tree passes; R4 the pinned `register` gate line is intact. MAIN alone.

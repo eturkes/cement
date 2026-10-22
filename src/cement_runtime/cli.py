@@ -312,7 +312,18 @@ def _parser() -> argparse.ArgumentParser:
     events = commands.add_parser("events", help="read append-only audit projections")
     events.add_argument("--after", type=int, default=0)
     events.add_argument("--limit", type=int, default=1_000)
+    # p49 (owner-ruled): no node accepts an abbreviated option, so a removed flag never stays
+    # reachable through a surviving flag's prefix and a new flag cannot collide with one.
+    _no_abbreviation(parser)
     return parser
+
+
+def _no_abbreviation(parser: argparse.ArgumentParser) -> None:
+    parser.allow_abbrev = False
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            for child in action.choices.values():
+                _no_abbreviation(child)
 
 
 def _input(value: str) -> JSONValue:

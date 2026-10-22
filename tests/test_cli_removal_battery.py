@@ -819,8 +819,8 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         """D06 obligation
 
         CONTRACT:
-        Legacy leaves abbreviate (`--act` reaches `--actor`), so flag removal is NOT pinnable
-        as absence. Every removed flag spelling AND every proper prefix of it must be refused
+        Legacy leaves abbreviated (`--act` reached `--actor`) until p49 removed abbreviation, so
+        flag removal is NOT pinnable as absence alone. Every removed flag spelling AND every proper prefix of it must be refused
         by every surviving leaf, derived over `_parser()` rather than enumerated by hand.
         """
         parser = cement_cli._parser()
@@ -832,8 +832,10 @@ class RemovalObligationBatteryTests(unittest.TestCase):
         self.assertEqual({" ".join(path) for path in leaves}, set(SURVIVING_LEAVES))
         self.assertEqual(len(leaves), 28)
 
-        legacy = parser.parse_args(["compile", "operation", "--act", "actor"])
-        self.assertEqual(legacy.actor, "actor")
+        # p49 (owner-ruled) removed abbreviation everywhere: `--act` no longer reaches `--actor`.
+        with self.assertRaises(cement_cli._UsageError) as legacy:
+            parser.parse_args(["compile", "operation", "--act", "actor"])
+        self.assertEqual(str(legacy.exception), "unrecognized arguments: --act actor")
 
         prefix_cases = [
             (removed, removed[:length])
@@ -1038,26 +1040,10 @@ class RemovalObligationBatteryTests(unittest.TestCase):
                             expected = claimed.type(value)
                         self.assertEqual(getattr(namespace, claimed.dest), expected)
 
-        r_claims = {
-            "artifact suspend": "reason",
-            "challenge": "reviewer",
-            "example revoke": "reason",
-            "function export": "receipt_id",
-            "function show": "receipt_id",
-            "proposal review": "reviewer",
-        }
-        expected_claims = {
-            (leaf, removed, token, dest)
-            for leaf, dest in r_claims.items()
-            for removed in ("--request-id", "--retry-failed")
-            for token in ("--r", "--re")
-        }
-        expected_claims |= {
-            (leaf, removed, "--s", dest)
-            for leaf, dest in {"proposal list": "status", "promote": "scope_hash"}.items()
-            for removed in ("--source-command", "--source-id", "--source-timeout")
-        }
-        self.assertEqual(claimed_cells, expected_claims)
+        # p49 (owner-ruled): no node abbreviates, so no surviving flag claims a prefix of a
+        # removed spelling; M3.5b's claim map (`--r`/`--re` → reason, reviewer, receipt_id;
+        # `--s` → status, scope_hash) left with that grammar, and every prefix is refused.
+        self.assertEqual(claimed_cells, set())
 
     def test_d11_no_cli_help_text_at_any_parser_node_names_handle_reque(self) -> None:
         """D11 obligation

@@ -90,6 +90,9 @@ authentication, authorization, policy, and idempotent effect execution. Determin
 
 Requirements: Python 3.11+ with SQLite 3.37+ and `uv` for the development workflow.
 
+Spell every option in full. The CLI rejects an abbreviated option, such as `--part` for
+`--partition`, with exit 2 and `unrecognized arguments`.
+
 ```bash
 uv sync
 uv run cement --db demo.db --partition acme operation register support.reply

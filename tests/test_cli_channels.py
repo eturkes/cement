@@ -2596,30 +2596,38 @@ class CliChannelTests(unittest.TestCase):
             {"resolve", "proposal submit"},
         )
 
-    def test_x23_root_and_nested_legacy_option_abbreviations_remain_accepte(self) -> None:
-        """X23 [D25] root and nested legacy option abbreviations remain accepted while new-node abbreviations fail
+    def test_x23_no_parser_node_accepts_an_abbreviated_option(self) -> None:
+        """X23 [D25] no parser node accepts an abbreviated option (p49, owner-ruled)
 
         ACTION: ENCODE
 
         EXPECTED:
-        The 3 legacy probes parse successfully with values `p`, `x`, and `0`; every resolve
+        Every `_parser()` node has `allow_abbrev=False`; the root `--part`, nested `--bun` and
+        `--in` examples each fail with `unrecognized arguments`, and every resolve
         `--in/--inp/--exp` and submit `--sub` probe exits 2.
 
         RULING:
-        CONFIRMED. The new nodes set `allow_abbrev=False` and no other node changed, so legacy
-        abbreviation must still work while the new leaves reject it. Verified by MAIN that all
-        four new-node prefix probes exit 2. Asserting only the new-node failures would let a
-        global `allow_abbrev=False` regression pass.
+        M3.5a kept legacy abbreviation on purpose and pinned it here; p49's owner ruling removed
+        it everywhere, so a removed flag can no longer stay reachable through a surviving flag's
+        prefix. The node census keeps a partial regression (one node re-enabling it) visible.
         """
         parser = cement_cli._parser()
-        root = parser.parse_args(["--part", "p", "operation", "list"])
-        nested = parser.parse_args(
-            ["function", "eval", "--bun", "x", "--in", "0"]
-        )
-        self.assertEqual(
-            (root.partition, nested.bundle, nested.input),
-            ("p", "x", "0"),
-        )
+        nodes = [parser]
+        for node in nodes:
+            for action in node._actions:
+                if isinstance(action, argparse._SubParsersAction):
+                    nodes.extend(action.choices.values())
+        self.assertGreater(len(nodes), 40)
+        self.assertEqual([node.prog for node in nodes if node.allow_abbrev], [])
+        for argv, stray in (
+            (["--part=p", "operation", "list"], "--part=p"),
+            (["function", "eval", "--bundle", "b", "--input", "0", "--bun", "x"], "--bun x"),
+            (["function", "eval", "--bundle", "b", "--input", "0", "--in", "0"], "--in 0"),
+        ):
+            with self.subTest(argv=argv):
+                with self.assertRaises(cement_cli._UsageError) as raised:
+                    parser.parse_args(argv)
+                self.assertEqual(str(raised.exception), f"unrecognized arguments: {stray}")
         envelope = json.dumps({"input": 1, "output": 2})
         probes = (
             self.run_cli(
