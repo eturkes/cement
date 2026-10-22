@@ -17,6 +17,16 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p75 close (MAINTAIN queue run, owner approval) — target = the commit landing this section
+
+Check set: R1 owner approval of the exact text; R2 meaning kept; R3 measured shape. MAIN alone (advisor shaped the question).
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | the committed text = the preview the owner approved, byte for byte (one 29-word sentence of the earlier draft split before asking). |
+| R2 | correctness | pass | every claim of the old Intent survives: recurrence, learning pass, exact cases, read + switch, follow / pinned / rollback, LLM fallback, projection fail-closed, no key widening, library + CLI + skill, web UI demo. |
+| R3 | acceptance | pass | 24 sentences, max 24 words, 0 ` = ` (counts in the ledger entry). |
+
 ## p22 close (MAINTAIN queue run, owner approval) — target = the commit landing this section
 
 Check set: R1 owner approval for the deletion; R2 the survivor carries the claim. MAIN alone.
