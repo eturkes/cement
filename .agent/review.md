@@ -17,6 +17,15 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p95 close (MAINTAIN queue run, owner ruling) — target = the commit landing this section
+
+Check set: R1 the owner ruling; R2 Decisions match the shipped header. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | owner: amend Decisions (the shipped state wins). |
+| R2 | acceptance | pass | the two Presentation clauses now describe `index.html:12` (brand + Concept demo) and the tool-call caption at `app.js:840`; spec-lint rc 0. |
+
 ## p43 close (MAINTAIN queue run, owner ruling) — target = the commit landing this section
 
 Check set: R1 the owner ruling; R2 the pins it keeps. MAIN alone.

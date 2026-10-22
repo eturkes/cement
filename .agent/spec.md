@@ -52,9 +52,9 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
   verifies + promotes. A person's ONE act = switching each learned function on or off (per
   operation, `route(enabled, operation)`), optionally after `Read`ing the function alone.
   Presentation (owner-ruled r7-r12: dense, unclear, wordy, then the human role corrected; Swamp's
-  homepage = the clarity reference, not its look): words stripped, the workflow shown, no Cement
-  term on the default page.
-  - Header = headline alone. Strip = three icons `Ask` → `Learn` → `Switch on`, one word + a
+  homepage = the clarity reference, not its look): words stripped, the workflow shown; Cement is named on the default page only by the header
+  brand and the tool-call caption (owner-ruled at the queue run's close, p95).
+  - Header = the `cement` brand + `Concept demo` beside the headline (p95). Strip = three icons `Ask` → `Learn` → `Switch on`, one word + a
     2-3 word sub each, doubling as the selected task's progress (done / now; billing strikes
     `Switch on`).
   - Band under the strip = one short line on what just happened + the next action: `Learn from
