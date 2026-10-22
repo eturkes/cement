@@ -8,7 +8,11 @@ credited (`.claude/rules/assurance.md`, `Instruments and validators`).
 
 EVERY closing diff draws a pass: each unit's close, each ad-hoc request's close, and the
 phase close alike — this ledger is not a phase-close step, and a unit that lands with no
-section here closed unreviewed. A finding inside the artifact's acceptance contract is
+section here closed unreviewed. Scope (owner-ruled, p73): the ledger holds the closes its sections
+name (added by the close itself, or naming its SHA); every other commit keeps its record in its
+own body's `Teammates:` / `dispatch:` line — the 17 closes of `a8109eb..1623535` among them — and
+`uv run python .agent/decisions/p73-review-coverage.py` prints any commit since `a8109eb` with
+neither (six listed there with their reasons). A finding inside the artifact's acceptance contract is
 fixed before the close it reviews; a finding outside it is born as a `.agent/deferred.md`
 row with its acceptance check. The one open row this ledger holds = an IMPLEMENT mutation
 survivor its unit left unruled, open until the closing-diff `reviewer` rules it against the
@@ -16,6 +20,16 @@ contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-
 against its acceptance check alone. A pass here is a reviewer's opinion about the repository: neither a
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
+
+## p73 close (MAINTAIN queue run, owner ruling) — target = the commit landing this section
+
+Check set: R1 the ruled branch (b); R2 the script prints nothing over `a8109eb..HEAD`; R3 it can fire. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | preamble scopes the ledger and names the commit-body record for the rest. |
+| R2 | acceptance | pass | `p73-review-coverage.py` rc 0 (this commit adds its own section, so it is covered too). |
+| R3 | integrity | pass | dropping `a97bbc3` from its list → rc 1 `NO-RECORD a97bbc3`. |
 
 ## p75 close (MAINTAIN queue run, owner approval) — target = the commit landing this section
 
