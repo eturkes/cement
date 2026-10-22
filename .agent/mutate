@@ -5,7 +5,9 @@
 mutation tool, default operators, shows it killing mutants over the files it imports or calls.
 Scope = every `src/cement_runtime/*.py` line the pin EXECUTES while it runs, traced after its
 module is loaded (a mutant on a line the pin never runs is unkillable by it and says nothing about
-it; module-level constants run at import time sit outside the scope). Mutants of
+it), plus the definition spans it READS through `dataclasses.fields`, `inspect.signature`,
+`typing.get_type_hints` (decorators + header + class-level assignments) and `inspect.getsource` /
+`inspect.getdoc` (the whole span), which run only at import time and no trace sees (p91). Mutants of
 code the pin reaches only through a subprocess are out of scope, and the report says so.
 
 Runs from a clean detached checkout of `--rev` (default HEAD), never the working tree: cosmic-ray
@@ -16,7 +18,7 @@ across `--workers` clones by a stable hash of (module, operator, occurrence).
 Usage: uv run python .agent/mutate <test id> [--rev REV] [--workers N] [--timeout SECONDS]
   test id = a dotted unittest id, e.g. tests.test_function.FunctionTests.test_x
 Prints scope + the tally killed, survived (each survivor: file:line operator occurrence),
-incompetent, invalid, no-test, error; rc 0 when the run completes, 2 when the baseline is red or
+incompetent, invalid, no-test, error, then the same tally per module; rc 0 when the run completes, 2 when the baseline is red or
 setup fails.
 """
 
@@ -45,6 +47,48 @@ def tracer(frame, event, arg):
     if event in ("call", "line"):
         lines.setdefault(name[len(src):], set()).add(frame.f_lineno)
     return tracer
+import ast, dataclasses, inspect, textwrap, typing
+read = {}
+_sourcefile, _sourcelines = inspect.getsourcefile, inspect.getsourcelines
+def _note(obj, whole):
+    # A definition the pin READS (fields, signature, hints, source, doc) runs only at import,
+    # so tracing never sees it; scope its span: the whole object for source + doc reads, else
+    # decorators + header + class-level assignments.
+    target = obj if inspect.isclass(obj) or inspect.isroutine(obj) else type(obj)
+    target = inspect.unwrap(target) if inspect.isroutine(target) else target
+    try:
+        name = _sourcefile(target)
+        text, start = _sourcelines(target)
+    except (TypeError, OSError):
+        return
+    if not name or not name.startswith(src):
+        return
+    numbers = set(range(start, start + len(text)))
+    if not whole:
+        node = ast.parse(textwrap.dedent("".join(text))).body[0]
+        first = min([node.lineno, *(item.lineno for item in node.decorator_list)])
+        body = [item for item in node.body if not (isinstance(item, ast.Expr) and isinstance(item.value, ast.Constant))]
+        header = set(range(first, (body[0].lineno if body else node.end_lineno + 1)))
+        if isinstance(node, ast.ClassDef):
+            for item in node.body:
+                if isinstance(item, (ast.AnnAssign, ast.Assign)):
+                    header |= set(range(item.lineno, item.end_lineno + 1))
+        numbers = {start - 1 + line for line in header}
+    read.setdefault(name[len(src):], set()).update(numbers)
+tests = str(pathlib.Path("tests").resolve()) + "/"
+def _reading(function, whole):
+    # Only a read made BY the test counts: `dataclasses` calls `inspect.signature` while classes
+    # are created at import, and `mock` reads signatures for autospec.
+    def wrapper(obj, *args, **kwargs):
+        if sys._getframe(1).f_code.co_filename.startswith(tests):
+            _note(obj, whole)
+        return function(obj, *args, **kwargs)
+    return wrapper
+dataclasses.fields = _reading(dataclasses.fields, False)
+inspect.signature = _reading(inspect.signature, False)
+typing.get_type_hints = _reading(typing.get_type_hints, False)
+inspect.getsource = _reading(inspect.getsource, True)
+inspect.getdoc = _reading(inspect.getdoc, True)
 import cement_runtime
 assert cement_runtime.__file__.startswith(src), cement_runtime.__file__
 suite = unittest.defaultTestLoader.loadTestsFromName(sys.argv[1])
@@ -52,7 +96,8 @@ threading.settrace(tracer); sys.settrace(tracer)
 result = unittest.TextTestRunner(stream=sys.stderr).run(suite)
 sys.settrace(None)
 json.dump({"ok": result.wasSuccessful() and result.testsRun > 0, "ran": result.testsRun,
-           "lines": {key: sorted(value) for key, value in lines.items()}}, sys.stdout)
+           "lines": {key: sorted(value) for key, value in lines.items()},
+           "read": {key: sorted(value) for key, value in read.items()}}, sys.stdout)
 """
 
 
@@ -161,7 +206,9 @@ def main() -> int:
                       file=sys.stderr)
                 print(traced.stderr[-4000:], file=sys.stderr)
                 return 2
-            executed = {name: set(lines) for name, lines in report["lines"].items()}
+            ran = {name: set(lines) for name, lines in report["lines"].items()}
+            read = {name: set(lines) for name, lines in report["read"].items()}
+            executed = {name: ran.get(name, set()) | read.get(name, set()) for name in {*ran, *read}}
             modules = sorted(f"src/cement_runtime/{name}" for name in executed)
             timeout = args.timeout or max(10.0, baseline * 4)
             config = "\n".join([
@@ -177,7 +224,9 @@ def main() -> int:
             print(f"mutate: {args.test_id} @ {revision[:12]}, baseline {baseline:.1f}s "
                   f"(ran {report['ran']}), timeout {timeout:.1f}s, workers {args.workers}")
             for name in sorted(executed):
-                print(f"  scope src/cement_runtime/{name}: {len(executed[name])} executed lines")
+                extra = len(read.get(name, set()) - ran.get(name, set()))
+                print(f"  scope src/cement_runtime/{name}: {len(ran.get(name, set()))} executed lines"
+                      + (f" + {extra} read definition lines" if extra else ""))
             with concurrent.futures.ThreadPoolExecutor(args.workers) as pool:
                 shards = list(pool.map(
                     lambda index: _run_shard(trees[index], config, executed, index, args.workers),
@@ -202,6 +251,11 @@ def main() -> int:
             tally["error"] += 1
     print("mutate: " + ", ".join(f"{key} {value}" for key, value in tally.items())
           + f" (of {len(rows)} in-scope mutants)")
+    for module in sorted({row["module"] for row in rows}):
+        verdicts = [str(row["test"]) if row["worker"] == "normal" else str(row["worker"])
+                    for row in rows if row["module"] == module]
+        counts = ", ".join(f"{key} {verdicts.count(key)}" for key in tally if verdicts.count(key))
+        print(f"  module src/cement_runtime/{module}: {len(verdicts)} mutants ({counts})")
     for row in survivors:
         print(f"  SURVIVED src/cement_runtime/{row['module']}:{row['line']} "
               f"{row['operator']} #{row['occurrence']}")

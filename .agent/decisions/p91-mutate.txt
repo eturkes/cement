@@ -1,0 +1,98 @@
+# `.agent/mutate` acceptance runs — p91 (tool at impl/p91 3ef05d3 = 8bef2a0 + per-module tally, tagged archive/p91-credit), offload pool, UV_PYTHON=3.13.14
+# run 1: ABI pin (O5 reads git objects, so the live ABI pin carries the acceptance): uv run python .agent/mutate tests.test_system.SystemTests.test_function_report_public_shape_is_exact_frozen_slotted_and_exported --rev impl/p91 --workers 6
+mutate: tests.test_system.SystemTests.test_function_report_public_shape_is_exact_frozen_slotted_and_exported @ 3ef05d30deea, baseline 0.4s (ran 1), timeout 10.0s, workers 6
+  scope src/cement_runtime/models.py: 0 executed lines + 64 read definition lines
+  scope src/cement_runtime/store.py: 95 executed lines
+  scope src/cement_runtime/system.py: 5 executed lines + 17 read definition lines
+mutate: killed 128, survived 84, incompetent 0, invalid 30, no-test 0, error 0 (of 242 in-scope mutants)
+  module src/cement_runtime/models.py: 27 mutants (killed 27)
+  module src/cement_runtime/store.py: 172 mutants (killed 85, survived 67, invalid 20)
+  module src/cement_runtime/system.py: 43 mutants (killed 16, survived 17, invalid 10)
+  SURVIVED src/cement_runtime/store.py:444 core/NumberReplacer #8
+  SURVIVED src/cement_runtime/store.py:444 core/NumberReplacer #9
+  SURVIVED src/cement_runtime/store.py:444 core/NumberReplacer #10
+  SURVIVED src/cement_runtime/store.py:444 core/NumberReplacer #11
+  SURVIVED src/cement_runtime/store.py:444 core/NumberReplacer #13
+  SURVIVED src/cement_runtime/store.py:569 core/NumberReplacer #15
+  SURVIVED src/cement_runtime/store.py:569 core/ReplaceComparisonOperator_NotEq_Gt #0
+  SURVIVED src/cement_runtime/store.py:569 core/ReplaceComparisonOperator_NotEq_Is #0
+  SURVIVED src/cement_runtime/store.py:569 core/ReplaceComparisonOperator_NotEq_Lt #0
+  SURVIVED src/cement_runtime/store.py:580 core/NumberReplacer #17
+  SURVIVED src/cement_runtime/store.py:580 core/ReplaceComparisonOperator_NotEq_Gt #1
+  SURVIVED src/cement_runtime/store.py:580 core/ReplaceComparisonOperator_NotEq_Is #1
+  SURVIVED src/cement_runtime/store.py:580 core/ReplaceComparisonOperator_NotEq_Lt #1
+  SURVIVED src/cement_runtime/store.py:580 core/ReplaceOrWithAnd #2
+  SURVIVED src/cement_runtime/store.py:582 core/ReplaceComparisonOperator_NotEq_Is #2
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_Add #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_BitAnd #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_BitXor #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_Div #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_FloorDiv #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_LShift #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_Mod #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_Mul #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_Pow #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_RShift #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_Sub #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_Mul_Div #2
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceTrueWithFalse #1
+  SURVIVED src/cement_runtime/store.py:603 core/ReplaceComparisonOperator_IsNot_NotEq #0
+  SURVIVED src/cement_runtime/store.py:605 core/ReplaceComparisonOperator_Lt_Eq #0
+  SURVIVED src/cement_runtime/store.py:605 core/ReplaceComparisonOperator_Lt_Is #0
+  SURVIVED src/cement_runtime/store.py:605 core/ReplaceComparisonOperator_Lt_LtE #0
+  SURVIVED src/cement_runtime/store.py:619 core/ReplaceComparisonOperator_Eq_Gt #3
+  SURVIVED src/cement_runtime/store.py:619 core/ReplaceComparisonOperator_Eq_GtE #3
+  SURVIVED src/cement_runtime/store.py:619 core/ReplaceComparisonOperator_Eq_Is #3
+  SURVIVED src/cement_runtime/store.py:623 core/ReplaceUnaryOperator_Delete_Not #1
+  SURVIVED src/cement_runtime/store.py:633 core/NumberReplacer #18
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_Add #5
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_Add #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_BitAnd #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_BitXor #5
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_BitXor #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_FloorDiv #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_LShift #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_Mod #5
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_Mod #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_Mul #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_Pow #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_RShift #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_Sub #6
+  SURVIVED src/cement_runtime/store.py:654 core/ReplaceBinaryOperator_Mul_Div #3
+  SURVIVED src/cement_runtime/store.py:669 core/NumberReplacer #22
+  SURVIVED src/cement_runtime/store.py:669 core/NumberReplacer #23
+  SURVIVED src/cement_runtime/store.py:679 core/AddNot #30
+  SURVIVED src/cement_runtime/store.py:682 core/AddNot #31
+  SURVIVED src/cement_runtime/store.py:682 core/ReplaceComparisonOperator_IsNot_Is #2
+  SURVIVED src/cement_runtime/store.py:683 core/ReplaceTrueWithFalse #3
+  SURVIVED src/cement_runtime/store.py:684 core/AddNot #32
+  SURVIVED src/cement_runtime/store.py:684 core/ReplaceComparisonOperator_IsNot_Is #3
+  SURVIVED src/cement_runtime/store.py:685 core/ReplaceFalseWithTrue #1
+  SURVIVED src/cement_runtime/store.py:699 core/NumberReplacer #25
+  SURVIVED src/cement_runtime/store.py:702 core/ReplaceComparisonOperator_Eq_GtE #4
+  SURVIVED src/cement_runtime/store.py:702 core/ReplaceComparisonOperator_Eq_LtE #4
+  SURVIVED src/cement_runtime/store.py:706 core/NumberReplacer #31
+  SURVIVED src/cement_runtime/store.py:706 core/ReplaceComparisonOperator_NotEq_Gt #3
+  SURVIVED src/cement_runtime/store.py:706 core/ReplaceComparisonOperator_NotEq_Lt #3
+  SURVIVED src/cement_runtime/store.py:706 core/ReplaceOrWithAnd #4
+  SURVIVED src/cement_runtime/system.py:608 core/AddNot #24
+  SURVIVED src/cement_runtime/system.py:608 core/ReplaceComparisonOperator_IsNot_Is #7
+  SURVIVED src/cement_runtime/system.py:612 core/AddNot #25
+  SURVIVED src/cement_runtime/system.py:612 core/NumberReplacer #56
+  SURVIVED src/cement_runtime/system.py:612 core/NumberReplacer #57
+  SURVIVED src/cement_runtime/system.py:612 core/ReplaceBinaryOperator_FloorDiv_Add #0
+  SURVIVED src/cement_runtime/system.py:612 core/ReplaceBinaryOperator_FloorDiv_BitAnd #0
+  SURVIVED src/cement_runtime/system.py:612 core/ReplaceBinaryOperator_FloorDiv_BitOr #0
+  SURVIVED src/cement_runtime/system.py:612 core/ReplaceBinaryOperator_FloorDiv_BitXor #0
+  SURVIVED src/cement_runtime/system.py:612 core/ReplaceBinaryOperator_FloorDiv_Div #0
+  SURVIVED src/cement_runtime/system.py:612 core/ReplaceBinaryOperator_FloorDiv_LShift #0
+  SURVIVED src/cement_runtime/system.py:612 core/ReplaceBinaryOperator_FloorDiv_Mod #0
+  SURVIVED src/cement_runtime/system.py:612 core/ReplaceBinaryOperator_FloorDiv_Mul #0
+  SURVIVED src/cement_runtime/system.py:612 core/ReplaceBinaryOperator_FloorDiv_Pow #0
+  SURVIVED src/cement_runtime/system.py:612 core/ReplaceBinaryOperator_FloorDiv_RShift #0
+  SURVIVED src/cement_runtime/system.py:612 core/ReplaceBinaryOperator_FloorDiv_Sub #0
+  SURVIVED src/cement_runtime/system.py:612 core/ReplaceComparisonOperator_IsNot_Is #8
+# run 2: p74 trial pin (tool at impl/p91 8bef2a0): uv run python .agent/mutate tests.test_json_value.CanonicalJSONTests.test_parser_rejects_ambiguous_or_unbounded_values --rev impl/p91 --workers 6
+mutate: tests.test_json_value.CanonicalJSONTests.test_parser_rejects_ambiguous_or_unbounded_values @ 8bef2a0aa3e6, baseline 0.2s (ran 1), timeout 10.0s, workers 6
+  scope src/cement_runtime/json_value.py: 90 executed lines
+mutate: killed 131, survived 126, incompetent 0, invalid 1, no-test 0, error 0 (of 258 in-scope mutants)

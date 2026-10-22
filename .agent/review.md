@@ -17,6 +17,16 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p91 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 an ABI pin reports ≥ 1 in-scope `models.py` mutant; R2 its survivors named; R3 the p74 trial pin keeps 131 / 126 / 1. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | scope adds read definition spans (test-caller frames only): `models.py: 0 executed lines + 64 read definition lines` → 27 mutants, 27 killed (per-module tally line added so the count is printed, not inferred). O5 reads git objects, so the live ABI pin carries the check — re-derivation stated in the ledger. |
+| R2 | acceptance | pass | 84 survivors listed in `.agent/decisions/p91-mutate.txt` (store 67, system 17); rulings owed → p113. |
+| R3 | acceptance | pass | p74 trial pin at `impl/p91`: killed 131, survived 126, invalid 1 of 258. |
+
 ## p56 close (MAINTAIN queue run, unit, tier `kernel`, two commits: `35411af` + this) — target = the commit landing this section
 
 Check set: R1 a committed campaign over the migrated assertions + demo verdicts; R2 every named-obligation mutant killed; R3 the three named survive-then-die cases; R4 premise re-derived at HEAD; R5 the oracle can fire and cannot pass vacuously. MAIN alone (advisor consulted on the design).
