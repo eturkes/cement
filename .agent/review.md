@@ -21,6 +21,32 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## nucllei skill request close (MAINTAIN, tier `kernel`) — target = `e325bdc` + the commit landing this section
+
+Check set = reviewer-1's 12 rows, seeded before it read `00dc010..e325bdc` (`.scratch/nucllei/review/verdicts.md`), + R13 live re-check + R14 full gate at the closing commit. Contract = `.agent/decisions/nucllei-contract.md` N1-N8. Teammate verdicts re-derived here.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | correctness vs N1-N6 | fixed F1-F4 | each finding red at `e325bdc` as `ReviewBattery` (failures=4, errors=3), green after the fix |
+| R2 | no write on refusal paths | fixed F1-F3 | expired ticket: exit 3, deleted, no proposal; duplicate-key output: exit 2, ticket kept |
+| R3 | robustness after durable writes | fixed F2 | `_discard` / `_remember` return a line; a ticket write failure = exit 5 + answer without recording; `main` maps `OSError` → exit 5 |
+| R4 | classic pitfalls | fixed F3 F4 | `parse_json` (repeated key, 100,000-deep nest → exit 2); `read OP 0` → exit 3 |
+| R5 | generator | pass | both `generate.py --check` rc 0; paste-ins change only by the loader fix below |
+| R6 | learning parity with the OWUI tool | fixed F2 | state store after the writes; parity otherwise held, deviations named in the contract |
+| R7 | skills ↔ command | pass | N8 census green after the G3 skill change (`use --input-file` exists in `_parser()`) |
+| R8 | trust | pass + G3 fixed | N6 AST pin, N8 census; G3 (heredoc delimiter in a document runs the rest as commands) → `write_file` + `--input-file`, live d5 kept an injected `switch … off` line as data; `docs/threat-model.md` states the model-executed switch |
+| R9 | llens conventions | pass | reviewer ran llens `parse_md_frontmatter`/`build_payload` over the 3 files; `cement-switch` alone has an empty description |
+| R10 | README claims | fixed F5 | per-operation switch wording (`off` start, `follow`, `pin`) in README + `cement-learn.md`; `--input-file` documented |
+| R11 | spec/contract/rule vs behavior | fixed | contract N1/N2/N5 + counts (G1), rule bullets, spec live-test line (source-built images, owner picked ghcr) |
+| R12 | tests bind behavior | fixed | +8 `ReviewBattery` tests (incl. the 24 h / 24 h + 1 µs pair); battery 44 |
+| R13 | live re-check | pass | `.agent/decisions/nucllei-live-e2e.md` § Re-check: d1-d6 with the file hand-over, in-turn learning, switch, hits, injected document inert, `in/` + `tickets/` empty after |
+| R14 | full gate at the closing commit | see the closing commit body | — |
+
+Rulings:
+- reviewer-1's probe `test_merge_reports_durable_reviews_when_state_write_fails` expects a nonzero exit; ruled: exit 0 — the merge's writes succeeded, the output names them plus a line that the projectability ruling was not stored (contract N5).
+- G2 (`_plain` + `dataclasses` unused) removed; removing `dataclasses` exposed a latent shared-`LOADER` recursion (`find_spec` lazily imports `importlib.machinery`, never preloaded under `python -I -S`) → N7 `test_n7_the_command_runs_on_the_standard_library_alone` fired with `RecursionError`; fixed in `examples/open_webui/generate.py` (preload before the finder), paste-ins regenerated (+3 lines each).
+- Owner-ruled limits stay limits: per-user ledgers, the model-executed switch (empty-description skill), in-turn learning wait.
+
 ## MAINTAIN queue run close — target = the commit landing this section
 
 Check set (the body's Met when): R1 every queue row closed by its acceptance in its own commit, owed with what it owes, routed, or waiting on its trigger; R2 the queue + ledger grader; R3 the standing censuses; R4 the full gate on a clean tree at this commit. MAIN alone.

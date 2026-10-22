@@ -9045,8 +9045,11 @@ class _CementImporter:
 
 
 def _cement_module(name: str) -> object:
+    # importlib.machinery loads before the finder exists: find_spec imports it lazily, and on a
+    # host that has not loaded it yet (`python -I -S`) that import re-enters find_spec forever.
     import hashlib
     import importlib
+    import importlib.machinery
     import sys
 
     # Checked on every call, not once per process: an edited copy pasted after a clean one would

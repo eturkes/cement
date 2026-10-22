@@ -31,8 +31,9 @@ therefore learns from the requests of one user, and each user switches their own
 A chat turn goes like this:
 
 1. The user pastes a form and asks which fields to extract. The model loads the `cement` skill.
-2. The model runs `use`. When a switched-on function covers the form, the command prints the
-   output of the function. The model uses that output in its reply.
+2. The model writes the form to a file in `/workspace/.cement/in/` and runs `use` with that file.
+   No line of the form goes into a shell command. When a switched-on function covers the form,
+   the command prints the output of the function. The model uses that output in its reply.
 3. When no function covers the form, the command prints a ticket. The model writes its own
    answer. Before it replies, it runs `record` with that ticket and its output.
 4. When the ledger holds two answers for the same case, `record` asks for a learning pass. The
@@ -48,8 +49,9 @@ of the function. That output does not depend on the model. The model still write
 around that output, so the reply text is not deterministic.
 
 A request that no function covers goes to the model, as before. Cement learns only from the
-answers that the model recorded. A case needs two confirmations before a version holds it. A
-version answers nothing until the user switches it on.
+answers that the model recorded. A case needs two confirmations before a version holds it. The
+switch of a new operation starts off. A version answers only while the switch selects it: with
+`follow`, each new version answers at once, and with `pin`, one version answers.
 
 ## Limits
 
@@ -132,7 +134,7 @@ podman run --rm -i --network none --read-only --user 65534:65534 --tmpfs /worksp
 
 | Command | What it does | Used by |
 |---|---|---|
-| `use <operation> [--field <name>]` | Looks up one input. Prints the output of the function, or a ticket. | `cement` |
+| `use <operation> [--field <name>] [--input-file <path>]` | Looks up one input. Prints the output of the function, or a ticket. | `cement` |
 | `record <ticket> [--request <text>]` | Retains the output for the input of the ticket. | `cement` |
 | `learn <operation> --projectable yes\|no` | Lists the cases, their answers and suspected regenerations. | `cement-learn` |
 | `show <proposal>` | Shows one recorded answer. | `cement-learn` |
@@ -147,4 +149,6 @@ podman run --rm -i --network none --read-only --user 65534:65534 --tmpfs /worksp
 | `switch <operation> off\|follow\|pin [<version>]` | Switches a function off, on, or to one version. | `cement-switch` |
 
 Each input and output on standard input is JSON. With `--field <name>`, `use` reads the whole
-standard input as the text of that one field and removes line breaks at its end.
+standard input as the text of that one field and removes line breaks at its end. With
+`--input-file <path>`, `use` reads that file instead of standard input. When the file is in
+`/workspace/.cement/in/`, `use` deletes it after it reads it.

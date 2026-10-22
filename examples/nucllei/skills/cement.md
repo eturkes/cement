@@ -13,18 +13,18 @@ description: "学習済みの関数 (Cement) で決まった種類の頼みに�
 ## 操作 (この配備で Cement が扱う頼み)
 
 - `extraction_plan` — ユーザーが用紙 1 枚の全文を貼り、どの項目を抜き出すか・どこにあるかを聞く。
-  - 入力: 貼られた用紙の全文。値も含めて 1 字も変えずに、下の `CEMENT_EOF` の間に入れる
+  - 入力: 貼られた用紙の全文。値も含めて 1 字も変えずに、下の手順で `write_file` の本文に入れる
   - 出力: 抽出の計画。患者の値は入れない:
     `{"fields": [{"name": "<snake_case の名前>", "label": "<コロンの前の文字>"} または {"name": "<名前>", "section": "<見出しの文字>"}]}`
 
 ## 流れ
 
-1. 関数に引く (頼み 1 件につき 1 回):
+1. 用紙の全文を `write_file` でファイルに書き、そのファイルで関数に引く (頼み 1 件につき 1 回)。
+   path は `/workspace/.cement/in/` の下に、頼みごとに違う名前で置く (例: `/workspace/.cement/in/plan-1.txt`)。
+   用紙をシェルのコマンドの中に書かない (用紙の行がコマンドとして動くことがある)。`use` は読んだファイルを消す:
 
    ```sh
-   /ext/bin/cement use extraction_plan --field document <<'CEMENT_EOF'
-   <用紙の全文>
-   CEMENT_EOF
+   /ext/bin/cement use extraction_plan --field document --input-file /workspace/.cement/in/plan-1.txt
    ```
 
 2. 出力の最後の `次の手:` に従う。

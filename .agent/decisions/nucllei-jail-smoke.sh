@@ -30,7 +30,9 @@ $C merge extraction_plan --projectable yes --proposals "$ids" --note union < /tm
 $C publish extraction_plan --projectable yes > /tmp/p; expect 'の版 1 (場合 1 件、' /tmp/p; expect '/cement-switch でオンにするまで答えない' /tmp/p
 $C use extraction_plan --field document < /tmp/c > /tmp/u3; expect '(関数がオフ)' /tmp/u3
 $C switch extraction_plan follow > /tmp/s; expect 'をオンにした' /tmp/s
-$C use extraction_plan --field document < /tmp/c > /tmp/u4; expect '学習済みの関数が答えた (extraction_plan の版 1)。' /tmp/u4; expect '"mrn"' /tmp/u4
+mkdir -p /workspace/.cement/in && cp /tmp/c /workspace/.cement/in/plan-1.txt
+$C use extraction_plan --field document --input-file /workspace/.cement/in/plan-1.txt > /tmp/u4; expect '学習済みの関数が答えた (extraction_plan の版 1)。' /tmp/u4; expect '"mrn"' /tmp/u4
+[ ! -e /workspace/.cement/in/plan-1.txt ] || { echo 'FAIL: the hand-over file was kept'; exit 1; }
 $C status > /tmp/st; expect 'スイッチ: オン (最新の版に追従)。' /tmp/st
 $C read extraction_plan > /tmp/rd; expect '"title": "PHYSICIAN PROGRESS NOTE"' /tmp/rd
 echo "jail smoke: PASS"

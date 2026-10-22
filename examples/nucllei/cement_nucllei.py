@@ -10,7 +10,6 @@ next step after `次の手:`. `generate.py` embeds `cement_runtime` and writes `
 from __future__ import annotations
 
 import argparse
-import dataclasses
 import datetime
 import json
 import os
@@ -33,7 +32,7 @@ from cement_runtime import (
     ValidationError,
 )
 from cement_runtime.function import evaluate
-from cement_runtime.json_value import canonicalize
+from cement_runtime.json_value import canonicalize, parse_json
 from cement_runtime.projection import draft_program
 from cement_runtime.system import PROVENANCE_MAX_BYTES
 
@@ -95,12 +94,6 @@ def _json(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, indent=2)
 
 
-def _plain(value: object) -> object:
-    if dataclasses.is_dataclass(value) and not isinstance(value, type):
-        return dataclasses.asdict(value)
-    return value
-
-
 def _same(left: object, right: object) -> bool:
     return canonicalize(left).digest == canonicalize(right).digest
 
@@ -146,11 +139,26 @@ def _projectable_state(operation: str) -> bool | None:
     return value if isinstance(value, bool) else None
 
 
-def _remember(operation: str, projectable: bool) -> None:
+def _remember(operation: str, projectable: bool) -> list[str]:
+    """Store the pass's ruling; a failure follows durable writes, so it becomes a line."""
+
     state = _state()
     known = state.get("projectable")
     state["projectable"] = (known if isinstance(known, dict) else {}) | {operation: projectable}
-    _write(_home() / "state.json", state)
+    try:
+        _write(_home() / "state.json", state)
+    except OSError as exc:
+        return [f"(用紙の形でまとめるかの判断は保存できなかった: {exc.__class__.__name__})"]
+    return []
+
+
+def _discard(path: pathlib.Path) -> list[str]:
+    try:
+        path.unlink(missing_ok=True)
+    except OSError as exc:
+        name = exc.__class__.__name__
+        return [f"(控えのファイルを消せなかった: {name}。同じ控えは記録済みとして扱われる)"]
+    return []
 
 
 def _read(path: str | None) -> str:
@@ -163,15 +171,11 @@ def _read(path: str | None) -> str:
 
 
 def _parse(text: str, what: str) -> object:
+    # Cement's strict reader: a repeated key or an over-deep nest is a refusal, never a guess.
     try:
-        value = json.loads(text)
-    except ValueError:
-        raise _RefusalError(2, f"{what}が JSON でない。") from None
-    try:
-        canonicalize(value)
+        return parse_json(text).value
     except ValidationError as exc:
-        raise _RefusalError(2, f"{what}が Cement の JSON の形でない ({exc})。") from None
-    return value
+        raise _RefusalError(2, f"{what}が JSON として読めない ({exc})。") from None
 
 
 # -- reading the ledger ------------------------------------------------------
@@ -353,6 +357,10 @@ def _use(args: argparse.Namespace) -> int:
     value = {args.field: text.rstrip("\n")} if args.field else _parse(text, "入力")
     if args.field:
         _parse(json.dumps(value), "入力")
+    if args.input_file is not None:
+        handed = pathlib.Path(args.input_file)
+        if handed.parent.resolve() == (_home() / "in").resolve():
+            _discard(handed)  # the chat skill's hand-over copy; the ticket keeps the input
     try:
         _home().mkdir(parents=True, exist_ok=True)
         system = System(_home() / "ledger.db", clock_us=_clock_us)
@@ -360,13 +368,13 @@ def _use(args: argparse.Namespace) -> int:
         reason, output, number = _lookup(system, args.operation, value)
     except ValidationError as exc:
         raise _RefusalError(2, str(exc)) from None
-    except CementError as exc:
+    except (CementError, OSError) as exc:
         # The chat never fails because Cement did: the model answers, and nothing is retained.
         _say(
             f"中止: Cement が使えない ({exc})。",
             "次の手: Cement を使わずに自分で答える。record は流さない。",
         )
-        return _status(exc)
+        return _status(exc) if isinstance(exc, CementError) else 5
     if reason == "hit":
         _say(
             f"学習済みの関数が答えた ({args.operation} の版 {number})。",
@@ -377,13 +385,20 @@ def _use(args: argparse.Namespace) -> int:
         return 0
     now = _clock_us()
     tickets = _home() / "tickets"
-    tickets.mkdir(exist_ok=True)
-    _prune(tickets, now)
     ticket = f"t_{secrets.token_hex(8)}"
-    _write(
-        tickets / f"{ticket}.json",
-        {"operation": args.operation, "input": value, "used_at_us": now},
-    )
+    try:
+        tickets.mkdir(exist_ok=True)
+        _prune(tickets, now)
+        _write(
+            tickets / f"{ticket}.json",
+            {"operation": args.operation, "input": value, "used_at_us": now},
+        )
+    except OSError as exc:
+        _say(
+            f"中止: 控えを書けない ({exc.__class__.__name__})。",
+            "次の手: Cement を使わずに自分で答える。record は流さない。",
+        )
+        return 5
     _say(
         f"学習済みの関数はこの頼みに答えない ({REASONS[reason]})。",
         f"控え: {ticket}",
@@ -436,6 +451,13 @@ def _record(args: argparse.Namespace) -> int:
         raise _RefusalError(
             5, f"控え {args.ticket} が読めない。", "次の手: 記録せずに返答を書く。"
         ) from None
+    if not isinstance(used, int) or _clock_us() - used > TICKET_TTL_US:
+        _discard(path)
+        raise _RefusalError(
+            3,
+            f"控え {args.ticket} は 24 時間を過ぎた (記録しない)。",
+            "次の手: 記録せずに返答を書く。",
+        )
     output = _parse(_read(args.output_file), "出力")
     system = _system()
     try:
@@ -449,10 +471,9 @@ def _record(args: argparse.Namespace) -> int:
             source_id=f"nucllei:{args.ticket}",
         )
     except ConflictError:
-        path.unlink(missing_ok=True)
-        _say(f"控え {args.ticket} は記録済み。", "次の手: 返答を書く。")
+        _say(f"控え {args.ticket} は記録済み。", *_discard(path), "次の手: 返答を書く。")
         return 0
-    path.unlink(missing_ok=True)
+    notes = _discard(path)
     try:
         count = _learnable(system, operation, proposal_id, output)
     except CementError:
@@ -460,11 +481,12 @@ def _record(args: argparse.Namespace) -> int:
     if count:
         _say(
             f"記録した ({operation} の提案 {proposal_id})。同じ場合の答えが {count} 件そろった。",
+            *notes,
             "次の手: 返答を書く前に load_skill で cement-learn を読み込み、"
             f"{operation} の学習を済ませる。",
         )
     else:
-        _say(f"記録した ({operation} の提案 {proposal_id})。", "次の手: 返答を書く。")
+        _say(f"記録した ({operation} の提案 {proposal_id})。", *notes, "次の手: 返答を書く。")
     return 0
 
 
@@ -591,8 +613,7 @@ def _merge(args: argparse.Namespace) -> int:
         )
         return _status(exc)
     # Only a pass that wrote rules on projectability; a refused or confused one rules nothing.
-    _remember(args.operation, projectable)
-    _say("場合をまとめた。", _json(done))
+    _say("場合をまとめた。", _json(done), *_remember(args.operation, projectable))
     return 0
 
 
@@ -649,18 +670,18 @@ def _publish(args: argparse.Namespace) -> int:
         if before and manifest.function_hash == before[0].receipt.function_hash
         else None
     )
-    if reason == "same":
-        _remember(operation, projectable)
+    notes = _remember(operation, projectable) if reason == "same" else []
     if reason is not None:
         _say(
             f"版を作らなかった ({PUBLISH_REASONS[reason]})。",
+            *notes,
             "次の手: 学習の結果をそのまま報告する。",
         )
         return 0
     system.promote_function(
         PARTITION, operation, expected_function_hash=manifest.function_hash, promoted_by=REVIEWER
     )
-    _remember(operation, projectable)
+    notes = _remember(operation, projectable)
     versions = _versions(system, operation)
     serving = versions[0].selected
     lines = [
@@ -676,7 +697,7 @@ def _publish(args: argparse.Namespace) -> int:
         if serving
         else "この版は、ユーザーが /cement-switch でオンにするまで答えない。"
     )
-    _say(*lines)
+    _say(*lines, *notes)
     return 0
 
 
@@ -740,7 +761,7 @@ def _read_version(args: argparse.Namespace) -> int:
     versions = _versions(system, args.operation)
     if not versions:
         raise _RefusalError(3, f"{args.operation} にはまだ版が無い。")
-    number = args.version or len(versions)
+    number = len(versions) if args.version is None else args.version
     receipt = _version(versions, number).receipt
     document = system.reconstruct_function_receipt(PARTITION, receipt.id).document
     lines = [
@@ -888,6 +909,12 @@ def main(argv: list[str] | None = None) -> int:
     except CementError as exc:
         _say(f"中止: {exc}", NEXT[_status(exc)])
         return _status(exc)
+    except OSError as exc:
+        _say(
+            f"中止: ファイルを読み書きできない ({exc.__class__.__name__}: {exc})。",
+            "次の手: 流し直さない。読み書きできなかったことをユーザーに伝える。",
+        )
+        return 5
 
 
 if __name__ == "__main__":

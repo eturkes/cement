@@ -333,7 +333,8 @@ with an agent that loads Agent Skills. It reads the retained answers, merges the
 recurring case into one output, reviews each proposal as `learning-pass`, writes or extends the
 projection program, compiles, verifies, and promotes. It never switches a function on. The Open
 WebUI example ships the same pass as an Open WebUI skill and an administrator tool, so the pass
-runs inside Open WebUI with the chat model.
+runs inside Open WebUI with the chat model. The nucllei example ships the pass as a nucllei skill:
+the chat model runs it inside a chat, on the ledger of one user.
 
 Its read surface groups pending proposals and active examples by case key:
 
@@ -539,6 +540,9 @@ full state model and trust boundaries.
   filter that retains the model's answers for the learning pass. The learning pass and the switch
   also run inside Open WebUI. Every part installs by paste, and `local.py` starts a local instance
   for a test with a real model.
+- [nucllei](examples/nucllei/README.md): Cement as a skill in nucllei, the chat platform of the
+  LLENS deployment. The chat model runs one sandbox command, and each user has a ledger of their own.
+  The learning pass runs in the chat, and the user switches each function on with `/cement-switch`.
 - [Command candidate source](examples/command_source/README.md): an optional source that runs a
   trusted adapter executable for one candidate.
 

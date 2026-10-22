@@ -24,11 +24,15 @@ paste-in byte-identical.
   off) on first use; hit ⇒ the function's output, version number, no ticket, no write; miss ⇒
   reason (`absent|off|failed|unrecognized`) + one ticket file `{operation, input, used_at_us}`;
   `--field NAME` = stdin text minus trailing newlines; ledger failure ⇒ exit class + "answer
-  without Cement, record nothing"; bad operation/input ⇒ exit 2, no ticket.
+  without Cement, record nothing"; bad operation/input ⇒ exit 2, no ticket; input read by Cement's
+  strict `parse_json` (repeated key, over-deep nest ⇒ exit 2); an `--input-file` inside
+  `$CEMENT_HOME/in/` (the chat skill's hand-over: a document never passes through the shell) is
+  deleted once read; a ticket that cannot be written ⇒ exit 5 + answer without recording.
 - N2 `record <ticket>`: one proposal, `source_id = nucllei:<ticket>`, provenance `{ticket,
   used_at_us, request, request_truncated}` within `PROVENANCE_MAX_BYTES` (longest start); the
-  ticket is consumed on success or on a duplicate source; a consumed/expired ticket ⇒ exit 3,
-  no write; a bad ticket or output ⇒ exit 2, ticket kept; tickets older than 24 h pruned at
+  ticket is consumed on success or on a duplicate source; a consumed ticket ⇒ exit 3, no write;
+  a ticket older than 24 h ⇒ exit 3, deleted, no write (exactly 24 h still records); a
+  filesystem failure after the commit becomes a line, never a traceback; a bad ticket or output ⇒ exit 2, ticket kept; tickets older than 24 h pruned at
   `use`.
 - N3 trigger: `record` asks for `cement-learn` before the reply iff the new proposal is no
   regeneration suspect AND the newest version does not map its input to the same output AND
@@ -41,7 +45,9 @@ paste-in byte-identical.
 - N5 learning steps = the Open WebUI learning tool's semantics (`learn/show/merge/reject/revoke/
   publish`, reviewer `learning-pass`, merge = one case, repeated ids refused before any write,
   partial write reported, publish = derived projection → compile → verify → promote, refusal
-  reasons `failed|empty|same`); nothing in it switches.
+  reasons `failed|empty|same`); projectability is stored only after a merge whose writes succeed
+  or a publish that creates or already holds a version, and a failed store becomes a line;
+  nothing in it switches.
 - N6 switch: `set_switch` reachable from `_switch` alone, actor `nucllei-user`, `pin N` over all
   receipts (version N = N-th promotion); `status/versions/read/diff` read only.
 - N7 generated `ext/bin/cement` = generator output (`--check`), shebang `#!/usr/bin/env
@@ -53,7 +59,7 @@ paste-in byte-identical.
 
 ## Gates (numbered; rerun from committed state)
 
-1. `uv run python -m unittest tests.test_nucllei_example` (32 tests).
+1. `uv run python -m unittest tests.test_nucllei_example` (44 tests).
 2. `uv run python examples/nucllei/generate.py --check` + `uv run python examples/open_webui/generate.py --check`.
 3. Fast gate: `.agent/gate tests.test_nucllei_example tests.test_cli_removal_battery tests.test_open_webui_paste_in tests.test_open_webui_example tests.test_authority_removal tests.test_submission_battery tests.test_cli_channels tests.test_proposal_binding_battery tests.test_cli_channels_battery`.
 4. Jail stand-in: `.agent/decisions/nucllei-jail-smoke.sh` in `python:3.12-slim-bookworm`
@@ -62,4 +68,5 @@ paste-in byte-identical.
 6. Live run on nucllei v20261020-01 + nucllei-sandbox → `.agent/decisions/nucllei-live-e2e.md`.
 
 Red: gate 1 at `00dc010` with this battery alone → `FileNotFoundError` (no
-`examples/nucllei/cement_nucllei.py`), every test unrun.
+`examples/nucllei/cement_nucllei.py`), every test unrun. Closing review (reviewer-1 on `e325bdc`):
+`ReviewBattery` F1-F4 + G3 red there (failures=4, errors=3); fixed in the closing commit.

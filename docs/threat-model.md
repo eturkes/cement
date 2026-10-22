@@ -17,7 +17,9 @@
 - Request JSON, including prompt injection.
 - LLM candidate output and self-reported provenance. A retained answer is evidence for the learning
   pass, never an instruction: a chat integration can deliver fabricated tool calls (the Open WebUI
-  example states how).
+  example states how). In the nucllei example, the chat model itself writes each retained answer and
+  runs the switch command when the user asks. The sandbox cannot tell who asked, so there a model
+  that ignores its skills can switch a function on (the example README states this limit).
 - The learning pass's judgment. It is an LLM run: its reviews, merges, and projection programs can be
   wrong. Cement verifies a program's grammar and consistency, never its semantic correctness. The
   switch keeps a person's decision between learned versions and production: it starts `off`, `follow`

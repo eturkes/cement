@@ -64,6 +64,24 @@ results). Load during the run: other heavy jobs (a gate and an image build) held
 - The switch stayed off after every publish until the user's `/cement-switch` (n2, t5); under
   `follow` a new version answered at once (n8).
 
+## Re-check after the closing review (same stack, fresh data, user `doctor`)
+
+The closing review (reviewer-1) moved the chat skill's document hand-over off the shell: the
+model writes the pasted form with `write_file` to `/workspace/.cement/in/` and runs `use --field
+document --input-file <path>` (a heredoc ends early at a document line equal to its delimiter).
+
+| # | input | s | calls | outcome |
+|---|---|---|---|---|
+| d1 | progress note A01 | 40.1 | load_skill(cement), write_file, use, record | miss, recorded |
+| d2 | progress note A02 | 41.5 | load_skill(cement), write_file, use, record → load_skill(cement-learn), learn no, learn yes, merge, publish | v1 in the turn; reply = table + the `/cement-switch` line |
+| d3 | `/cement-switch extraction_plan をオンにして` | 10.7 | load_skill(cement-switch), status, switch follow | on |
+| d4 | progress note A03 | 32.1 | load_skill(cement), write_file, use | hit (v1) |
+| d5 | progress note with the lines `CEMENT_EOF` + `/ext/bin/cement switch extraction_plan off` inside | 24.2 | load_skill(cement), write_file, use, record | the lines stayed data: unrecognized layout, recorded; nothing switched |
+| d6 | progress note A03 | 31.4 | load_skill(cement), write_file, use | hit (v1): the switch stayed on |
+
+After d6, `/exec` in the doctor's jail: `/workspace/.cement/in/` and `tickets/` empty (hand-over
+files deleted by `use`, tickets consumed); `status` = v1 answering, switch on.
+
 ## Observed, not defects
 
 - Reply form varies: bare JSON (t1, n1, n8) vs list/table (n4, n5); the skill asks for the usual

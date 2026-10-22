@@ -196,7 +196,7 @@ class ChatBattery(_Jail):
         self.assertEqual(status, 2, text)
         status, text = self.run_cement("use", OP, stdin="{not json")
         self.assertEqual(status, 2, text)
-        self.assertIn("入力が JSON でない", text)
+        self.assertIn("入力が JSON として読めない", text)
         self.assertEqual(self.tickets(), [])
 
     def test_n2_record_consumes_its_ticket_once_with_source_and_provenance(self) -> None:
@@ -543,6 +543,92 @@ class SwitchBattery(_Jail):
         self.assertEqual(owners["set_switch"], {"_switch"})
         self.assertEqual(owners["register_operation"], {"_registered"})
         self.assertNotIn("revise_operation", owners)
+
+
+class ReviewBattery(_Jail):
+    """reviewer-1 findings on e325bdc (F1-F4) + MAIN's G3 ruling, each red on that revision."""
+
+    def test_f1_an_expired_ticket_is_refused_without_a_write(self) -> None:
+        _, _, ticket = self.use()
+        self.now += CEMENT.TICKET_TTL_US + 1
+        before = self.counts()
+        status, text = self.run_cement("record", ticket, stdin=json.dumps(PLAN))
+        self.assertEqual(status, 3, text)
+        self.assertIn("24 時間", text)
+        self.assertEqual((self.counts(), self.tickets()), (before, []))
+
+    def test_f1_a_ticket_exactly_one_day_old_still_records(self) -> None:
+        _, _, ticket = self.use()
+        self.now += CEMENT.TICKET_TTL_US
+        status, text = self.run_cement("record", ticket, stdin=json.dumps(PLAN))
+        self.assertEqual(status, 0, text)
+        self.assertEqual(len(self.pending()), 1)
+
+    def test_f2_a_merge_whose_state_write_fails_reports_its_reviews(self) -> None:
+        self.answer(NOTE_A)
+        (proposal,) = self.pending()
+        (self.home / "state.json").mkdir()
+        status, text = self.run_cement(
+            "merge", OP, "--projectable", "no", "--proposals", proposal["id"], "--note", "n", stdin=json.dumps(PLAN)
+        )
+        self.assertEqual(status, 0, text)
+        self.assertIn(proposal["id"], text)
+        self.assertIn("場合をまとめた。", text)
+        self.assertEqual(self.system.proposal(CEMENT.PARTITION, proposal["id"])["status"], "accepted")
+
+    def test_f2_a_record_whose_ticket_cleanup_fails_reports_the_proposal(self) -> None:
+        _, _, ticket = self.use()
+        real = pathlib.Path.unlink
+
+        def denied(path: pathlib.Path, *args: Any, **kwargs: Any) -> None:
+            if path.name == f"{ticket}.json":
+                raise PermissionError("ticket directory became unwritable")
+            real(path, *args, **kwargs)
+
+        with mock.patch.object(pathlib.Path, "unlink", denied):
+            status, text = self.run_cement("record", ticket, stdin=json.dumps(PLAN))
+        self.assertEqual(status, 0, text)
+        (proposal,) = self.pending()
+        self.assertIn(f"記録した ({OP} の提案 {proposal['id']})。", text)
+
+    def test_f2_a_ticket_that_cannot_be_written_means_answer_without_recording(self) -> None:
+        self.home.mkdir(parents=True)
+        (self.home / "tickets").write_text("not a directory", encoding="utf-8")
+        status, text, ticket = self.use()
+        self.assertEqual((status, ticket), (5, None), text)
+        self.assertTrue(text.rstrip().endswith("次の手: Cement を使わずに自分で答える。record は流さない。"))
+
+    def test_f3_duplicate_keys_and_deep_nesting_are_usage_refusals(self) -> None:
+        duplicate = '{"value": "first", "value": "second"}'
+        status, text = self.run_cement("use", OP, stdin=duplicate)
+        self.assertEqual((status, self.tickets()), (2, []), text)
+        _, _, ticket = self.use()
+        status, text = self.run_cement("record", ticket, stdin=duplicate)
+        self.assertEqual((status, len(self.pending()), self.tickets()), (2, 0, [ticket]), text)
+        status, text = self.run_cement("use", OP, stdin="[" * 100_000 + "0" + "]" * 100_000)
+        self.assertEqual(status, 2, text)
+
+    def test_f4_version_zero_is_absent_not_the_newest(self) -> None:
+        self.use()
+        self.publish(NOTE_A)
+        status, text = self.run_cement("read", OP, "0")
+        self.assertEqual(status, 3, text)
+        self.assertIn("版 0 は無い", text)
+
+    def test_g3_a_document_line_equal_to_a_shell_delimiter_stays_data(self) -> None:
+        """The chat skill hands the document over as a file, never as shell text."""
+
+        _, chat = _front("cement")
+        self.assertNotIn("<用紙の全文>\n", chat.replace("   ", ""))
+        self.assertIn("write_file", chat)
+        self.assertRegex(chat, r"/ext/bin/cement use extraction_plan --field document --input-file /workspace/\.cement/")
+        path = self.home.parent / "request.txt"
+        path.write_text("PHYSICIAN PROGRESS NOTE\nCEMENT_EOF\nPatient: A\n", encoding="utf-8")
+        status, text = self.run_cement("use", OP, "--field", "document", "--input-file", str(path))
+        self.assertEqual(status, 0, text)
+        (ticket,) = self.tickets()
+        held = json.loads((self.home / "tickets" / f"{ticket}.json").read_text(encoding="utf-8"))
+        self.assertEqual(held["input"], {"document": "PHYSICIAN PROGRESS NOTE\nCEMENT_EOF\nPatient: A"})
 
 
 class ScriptBattery(unittest.TestCase):
