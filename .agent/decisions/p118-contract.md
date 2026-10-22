@@ -62,7 +62,7 @@ proposals paged at 100).
   answers nothing, `follow` serves the new version at once, `pinned` keeps its version) — tests pin the failed branch and each of
   published, empty and same. `learn cases --projectable` routes through `learning.cases`;
   `_learning_inputs` leaves `cli.py`; byte identity = `cmp` of its stdout at base and after on the
-  fixture ledger `.scratch/p118/fixture.py` builds (seven hospital forms over three layouts,
+  fixture ledger of `examples/hospital_ocr/documents/` (seven hospital forms over three layouts,
   confirmed + pending + one superseded example; the result rides the commit body).
 - L7 both examples call the library: Open WebUI `learn_cases`, `merge_case`, `publish_version`;
   nucllei `learn`, `merge`, `publish` and the N3 trigger's input read. Neither defines `_inputs`
