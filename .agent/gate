@@ -29,6 +29,7 @@ if [ "${1:-}" = "--omit-d28" ]; then
   step secrets .agent/gitleaks
   step skips uv run python .agent/skip-census
   step register uv run python .agent/register-audit --gate
+  step reports uv run python .agent/decisions/m3-report-validate.py --all
   step unittest uv run python .agent/suite --omit-d28 "${durations[@]}"
   step build uv build
 elif [ $# -eq 0 ]; then
@@ -36,6 +37,7 @@ elif [ $# -eq 0 ]; then
   step secrets .agent/gitleaks
   step skips uv run python .agent/skip-census
   step register uv run python .agent/register-audit --gate
+  step reports uv run python .agent/decisions/m3-report-validate.py --all
   step unittest uv run python -m unittest discover -s tests -t . "${durations[@]}"
   step build uv build
 else

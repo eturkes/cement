@@ -95,10 +95,23 @@ def main(argv: list[str]) -> int:
     return grade(Path(argv[1]), None)
 
 
+# Records `--all` skips, each with its reason (owner-ruled at the MAINTAIN queue run's close, p05).
+EXEMPT = {
+    ".agent/decisions/m3-plan-review.md": "its 48 anchors point into the gitignored, deleted"
+    " `.scratch/agents/plan-m3.md` (p10), so it reds at every revision, its adding commit included",
+}
+
+
 def grade_all() -> int:
     listed = (_git("ls-files", "--", ".agent/decisions/*.md") or "").split()
     failed = graded = 0
+    for rel in sorted(set(EXEMPT) - set(listed)):
+        print(f"STALE-EXEMPT {rel}: not a tracked record")
+        failed += 1
     for rel in listed:
+        if rel in EXEMPT:
+            print(f"EXEMPT {rel}: {EXEMPT[rel]}")
+            continue
         if not any(tuple(c.lower() for c in cells(line)) in SHAPES
                    for line in (ROOT / rel).read_text(encoding="utf-8").splitlines()):
             continue

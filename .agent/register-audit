@@ -9,7 +9,9 @@ modal, contraction and dash counts print beside it as leads.
 Usage:
   .agent/register-audit --gate [files…]   summary + filler hits; rc 1 on a hit (the gate step)
   .agent/register-audit [files…]          every sentence with its word count, for judgment
-Files default to the tracked surfaces: README.md, docs/*.md, examples/*/README.md.
+Files default to the tracked surfaces: README.md, docs/*.md, examples/*/README.md, plus every
+`--help` page of the shipped CLI (p92): `cement_runtime.cli._parser()` walked node by node, each
+node's `format_help()` graded for filler and reported under its command path.
 """
 
 from __future__ import annotations
@@ -101,6 +103,25 @@ def sentences(text: str) -> list[str]:
     return [part.strip() for part in parts if part.strip()]
 
 
+def cli_help() -> list[tuple[str, str]]:
+    """(command path, `--help` text) for the root parser and every subcommand node."""
+    import argparse
+
+    from cement_runtime import cli
+
+    pages: list[tuple[str, str]] = []
+
+    def walk(parser: argparse.ArgumentParser, path: str) -> None:
+        pages.append((path, parser.format_help()))
+        for action in parser._actions:
+            if isinstance(action, argparse._SubParsersAction):
+                for name, child in action.choices.items():
+                    walk(child, f"{path} {name}")
+
+    walk(cli._parser(), "cement")
+    return pages
+
+
 def words(sentence: str) -> int:
     return sum(1 for token in sentence.split() if re.search(r"\w", token))
 
@@ -129,6 +150,13 @@ def main(argv: list[str]) -> int:
         if not gate:
             for number, sentence in said:
                 print(f"  {path}:{number} [{words(sentence)}] {sentence}")
+    if len(argv) == (2 if gate else 1):
+        pages = cli_help()
+        hits = [(path, m.group(0)) for path, text in pages for m in FILLER.finditer(text)]
+        filler_total += len(hits)
+        print(f"== cli --help: {len(pages)} pages, filler {len(hits)}")
+        for path, word in hits:
+            print(f"  FILLER `{path} --help`: {word}")
     if filler_total:
         print(f"register-audit: FAIL ({filler_total} filler hits)")
         return 1

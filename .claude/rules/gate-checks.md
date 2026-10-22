@@ -10,6 +10,7 @@ paths:
   - ".gitleaksignore"
   - ".agent/skip-census"
   - ".agent/register-audit"
+  - ".agent/decisions/m3-report-validate.py"
   - ".agent/mutate"
   - ".agent/replay-mutants"
   - ".agent/decisions/*-mutants.jsonl"
@@ -45,3 +46,5 @@ Each purpose-built check below ships the seed that reds it; law → `.claude/rul
 - `.agent/contract-claims` (p60, contract checker, not a gate step): fixtures `.agent/fixtures/contract-claims/` — `good.md` → rc 0 (1 graded row: 7 `^class` lines in `6fb4d92:src/cement_runtime/errors.py`); `wrong-count.md` (claims 8) → rc 1 `MISMATCH`; `unclaimed.md` → rc 1 `UNCLAIMED 3`; `stale-anchor.md` (fragment absent from its line) → rc 1 `STALE` (+ `UNCLAIMED`). Shipped `.agent/decisions/m3u6a1-contract.md` → rc 0: 44 count-bearing lines, 50 graded rows, 20 unchecked.
 - `.agent/article-audit` (p64, prose check, not a gate step): shipped surfaces → rc 0 (6 files, 380 grounded words); `docs/architecture.md` + the sentence `Cement withholds the cached output from \`follow\`.` → rc 1 `the cached`; the pre-p64 `docs/architecture.md` → rc 1 `:150 the cached` (the defect p64 named).
 - `.agent/mutate` (p74, credit tool, not a gate step): see `.agent/decisions/m3u10-gate-tooling.md` `## p74` — the pin's survivor count and the survivor count after deleting the pin's assertion (seed branch), both runs recorded there.
+- `.agent/register-audit --gate` CLI help (p92): `simply ` inserted at the start of `function switch`'s help → rc 1, `FILLER \`cement function switch --help\`: simply`, `register-audit: FAIL (1 filler hits)`; restored → rc 0, `== cli --help: 46 pages, filler 0`.
+- `.agent/decisions/m3-report-validate.py --all` (gate step `reports`, p05): fixtures `.agent/fixtures/report-anchors/` — `one-stale.md` → rc 1 `lacks ['beta line']`, `resolving.md` → rc 0; the EXEMPT key repointed at a missing file → rc 1 `STALE-EXEMPT …` + `m3-plan-review.md` graded red (`RECORDS: 6 graded, 2 failed`); shipped → rc 0 `RECORDS: 5 graded, 0 failed` + one `EXEMPT` line.

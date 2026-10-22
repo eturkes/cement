@@ -21,6 +21,17 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p05 + p92 close (MAINTAIN queue run, owner-approved gate changes, one boundary) — target = the commit landing this section
+
+Check set: R1 the gate runs each check; R2 each check fires on its seed; R3 the shipped tree passes; R4 the pinned `register` gate line is intact. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `.agent/gate` gains `step reports …m3-report-validate.py --all` in both full branches; `register-audit` grades every CLI `--help` page inside its existing step. |
+| R2 | acceptance | pass | p05: `one-stale.md` rc 1, misdirected exemption rc 1 (`STALE-EXEMPT` + the record red); p92: seeded `simply` rc 1 naming `cement function switch --help`. |
+| R3 | acceptance | pass | `--all` rc 0 (5 graded, 1 exempt); `register-audit --gate` rc 0 (46 help pages, filler 0). |
+| R4 | correctness | pass | `tests.test_cli_removal_battery` (pins `step register uv run python .agent/register-audit --gate`) green. |
+
 ## p83 close (MAINTAIN queue run, owner ruling, tier `docs`) — target = the commit landing this section
 
 Check set: R1 the ruled surface; R2 a fresh agent answers the near-match question from it alone; R3 each stated fact matches shipped code. MAIN alone.
