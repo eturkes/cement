@@ -17,6 +17,19 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p42 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 SCHEMA_VERSION + SCHEMA digest frozen; R2 identities read per writer; R3 every event branch's payload keys + the 1,001 sentinels; R4 invalid identities make 0 clock / id calls; R5 credentials; R6 harvest. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | digest + length + fingerprint equality; one-space SCHEMA edit → FAILED (module constant: 0 in-scope mutants, so the planted edit is its check). |
+| R2 | acceptance | pass | identity-writer census green on today's tree (p38's `_entity_id` rename leaves it intact). |
+| R3 | acceptance | pass | 20 event kinds' payload keys pinned; 1,001-member retained + candidate page tails already pinned by the two `…page_tail` tests. |
+| R4 | acceptance | pass | invalid-identity probe: 0 clock reads, 0 `_new_id` calls. |
+| R5 | integrity | pass | `.agent/mutate` ×3 at `impl/p42` (tag `archive/p42-credit`): killed 1767 / 1427 / 1809; survivors → p114. |
+| R6 | integrity | pass | cherry-pick of `059dab8` conflicted only where both sides appended to `SystemTests`'s end (base empty) → both kept, mine first; class runs 4 OK. |
+
 ## p91 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 an ABI pin reports ≥ 1 in-scope `models.py` mutant; R2 its survivors named; R3 the p74 trial pin keeps 131 / 126 / 1. MAIN alone.

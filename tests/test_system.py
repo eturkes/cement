@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import gc
 import hashlib
 import inspect
@@ -64,6 +65,7 @@ from cement_runtime.artifacts import (
     build_exact_lookup,
 )
 from cement_runtime.json_value import CANONICALIZER, canonicalize
+from cement_runtime.projection import structure
 from cement_runtime.store import SCHEMA_VERSION
 from cement_runtime.system import (
     FUNCTION_MEMBERSHIP_ABI,
@@ -17171,6 +17173,330 @@ class SystemTests(unittest.TestCase):
             with self.subTest(label=label, call=cases.index((label, call))):
                 with self.assertRaisesRegex(ValidationError, f"^{label} must be a bounded ASCII identifier$"):
                     call()
+
+
+class PreservedInvariantCensusTests(unittest.TestCase):
+    """p42: P6-P10 at writer + branch granularity, each census derived from the live code."""
+
+    PARTITION, OPERATION = "tenant-a", "echo"
+    # Each identity writer -> every `table.column` its identity lands in (`[json]` = inside a JSON
+    # text). Frozen from a measured run; a writer with a new identity argument must join.
+    IDENTITY_SITES = {
+        "register_operation": ["events.payload_json[json]"],
+        "revise_operation": ["events.payload_json[json]"],
+        "review": [
+            "events.payload_json[json]",
+            "examples.receipt_json[json]",
+            "examples.reviewer",
+            "proposals.reviewer",
+        ],
+        "compile": ["events.payload_json[json]"],
+        "verify": ["events.payload_json[json]", "test_reports.details_json[json]"],
+        "promote": ["artifacts.promoted_by", "events.payload_json[json]"],
+        "challenge": ["events.payload_json[json]", "examples.receipt_json[json]", "examples.reviewer"],
+        "revoke_example": ["events.payload_json[json]", "example_revocations.revoked_by"],
+        "suspend_artifact": ["events.payload_json[json]"],
+        "verify_drafts": ["events.payload_json[json]", "test_reports.details_json[json]"],
+        "promote_function": [
+            "artifacts.promoted_by",
+            "events.payload_json[json]",
+            "function_receipts.promoted_by",
+        ],
+        "set_switch": ["events.payload_json[json]", "switch_settings.set_by"],
+        "set_projection": ["events.payload_json[json]", "projection_settings.set_by"],
+        "supersede_examples": [
+            "events.payload_json[json]",
+            "examples.receipt_json[json]",
+            "examples.reviewer",
+        ],
+    }
+    EVENT_PAYLOAD_KEYS = {
+        "artifact.challenged": ("example_id", "receipt_hash", "reviewer", "suspended"),
+        "artifact.compiled": (
+            "artifact_hash", "build_hash", "compiled_by", "evidence_snapshot_hash", "scope_hash",
+            "support",
+        ),
+        "artifact.contradicted": ("example_id", "proposal_id"),
+        "artifact.counterexample": ("example_id", "receipt_hash", "reviewer", "suspended"),
+        "artifact.integrity_quarantined": ("source",),
+        "artifact.promoted": ("promoted_by", "replaced_artifact_ids", "scope_hash"),
+        "artifact.suspended": ("reason", "suspended_by"),
+        "artifact.verification_failed": ("failures", "report_id", "scope_hash", "tests", "verified_by"),
+        "artifact.verified": ("failures", "report_id", "scope_hash", "tests", "verified_by"),
+        "example.revoked": (
+            "reason", "revoked_by", "suspended_artifact_count", "suspended_artifact_ids",
+            "suspended_artifact_ids_hash",
+        ),
+        "example.superseded": ("example_id", "reviewer"),
+        "function.promoted": (
+            "candidate_artifact_count", "candidate_artifact_ids", "candidate_artifact_ids_hash",
+            "function_hash", "member_artifact_count", "member_artifact_ids",
+            "member_artifact_ids_hash", "promoted_by", "receipt_hash", "receipt_id",
+            "retired_artifact_count", "retired_artifact_ids", "retired_artifact_ids_hash",
+        ),
+        "function.switched": (
+            "function_hash", "mode", "previous_function_hash", "previous_mode", "receipt_id", "set_by",
+        ),
+        "operation.registered": ("policy_hash", "registered_by"),
+        "operation.revised": ("policy_hash", "previous_revision", "revised_by"),
+        "projection.set": ("previous_program_hash", "program_hash", "retired_artifact_ids", "set_by"),
+        "proposal.accepted": ("contradicted_artifact_ids", "example_id", "receipt_hash", "reviewer"),
+        "proposal.corrected": ("contradicted_artifact_ids", "example_id", "receipt_hash", "reviewer"),
+        "proposal.created": (),
+        "proposal.rejected": ("reviewer",),
+    }
+
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.ledgers = 0
+
+    def _ledger(self, **kwargs) -> tuple[System, str]:
+        self.ledgers += 1
+        database = str(pathlib.Path(self.temporary.name) / f"ledger-{self.ledgers}.db")
+        base = System(database)
+        base.register_operation(
+            self.PARTITION, self.OPERATION, policy=CompilePolicy(2, 1, 0), registered_by="base"
+        )
+        self._confirm(base, {"x": 1}, {"y": 1})
+        base.compile(self.PARTITION, self.OPERATION, compiled_by="base")
+        base.verify_drafts(self.PARTITION, self.OPERATION, verified_by="base")
+        manifest = base.inspect_function_promotion(self.PARTITION, self.OPERATION)
+        base.promote_function(
+            self.PARTITION,
+            self.OPERATION,
+            expected_function_hash=manifest.function_hash,
+            promoted_by="base",
+        )
+        return System(database, **kwargs), database
+
+    def _confirm(self, system: System, value, output, operation: str | None = None) -> None:
+        for reviewer in ("base-r1", "base-r2"):
+            proposal = system.submit_proposal(
+                self.PARTITION,
+                operation or self.OPERATION,
+                value,
+                candidate=Candidate(output=output, provenance={}),
+            )
+            system.review(self.PARTITION, proposal, reviewer=reviewer, decision="accept")
+
+    def _draft(self, system: System) -> str:
+        self._confirm(system, {"x": 2}, {"y": 2})
+        return system.compile(self.PARTITION, self.OPERATION, compiled_by="base").created[0]
+
+    def _program(self, system: System) -> dict[str, object]:
+        system.register_operation(
+            self.PARTITION, "plan", policy=CompilePolicy(2, 1, 0), registered_by="base"
+        )
+        documents = sorted(
+            (pathlib.Path(__file__).resolve().parents[1] / "examples/hospital_ocr/documents").glob(
+                "*.txt"
+            )
+        )[:4]
+        layouts: dict[object, dict[str, object]] = {}
+        for document in documents:
+            text = document.read_text(encoding="utf-8")
+            self._confirm(system, {"document": text}, {"plan": text.splitlines()[0]}, "plan")
+            parsed = structure(text)
+            assert parsed is not None
+            title, pairs = parsed
+            layouts[(title, pairs)] = {
+                "name": title.lower(),
+                "title": title,
+                "entries": [{kind: key} for kind, key in pairs],
+            }
+        return {"abi": "cement-projection-v1", "text": "document", "keep": [], "layouts": list(layouts.values())}
+
+    def _writers(self):
+        """(writer, identity argument, setup(system) -> context, act(system, context, identity))."""
+
+        p, op = self.PARTITION, self.OPERATION
+
+        def promote_setup(system):
+            artifact_id = self._draft(system)
+            system.verify(p, artifact_id, verified_by="base")
+            return artifact_id, system.artifact(p, artifact_id)["scope_hash"]
+
+        def promote_function_setup(system):
+            self._draft(system)
+            system.verify_drafts(p, op, verified_by="base")
+            return system.inspect_function_promotion(p, op).function_hash
+
+        return (
+            ("register_operation", "registered_by", lambda s: None,
+             lambda s, c, i: s.register_operation(p, "other", registered_by=i)),
+            ("revise_operation", "revised_by", lambda s: None,
+             lambda s, c, i: s.revise_operation(p, op, policy=CompilePolicy(2, 1, 0), revised_by=i)),
+            ("review", "reviewer",
+             lambda s: s.submit_proposal(p, op, {"x": 3}, candidate=Candidate(output={"y": 3}, provenance={})),
+             lambda s, c, i: s.review(p, c, reviewer=i, decision="accept")),
+            ("compile", "compiled_by", lambda s: self._confirm(s, {"x": 2}, {"y": 2}),
+             lambda s, c, i: s.compile(p, op, compiled_by=i)),
+            ("verify", "verified_by", self._draft, lambda s, c, i: s.verify(p, c, verified_by=i)),
+            ("promote", "promoted_by", promote_setup,
+             lambda s, c, i: s.promote(p, c[0], scope_hash=c[1], promoted_by=i)),
+            ("challenge", "reviewer", lambda s: None,
+             lambda s, c, i: s.challenge(p, op, {"x": 1}, {"y": 1}, reviewer=i)),
+            ("revoke_example", "revoked_by", lambda s: s.examples(p, op)[0]["id"],
+             lambda s, c, i: s.revoke_example(p, c, revoked_by=i, reason="probe")),
+            ("suspend_artifact", "suspended_by",
+             lambda s: next(a["id"] for a in s.artifacts(p, op) if a["status"] == "promoted"),
+             lambda s, c, i: s.suspend_artifact(p, c, suspended_by=i, reason="probe")),
+            ("verify_drafts", "verified_by", self._draft,
+             lambda s, c, i: s.verify_drafts(p, op, verified_by=i)),
+            ("promote_function", "promoted_by", promote_function_setup,
+             lambda s, c, i: s.promote_function(p, op, expected_function_hash=c, promoted_by=i)),
+            ("set_switch", "actor", lambda s: None,
+             lambda s, c, i: s.set_switch(p, op, mode="follow", actor=i)),
+            ("set_projection", "actor", self._program,
+             lambda s, c, i: s.set_projection(p, "plan", c, actor=i)),
+            ("supersede_examples", "reviewer", lambda s: [e["id"] for e in s.examples(p, op)],
+             lambda s, c, i: s.supersede_examples(p, op, example_ids=c, output={"y": 9}, reviewer=i)),
+        )
+
+    @staticmethod
+    def _dump(database: str) -> tuple[str, ...]:
+        connection = sqlite3.connect(database)
+        try:
+            return tuple(connection.iterdump())
+        finally:
+            connection.close()
+
+    @staticmethod
+    def _sites(database: str, identity: str) -> list[str]:
+        connection = sqlite3.connect(database)
+        try:
+            found = set()
+            tables = [row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")]
+            for table in tables:
+                for column in [row[1] for row in connection.execute(f'PRAGMA table_info("{table}")')]:
+                    for (exact,) in connection.execute(
+                        f'SELECT CAST("{column}" AS TEXT) = ? FROM "{table}" '
+                        f'WHERE instr(CAST("{column}" AS TEXT), ?) > 0',
+                        (identity, identity),
+                    ):
+                        found.add(f"{table}.{column}" + ("" if exact else "[json]"))
+            return sorted(found)
+        finally:
+            connection.close()
+
+    def test_the_live_schema_is_frozen_at_v3(self) -> None:
+        # v3 shipped with the IMPLEMENT close: a schema byte change now needs a version bump in an
+        # owner-approved unit, which updates this frozen digest beside it.
+        payload = store_module.SCHEMA.encode("utf-8")
+        self.assertEqual(SCHEMA_VERSION, 3)
+        self.assertEqual(len(payload), 15_997)
+        self.assertEqual(
+            hashlib.sha256(payload).hexdigest(),
+            "298d84d468ea62b8fa77a7e1ab5f353155b119beccd22a17ac719d7ee2129106",
+        )
+        self.assertEqual(store_module.SCHEMA_FINGERPRINT, hashlib.sha256(payload).hexdigest())
+
+    def test_every_identity_writer_records_its_identity_where_it_did(self) -> None:
+        census = {
+            name: [parameter for parameter in inspect.signature(method).parameters
+                   if parameter.endswith("_by") or parameter in ("actor", "reviewer")]
+            for name, method in inspect.getmembers(System, inspect.isfunction)
+            if not name.startswith("_")
+        }
+        census = {name: parameters for name, parameters in census.items() if parameters}
+        writers = self._writers()
+        self.assertEqual(census, {name: [argument] for name, argument, _, _ in writers})
+        self.assertEqual({name for name, *_ in writers}, set(self.IDENTITY_SITES))
+        for name, _, setup, act in writers:
+            with self.subTest(writer=name):
+                system, database = self._ledger()
+                identity = f"ID-{name}"
+                act(system, setup(system), identity)
+                self.assertEqual(self._sites(database, identity), self.IDENTITY_SITES[name])
+
+    def test_an_invalid_identity_reaches_no_clock_read_and_no_id_allocation(self) -> None:
+        for name, argument, setup, act in self._writers():
+            with self.subTest(writer=name):
+                armed: list[bool] = []
+                clock_reads: list[int] = []
+
+                def clock() -> int:
+                    if armed:
+                        clock_reads.append(1)
+                    return 5_000_000_000
+
+                system, database = self._ledger(clock_us=clock)
+                context = setup(system)
+                before = self._dump(database)
+                armed.append(True)
+                with mock.patch.object(
+                    system_module, "_new_id", wraps=system_module._new_id
+                ) as allocated, self.assertRaises(ValidationError) as raised:
+                    act(system, context, "")
+                self.assertEqual(str(raised.exception), f"{argument} must be non-empty text")
+                self.assertEqual((len(clock_reads), allocated.call_count), (0, 0))
+                self.assertEqual(self._dump(database), before)
+
+    def test_every_event_branch_keeps_its_payload_keys(self) -> None:
+        # Static half: every `_event` call site, each kind it can emit (constant, both IfExp
+        # branches, the Literal-annotated f-string), and its literal payload keys.
+        tree = ast.parse(inspect.getsource(system_module))
+        static: dict[str, set[tuple[str, ...]]] = {}
+        for function in [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)]:
+            literals = {
+                node.target.id: node.annotation
+                for node in ast.walk(function)
+                if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
+            }
+            for call in [node for node in ast.walk(function) if isinstance(node, ast.Call)]:
+                if getattr(call.func, "id", None) != "_event":
+                    continue
+                keywords = {keyword.arg: keyword.value for keyword in call.keywords}
+                kind, payload = keywords["kind"], keywords["payload"]
+                if isinstance(kind, ast.Constant):
+                    kinds = [kind.value]
+                elif isinstance(kind, ast.IfExp):
+                    kinds = [kind.body.value, kind.orelse.value]
+                elif isinstance(kind, ast.JoinedStr):
+                    prefix, value = kind.values
+                    annotation = literals[value.value.id]
+                    kinds = [prefix.value + element.value for element in annotation.slice.elts]
+                else:
+                    self.fail(f"unsupported _event kind form at system.py:{call.lineno}")
+                self.assertIsInstance(payload, ast.Dict, f"system.py:{call.lineno}")
+                keys = tuple(sorted(key.value for key in payload.keys))
+                for emitted in kinds:
+                    static.setdefault(emitted, set()).add(keys)
+        self.assertEqual(
+            static, {kind: {keys} for kind, keys in self.EVENT_PAYLOAD_KEYS.items()}
+        )
+
+        # Runtime half: every branch a public call reaches (integrity quarantine needs a
+        # fabricated corrupt ledger; its keys stay pinned by the static half).
+        p, op = self.PARTITION, self.OPERATION
+        observed: dict[str, set[tuple[str, ...]]] = {}
+        for name, _, setup, act in self._writers():
+            system, _ = self._ledger()
+            act(system, setup(system), f"ID-{name}")
+            for event in system.events(p):
+                observed.setdefault(str(event["kind"]), set()).add(
+                    tuple(sorted(typing.cast(dict, event["payload"])))
+                )
+        system, _ = self._ledger()
+        corrected = system.submit_proposal(p, op, {"x": 5}, candidate=Candidate(output={"y": 5}, provenance={}))
+        system.review(p, corrected, reviewer="r", decision="correct", corrected_output={"y": 6})
+        rejected = system.submit_proposal(p, op, {"x": 6}, candidate=Candidate(output={"y": 6}, provenance={}))
+        system.review(p, rejected, reviewer="r", decision="reject")
+        contradicting = system.submit_proposal(p, op, {"x": 1}, candidate=Candidate(output={"y": 99}, provenance={}))
+        system.review(p, contradicting, reviewer="r", decision="accept")
+        self.assertTrue(system.challenge(p, op, {"x": 1}, {"y": 77}, reviewer="r")[1])
+        draft = self._draft(system)
+        late = system.submit_proposal(p, op, {"x": 2}, candidate=Candidate(output={"y": 2}, provenance={}))
+        system.review(p, late, reviewer="base-r3", decision="accept")
+        self.assertFalse(system.verify(p, draft, verified_by="v").passed)
+        for event in system.events(p):
+            observed.setdefault(str(event["kind"]), set()).add(
+                tuple(sorted(typing.cast(dict, event["payload"])))
+            )
+        expected = {kind: {keys} for kind, keys in self.EVENT_PAYLOAD_KEYS.items()}
+        expected.pop("artifact.integrity_quarantined")
+        self.assertEqual(observed, expected)
 
 
 if __name__ == "__main__":
