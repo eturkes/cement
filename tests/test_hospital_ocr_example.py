@@ -765,20 +765,6 @@ class OfflineBundleTests(unittest.TestCase):
             _signature_digest("layout_c_lab_slip_01.txt"), self.input_hashes
         )
 
-    def test_bundle_identity_is_per_run_while_its_length_is_stable(self) -> None:
-        # Run-specific evidence and example IDs feed `entry_seal`, which moves
-        # the root hash. The example README states this; the assertion below is
-        # what keeps that statement true, so relaxing it is a documentation
-        # change as much as a code change.
-        with tempfile.TemporaryDirectory() as directory:
-            second = _promoted_example_ledger(os.path.join(directory, "cement.db"))
-
-        self.assertEqual(
-            len(second.text.encode("utf-8")), len(self.bundle_text.encode("utf-8"))
-        )
-        self.assertNotEqual(second.function_hash, self.function_hash)
-
-
     def test_bundle_identity_follows_its_ids_and_clock_alone(self) -> None:
         # The cause behind the README's per-run sentence: hold every id and the clock fixed and
         # two independent ledgers export the same bytes; move ONE confirmed-example id and the

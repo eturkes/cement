@@ -17,6 +17,15 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p22 close (MAINTAIN queue run, owner approval) — target = the commit landing this section
+
+Check set: R1 owner approval for the deletion; R2 the survivor carries the claim. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | owner approved deleting the observational test (closing question); deletion = one test function, no skip added. |
+| R2 | acceptance | pass | the mechanism test pins byte equality + the hash move at equal length and names the README sentence it backs; module OK. |
+
 ## Owner rulings recorded (MAINTAIN queue run, closing question) — target = the commit landing this section
 
 Check set: R1 each ruled row carries its new status; R2 the approved survivor-scope rule is written where credit law lives. MAIN alone.
