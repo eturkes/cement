@@ -43,9 +43,10 @@ uv run python prototype/webui-demo/app.py
 
 Open <http://127.0.0.1:8765/>. Select **Play the story** for a guided tour. Each step dims the page and lights up one
 part of it, with a short note beside it. Select **Next** in the note to go on, or **Back**
-to go to the previous note. Going back to an earlier step replays the story up to that step
-without the simulated wait, so the page shows the same state as before. Select the **×** in
-the note or **Leave the story** to stop.
+to go to the previous note. Going back to an earlier step restores the state that the demo
+saved when that step ended, so the page shows the same state as before. If no saved state
+exists for that step, the demo runs the story again up to that step, without the simulated
+wait. Select the **×** in the note or **Leave the story** to stop.
 Stop the server with Ctrl+C. The ledger is a temporary SQLite file, and Ctrl+C removes it with
 the process. A server that a signal such as `SIGTERM` stops leaves its `cement-demo-*` directory
 in the system temporary directory. Remove that directory by hand.
