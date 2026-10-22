@@ -31,10 +31,10 @@ same observation keys, so session 3 compares two files field by field.
 
 from __future__ import annotations
 
-import json
 import re
 import sys
-from pathlib import Path
+
+from wave_validate import StrictWave
 
 UNKNOWN = "unknown"
 CANCELLED = "cancelled"
@@ -124,163 +124,20 @@ ORACLE_PROBES: dict[str, str] = {
 ORACLE_FIELDS = ("outcome", "observation", "note")
 
 
-def _fail(message: str) -> None:
-    print(f"INVALID: {message}")
-    raise SystemExit(1)
-
-
-def _rows(payload: dict, key: str, required: list[str]) -> dict[str, dict]:
-    raw = payload.get(key)
-    if not isinstance(raw, list):
-        _fail(f"{key!r} must be a list")
-    seen: dict[str, dict] = {}
-    for row in raw:
-        if not isinstance(row, dict) or not isinstance(row.get("id"), str):
-            _fail(f"every {key} row must be an object with a string id")
-        if row["id"] in seen:
-            _fail(f"duplicate row id {row['id']!r}")
-        seen[row["id"]] = row
-    missing = [identifier for identifier in required if identifier not in seen]
-    extra = [identifier for identifier in seen if identifier not in required]
-    if missing:
-        _fail(f"missing row ids: {missing}")
-    if extra:
-        _fail(f"unexpected row ids: {extra}")
-    return seen
-
-
-def _grade_table(
-    rows: dict[str, dict],
-    fields: tuple[str, ...],
-    *,
-    prose: set[str],
-    checks: dict[str, set[str]],
-) -> tuple[int, int]:
-    unknown = 0
-    cancelled = 0
-    for identifier, row in sorted(rows.items()):
-        values = {field: row.get(field) for field in fields}
-        for field, value in values.items():
-            if not isinstance(value, str):
-                _fail(f"{identifier}.{field} must be a string")
-        if all(value == CANCELLED for value in values.values()):
-            cancelled += 1
-            continue
-        for field, value in values.items():
-            if value == CANCELLED:
-                _fail(f"{identifier}.{field} is cancelled while siblings are not")
-            if value == UNKNOWN:
-                if field not in MAIN_OWNED:
-                    unknown += 1
-                continue
-            if field in checks and value not in checks[field]:
-                _fail(f"{identifier}.{field}={value!r} is not one of {sorted(checks[field])}")
-            if field in prose and len(value) < PROSE_MIN:
-                _fail(f"{identifier}.{field} is {len(value)} chars, under {PROSE_MIN}")
-        anchor = values.get("anchor") or values.get("section")
-        if anchor not in (None, UNKNOWN) and ANCHOR.fullmatch(anchor) is None:
-            _fail(f"{identifier} anchor {anchor!r} is neither §N nor path:line")
-    return unknown, cancelled
-
-
-def _validate_divergences(payload: dict) -> tuple[int, int]:
-    rows = _rows(payload, "rows", DIVERGENCE_IDS)
-    return _grade_table(
-        rows,
-        DIVERGENCE_FIELDS,
-        prose={"probe", "reading_a", "reading_b", "why_ambiguous", "recommendation"},
-        checks={},
-    )
-
-
-def _validate_attack(payload: dict) -> tuple[int, int]:
-    rows = _rows(payload, "rows", ATTACK_IDS)
-    return _grade_table(
-        rows,
-        ATTACK_FIELDS,
-        prose={"claim_as_written", "evidence"},
-        checks={"severity": SEVERITIES, "lens": LENSES},
-    )
-
-
-def _validate_review(payload: dict) -> tuple[int, int]:
-    rows = _rows(payload, "rows", REVIEW_IDS)
-    return _grade_table(
-        rows,
-        REVIEW_FIELDS,
-        prose={"finding", "evidence", "acceptance_check"},
-        checks={"severity": SEVERITIES, "lens": LENSES},
-    )
-
-
-def _validate_oracle(payload: dict) -> tuple[int, int]:
-    unknown = 0
-    for field in ("impl_path", "driver_path", "commit"):
-        if not isinstance(payload.get(field), str) or not payload[field]:
-            _fail(f"top-level {field!r} must be a non-empty string")
-        if payload[field] == UNKNOWN:
-            unknown += 1
-    probes = payload.get("probes")
-    if not isinstance(probes, dict):
-        _fail("'probes' must be an object")
-    missing = [identifier for identifier in ORACLE_PROBES if identifier not in probes]
-    extra = [identifier for identifier in probes if identifier not in ORACLE_PROBES]
-    if missing:
-        _fail(f"missing probe ids: {missing}")
-    if extra:
-        _fail(f"unexpected probe ids: {extra}")
-    for identifier, probe in sorted(probes.items()):
-        if not isinstance(probe, dict) or set(probe) != set(ORACLE_FIELDS):
-            _fail(f"{identifier} must be an object with keys {sorted(ORACLE_FIELDS)}")
-        outcome = probe["outcome"]
-        if outcome not in OUTCOMES:
-            _fail(f"{identifier}.outcome={outcome!r} is not one of {sorted(OUTCOMES)}")
-        note = probe["note"]
-        if not isinstance(note, str):
-            _fail(f"{identifier}.note must be a string")
-        observation = probe["observation"]
-        if outcome == UNKNOWN:
-            unknown += 1
-            continue
-        if not isinstance(observation, dict) or not observation:
-            _fail(f"{identifier}.observation must be a non-empty object once outcome is filled")
-        if len(note) < PROSE_MIN:
-            _fail(f"{identifier}.note is {len(note)} chars, under {PROSE_MIN}")
-    return unknown, 0
-
-
-VALIDATORS = {
-    "divergences": _validate_divergences,
-    "attack": _validate_attack,
-    "review": _validate_review,
-    "oracle": _validate_oracle,
+TABLES = {
+    "divergences": dict(subjects=DIVERGENCE_IDS, fields=DIVERGENCE_FIELDS, named_rows=True, cancelled=True,
+                        prose={"probe", "reading_a", "reading_b", "why_ambiguous", "recommendation"}),
+    "attack": dict(subjects=ATTACK_IDS, fields=ATTACK_FIELDS, named_rows=True, cancelled=True,
+                   prose={"claim_as_written", "evidence"}, enums={"severity": SEVERITIES, "lens": LENSES}),
+    "review": dict(subjects=REVIEW_IDS, fields=REVIEW_FIELDS, named_rows=True, cancelled=True,
+                   prose={"finding", "evidence", "acceptance_check"}, enums={"severity": SEVERITIES, "lens": LENSES}),
+    "oracle": dict(subjects=ORACLE_PROBES, fields=ORACLE_FIELDS, probe_object=True,
+                   top=("impl_path", "driver_path", "commit"), outcomes=OUTCOMES),
 }
-
-
-def main(argv: list[str]) -> int:
-    if len(argv) != 2:
-        print(__doc__)
-        return 1
-    path = Path(argv[1])
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as exc:
-        _fail(f"unreadable artifact: {exc}")
-    if not isinstance(payload, dict):
-        _fail("artifact must be a JSON object")
-    kind = payload.get("kind")
-    if kind not in VALIDATORS:
-        _fail(f"kind={kind!r} is not one of {sorted(VALIDATORS)}")
-    unknown, cancelled = VALIDATORS[kind](payload)
-    print(f"KIND: {kind}")
-    print(f"CANCELLED: {cancelled}")
-    print(f"UNKNOWN-CELLS: {unknown}")
-    if unknown:
-        print("INCOMPLETE: fill every cell, then rerun this validator LAST")
-        return 1
-    print("VALID: structurally sound with zero unfilled cells")
-    return 0
-
+ENGINE = StrictWave(TABLES, doc=__doc__, main_owned=MAIN_OWNED, prose_min=PROSE_MIN,
+                    anchor=ANCHOR, seed=False, report="cancelled")
+VALIDATORS = ENGINE.validators
+main = ENGINE.main
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv))

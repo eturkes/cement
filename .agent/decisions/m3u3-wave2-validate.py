@@ -32,10 +32,10 @@ that the teammate owns its subject text.
 
 from __future__ import annotations
 
-import json
 import re
 import sys
-from pathlib import Path
+
+from wave_validate import StrictWave
 
 UNKNOWN = "unknown"
 MAIN_OWNED = {"main_verdict", "main_disposition", "contract_action"}
@@ -170,209 +170,28 @@ PROBE_SUBJECTS: dict[str, str] = {
 }
 
 
-def _fail(message: str) -> None:
-    print(f"INVALID: {message}")
-    raise SystemExit(1)
-
-
-def _rows(payload: dict, required: dict[str, str], extension: str) -> dict[str, dict]:
-    raw = payload.get("rows")
-    if not isinstance(raw, list):
-        _fail("'rows' must be a list")
-    pattern = re.compile(rf"^{extension}\d{{2}}$")
-    seen: dict[str, dict] = {}
-    for row in raw:
-        if not isinstance(row, dict) or not isinstance(row.get("id"), str):
-            _fail("every row must be an object with a string id")
-        if row["id"] in seen:
-            _fail(f"duplicate row id {row['id']!r}")
-        if row["id"] not in required and pattern.fullmatch(row["id"]) is None:
-            _fail(f"row id {row['id']!r} is neither seeded nor a {extension}nn extension row")
-        seen[row["id"]] = row
-    missing = [identifier for identifier in required if identifier not in seen]
-    if missing:
-        _fail(f"missing row ids: {missing}")
-    return seen
-
-
-def _prose(identifier: str, field: str, value: object) -> None:
-    if not isinstance(value, str):
-        _fail(f"{identifier}.{field} must be a string")
-    if len(value) < PROSE_MIN:
-        _fail(f"{identifier}.{field} is {len(value)} chars, under {PROSE_MIN}")
-
-
-def _validate_verdicts(payload: dict) -> int:
-    rows = _rows(payload, VERDICT_LOCI, "X")
-    unknown = 0
-    for identifier, row in sorted(rows.items()):
-        if set(row) != {"id", *VERDICT_FIELDS}:
-            _fail(f"{identifier} must carry exactly id plus {list(VERDICT_FIELDS)}")
-        seeded = VERDICT_LOCI.get(identifier)
-        if seeded is not None and row["locus"] != seeded:
-            _fail(f"{identifier}.locus was rewritten; MAIN owns it, report the objection instead")
-        if seeded is None:
-            _prose(identifier, "locus", row["locus"])
-        for field in VERDICT_FIELDS[1:]:
-            value = row[field]
-            if not isinstance(value, str):
-                _fail(f"{identifier}.{field} must be a string")
-            if value == UNKNOWN:
-                if field not in MAIN_OWNED:
-                    unknown += 1
-                continue
-            if field == "divergence" and CLEARED.fullmatch(value) is not None:
-                continue
-            if field == "distinguishing_probe" and value == "n/a":
-                continue
-            if field not in MAIN_OWNED:
-                _prose(identifier, field, value)
-    return unknown
-
-
-def _validate_attack(payload: dict) -> int:
-    rows = _rows(payload, ATTACK_LENSES, "Y")
-    unknown = 0
-    for identifier, row in sorted(rows.items()):
-        if set(row) != {"id", *ATTACK_FIELDS}:
-            _fail(f"{identifier} must carry exactly id plus {list(ATTACK_FIELDS)}")
-        seeded = ATTACK_LENSES.get(identifier)
-        if seeded is not None and row["lens"] != seeded:
-            _fail(f"{identifier}.lens was rewritten; MAIN owns it, report the objection instead")
-        if seeded is None:
-            _prose(identifier, "lens", row["lens"])
-        severity = row["severity"]
-        if severity not in SEVERITIES:
-            _fail(f"{identifier}.severity={severity!r} is not one of {sorted(SEVERITIES)}")
-        if severity == UNKNOWN:
-            unknown += 1
-        for field in ("finding", "evidence", "acceptance_check"):
-            value = row[field]
-            if not isinstance(value, str):
-                _fail(f"{identifier}.{field} must be a string")
-            if value == UNKNOWN:
-                unknown += 1
-                continue
-            if field == "finding" and CLEARED.fullmatch(value) is not None:
-                continue
-            if field == "acceptance_check" and severity == "cleared":
-                continue
-            _prose(identifier, field, value)
-        if not isinstance(row["main_disposition"], str):
-            _fail(f"{identifier}.main_disposition must be a string")
-    return unknown
-
-
-def _validate_probes(payload: dict) -> int:
-    unknown = 0
-    for field in ("implementation", "worktree_commit"):
-        value = payload.get(field)
-        if not isinstance(value, str) or not value:
-            _fail(f"top-level {field!r} must be a non-empty string")
-        if value == UNKNOWN:
-            unknown += 1
-    rows = _rows(payload, PROBE_SUBJECTS, "X")
-    for identifier, row in sorted(rows.items()):
-        if set(row) != {"id", *PROBE_FIELDS}:
-            _fail(f"{identifier} must carry exactly id plus {list(PROBE_FIELDS)}")
-        seeded = PROBE_SUBJECTS.get(identifier)
-        if seeded is not None and row["probe"] != seeded:
-            _fail(f"{identifier}.probe was rewritten; MAIN owns it, report the objection instead")
-        if seeded is None:
-            _prose(identifier, "probe", row["probe"])
-        outcome = row["outcome"]
-        if outcome not in OUTCOMES:
-            _fail(f"{identifier}.outcome={outcome!r} is not one of {sorted(OUTCOMES)}")
-        if not isinstance(row["note"], str):
-            _fail(f"{identifier}.note must be a string")
-        if outcome == UNKNOWN:
-            unknown += 1
-            continue
-        if not isinstance(row["observation"], dict) or not row["observation"]:
-            _fail(f"{identifier}.observation must be a non-empty object once outcome is filled")
-        _prose(identifier, "note", row["note"])
-    return unknown
-
-
-def _seed(kind: str) -> dict:
-    if kind == "verdicts":
-        return {
-            "kind": "verdicts",
-            "rows": [
-                {
-                    "id": identifier,
-                    "locus": locus,
-                    "divergence": UNKNOWN,
-                    "distinguishing_probe": UNKNOWN,
-                    "proposed": UNKNOWN,
-                    "main_verdict": UNKNOWN,
-                    "contract_action": UNKNOWN,
-                }
-                for identifier, locus in VERDICT_LOCI.items()
-            ],
-        }
-    if kind == "attack":
-        return {
-            "kind": "attack",
-            "rows": [
-                {
-                    "id": identifier,
-                    "lens": lens,
-                    "finding": UNKNOWN,
-                    "evidence": UNKNOWN,
-                    "severity": UNKNOWN,
-                    "acceptance_check": UNKNOWN,
-                    "main_disposition": UNKNOWN,
-                }
-                for identifier, lens in ATTACK_LENSES.items()
-            ],
-        }
-    return {
-        "kind": "probes",
-        "implementation": UNKNOWN,
-        "worktree_commit": UNKNOWN,
-        "rows": [
-            {"id": identifier, "probe": probe, "outcome": UNKNOWN, "observation": {}, "note": ""}
-            for identifier, probe in PROBE_SUBJECTS.items()
-        ],
-    }
-
-
-VALIDATORS = {"verdicts": _validate_verdicts, "attack": _validate_attack, "probes": _validate_probes}
-
-
-def main(argv: list[str]) -> int:
-    if len(argv) == 3 and argv[1] == "--emit-seed" and argv[2] in VALIDATORS:
-        print(json.dumps(_seed(argv[2]), indent=2))
-        return 0
-    if len(argv) != 2:
-        print(__doc__)
-        return 1
-    path = Path(argv[1])
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as exc:
-        _fail(f"unreadable artifact: {exc}")
-    if not isinstance(payload, dict):
-        _fail("artifact must be a JSON object")
-    kind = payload.get("kind")
-    if kind not in VALIDATORS:
-        _fail(f"kind={kind!r} is not one of {sorted(VALIDATORS)}")
-    unknown = VALIDATORS[kind](payload)
-    seeded = {"verdicts": VERDICT_LOCI, "attack": ATTACK_LENSES, "probes": PROBE_SUBJECTS}[kind]
-    extra = [row["id"] for row in payload["rows"] if row["id"] not in seeded]
-    print(f"KIND: {kind}")
-    print(f"ROWS: {len(payload['rows'])} ({len(seeded)} seeded, {len(extra)} extension)")
-    if extra:
-        print(f"EXTENSION-ROWS: {sorted(extra)}")
-    print(f"MAIN-OWNED-COLUMNS: {sorted(MAIN_OWNED)} (exempt from UNKNOWN-CELLS)")
-    print(f"UNKNOWN-CELLS: {unknown}")
-    if unknown:
-        print("INCOMPLETE: fill every cell, then rerun this validator LAST")
-        return 1
-    print("VALID: structurally sound with zero unfilled cells")
-    return 0
-
+TABLES = {
+    "verdicts": dict(subjects=VERDICT_LOCI, fields=VERDICT_FIELDS, identity="locus",
+                     extension=re.compile(r"^X\d{2}$"), extension_prefix="X", extension_first=True,
+                     typed_identity=True, strings=VERDICT_FIELDS[1:],
+                     prose=("divergence", "distinguishing_probe", "proposed"),
+                     cleared_fields=("divergence",), na_fields=("distinguishing_probe",)),
+    "attack": dict(subjects=ATTACK_LENSES, fields=ATTACK_FIELDS, identity="lens",
+                   extension=re.compile(r"^Y\d{2}$"), extension_prefix="Y", extension_first=True,
+                   typed_identity=True, severity_first=True, severity_count=True,
+                   enums={"severity": SEVERITIES}, strings=("finding", "evidence", "acceptance_check"),
+                   prose=("finding", "evidence", "acceptance_check"), cleared_fields=("finding",),
+                   cleared_acceptance=True, string_tail=("main_disposition",)),
+    "probes": dict(subjects=PROBE_SUBJECTS, fields=PROBE_FIELDS, identity="probe",
+                   extension=re.compile(r"^X\d{2}$"), extension_prefix="X", extension_first=True,
+                   typed_identity=True, top=("implementation", "worktree_commit"), outcomes=OUTCOMES,
+                   defaults={"observation": {}, "note": ""}),
+}
+ENGINE = StrictWave(TABLES, doc=__doc__, main_owned=MAIN_OWNED, prose_min=PROSE_MIN,
+                    cleared=CLEARED, report="extensions")
+VALIDATORS = ENGINE.validators
+_seed = ENGINE.seed
+main = ENGINE.main
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv))

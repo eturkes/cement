@@ -28,10 +28,10 @@ evidence about MAIN.
 
 from __future__ import annotations
 
-import argparse
-import json
 import sys
 from pathlib import Path
+
+from wave_validate import ColumnTables
 
 ROOT = Path(__file__).resolve().parents[2]
 DECISIONS = ROOT / ".agent" / "decisions"
@@ -181,125 +181,24 @@ MUTANT_SUBJECTS: list[tuple[str, str, str]] = [
 ]
 
 
-def _fail(message: str) -> None:
-    print(f"INVALID: {message}")
+ENGINE = ColumnTables(
+    DIFFERS=DIFFERS,
+    MUTANT_SUBJECTS=MUTANT_SUBJECTS,
+    PROBE_SUBJECTS=PROBE_SUBJECTS,
+    PROSE_MIN=PROSE_MIN,
+    RESULT=RESULT,
+    REVIEW_SUBJECTS=REVIEW_SUBJECTS,
+    ROOT=ROOT,
+    SEVERITY=SEVERITY,
+    SPEC=SPEC,
+    UNKNOWN=UNKNOWN,
+    documentation=__doc__,
+    source_path=__file__
+)
+_fail = ENGINE._fail
+emit_seed = ENGINE.emit_seed
+grade = ENGINE.grade
+main = ENGINE.main
 
-
-def emit_seed(kind: str) -> int:
-    spec = SPEC[kind]
-    subjects = {"probes": PROBE_SUBJECTS, "review": REVIEW_SUBJECTS, "mutants": MUTANT_SUBJECTS}[kind]
-    columns = tuple(spec["graded"]) + tuple(spec["exempt"])
-    rows = []
-    for identifier, section, locus in subjects:
-        row: dict[str, object] = {"id": identifier, "section": section, "locus": locus}
-        for column in columns:
-            row[column] = None if column in spec["exempt"] else UNKNOWN
-        rows.append(row)
-    path = Path(str(spec["path"]))
-    path.write_text(
-        json.dumps({"kind": kind, "rows": rows}, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
-    print(f"WROTE: {path.relative_to(ROOT)} ({len(rows)} rows)")
-    return 0
-
-
-def grade(path: Path, *, differential: bool = False) -> int:
-    try:
-        document = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        _fail(f"{path} is unreadable: {error}")
-        return 2
-    kind = document.get("kind")
-    if kind not in SPEC:
-        _fail(f"kind must be one of {sorted(SPEC)}, got {kind!r}")
-        return 2
-    spec = SPEC[kind]
-    rows = document.get("rows")
-    if not isinstance(rows, list) or not rows:
-        _fail("rows must be a nonempty list")
-        return 2
-
-    promoted = tuple(spec["differential"]) if differential else ()
-    if differential and not promoted:
-        _fail(f"kind {kind} has no differential columns; drop --differential")
-        return 2
-    graded = tuple(spec["graded"]) + promoted
-    exempt = tuple(column for column in spec["exempt"] if column not in promoted)
-    prose = set(spec["prose"])
-    unknown_cells = 0
-    problems: list[str] = []
-    seen: set[str] = set()
-
-    for index, row in enumerate(rows):
-        identifier = row.get("id") or f"row[{index}]"
-        if identifier in seen:
-            problems.append(f"{identifier}: duplicate id")
-        seen.add(identifier)
-        for column in ("id", "section", "locus", *graded):
-            if column not in row:
-                problems.append(f"{identifier}: missing column {column}")
-        for column in graded:
-            value = row.get(column)
-            if value is None or (isinstance(value, str) and value.strip().lower() == UNKNOWN):
-                unknown_cells += 1
-                continue
-            if not isinstance(value, str) or not value.strip():
-                problems.append(f"{identifier}.{column}: must be a nonempty string")
-                continue
-            if column in prose and len(value.strip()) < PROSE_MIN:
-                problems.append(
-                    f"{identifier}.{column}: {len(value.strip())} chars, needs {PROSE_MIN}"
-                )
-        if kind == "review":
-            severity = row.get("severity")
-            if isinstance(severity, str) and severity not in SEVERITY and severity != UNKNOWN:
-                problems.append(f"{identifier}.severity: must be one of {SEVERITY}")
-        if kind == "mutants":
-            result = row.get("result")
-            if isinstance(result, str) and result not in RESULT:
-                problems.append(f"{identifier}.result: must be one of {RESULT}")
-        if "differs" in promoted:
-            differs = row.get("differs")
-            if isinstance(differs, str) and differs not in DIFFERS:
-                problems.append(f"{identifier}.differs: must be one of {DIFFERS}")
-
-    seeded = {
-        "probes": len(PROBE_SUBJECTS),
-        "review": len(REVIEW_SUBJECTS),
-        "mutants": len(MUTANT_SUBJECTS),
-    }[kind]
-    for problem in problems:
-        _fail(problem)
-    print(f"KIND: {kind}")
-    print(f"ROWS: {len(rows)} (seeded {seeded}, extension {max(0, len(rows) - seeded)})")
-    print(f"GRADED-COLUMNS: {', '.join(graded)}")
-    print(f"GRADED-MODE: {'differential' if differential else 'production'}")
-    print(
-        f"EXEMPT-COLUMNS: {', '.join(exempt) or '(none)'} (MAIN-owned, never graded here)"
-    )
-    print(f"UNKNOWN-CELLS: {unknown_cells}")
-    ok = not problems and unknown_cells == 0
-    print("RESULT: PASS" if ok else "RESULT: FAIL")
-    return 0 if ok else 1
-
-
-def main(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--emit-seed", choices=sorted(SPEC), help="write the all-unknown seed")
-    parser.add_argument(
-        "--differential",
-        action="store_true",
-        help="also grade the differential columns a re-derivation against MAIN's code fills",
-    )
-    parser.add_argument("table", nargs="?", help="the table to grade")
-    args = parser.parse_args(argv)
-    if args.emit_seed:
-        return emit_seed(args.emit_seed)
-    if not args.table:
-        parser.error("give a table to grade or --emit-seed <kind>")
-    return grade(Path(args.table), differential=args.differential)
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))

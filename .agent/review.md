@@ -17,6 +17,17 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p46 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section
+
+Check set: R1 one shared engine, each existing validator a schema; R2 old/new identical rc + unfilled count on every artifact; R3 blank seed rc 1, filled control rc 0; R4 harvest integrity. general-purpose-4 built; MAIN reran.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | 13 schema modules over `wave_validate.py`; 16 validators out of scope with a stated shape each (`.scratch` deliverable table, restated in the ledger entry). |
+| R2 | acceptance | pass | MAIN's rerun of `p46-differential.py --base 02440b8`: 3,274 cases over 34 artifacts, 0 differences (four inherited reds stay red, identical output). |
+| R3 | acceptance | pass | 29 blank → filled pairs inside the same run; `--self-test` detects a planted counter deletion (31 differences in the teammate's run). |
+| R4 | integrity | pass | 15 files taken from `wt/general-purpose-4` @ `9248747` (no base drift since `02440b8`), sha256-equal to the branch; no test names a touched file; p94 census still rc 0. |
+
 ## p98 close (MAINTAIN queue run, unit, tier `docs`) — target = the commit landing this section
 
 Check set: R1 a measured decision (keep → the editor's load + save times on 0.12.3 recorded for the largest file); R2 the published claim matches the measurement. MAIN alone.

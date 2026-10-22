@@ -27,14 +27,11 @@ Usage:
 
 from __future__ import annotations
 
-import argparse
-import json
 import pathlib
 import re
-import shutil
-import subprocess
 import sys
-import tempfile
+
+from wave_validate import AttackTable
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -88,240 +85,30 @@ SEED: tuple[tuple[str, str, str], ...] = (
 )
 
 
-def _contract_ids(root: pathlib.Path) -> set[str]:
-    lines = (root / ".agent" / "decisions" / CONTRACT_NAME).read_text(encoding="utf-8").splitlines()
-    found = {match.group(1) for line in lines if (match := OBLIGATION.match(line))}
-    found |= {match.group(1) for line in lines if (match := CORRECTION.match(line))}
-    return found | set(EXTRA_ANCHORS)
+ENGINE = AttackTable(
+    CONTRACT_NAME=CONTRACT_NAME,
+    CORRECTION=CORRECTION,
+    EXTRA_ANCHORS=EXTRA_ANCHORS,
+    HERE=HERE,
+    MIN_ATTACK_CHARS=MIN_ATTACK_CHARS,
+    MIN_REPRO_CHARS=MIN_REPRO_CHARS,
+    OBLIGATION=OBLIGATION,
+    ROOT=ROOT,
+    SEED=SEED,
+    SEVERITIES=SEVERITIES,
+    TABLE_RELPATH=TABLE_RELPATH,
+    TEAMMATE_FIELDS=TEAMMATE_FIELDS,
+    UNKNOWN=UNKNOWN,
+    documentation=__doc__,
+    source_path=__file__
+)
+_contract_ids = ENGINE._contract_ids
+emit_seed = ENGINE.emit_seed
+grade = ENGINE.grade
+_fill = ENGINE._fill
+_run = ENGINE._run
+self_test = ENGINE.self_test
+main = ENGINE.main
 
-
-def emit_seed(root: pathlib.Path) -> str:
-    rows = [
-        {
-            "id": row_id,
-            "section": section,
-            "locus": locus,
-            "claim": UNKNOWN,
-            "attack": UNKNOWN,
-            "reproduction": UNKNOWN,
-            "severity": UNKNOWN,
-            "verdict": UNKNOWN,
-            "disposition": UNKNOWN,
-            "main_note": UNKNOWN,
-        }
-        for row_id, section, locus in SEED
-    ]
-    document = {
-        "unit": "M3.6a1",
-        "artifact": "contract attack + evasion matrix",
-        "seeded_rows": len(rows),
-        "rows": rows,
-    }
-    return json.dumps(document, indent=2, ensure_ascii=False) + "\n"
-
-
-def grade(table: pathlib.Path, root: pathlib.Path) -> int:
-    if not table.exists():
-        print(f"ABSENT: {table}")
-        print("RESULT: FAIL")
-        return 1
-    try:
-        document = json.loads(table.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as error:
-        print(f"MALFORMED: {error}")
-        print("RESULT: FAIL")
-        return 1
-    rows = document.get("rows", [])
-    anchors = _contract_ids(root)
-
-    unknown_cells: list[str] = []
-    unresolved: list[str] = []
-    bad_severity: list[str] = []
-    short_attack: list[str] = []
-    unreproduced: list[str] = []
-    duplicates: list[str] = []
-    bad_id: list[str] = []
-
-    seen: set[str] = set()
-    for row in rows:
-        row_id = str(row.get("id", "?"))
-        if row_id in seen:
-            duplicates.append(row_id)
-        seen.add(row_id)
-        if not re.fullmatch(r"[AY]\d{2,}", row_id):
-            bad_id.append(row_id)
-        for field in TEAMMATE_FIELDS:
-            value = str(row.get(field, "")).strip()
-            if not value or value == UNKNOWN:
-                unknown_cells.append(f"{row_id}.{field}")
-        if str(row.get("section", "")) not in anchors:
-            unresolved.append(f"{row_id}:{row.get('section')}")
-        if str(row.get("severity", "")) not in SEVERITIES:
-            bad_severity.append(f"{row_id}:{row.get('severity')}")
-        attack = str(row.get("attack", ""))
-        if attack != UNKNOWN and len(attack) < MIN_ATTACK_CHARS:
-            short_attack.append(row_id)
-        repro = str(row.get("reproduction", ""))
-        if repro != UNKNOWN and len(repro) < MIN_REPRO_CHARS:
-            unreproduced.append(row_id)
-
-    seeded = {row_id for row_id, _, _ in SEED}
-    dropped = sorted(seeded - seen)
-
-    print(f"ROWS: {len(rows)} (seed {len(SEED)}, extension {max(0, len(rows) - len(SEED))})")
-    print(f"UNKNOWN-CELLS: {len(unknown_cells)} {sorted(unknown_cells)[:8]}")
-    print(f"SEED-DROPPED: {len(dropped)} {dropped}")
-    print(f"UNRESOLVED-SECTION: {len(unresolved)} {sorted(unresolved)}")
-    print(f"BAD-SEVERITY: {len(bad_severity)} {sorted(bad_severity)}")
-    print(f"BAD-ID: {len(bad_id)} {sorted(bad_id)}")
-    print(f"DUPLICATE-ID: {len(duplicates)} {sorted(duplicates)}")
-    print(f"SHORT-ATTACK: {len(short_attack)} {sorted(short_attack)}")
-    print(f"UNREPRODUCED: {len(unreproduced)} {sorted(unreproduced)}")
-
-    failures = (
-        len(unknown_cells)
-        + len(dropped)
-        + len(unresolved)
-        + len(bad_severity)
-        + len(bad_id)
-        + len(duplicates)
-        + len(short_attack)
-        + len(unreproduced)
-    )
-    print(f"RESULT: {'PASS' if failures == 0 else 'FAIL'}")
-    return 0 if failures == 0 else 1
-
-
-def _fill(seed: str) -> str:
-    document = json.loads(seed)
-    for row in document["rows"]:
-        row["claim"] = "the contract asserts X at this locus"
-        row["attack"] = "a" * (MIN_ATTACK_CHARS + 10)
-        row["reproduction"] = "b" * (MIN_REPRO_CHARS + 10)
-        row["severity"] = "cleared"
-        row["verdict"] = "holds"
-    return json.dumps(document, indent=2, ensure_ascii=False) + "\n"
-
-
-def _run(root: pathlib.Path, table: pathlib.Path) -> tuple[int, str]:
-    result = subprocess.run(
-        [sys.executable, str(HERE / pathlib.Path(__file__).name), "--table", str(table), "--root", str(root)],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    return result.returncode, result.stdout
-
-
-def self_test() -> int:
-    failures = 0
-    with tempfile.TemporaryDirectory() as raw:
-        stage = pathlib.Path(raw)
-        decisions = stage / ".agent" / "decisions"
-        decisions.mkdir(parents=True)
-        shutil.copy2(ROOT / ".agent" / "decisions" / CONTRACT_NAME, decisions / CONTRACT_NAME)
-        table = stage / TABLE_RELPATH
-
-        seed = emit_seed(stage)
-        filled = _fill(seed)
-
-        def check(label: str, text: str, expect_rc: int, expect: list[str]) -> None:
-            nonlocal failures
-            table.write_text(text, encoding="utf-8")
-            code, out = _run(stage, table)
-            ok = code == expect_rc and all(line in out for line in expect)
-            print(f"{'OK  ' if ok else 'FAIL'} {label}: rc={code} expect={expect_rc}")
-            if not ok:
-                failures += 1
-                print(out)
-
-        check("seed graded red", seed, 1, [f"UNKNOWN-CELLS: {len(SEED) * len(TEAMMATE_FIELDS) - 2 * len(SEED)}"])
-        check("filled graded green", filled, 0, ["RESULT: PASS", f"SEED-DROPPED: 0"])
-
-        def mutate(fn) -> str:
-            document = json.loads(filled)
-            fn(document)
-            return json.dumps(document, indent=2, ensure_ascii=False) + "\n"
-
-        check(
-            "control dropped seed row -> SEED-DROPPED",
-            mutate(lambda d: d["rows"].pop(0)),
-            1,
-            ["SEED-DROPPED: 1"],
-        )
-        check(
-            "control unresolvable section -> UNRESOLVED-SECTION",
-            mutate(lambda d: d["rows"][0].__setitem__("section", "D99")),
-            1,
-            ["UNRESOLVED-SECTION: 1"],
-        )
-        check(
-            "control bad severity -> BAD-SEVERITY",
-            mutate(lambda d: d["rows"][0].__setitem__("severity", "critical")),
-            1,
-            ["BAD-SEVERITY: 1"],
-        )
-        check(
-            "control short attack -> SHORT-ATTACK",
-            mutate(lambda d: d["rows"][0].__setitem__("attack", "too short")),
-            1,
-            ["SHORT-ATTACK: 1"],
-        )
-        check(
-            "control empty reproduction -> UNREPRODUCED",
-            mutate(lambda d: d["rows"][0].__setitem__("reproduction", "ran it")),
-            1,
-            ["UNREPRODUCED: 1"],
-        )
-        check(
-            "control blanked cell -> UNKNOWN-CELLS",
-            mutate(lambda d: d["rows"][0].__setitem__("verdict", "")),
-            1,
-            ["UNKNOWN-CELLS: 1"],
-        )
-        check(
-            "control duplicate id -> DUPLICATE-ID",
-            mutate(lambda d: d["rows"].append(dict(d["rows"][0]))),
-            1,
-            ["DUPLICATE-ID: 1"],
-        )
-        check(
-            "control bad extension id -> BAD-ID",
-            mutate(
-                lambda d: d["rows"].append({**d["rows"][0], "id": "Z1"}),
-            ),
-            1,
-            ["BAD-ID: 1"],
-        )
-        check("control malformed table -> FAIL", "{not json", 1, ["MALFORMED", "RESULT: FAIL"])
-        table.unlink()
-        code, out = _run(stage, table)
-        ok = code == 1 and "ABSENT" in out
-        print(f"{'OK  ' if ok else 'FAIL'} control absent table -> ABSENT: rc={code}")
-        if not ok:
-            failures += 1
-
-    print(f"SELF-TEST: {'PASS' if failures == 0 else 'FAIL'} ({failures} control(s) not firing)")
-    return 0 if failures == 0 else 1
-
-
-def main(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--emit-seed", action="store_true")
-    parser.add_argument("--self-test", action="store_true")
-    parser.add_argument("--table", type=pathlib.Path, default=None)
-    parser.add_argument("--root", type=pathlib.Path, default=None)
-    args = parser.parse_args(argv)
-
-    root = (args.root or ROOT).resolve()
-    if args.self_test:
-        return self_test()
-    if args.emit_seed:
-        sys.stdout.write(emit_seed(root))
-        return 0
-    table = args.table or (root / TABLE_RELPATH)
-    return grade(table.resolve(), root)
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     raise SystemExit(main(sys.argv[1:]))

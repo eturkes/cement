@@ -32,10 +32,11 @@ except that the teammate owns its subject text.
 
 from __future__ import annotations
 
-import json
 import re
 import sys
 from pathlib import Path
+
+from wave_validate import ObservationTables
 
 ROOT = Path(__file__).resolve().parents[2]
 UNKNOWN = "unknown"
@@ -60,12 +61,6 @@ REVIEW_FIELDS = ("lens", "finding", "evidence", "severity", "acceptance_check", 
 DIVERGENCE_PROBES: dict[str, str] = {}
 
 
-def _load_probe_subjects() -> dict[str, str]:
-    path = ROOT / ".agent" / "decisions" / "m3u3-probes.json"
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    return {row["id"]: row["probe"] for row in payload["rows"]}
-
-
 # One row per review lens. Z-rows extend. The lenses split into three declared
 # groups so two reviewers can take complementary halves without overlap.
 REVIEW_LENSES: dict[str, str] = {
@@ -88,150 +83,31 @@ REVIEW_LENSES: dict[str, str] = {
 }
 
 
-def _fail(message: str) -> None:
-    print(f"INVALID: {message}")
+ENGINE = ObservationTables(
+    CLEARED=CLEARED,
+    DIVERGENCE_FIELDS=DIVERGENCE_FIELDS,
+    EXTENSION=EXTENSION,
+    MAIN_OWNED=MAIN_OWNED,
+    PROSE_MIN=PROSE_MIN,
+    REVIEW_FIELDS=REVIEW_FIELDS,
+    REVIEW_LENSES=REVIEW_LENSES,
+    ROOT=ROOT,
+    SEVERITIES=SEVERITIES,
+    UNKNOWN=UNKNOWN,
+    VERDICTS=VERDICTS,
+    documentation=__doc__,
+    source_path=__file__
+)
+VALIDATORS = ENGINE.VALIDATORS = {'divergences': ENGINE._validate_divergences, 'review': ENGINE._validate_review}
+_load_probe_subjects = ENGINE._load_probe_subjects
+_fail = ENGINE._fail
+_rows = ENGINE._rows
+_prose = ENGINE._prose
+_count_unknown = ENGINE._count_unknown
+_validate_divergences = ENGINE._validate_divergences
+_validate_review = ENGINE._validate_review
+_seed = ENGINE._seed
+main = ENGINE.main
 
-
-def _rows(payload: dict, required: dict[str, str], fields: tuple[str, ...]) -> tuple[dict[str, dict], int]:
-    rows = payload.get("rows")
-    if not isinstance(rows, list):
-        _fail("payload has no 'rows' list")
-        return {}, 1
-    problems = 0
-    seen: dict[str, dict] = {}
-    for row in rows:
-        if not isinstance(row, dict) or "id" not in row:
-            _fail(f"row is not an object with an id: {row!r:.80}")
-            problems += 1
-            continue
-        identifier = row["id"]
-        if identifier in seen:
-            _fail(f"duplicate row id {identifier}")
-            problems += 1
-            continue
-        if identifier not in required and not EXTENSION.match(str(identifier)):
-            _fail(f"row id {identifier} is neither seeded nor an extension row Z<nn>")
-            problems += 1
-            continue
-        subject = fields[0]
-        if identifier in required and row.get(subject) != required[identifier]:
-            _fail(f"{identifier}: '{subject}' is MAIN-owned row identity and was rewritten")
-            problems += 1
-        missing = [field for field in fields if field not in row]
-        if missing:
-            _fail(f"{identifier}: missing field(s) {missing}")
-            problems += 1
-        seen[identifier] = row
-    for identifier in required:
-        if identifier not in seen:
-            _fail(f"seeded row {identifier} is absent")
-            problems += 1
-    return seen, problems
-
-
-def _prose(identifier: str, field: str, value: object) -> int:
-    if value == UNKNOWN:
-        return 0
-    if not isinstance(value, str) or len(value.strip()) < PROSE_MIN:
-        _fail(f"{identifier}: '{field}' must be at least {PROSE_MIN} characters of prose")
-        return 1
-    return 0
-
-
-def _count_unknown(row: dict, fields: tuple[str, ...]) -> int:
-    return sum(1 for field in fields if field not in MAIN_OWNED and row.get(field) == UNKNOWN)
-
-
-def _validate_divergences(payload: dict) -> tuple[int, int]:
-    required = _load_probe_subjects()
-    rows, problems = _rows(payload, required, DIVERGENCE_FIELDS)
-    unknown = 0
-    for identifier, row in sorted(rows.items()):
-        verdict = row.get("verdict")
-        if verdict not in VERDICTS:
-            _fail(f"{identifier}: 'verdict' must be one of {sorted(VERDICTS)}")
-            problems += 1
-        for field in ("main_observation", "oracle_observation"):
-            value = row.get(field)
-            if value != UNKNOWN and not isinstance(value, (dict, str)):
-                _fail(f"{identifier}: '{field}' must be the recorded observation object or prose")
-                problems += 1
-        divergence = row.get("divergence")
-        if verdict == "identical" and divergence not in (UNKNOWN, None) and not CLEARED.match(str(divergence)):
-            _fail(f"{identifier}: an identical verdict states 'no divergence: <why the join is exact>'")
-            problems += 1
-        if verdict == "differs":
-            problems += _prose(identifier, "divergence", divergence)
-        unknown += _count_unknown(row, DIVERGENCE_FIELDS)
-    return unknown, problems
-
-
-def _validate_review(payload: dict) -> tuple[int, int]:
-    rows, problems = _rows(payload, REVIEW_LENSES, REVIEW_FIELDS)
-    unknown = 0
-    for identifier, row in sorted(rows.items()):
-        severity = row.get("severity")
-        if severity not in SEVERITIES:
-            _fail(f"{identifier}: 'severity' must be one of {sorted(SEVERITIES)}")
-            problems += 1
-        finding = row.get("finding")
-        if severity == "cleared" and finding != UNKNOWN and not CLEARED.match(str(finding)):
-            _fail(f"{identifier}: a cleared lens states 'no defect: <what was checked and why it holds>'")
-            problems += 1
-        for field in ("finding", "evidence", "acceptance_check"):
-            problems += _prose(identifier, field, row.get(field))
-        unknown += _count_unknown(row, REVIEW_FIELDS)
-    return unknown, problems
-
-
-def _seed(kind: str) -> dict:
-    if kind == "divergences":
-        subjects, fields = _load_probe_subjects(), DIVERGENCE_FIELDS
-    else:
-        subjects, fields = REVIEW_LENSES, REVIEW_FIELDS
-    rows = []
-    for identifier, subject in subjects.items():
-        row = {"id": identifier, fields[0]: subject}
-        row.update({field: UNKNOWN for field in fields[1:]})
-        rows.append(row)
-    return {"kind": kind, "implementation": UNKNOWN, "rows": rows}
-
-
-VALIDATORS = {"divergences": _validate_divergences, "review": _validate_review}
-
-
-def main(argv: list[str]) -> int:
-    if len(argv) == 2 and argv[0] == "--emit-seed":
-        kind = argv[1]
-        if kind not in VALIDATORS:
-            _fail(f"unknown kind {kind}; expected one of {sorted(VALIDATORS)}")
-            return 2
-        print(json.dumps(_seed(kind), indent=2))
-        return 0
-    if len(argv) != 1:
-        _fail(__doc__.splitlines()[2].strip())
-        return 2
-    path = Path(argv[0])
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as error:
-        _fail(f"cannot read {path}: {error}")
-        return 2
-    kind = payload.get("kind")
-    if kind not in VALIDATORS:
-        _fail(f"top-level 'kind' must be one of {sorted(VALIDATORS)}, got {kind!r}")
-        return 2
-    unknown, problems = VALIDATORS[kind](payload)
-    if payload.get("implementation") == UNKNOWN:
-        unknown += 1
-    print(f"KIND: {kind}")
-    print(f"MAIN-OWNED-COLUMNS: {sorted(MAIN_OWNED)} (exempt from UNKNOWN-CELLS)")
-    print(f"UNKNOWN-CELLS: {unknown}")
-    print(f"STRUCTURAL-PROBLEMS: {problems}")
-    ok = not unknown and not problems
-    print("RESULT: PASS" if ok else "RESULT: FAIL")
-    return 0 if ok else 1
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))

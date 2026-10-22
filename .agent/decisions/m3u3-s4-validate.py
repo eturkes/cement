@@ -14,10 +14,8 @@ completeness and MAIN's ruling are two different deliverables and only one of th
 
 from __future__ import annotations
 
-import argparse
-import json
-from pathlib import Path
-import sys
+from wave_validate import FieldTables
+
 
 UNFILLED = ("unknown", "", None, [], {})
 
@@ -67,73 +65,14 @@ KINDS = {
 }
 
 
-def grade(kind: str, path: Path) -> int:
-    seed, fields, exempt = KINDS[kind]
-    try:
-        document = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as error:
-        print(f"UNREADABLE {path}: {error}", file=sys.stderr)
-        return 1
+ENGINE = FieldTables(
+    KINDS=KINDS,
+    UNFILLED=UNFILLED,
+    documentation=__doc__,
+    source_path=__file__
+)
+grade = ENGINE.grade
+main = ENGINE.main
 
-    problems: list[str] = []
-    if document.get("kind") != kind:
-        problems.append(f"kind must be {kind!r}, found {document.get('kind')!r}")
-    rows = document.get("rows")
-    if not isinstance(rows, list) or not rows:
-        print(f"NO ROWS in {path}", file=sys.stderr)
-        return 1
-
-    identifiers = [row.get("id") for row in rows]
-    if len(set(identifiers)) != len(identifiers):
-        problems.append("duplicate row ids")
-    missing = sorted(set(seed) - set(identifiers))
-    if missing:
-        problems.append(f"seeded rows absent (the seed is a floor): {missing}")
-    for identifier in identifiers:
-        if identifier not in seed and not str(identifier).startswith("X"):
-            problems.append(f"unseeded row {identifier!r} must take an X-prefixed id")
-
-    unknown = 0
-    for row in rows:
-        for field in fields:
-            if field not in row:
-                problems.append(f"{row.get('id')}: field {field!r} absent")
-                unknown += 1
-            elif row[field] in UNFILLED:
-                unknown += 1
-        for field in row:
-            if field not in fields and field not in exempt:
-                problems.append(f"{row.get('id')}: unexpected field {field!r}")
-
-    print(f"kind={kind} rows={len(rows)} seeded={len(seed)} extensions={len(rows) - len(seed)}")
-    print(f"EXEMPT-COLUMNS (MAIN fills, not graded here): {list(exempt)}")
-    for problem in problems:
-        print(f"PROBLEM {problem}")
-    print(f"UNKNOWN-CELLS: {unknown}")
-    print("PASS" if unknown == 0 and not problems else "FAIL")
-    return 0 if unknown == 0 and not problems else 1
-
-
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--kind", required=True, choices=sorted(KINDS))
-    parser.add_argument("--emit-stub", action="store_true", help="print the all-unknown skeleton")
-    parser.add_argument("path", nargs="?")
-    arguments = parser.parse_args(argv)
-
-    seed, fields, _ = KINDS[arguments.kind]
-    if arguments.emit_stub:
-        rows = [
-            {field: (identifier if field == "id" else subject if field == "subject" else "unknown")
-             for field in fields}
-            for identifier, subject in seed.items()
-        ]
-        print(json.dumps({"kind": arguments.kind, "rows": rows}, indent=2))
-        return 0
-    if not arguments.path:
-        parser.error("a path is required unless --emit-stub is given")
-    return grade(arguments.kind, Path(arguments.path))
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     raise SystemExit(main())

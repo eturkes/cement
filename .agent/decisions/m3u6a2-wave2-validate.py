@@ -22,11 +22,10 @@ inside `L010`, and containment certifies a dropped token.
 
 from __future__ import annotations
 
-import argparse
-import json
 import pathlib
 import re
-import sys
+
+from wave_validate import ContractTables
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CONTRACT = ROOT / ".agent" / "decisions" / "m3u6a2-contract.md"
@@ -115,231 +114,35 @@ MIN_PROSE = {
 }
 
 
-def _contract_text() -> str:
-    return CONTRACT.read_text(encoding="utf-8")
+SEED_NOTE = "Seeded rows are a FLOOR, never a cap. Add extension rows with ids {extensions} for any locus the seed missed; extensions have outnumbered seeds in every M3 wave. A cleared claim is a FILLED cell: write 'no defensible alternative: <reason>' rather than leaving unknown."
 
-
-def contract_tokens(text: str) -> set[str]:
-    return set(re.findall(r"[A-Za-z0-9_-]+", text))
-
-
-def contract_sections(text: str) -> set[str]:
-    return set(re.findall(r"^## (\d{1,2})\.", text, flags=re.MULTILINE))
-
-
-def contract_gates(text: str) -> set[str]:
-    """Gate ids are the numbered list under section 6, so `G7` resolves only while gate 7 exists."""
-    block = re.search(r"^## 6\..*?(?=^## \d)", text, flags=re.MULTILINE | re.DOTALL)
-    return set(re.findall(r"^(\d+)\. ", block.group(0), flags=re.MULTILINE)) if block else set()
-
-
-def emit_stub(kind: str) -> str:
-    seed = VERDICT_SEED if kind == "verdicts" else ATTACK_SEED
-    rows = []
-    for identifier, section, subject in seed:
-        if kind == "verdicts":
-            rows.append({
-                "id": identifier, "section": section, "locus": subject,
-                "probe": UNKNOWN, "reading": UNKNOWN, "baseline": UNKNOWN,
-                "expected": UNKNOWN, "divergent": UNKNOWN,
-                "main_verdict": None, "action": None,
-            })
-        else:
-            rows.append({
-                "id": identifier, "section": section, "lens": subject,
-                "attack": UNKNOWN, "evidence": UNKNOWN, "severity": UNKNOWN,
-                "disposition": None, "main_note": None,
-            })
-    document = {
-        "kind": kind,
-        "unit": "M3.6a2",
-        "note": (
-            "Seeded rows are a FLOOR, never a cap. Add extension rows with ids "
-            + ("X01, X02, ..." if kind == "verdicts" else "Y01, Y02, ...")
-            + " for any locus the seed missed; extensions have outnumbered seeds in every M3 wave."
-            " A cleared claim is a FILLED cell: write 'no defensible alternative: <reason>' rather"
-            " than leaving unknown."
-        ),
-        "rows": rows,
-    }
-    return json.dumps(document, ensure_ascii=False, indent=2, sort_keys=False) + "\n"
-
-
-def grade(path: pathlib.Path) -> list[str]:
-    findings: list[str] = []
-    try:
-        document = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        return [f"UNREADABLE: {exc}"]
-    kind = document.get("kind")
-    if kind not in FIELDS:
-        return [f"BAD-KIND: {kind!r} is not verdicts or attack"]
-
-    rows = document.get("rows")
-    if not isinstance(rows, list) or not rows:
-        return ["NO-ROWS: rows must be a non-empty list"]
-
-    text = _contract_text()
-    tokens = contract_tokens(text)
-    sections = contract_sections(text)
-    gates = contract_gates(text)
-    seed = VERDICT_SEED if kind == "verdicts" else ATTACK_SEED
-    seen: set[str] = set()
-    unknown_cells = 0
-    concrete_rows = 0
-
-    for index, row in enumerate(rows):
-        if not isinstance(row, dict):
-            findings.append(f"row {index}: not an object")
-            continue
-        identifier = str(row.get("id", ""))
-        if not ROW_ID[kind].match(identifier):
-            findings.append(f"row {index}: id {identifier!r} must match {ROW_ID[kind].pattern}")
-            continue
-        if identifier in seen:
-            findings.append(f"{identifier}: duplicate id")
-        seen.add(identifier)
-
-        for field in FIELDS[kind]:
-            if field not in row:
-                findings.append(f"{identifier}: missing field {field}")
-                continue
-            value = row[field]
-            if not isinstance(value, str) or not value.strip():
-                findings.append(f"{identifier}.{field}: must be a non-empty string")
-                continue
-            if value.strip().lower() == UNKNOWN:
-                unknown_cells += 1
-                continue
-            floor = MIN_PROSE.get(field)
-            if floor is not None and len(value.strip()) < floor:
-                findings.append(f"{identifier}.{field}: {len(value.strip())} chars, floor {floor}")
-
-        citation = str(row.get("section", "")).strip()
-        if citation and citation.lower() != UNKNOWN:
-            for element in (part.strip() for part in citation.split(",")):
-                head = element.split()[0] if element.split() else ""
-                if not CITATION.match(head):
-                    findings.append(f"{identifier}.section: {head!r} is not a citation form")
-                elif head.startswith("S"):
-                    if head[1:] not in sections:
-                        findings.append(f"{identifier}.section: contract has no section {head[1:]}")
-                elif head.startswith("G"):
-                    if head[1:] not in gates:
-                        findings.append(f"{identifier}.section: contract has no gate {head[1:]}")
-                elif head not in tokens:
-                    findings.append(f"{identifier}.section: {head} resolves nowhere in the contract")
-
-        if kind == "verdicts":
-            divergent = str(row.get("divergent", "")).strip().lower()
-            if divergent not in (UNKNOWN, "yes", "no"):
-                findings.append(f"{identifier}.divergent: {divergent!r} must be yes or no")
-            expected = str(row.get("expected", ""))
-            if expected.strip().lower() != UNKNOWN and CONCRETE.search(expected):
-                concrete_rows += 1
-            elif expected.strip().lower() != UNKNOWN:
-                findings.append(
-                    f"{identifier}.expected: names no concrete observable"
-                    " (exit code, quoted string, key set, or number)"
-                )
-        else:
-            severity = str(row.get("severity", "")).strip().lower()
-            if severity not in (UNKNOWN, *SEVERITY):
-                findings.append(f"{identifier}.severity: {severity!r} must be one of {SEVERITY}")
-
-    missing = [identifier for identifier, _, _ in seed if identifier not in seen]
-    if missing:
-        findings.append(f"SEED-ROWS-MISSING: {', '.join(missing)}")
-
-    print(f"KIND: {kind}")
-    print(f"ROWS: {len(rows)} ({len(seed)} seeded, {len(rows) - len(seed)} extension)")
-    print(f"UNKNOWN-CELLS: {unknown_cells}")
-    print(f"EXEMPT-COLUMNS (MAIN-owned, NOT graded): {', '.join(EXEMPT[kind])}")
-    if kind == "verdicts":
-        print(f"CONCRETE-EXPECTATIONS: {concrete_rows}")
-    if unknown_cells:
-        findings.append(f"UNFILLED: {unknown_cells} cells still read unknown")
-    return findings
-
-
-def self_test() -> int:
-    """Grade the grader both ways on a temporary file: the stub FAILS, a filled copy PASSES."""
-    import contextlib
-    import io
-    import tempfile
-
-    silent: list[str] = []
-    with tempfile.TemporaryDirectory() as directory:
-        for kind in ("verdicts", "attack"):
-            path = pathlib.Path(directory) / f"{kind}.json"
-            path.write_text(emit_stub(kind), encoding="utf-8")
-            buffer = io.StringIO()
-            with contextlib.redirect_stdout(buffer):
-                stub_findings = grade(path)
-            if not any(f.startswith("UNFILLED") for f in stub_findings):
-                silent.append(f"{kind}: the all-unknown stub did not report UNFILLED")
-
-            document = json.loads(path.read_text(encoding="utf-8"))
-            for row in document["rows"]:
-                for field in FIELDS[kind]:
-                    if row.get(field) == UNKNOWN:
-                        row[field] = (
-                            "exit 0 and the key set `{a, b}` filled to clear the floor of characters"
-                            if field == "expected" else
-                            "no" if field == "divergent" else
-                            "cleared" if field == "severity" else
-                            "filled placeholder text long enough to clear every prose floor here"
-                        )
-            path.write_text(json.dumps(document), encoding="utf-8")
-            buffer = io.StringIO()
-            with contextlib.redirect_stdout(buffer):
-                filled_findings = grade(path)
-            if filled_findings:
-                silent.append(f"{kind}: a filled table reported {filled_findings}")
-
-            broken = json.loads(path.read_text(encoding="utf-8"))
-            broken["rows"][0]["section"] = "L99"
-            path.write_text(json.dumps(broken), encoding="utf-8")
-            buffer = io.StringIO()
-            with contextlib.redirect_stdout(buffer):
-                cited = grade(path)
-            if not any("resolves nowhere" in f for f in cited):
-                silent.append(f"{kind}: an unresolvable citation was accepted")
-
-            dropped = json.loads(path.read_text(encoding="utf-8"))
-            dropped["rows"] = dropped["rows"][1:]
-            path.write_text(json.dumps(dropped), encoding="utf-8")
-            buffer = io.StringIO()
-            with contextlib.redirect_stdout(buffer):
-                missing = grade(path)
-            if not any(f.startswith("SEED-ROWS-MISSING") for f in missing):
-                silent.append(f"{kind}: a dropped seed row was accepted")
-
-    for line in silent:
-        print(f"SILENT: {line}")
-    print(f"CONTROLS: {8 - len(silent)}/8 firing")
-    return 1 if silent else 0
-
-
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="grade an M3.6a2 wave-2 table")
-    parser.add_argument("path", nargs="?")
-    parser.add_argument("--emit-stub", choices=("verdicts", "attack"))
-    parser.add_argument("--self-test", action="store_true")
-    args = parser.parse_args(argv)
-    if args.self_test:
-        return self_test()
-    if args.emit_stub:
-        sys.stdout.write(emit_stub(args.emit_stub))
-        return 0
-    if not args.path:
-        parser.error("a table path is required unless --emit-stub is given")
-    findings = grade(pathlib.Path(args.path))
-    for finding in findings:
-        print(finding)
-    print("PASS" if not findings else f"FAIL ({len(findings)} findings)")
-    return 1 if findings else 0
-
+ENGINE = ContractTables(
+    ATTACK_SEED=ATTACK_SEED,
+    CITATION=CITATION,
+    CONCRETE=CONCRETE,
+    CONTRACT=CONTRACT,
+    EXEMPT=EXEMPT,
+    FIELDS=FIELDS,
+    MIN_PROSE=MIN_PROSE,
+    ROW_ID=ROW_ID,
+    SEVERITY=SEVERITY,
+    UNKNOWN=UNKNOWN,
+    VERDICT_SEED=VERDICT_SEED,
+    unit='M3.6a2',
+    gate_section=6,
+    has_self_test=True,
+    documentation=__doc__,
+    source_path=__file__,
+    seed_note=SEED_NOTE
+)
+_contract_text = ENGINE._contract_text
+contract_tokens = ENGINE.contract_tokens
+contract_sections = ENGINE.contract_sections
+contract_gates = ENGINE.contract_gates
+emit_stub = ENGINE.emit_stub
+grade = ENGINE.grade
+self_test = ENGINE.self_test
+main = ENGINE.main
 
 if __name__ == "__main__":
     raise SystemExit(main())

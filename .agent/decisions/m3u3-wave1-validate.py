@@ -26,10 +26,10 @@ never counts as unfilled.
 
 from __future__ import annotations
 
-import json
 import re
 import sys
-from pathlib import Path
+
+from wave_validate import StrictWave
 
 UNKNOWN = "unknown"
 MAIN_OWNED = {"main_verdict"}
@@ -110,144 +110,18 @@ SPIKE_PROBES: dict[str, str] = {
 }
 
 
-def _fail(message: str) -> None:
-    print(f"INVALID: {message}")
-    raise SystemExit(1)
-
-
-def _rows(payload: dict, required: dict[str, str]) -> dict[str, dict]:
-    raw = payload.get("rows")
-    if not isinstance(raw, list):
-        _fail("'rows' must be a list")
-    seen: dict[str, dict] = {}
-    for row in raw:
-        if not isinstance(row, dict) or not isinstance(row.get("id"), str):
-            _fail("every row must be an object with a string id")
-        if row["id"] in seen:
-            _fail(f"duplicate row id {row['id']!r}")
-        seen[row["id"]] = row
-    missing = [identifier for identifier in required if identifier not in seen]
-    extra = [identifier for identifier in seen if identifier not in required]
-    if missing:
-        _fail(f"missing row ids: {missing}")
-    if extra:
-        _fail(f"unexpected row ids: {extra}")
-    return seen
-
-
-def _validate_map(payload: dict) -> int:
-    rows = _rows(payload, MAP_SUBJECTS)
-    unknown = 0
-    for identifier, row in sorted(rows.items()):
-        if set(row) != {"id", *MAP_FIELDS}:
-            _fail(f"{identifier} must carry exactly id plus {list(MAP_FIELDS)}")
-        if row["subject"] != MAP_SUBJECTS[identifier]:
-            _fail(f"{identifier}.subject was rewritten; MAIN owns it, report the objection instead")
-        for field in ("anchor", "finding", "evidence", "action", "main_verdict"):
-            value = row[field]
-            if not isinstance(value, str):
-                _fail(f"{identifier}.{field} must be a string")
-            if value == UNKNOWN:
-                if field not in MAIN_OWNED:
-                    unknown += 1
-                continue
-            if field == "action" and value not in ACTIONS:
-                _fail(f"{identifier}.action={value!r} is not one of {sorted(ACTIONS)}")
-            if field == "anchor" and ANCHOR.fullmatch(value) is None:
-                _fail(f"{identifier}.anchor {value!r} is neither path:line[-line] nor a SHA nor n/a")
-            if field in ("finding", "evidence") and len(value) < PROSE_MIN:
-                _fail(f"{identifier}.{field} is {len(value)} chars, under {PROSE_MIN}")
-    return unknown
-
-
-def _validate_spike(payload: dict) -> int:
-    unknown = 0
-    for field in ("alternative", "api_signature", "worktree_commit"):
-        value = payload.get(field)
-        if not isinstance(value, str) or not value:
-            _fail(f"top-level {field!r} must be a non-empty string")
-        if value == UNKNOWN:
-            unknown += 1
-    rows = _rows(payload, SPIKE_PROBES)
-    for identifier, row in sorted(rows.items()):
-        if set(row) != {"id", *SPIKE_FIELDS}:
-            _fail(f"{identifier} must carry exactly id plus {list(SPIKE_FIELDS)}")
-        if row["probe"] != SPIKE_PROBES[identifier]:
-            _fail(f"{identifier}.probe was rewritten; MAIN owns it, report the objection instead")
-        outcome = row["outcome"]
-        if outcome not in OUTCOMES:
-            _fail(f"{identifier}.outcome={outcome!r} is not one of {sorted(OUTCOMES)}")
-        if not isinstance(row["note"], str):
-            _fail(f"{identifier}.note must be a string")
-        if outcome == UNKNOWN:
-            unknown += 1
-            continue
-        if not isinstance(row["observation"], dict) or not row["observation"]:
-            _fail(f"{identifier}.observation must be a non-empty object once outcome is filled")
-        if len(row["note"]) < PROSE_MIN:
-            _fail(f"{identifier}.note is {len(row['note'])} chars, under {PROSE_MIN}")
-    return unknown
-
-
-def _seed(kind: str) -> dict:
-    if kind == "map":
-        return {
-            "kind": "map",
-            "rows": [
-                {
-                    "id": identifier,
-                    "anchor": UNKNOWN,
-                    "subject": subject,
-                    "finding": UNKNOWN,
-                    "evidence": UNKNOWN,
-                    "action": UNKNOWN,
-                    "main_verdict": UNKNOWN,
-                }
-                for identifier, subject in MAP_SUBJECTS.items()
-            ],
-        }
-    return {
-        "kind": "spike",
-        "alternative": UNKNOWN,
-        "api_signature": UNKNOWN,
-        "worktree_commit": UNKNOWN,
-        "rows": [
-            {"id": identifier, "probe": probe, "outcome": UNKNOWN, "observation": {}, "note": ""}
-            for identifier, probe in SPIKE_PROBES.items()
-        ],
-    }
-
-
-VALIDATORS = {"map": _validate_map, "spike": _validate_spike}
-
-
-def main(argv: list[str]) -> int:
-    if len(argv) == 3 and argv[1] == "--emit-seed" and argv[2] in VALIDATORS:
-        print(json.dumps(_seed(argv[2]), indent=2))
-        return 0
-    if len(argv) != 2:
-        print(__doc__)
-        return 1
-    path = Path(argv[1])
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as exc:
-        _fail(f"unreadable artifact: {exc}")
-    if not isinstance(payload, dict):
-        _fail("artifact must be a JSON object")
-    kind = payload.get("kind")
-    if kind not in VALIDATORS:
-        _fail(f"kind={kind!r} is not one of {sorted(VALIDATORS)}")
-    unknown = VALIDATORS[kind](payload)
-    print(f"KIND: {kind}")
-    print(f"ROWS: {len(payload['rows'])}")
-    print(f"UNKNOWN-CELLS: {unknown}")
-    if unknown:
-        print("INCOMPLETE: fill every cell, then rerun this validator LAST")
-        return 1
-    print("VALID: structurally sound with zero unfilled cells")
-    return 0
-
+TABLES = {
+    "map": dict(subjects=MAP_SUBJECTS, fields=MAP_FIELDS, identity="subject",
+                strings=("anchor", "finding", "evidence", "action", "main_verdict"),
+                prose=("finding", "evidence"), enums={"action": ACTIONS}),
+    "spike": dict(subjects=SPIKE_PROBES, fields=SPIKE_FIELDS, identity="probe",
+                  top=("alternative", "api_signature", "worktree_commit"), outcomes=OUTCOMES,
+                  defaults={"observation": {}, "note": ""}),
+}
+ENGINE = StrictWave(TABLES, doc=__doc__, main_owned=MAIN_OWNED, prose_min=PROSE_MIN, anchor=ANCHOR)
+VALIDATORS = ENGINE.validators
+_seed = ENGINE.seed
+main = ENGINE.main
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv))

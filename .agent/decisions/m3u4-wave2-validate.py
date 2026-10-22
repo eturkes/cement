@@ -27,10 +27,10 @@ The validator prints the exempt columns so a clean grade is never read as a clos
 
 from __future__ import annotations
 
-import json
 import re
 import sys
-from pathlib import Path
+
+from wave_validate import StrictWave
 
 UNKNOWN = "unknown"
 PROSE_MIN = 40
@@ -105,177 +105,25 @@ ATTACK_LENSES: dict[str, str] = {
 }
 
 
-def _fail(message: str) -> None:
-    print(f"INVALID: {message}")
-    raise SystemExit(1)
-
-
-def _rows(payload: dict, required: dict[str, str], extension: re.Pattern[str]) -> dict[str, dict]:
-    raw = payload.get("rows")
-    if not isinstance(raw, list):
-        _fail("'rows' must be a list")
-    seen: dict[str, dict] = {}
-    for row in raw:
-        if not isinstance(row, dict) or not isinstance(row.get("id"), str):
-            _fail("every row must be an object with a string id")
-        if row["id"] in seen:
-            _fail(f"duplicate row id {row['id']!r}")
-        seen[row["id"]] = row
-    missing = [identifier for identifier in required if identifier not in seen]
-    extra = [
-        identifier
-        for identifier in seen
-        if identifier not in required and extension.fullmatch(identifier) is None
-    ]
-    if missing:
-        _fail(f"missing row ids: {missing}")
-    if extra:
-        _fail(f"unexpected row ids (extensions must match {extension.pattern}): {extra}")
-    return seen
-
-
-def _common(identifier: str, row: dict, fields: tuple[str, ...], seeded: str | None) -> None:
-    if set(row) != {"id", *fields}:
-        _fail(f"{identifier} must carry exactly id plus {list(fields)}")
-    if seeded is not None and row["locus"] != seeded:
-        _fail(f"{identifier}.locus was rewritten; MAIN owns it, report the objection instead")
-    if seeded is None and len(row["locus"]) < PROSE_MIN:
-        _fail(f"{identifier}.locus is {len(row['locus'])} chars, under {PROSE_MIN}")
-    section = row["section"]
-    if not isinstance(section, str):
-        _fail(f"{identifier}.section must be a string")
-    if section != UNKNOWN:
-        if CITATION.search(section) is None:
-            _fail(
-                f"{identifier}.section {section!r} cites no contract locus; name at least one, "
-                "e.g. 'D12', 'D07, D11', '§13 S2 RULING' or 'Sections 8.3 and 12'"
-            )
-        if len(section) > SECTION_MAX:
-            _fail(
-                f"{identifier}.section is {len(section)} chars, over {SECTION_MAX}; it is a "
-                "pointer, so put the argument in the row's own prose fields"
-            )
-
-
-def _validate_verdicts(payload: dict) -> int:
-    rows = _rows(payload, VERDICT_LOCI, VERDICT_EXTENSION)
-    unknown = 0
-    for identifier, row in sorted(rows.items()):
-        _common(identifier, row, VERDICT_FIELDS, VERDICT_LOCI.get(identifier))
-        divergent = row["divergent"]
-        if divergent not in (True, False, UNKNOWN):
-            _fail(f"{identifier}.divergent must be true, false or {UNKNOWN!r}")
-        for field in ("section", "reading_a", "reading_b", "expected", "test_name", "main_verdict"):
-            value = row[field]
-            if not isinstance(value, str):
-                _fail(f"{identifier}.{field} must be a string")
-            if value == UNKNOWN:
-                if field not in MAIN_OWNED:
-                    unknown += 1
-                continue
-            if field in ("reading_a", "reading_b", "expected") and len(value) < PROSE_MIN:
-                _fail(f"{identifier}.{field} is {len(value)} chars, under {PROSE_MIN}")
-            if field == "test_name" and not value.startswith("test_"):
-                _fail(f"{identifier}.test_name {value!r} must name the encoding test")
-        if divergent == UNKNOWN:
-            unknown += 1
-        elif divergent is False and row["reading_b"] == row["reading_a"]:
-            _fail(f"{identifier} is marked non-divergent but its two readings are identical text")
-    return unknown
-
-
-def _validate_attack(payload: dict) -> int:
-    rows = _rows(payload, ATTACK_LENSES, ATTACK_EXTENSION)
-    unknown = 0
-    for identifier, row in sorted(rows.items()):
-        _common(identifier, row, ATTACK_FIELDS, ATTACK_LENSES.get(identifier))
-        if row["severity"] not in SEVERITIES:
-            _fail(f"{identifier}.severity must be one of {sorted(SEVERITIES)}")
-        for field in ("section", "claim", "attack", "severity", "reproduction",
-                      "acceptance_check", "disposition"):
-            value = row[field]
-            if not isinstance(value, str):
-                _fail(f"{identifier}.{field} must be a string")
-            if value == UNKNOWN:
-                if field not in MAIN_OWNED:
-                    unknown += 1
-                continue
-            if field in ("claim", "attack", "reproduction", "acceptance_check"):
-                if len(value) < PROSE_MIN:
-                    _fail(f"{identifier}.{field} is {len(value)} chars, under {PROSE_MIN}")
-    return unknown
-
-
-def _seed(kind: str) -> dict:
-    if kind == "verdicts":
-        return {
-            "kind": "verdicts",
-            "rows": [
-                {
-                    "id": identifier,
-                    "section": UNKNOWN,
-                    "locus": locus,
-                    "reading_a": UNKNOWN,
-                    "reading_b": UNKNOWN,
-                    "divergent": UNKNOWN,
-                    "expected": UNKNOWN,
-                    "test_name": UNKNOWN,
-                    "main_verdict": UNKNOWN,
-                }
-                for identifier, locus in VERDICT_LOCI.items()
-            ],
-        }
-    return {
-        "kind": "attack",
-        "rows": [
-            {
-                "id": identifier,
-                "section": UNKNOWN,
-                "locus": locus,
-                "claim": UNKNOWN,
-                "attack": UNKNOWN,
-                "severity": UNKNOWN,
-                "reproduction": UNKNOWN,
-                "acceptance_check": UNKNOWN,
-                "disposition": UNKNOWN,
-            }
-            for identifier, locus in ATTACK_LENSES.items()
-        ],
-    }
-
-
-VALIDATORS = {"verdicts": _validate_verdicts, "attack": _validate_attack}
 EXEMPT = {"verdicts": ["main_verdict"], "attack": ["disposition"]}
 
 
-def main(argv: list[str]) -> int:
-    if len(argv) == 3 and argv[1] == "--emit-seed" and argv[2] in VALIDATORS:
-        print(json.dumps(_seed(argv[2]), indent=2))
-        return 0
-    if len(argv) != 2:
-        print(__doc__)
-        return 1
-    path = Path(argv[1])
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as exc:
-        _fail(f"unreadable artifact: {exc}")
-    if not isinstance(payload, dict):
-        _fail("artifact must be a JSON object")
-    kind = payload.get("kind")
-    if kind not in VALIDATORS:
-        _fail(f"kind={kind!r} is not one of {sorted(VALIDATORS)}")
-    unknown = VALIDATORS[kind](payload)
-    print(f"KIND: {kind}")
-    print(f"ROWS: {len(payload['rows'])}")
-    print(f"EXEMPT-COLUMNS: {EXEMPT[kind]} (MAIN-owned; a clean grade does NOT mean a closed table)")
-    print(f"UNKNOWN-CELLS: {unknown}")
-    if unknown:
-        print("INCOMPLETE: fill every cell, then rerun this validator LAST")
-        return 1
-    print("VALID: structurally sound with zero unfilled cells")
-    return 0
-
+TABLES = {
+    "verdicts": dict(subjects=VERDICT_LOCI, fields=VERDICT_FIELDS, identity="locus",
+                     extension=VERDICT_EXTENSION, section_pointer=True, paired=True, test_name=True,
+                     strings=("section", "reading_a", "reading_b", "expected", "test_name", "main_verdict"),
+                     prose=("reading_a", "reading_b", "expected"), exempt=EXEMPT["verdicts"]),
+    "attack": dict(subjects=ATTACK_LENSES, fields=ATTACK_FIELDS, identity="locus",
+                   extension=ATTACK_EXTENSION, section_pointer=True, severity_first=True,
+                   severity_value=False, enums={"severity": SEVERITIES},
+                   strings=("section", "claim", "attack", "severity", "reproduction", "acceptance_check", "disposition"),
+                   prose=("claim", "attack", "reproduction", "acceptance_check"), exempt=EXEMPT["attack"]),
+}
+ENGINE = StrictWave(TABLES, doc=__doc__, main_owned=MAIN_OWNED, prose_min=PROSE_MIN,
+                    citation=CITATION, section_max=SECTION_MAX, report="exempt")
+VALIDATORS = ENGINE.validators
+_seed = ENGINE.seed
+main = ENGINE.main
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv))
