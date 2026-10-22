@@ -509,8 +509,10 @@ def _proposal_bindings(
 ) -> _ProposalBindingSet:
     """Resolve proposals by id set, by status feed, or as one operation's pending page.
 
-    `_PendingProposals` issues an unbounded count and a bounded detail: the count is the total the
-    report publishes, and the detail materializes only the rows the caller reads.
+    An id set is MEMBERSHIP: its rows come back in arrival order (`status_sequence`), whatever
+    order the selection names them, like the other two selections. `_PendingProposals` issues an
+    unbounded count and a bounded detail: the count is the total the report publishes, and the
+    detail materializes only the rows the caller reads.
     """
 
     if type(selection) is _ProposalIds:
@@ -526,6 +528,8 @@ def _proposal_bindings(
             """,  # noqa: S608 — only code-chosen fragments; every value binds as `?`
             (partition, *selection.values),
         ).fetchall()
+        # Sorted here, not in SQL: B34 pins this statement's exact text.
+        rows = sorted(rows, key=lambda row: row["status_sequence"])
     elif type(selection) is _ProposalFeed:
         rows = connection.execute(
             """

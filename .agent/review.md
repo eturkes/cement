@@ -17,6 +17,19 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p48 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 two-id order pinned; R2 duplicate → IntegrityError; R3 empty → zero SQL; R4 half-missing inputs; R5 M02/M03/M15/M26 rerun + killed; R6 credentials. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | fixed | documented order = arrival (`status_sequence`), like the feed + pending selections; red at `397a43a`, green after a Python-side sort (B34 freezes the SQL text, so `ORDER BY` stays out). |
+| R2 | acceptance | pass | duplicate selection raises `IntegrityError`. |
+| R3 | acceptance | pass | empty selection returns `total=0, rows=()` with no statement traced. |
+| R4 | acceptance | superseded | the half-missing resolved-request writer left with `93007ac` (M3.6b); no production writer takes a half-missing input today. |
+| R5 | acceptance | pass | M02/M03/M15 killed at HEAD (control 572 green); M26 = superseded (anchor count 0, removed in `93007ac`). |
+| R6 | integrity | pass | 3 preservation pins credited (`.agent/decisions/p48-mutate.txt`, survivors → p115); paste-ins regenerated; p03 census rc 0. |
+
 ## p42 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 SCHEMA_VERSION + SCHEMA digest frozen; R2 identities read per writer; R3 every event branch's payload keys + the 1,001 sentinels; R4 invalid identities make 0 clock / id calls; R5 credentials; R6 harvest. MAIN alone.

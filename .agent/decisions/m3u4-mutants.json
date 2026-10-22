@@ -15,20 +15,20 @@
       "id": "M02",
       "section": "adapter",
       "locus": "the empty-selection early return",
-      "anchor": "src/cement_runtime/system.py:514 exact source fragment:\n        if not selection.values:\n            return _ProposalBindingSet(total=0, rows=())\n",
+      "anchor": "src/cement_runtime/system.py:519 exact source fragment:\n        if not selection.values:\n            return _ProposalBindingSet(total=0, rows=())\n",
       "mutation": "src/cement_runtime/system.py exact replacement text:\n        if False:\n            return _ProposalBindingSet(total=0, rows=())\n",
-      "expected_killer": "tests.test_proposal_binding_battery.ProposalBindingAdapterTests.test_empty_identifier_selection_returns_empty is absent from this worktree; configured verdict modules all passed: tests.test_proposal_binding, tests.test_proposal_binding_battery, tests.test_system, tests.test_cli",
-      "result": "survived",
+      "expected_killer": "tests.test_proposal_binding_battery.ProposalBindingAdapterTests.test_empty_identifier_selection_returns_empty failed; configured verdict modules: tests.test_proposal_binding, tests.test_proposal_binding_battery, tests.test_system, tests.test_cli",
+      "result": "killed",
       "main_ruling": null
     },
     {
       "id": "M03",
       "section": "adapter",
       "locus": "the duplicate-identifier guard",
-      "anchor": "src/cement_runtime/system.py:516 exact source fragment:\n        if len(set(selection.values)) != len(selection.values):\n            raise IntegrityError(\"proposal binding selection contains duplicate identifiers\")\n",
+      "anchor": "src/cement_runtime/system.py:521 exact source fragment:\n        if len(set(selection.values)) != len(selection.values):\n            raise IntegrityError(\"proposal binding selection contains duplicate identifiers\")\n",
       "mutation": "src/cement_runtime/system.py exact replacement text:\n        if False:\n            raise IntegrityError(\"proposal binding selection contains duplicate identifiers\")\n",
-      "expected_killer": "tests.test_proposal_binding_battery.ProposalBindingAdapterTests.test_duplicate_identifier_selection_is_rejected is absent from this worktree; configured verdict modules all passed: tests.test_proposal_binding, tests.test_proposal_binding_battery, tests.test_system, tests.test_cli",
-      "result": "survived",
+      "expected_killer": "tests.test_proposal_binding_battery.ProposalBindingAdapterTests.test_duplicate_identifier_selection_is_rejected failed; configured verdict modules: tests.test_proposal_binding, tests.test_proposal_binding_battery, tests.test_system, tests.test_cli",
+      "result": "killed",
       "main_ruling": null
     },
     {
@@ -145,10 +145,10 @@
       "id": "M15",
       "section": "adapter",
       "locus": "the invalid-selection fallback",
-      "anchor": "src/cement_runtime/system.py:595 exact source fragment:\n    else:\n        raise IntegrityError(\"proposal binding selection is invalid\")\n",
+      "anchor": "src/cement_runtime/system.py:571 exact source fragment:\n    else:\n        raise IntegrityError(\"proposal binding selection is invalid\")\n",
       "mutation": "src/cement_runtime/system.py exact replacement text:\n    else:\n        return _ProposalBindingSet(total=0, rows=())\n",
-      "expected_killer": "tests.test_proposal_binding_battery.ProposalBindingAdapterTests.test_invalid_selection_type_is_rejected is absent from this worktree; configured verdict modules all passed: tests.test_proposal_binding, tests.test_proposal_binding_battery, tests.test_system, tests.test_cli",
-      "result": "survived",
+      "expected_killer": "tests.test_proposal_binding_battery.ProposalBindingAdapterTests.test_invalid_selection_type_is_rejected failed; configured verdict modules: tests.test_proposal_binding, tests.test_proposal_binding_battery, tests.test_system, tests.test_cli",
+      "result": "killed",
       "main_ruling": null
     },
     {

@@ -303,6 +303,74 @@ def _review_write_labels(
     return labels
 
 
+class ProposalBindingAdapterTests(unittest.TestCase):
+    """p48: `_ProposalIds`' plural paths, which no production caller reaches (one id each)."""
+
+    def setUp(self) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.system = System(Path(temporary.name) / "cement.db", clock_us=_Clock())
+        self.system.register_operation("tenant_a", "echo_1", policy=CompilePolicy(2, 1, 0))
+
+    def _submit(self, value: object) -> str:
+        return self.system.submit_proposal(
+            "tenant_a", "echo_1", value, candidate=Candidate(output={"echo": value}, provenance={})
+        )
+
+    def _bindings(self, selection: object) -> tuple[system_module._ProposalBindingSet, list[str]]:
+        statements: list[str] = []
+        with self.system.store.transaction() as connection:
+            connection.set_trace_callback(statements.append)
+            try:
+                return (
+                    system_module._proposal_bindings(
+                        connection, partition="tenant_a", selection=selection  # type: ignore[arg-type]
+                    ),
+                    statements,
+                )
+            finally:
+                connection.set_trace_callback(None)
+
+    def test_two_identifier_selection_returns_arrival_order(self) -> None:
+        # Ids drawn against arrival order: the first proposal sorts LAST by id, so an id-ordered
+        # or selection-ordered answer differs from the documented arrival order.
+        with mock.patch.object(
+            system_module, "_new_id", side_effect=lambda prefix: f"{prefix}_" + "f" * 32
+        ):
+            first = self._submit({"n": 1})
+        with mock.patch.object(
+            system_module, "_new_id", side_effect=lambda prefix: f"{prefix}_" + "0" * 32
+        ):
+            second = self._submit({"n": 2})
+        self.assertGreater(first, second)
+        for selection in ((first, second), (second, first)):
+            with self.subTest(selection=selection):
+                result, _ = self._bindings(system_module._ProposalIds(selection))
+                self.assertEqual(result.total, 2)
+                self.assertEqual([row.proposal_id for row in result.rows], [first, second])
+
+    def test_empty_identifier_selection_returns_empty(self) -> None:
+        result, statements = self._bindings(system_module._ProposalIds(()))
+        self.assertEqual((result.total, result.rows), (0, ()))
+        self.assertEqual(statements, [])
+        # Control: the same spy records the one statement a one-id selection issues.
+        _, traced = self._bindings(system_module._ProposalIds((self._submit({"n": 1}),)))
+        self.assertEqual(len(traced), 1)
+
+    def test_duplicate_identifier_selection_is_rejected(self) -> None:
+        proposal = self._submit({"n": 1})
+        with self.assertRaises(IntegrityError) as raised:
+            self._bindings(system_module._ProposalIds((proposal, proposal)))
+        self.assertEqual(
+            str(raised.exception), "proposal binding selection contains duplicate identifiers"
+        )
+
+    def test_invalid_selection_type_is_rejected(self) -> None:
+        with self.assertRaises(IntegrityError) as raised:
+            self._bindings(("not", "a", "selection"))
+        self.assertEqual(str(raised.exception), "proposal binding selection is invalid")
+
+
 class ProposalBindingBatteryTests(unittest.TestCase):
     """Contract-derived pins. The author reads the contract, never the diff."""
 
