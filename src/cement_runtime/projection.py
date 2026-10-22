@@ -1,9 +1,11 @@
-"""`cement-projection-v1`: a closed, line-oriented recognizer from raw input to an exact case key.
+"""`cement-projection-v1` + `-v2`: a closed, line-oriented recognizer from raw input to a case key.
 
 Contract: `.agent/decisions/m45-contract.md` §4. The text rules are explicit ASCII on purpose:
 Python 3.11-3.14 ship four Unicode databases (UCD 14.0.0 -> 16.0.0), so `str.isspace`, `lower`
 or NFKC would make one key depend on the interpreter. No regex runs on input, nothing is
-evaluated, and `work` counts the characters, lines and entries the recognizer touches.
+evaluated, and `work` counts the characters, lines and entries the recognizer touches. v2 (p97)
+differs in one rule: a label ends at the first ASCII colon OR full-width colon (U+FF1A), so forms
+that label with U+FF1A (Japanese) get layouts; a v1 program keeps its ASCII-only meaning unchanged.
 """
 
 from __future__ import annotations
@@ -26,6 +28,9 @@ __all__ = [
 ]
 
 PROJECTION_ABI = "cement-projection-v1"
+PROJECTION_ABI_V2 = "cement-projection-v2"
+# The label separators per ABI. v1 stays ASCII-only, so a promoted v1 program never widens.
+_SEPARATORS = {PROJECTION_ABI: (":",), PROJECTION_ABI_V2: (":", "\uff1a")}
 PROGRAM_MAX_BYTES = 64 * 1024
 MAX_LAYOUTS = 1_000
 MAX_ENTRIES = 256
@@ -84,31 +89,33 @@ def _field(value: object, label: str) -> str:
     return value
 
 
-def _literal(value: object, label: str, *, colon_free: bool) -> str:
+def _literal(value: object, label: str, *, separators: tuple[str, ...] = ()) -> str:
     if type(value) is not str or not 1 <= len(value) <= MAX_LITERAL:
         raise ValidationError(f"{label} must be a string of 1-{MAX_LITERAL} characters")
     if any(char in _LITERAL_FORBIDDEN or 0xD800 <= ord(char) <= 0xDFFF for char in value):
         raise ValidationError(f"{label} holds a control character or a lone surrogate")
     if value[0] in _EDGE or value[-1] in _EDGE:
         raise ValidationError(f"{label} must not start or end with an ASCII space or tab")
-    if colon_free and ":" in value:
-        raise ValidationError(f"{label} must not contain ':'")
+    for separator in separators:
+        if separator in value:
+            raise ValidationError(f"{label} must not contain {separator!r}")
     return value
 
 
-def _entry(value: object, label: str) -> tuple[str, str]:
+def _entry(value: object, label: str, separators: tuple[str, ...]) -> tuple[str, str]:
     if type(value) is not dict or len(value) != 1 or next(iter(value)) not in {"label", "section"}:
         raise ValidationError(f"{label} must be exactly {{'label': K}} or {{'section': H}}")
     kind = next(iter(value))
-    return kind, _literal(value[kind], f"{label} {kind}", colon_free=True)
+    return kind, _literal(value[kind], f"{label} {kind}", separators=separators)
 
 
 def parse_program(value: object) -> ProjectionProgram:
     """Validate one program object; every rule violation raises `ValidationError` naming it."""
 
     root = _exact_keys(value, {"abi", "text", "keep", "layouts"}, "projection program")
-    if root["abi"] != PROJECTION_ABI:
-        raise ValidationError(f"projection abi must be {PROJECTION_ABI!r}")
+    if type(root["abi"]) is not str or root["abi"] not in _SEPARATORS:
+        raise ValidationError(f"projection abi must be {PROJECTION_ABI!r} or {PROJECTION_ABI_V2!r}")
+    separators = _SEPARATORS[str(root["abi"])]
     text = _field(root["text"], "projection text")
     raw_keep = root["keep"]
     if type(raw_keep) is not list or len(raw_keep) > MAX_KEEP:
@@ -125,13 +132,13 @@ def parse_program(value: object) -> ProjectionProgram:
     seen: set[tuple[str, tuple[tuple[str, str], ...]]] = set()
     for index, raw_layout in enumerate(raw_layouts):
         layout = _exact_keys(raw_layout, {"name", "title", "entries"}, f"projection layout {index}")
-        name = _literal(layout["name"], f"layout {index} name", colon_free=False)
-        title = _literal(layout["title"], f"layout {index} title", colon_free=False)
+        name = _literal(layout["name"], f"layout {index} name")
+        title = _literal(layout["title"], f"layout {index} title")
         raw_entries = layout["entries"]
         if type(raw_entries) is not list or not 1 <= len(raw_entries) <= MAX_ENTRIES:
             raise ValidationError(f"layout {index} entries must be an array of 1-{MAX_ENTRIES}")
         entries = tuple(
-            _entry(item, f"layout {index} entry {position}")
+            _entry(item, f"layout {index} entry {position}", separators)
             for position, item in enumerate(raw_entries)
         )
         identity = (title, entries)
@@ -149,15 +156,27 @@ def parse_program(value: object) -> ProjectionProgram:
     )
 
 
-def _label(line: str) -> tuple[str, str] | None:
-    key, separator, remainder = line.partition(":")
-    key = key.strip(_EDGE)
-    if not separator or not key:
+def _label(line: str, separators: tuple[str, ...]) -> tuple[str, str] | None:
+    cut = min((at for at in (line.find(s) for s in separators) if at >= 0), default=-1)
+    if cut < 0:
         return None
-    return key, remainder
+    key = line[:cut].strip(_EDGE)
+    if not key:
+        return None
+    return key, line[cut + 1 :]
 
 
-def _structure(text: str) -> tuple[tuple[str, tuple[tuple[str, str], ...]] | None, int]:
+def program_abi(program: ProjectionProgram) -> str:
+    """The program's own ABI string (the field is inside its canonical bytes, already validated)."""
+
+    root = program.canonical.value
+    assert type(root) is dict  # noqa: S101 — narrowing only: parse_program built it from an object
+    return str(root["abi"])
+
+
+def _structure(
+    text: str, separators: tuple[str, ...] = (":",)
+) -> tuple[tuple[str, tuple[tuple[str, str], ...]] | None, int]:
     work = len(text)
     lines: list[str] = []
     for raw in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
@@ -181,13 +200,13 @@ def _structure(text: str) -> tuple[tuple[str, tuple[tuple[str, str], ...]] | Non
     pairs: list[tuple[str, str]] = []
     for line in header:
         work += len(line)
-        label = _label(line)
+        label = _label(line, separators)
         if label is None:
             return None, work
         pairs.append(("label", label[0]))
     for block in blocks[1:]:
         work += len(block[0])
-        leader = _label(block[0])
+        leader = _label(block[0], separators)
         if leader is None:
             return None, work
         if not leader[1].strip(_EDGE):
@@ -195,14 +214,14 @@ def _structure(text: str) -> tuple[tuple[str, tuple[tuple[str, str], ...]] | Non
                 return None, work
             for body in block[1:]:
                 work += len(body)
-                if ":" in body:
+                if any(separator in body for separator in separators):
                     return None, work
             pairs.append(("section", leader[0]))
             continue
         pairs.append(("label", leader[0]))
         for line in block[1:]:
             work += len(line)
-            label = _label(line)
+            label = _label(line, separators)
             if label is None:
                 return None, work
             pairs.append(("label", label[0]))
@@ -226,7 +245,7 @@ def project(program: ProjectionProgram, value: JSONValue) -> Projection:
         return Projection(matched=False, key=None, reason="input", work=0)
     text = value[program.text]
     assert type(text) is str  # noqa: S101 — narrowing only: checked on the line above
-    parsed, work = _structure(text)
+    parsed, work = _structure(text, _SEPARATORS[program_abi(program)])
     if parsed is None:
         return Projection(matched=False, key=None, reason="text", work=work)
     title, pairs = parsed
@@ -254,7 +273,8 @@ def project(program: ProjectionProgram, value: JSONValue) -> Projection:
 # Outside `__all__` on purpose: the two learning surfaces (CLI `learn cases --projectable`, the Open
 # WebUI learning tool) share it, while the projection contract API stays the seven pinned names.
 def draft_program(inputs: list[JSONValue]) -> dict[str, JSONValue]:
-    """One `cement-projection-v1` layout per distinct title + structure of the raw inputs.
+    """One layout per distinct title + structure of the raw inputs, as a v1 program unless some
+    input reads differently under v2's separators (a U+FF1A label): then a v2 program (p97).
 
     The learning pass decides that an operation is projectable; the program itself is mechanical,
     so it is derived here and nobody copies a label by hand.
@@ -279,9 +299,16 @@ def draft_program(inputs: list[JSONValue]) -> dict[str, JSONValue]:
     ):
         raise ValidationError("a projection needs inputs that hold exactly one text field")
     (field,) = fields
+    texts = [str(cast(dict[str, JSONValue], value)[field]) for value in inputs]
+    v2 = _SEPARATORS[PROJECTION_ABI_V2]
+    abi = (
+        PROJECTION_ABI_V2
+        if any(_structure(t, v2)[0] != structure(t) for t in texts)
+        else PROJECTION_ABI
+    )
     layouts: dict[tuple[str, tuple[tuple[str, str], ...]], dict[str, JSONValue]] = {}
-    for value in inputs:
-        parsed = structure(str(cast(dict[str, JSONValue], value)[field]))
+    for text in texts:
+        parsed = _structure(text, _SEPARATORS[abi])[0]
         if parsed is None or parsed in layouts:
             continue
         title, pairs = parsed
@@ -293,7 +320,7 @@ def draft_program(inputs: list[JSONValue]) -> dict[str, JSONValue]:
     if not layouts:
         raise ValidationError("no input has a form layout that a projection can read")
     return {
-        "abi": PROJECTION_ABI,
+        "abi": abi,
         "text": field,
         "keep": [],
         "layouts": [layouts[key] for key in sorted(layouts)],

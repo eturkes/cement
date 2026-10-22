@@ -299,6 +299,8 @@ shares that one review surface.
 Some operations receive inputs that share one structure and differ in their values: forms of one
 layout with different patients, for example. Exact keys would never repeat there. A projection program
 (`cement-projection-v1`) maps each raw input to the key of its case: the layout and its field names.
+A `cement-projection-v2` program also ends a label at a full-width colon `：`, for forms such as
+Japanese forms.
 The learning pass writes the program. Cement verifies it before it stores it. This program
 recognizes one intake form layout of an operation `form.plan` whose input is `{"document": TEXT}`.
 `projection set` refuses a layout that no confirmed example shows, so the learning pass first

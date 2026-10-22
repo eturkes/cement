@@ -270,8 +270,11 @@ class ValidationMixin(BoundMixin):
         for value in wrong:
             if type(value) is not str:
                 self.invalid(replace_path(section, ("layouts", 0, "entries", 0, "section"), value))
-        for value in ("cement-projection-v2", "CEMENT-PROJECTION-V1", ""):
+        # p97 (owner-ruled): `cement-projection-v2` is a second accepted ABI; v3 stands in for an
+        # unknown version so the check keeps one probe beyond every accepted spelling.
+        for value in ("cement-projection-v3", "CEMENT-PROJECTION-V1", ""):
             self.invalid(replace_path(base, ("abi",), value), "abi", "version")
+        self.impl.parse_program(replace_path(base, ("abi",), "cement-projection-v2"))
         for path, value in [(("text",), type("Text", (str,), {})("document")),
                             (("keep",), type("Array", (list,), {})(["k"])),
                             (("layouts", 0), type("Object", (dict,), {})(base["layouts"][0]))]:
@@ -530,6 +533,38 @@ class ProjectionMixin(BoundMixin):
         self.refused(p, {"document": "\x00", "k": nested(63)}, "text")
         self.refused(p, {"document": "U\nA:v", "k": nested(63)}, "layout")
         self.refused(p, {"document": "T\nA:v", "k": nested(63)}, "key")
+
+
+    def test_p97_full_width_colon_labels_project_under_v2_alone(self):
+        # p97 (owner-ruled): a v2 label ends at ':' or U+FF1A; a v1 program keeps its ASCII meaning,
+        # so a promoted v1 version never starts matching full-width-colon forms.
+        forms = [
+            "診療記録\n患者名：山田太郎\n生年月日：1980-01-01\n診断：高血圧\n",
+            "診療記録\n患者名：鈴木花子\n生年月日：1975-05-05\n診断：糖尿病\n",
+        ]
+        layout = {"name": "shinryo", "title": "診療記録",
+                  "entries": [{"label": "患者名"}, {"label": "生年月日"}, {"label": "診断"}]}
+
+        def program(abi, layouts):
+            return self.impl.parse_program({"abi": abi, "text": "document", "keep": [], "layouts": layouts})
+
+        v1, v2 = program("cement-projection-v1", [layout]), program("cement-projection-v2", [layout])
+        results = [self.impl.project(v2, {"document": text}) for text in forms]
+        for text, result in zip(forms, results):
+            self.assertTrue(result.matched)
+            self.bound(v2, text, result)
+        self.assertEqual(results[0].key.text, results[1].key.text)
+        for text in forms:
+            result = self.impl.project(v1, {"document": text})
+            self.assertEqual((result.matched, result.reason), (False, "text"))
+            self.bound(v1, text, result)
+        ascii_layout = {"name": "note", "title": "NOTE", "entries": [{"label": "Patient"}, {"label": "MRN"}]}
+        ascii_text = "NOTE\nPatient: A\nMRN: 1\n"
+        keys = [self.impl.project(program(abi, [ascii_layout]), {"document": ascii_text}).key.text
+                for abi in ("cement-projection-v1", "cement-projection-v2")]
+        self.assertEqual(keys[0], keys[1])
+        with self.assertRaises(ValidationError):
+            program("cement-projection-v2", [dict(layout, entries=[{"label": "患者名：氏名"}])])
 
 
 class PropertyMixin(BoundMixin):
@@ -819,6 +854,26 @@ class RuntimeDifferentialTests(DifferentialMixin, unittest.TestCase):
 
 class OracleDifferentialTests(DifferentialMixin, unittest.TestCase):
     module_name = "tests.projection_oracle"
+
+
+class DraftProgramV2Tests(unittest.TestCase):
+    """p97: `draft_program` emits v2 only when an input labels with U+FF1A."""
+
+    def test_full_width_forms_draft_one_v2_layout_and_ascii_forms_stay_v1(self):
+        from cement_runtime.projection import draft_program, structure
+
+        forms = [{"document": "診療記録\n患者名：山田太郎\n診断：高血圧\n"},
+                 {"document": "診療記録\n患者名：鈴木花子\n診断：糖尿病\n"}]
+        self.assertIsNone(structure(forms[0]["document"]))
+        drafted = draft_program(forms)
+        self.assertEqual(drafted["abi"], "cement-projection-v2")
+        self.assertEqual(drafted["layouts"], [{"name": "診療記録", "title": "診療記録",
+                                               "entries": [{"label": "患者名"}, {"label": "診断"}]}])
+        ascii_forms = [{"document": "NOTE\nPatient: A\nMRN: 1\n"}, {"document": "NOTE\nPatient: B\nMRN: 2\n"}]
+        self.assertEqual(draft_program(ascii_forms), {
+            "abi": "cement-projection-v1", "text": "document", "keep": [],
+            "layouts": [{"name": "note", "title": "NOTE", "entries": [{"label": "Patient"}, {"label": "MRN"}]}],
+        })
 
 
 if __name__ == "__main__":

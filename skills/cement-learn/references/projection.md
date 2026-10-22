@@ -9,6 +9,10 @@ model.
 
 ## Program format (`cement-projection-v1`)
 
+`cement-projection-v2` has the same format; its labels end at `:` or the full-width `：` (U+FF1A).
+The drafted program is v2 only when an input labels with `：`; a v2 label or section literal holds
+neither colon.
+
 ```json
 {"abi": "cement-projection-v1",
  "text": "document",

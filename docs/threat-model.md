@@ -36,7 +36,8 @@
   For unknown or near-match input, `resolve` returns a miss, and the caller gives that input to the
   LLM. Offline function evaluation has no fallback path: an unknown input returns an inert miss.
 - A projection program is a closed recognizer, not code: no regular expression runs on input, no
-  expression is evaluated, and the work is linear in the input. A program is stored only after it
+  expression is evaluated, and the work is linear in the input. Both ABIs keep this: v2 only adds
+  one character, a full-width colon, to a fixed separator set. A program is stored only after it
   parses, after an active example witnesses every layout, after no key merges different outputs, and
   after at least one example projects. An input that no layout recognizes is a miss.
 - A switched-off operation answers nothing. Only `function switch` changes the switch, and every

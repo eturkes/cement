@@ -84,12 +84,17 @@ answering when a challenge, a revocation, or a suspension reaches one of its mem
 
 ### Projection
 
-A projection program (`cement-projection-v1`) is a closed, line-oriented recognizer. It matches a raw
-text field against named layouts. A layout is a title line, then labels and section headings. A match
+A projection program (`cement-projection-v1` or `cement-projection-v2`) is a closed, line-oriented
+recognizer. It matches a raw text field against named layouts. A layout is a title line, then labels and section headings. A match
 returns the case key: the layout and its field names, plus the value of each field that the program
 names in `keep`. The key holds no value from the text itself. An input that no layout recognizes is a miss,
 and the LLM answers it. The interpreter is pure, total, and linear in its input: it runs no
 regular expression on input and evaluates nothing.
+
+A label ends at its first colon. Under v1 that is the ASCII `:` alone. Under v2 it is the first `:`
+or full-width `：` (U+FF1A), so a form that labels with `：`, such as a Japanese form, gets a layout.
+A v1 program keeps its meaning, so a promoted v1 version never starts to match `：` forms. The
+learning pass drafts a v2 program only when an input labels with `：`.
 
 `projection test` previews a program over the current revision and writes nothing. `projection set`
 stores it in one write transaction after four checks:

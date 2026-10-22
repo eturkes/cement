@@ -21,6 +21,18 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p97 close (MAINTAIN queue run, owner ruling, tier `kernel`) — target = the commit landing this section
+
+Check set: R1 the ruled ABI (v2 with `:` + `：`, v1 unchanged); R2 Japanese fixture: one layout, shared key; R3 threat-model claims re-checked; R4 pins moved + oracle; R5 run the real path. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | v1 programs parse + project exactly as before (ASCII-only separator); v2 adds `：`; ASCII drafts stay v1 byte for byte (draft test). |
+| R2 | acceptance | pass | runtime + oracle: one layout, equal keys for two value sets; v1 refuses (`text`). |
+| R3 | acceptance | pass | separator set fixed per ABI, no regex, linear `bound()` held on every v2 projection; threat model + architecture state it. |
+| R4 | correctness | pass | `test_v1_exact_types_at_every_node`: `cement-projection-v2` moved from rejected to accepted, `cement-projection-v3` added as the unknown-version probe (strength kept); oracle extended in its own code path; red at `d75f22f` (3 runtime-side tests). |
+| R5 | acceptance | pass | CLI `learn cases --projectable` → v2 draft; `projection test` → one key hash for both examples. |
+
 ## p86 close (MAINTAIN queue run, owner ruling, tier `docs` — PROTOTYPE law) — target = the commit landing this section
 
 Check set: R1 Back restores a per-step snapshot of ledger + session; R2 Back across the third learn step < 500 ms; R3 state string after Back + forward equals the forward pass. MAIN alone.

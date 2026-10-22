@@ -85,7 +85,7 @@ from .models import (
     SwitchState,
     VerificationReport,
 )
-from .projection import ProjectionProgram, parse_program, project
+from .projection import ProjectionProgram, parse_program, program_abi, project
 from .source import CandidateSource
 from .store import Store
 
@@ -3727,7 +3727,7 @@ class System:
                 INSERT OR IGNORE INTO projection_programs(program_hash, abi, program_json)
                 VALUES (?, ?, ?)
                 """,
-                (parsed.program_hash, "cement-projection-v1", parsed.canonical.text),
+                (parsed.program_hash, program_abi(parsed), parsed.canonical.text),
             )
             connection.execute(
                 """

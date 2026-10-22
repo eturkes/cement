@@ -9,6 +9,8 @@ from cement_runtime.errors import ValidationError
 from cement_runtime.json_value import CanonicalJSON, JSONValue, canonicalize
 
 PROJECTION_ABI = "cement-projection-v1"
+# p97: each ABI's label delimiters (v2 adds the full-width colon U+FF1A).
+DELIMITERS = {PROJECTION_ABI: ":", "cement-projection-v2": ":\uff1a"}
 _FIELD_CHARS = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-")
 
 
@@ -53,22 +55,23 @@ def _field(value: object, rule: str) -> str:
     return value
 
 
-def _literal(value: object, rule: str, *, colon: bool = True) -> str:
+def _literal(value: object, rule: str, *, colon: bool = True, delimiters: str = ":") -> str:
     if type(value) is not str or not 1 <= len(value) <= 256:
         raise ValidationError(f"{rule}: literal must contain 1-256 Unicode scalars")
     if any(_forbidden(c) for c in value):
         raise ValidationError(f"{rule}: forbidden character in literal")
     if value != value.strip(" \t"):
         raise ValidationError(f"{rule}: literal has edge ASCII whitespace")
-    if not colon and ":" in value:
+    if not colon and any(char in delimiters for char in value):
         raise ValidationError(f"{rule}: colon in label or section literal")
     return value
 
 
 def parse_program(value: object) -> ProjectionProgram:
     obj = _object(value, {"abi", "text", "keep", "layouts"}, "program")
-    if type(obj["abi"]) is not str or obj["abi"] != PROJECTION_ABI:
-        raise ValidationError("abi: expected cement-projection-v1")
+    if type(obj["abi"]) is not str or obj["abi"] not in DELIMITERS:
+        raise ValidationError("abi: expected cement-projection-v1 or cement-projection-v2")
+    delimiters = DELIMITERS[obj["abi"]]
     text = _field(obj["text"], "text")
     keep = obj["keep"]
     if type(keep) is not list or len(keep) > 32:
@@ -96,7 +99,7 @@ def parse_program(value: object) -> ProjectionProgram:
             if type(entry) is not dict or len(entry) != 1 or next(iter(entry)) not in {"label", "section"}:
                 raise ValidationError("entry: exactly one label or section key required")
             kind, literal = next(iter(entry.items()))
-            entries.append((kind, _literal(literal, kind, colon=False)))
+            entries.append((kind, _literal(literal, kind, colon=False, delimiters=delimiters)))
         identity = (title, tuple(entries))
         if identity in identities:
             raise ValidationError("layout identity: duplicate title and normalized entries")
@@ -106,7 +109,7 @@ def parse_program(value: object) -> ProjectionProgram:
     return ProjectionProgram(text, tuple(keep), tuple(parsed), canonical, canonical.digest)
 
 
-def _analyze(text: str) -> tuple[tuple[str, tuple[tuple[str, str], ...]] | None, int]:
+def _analyze(text: str, delimiters: str = ":") -> tuple[tuple[str, tuple[tuple[str, str], ...]] | None, int]:
     if type(text) is not str:
         return None, 0
     raw_lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
@@ -137,9 +140,11 @@ def _analyze(text: str) -> tuple[tuple[str, tuple[tuple[str, str], ...]] | None,
     def label(line: str) -> tuple[str, str] | None:
         nonlocal work
         work += len(line)
-        key, delimiter, value = line.partition(":")
-        key = key.strip(" \t")
-        if not delimiter or not key:
+        cut = next((index for index, char in enumerate(line) if char in delimiters), None)
+        if cut is None:
+            return None
+        key, value = line[:cut].strip(" \t"), line[cut + 1 :]
+        if not key:
             return None
         return key, value
 
@@ -157,7 +162,7 @@ def _analyze(text: str) -> tuple[tuple[str, tuple[tuple[str, str], ...]] | None,
                 return None, work
             for body in block[1:]:
                 work += len(body)
-                if ":" in body:
+                if any(char in delimiters for char in body):
                     return None, work
             entries.append(("section", first[0]))
         else:
@@ -177,7 +182,7 @@ def structure(text: str) -> tuple[str, tuple[tuple[str, str], ...]] | None:
 def project(program: ProjectionProgram, value: JSONValue) -> Projection:
     if type(value) is not dict or set(value) != {program.text, *program.keep} or type(value[program.text]) is not str:
         return Projection(False, None, "input", 0)
-    parsed, work = _analyze(value[program.text])
+    parsed, work = _analyze(value[program.text], DELIMITERS[program.canonical.value["abi"]])
     if parsed is None:
         return Projection(False, None, "text", work)
     title, entries = parsed
