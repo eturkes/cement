@@ -21,6 +21,17 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## MAINTAIN queue run close — target = the commit landing this section
+
+Check set (the body's Met when): R1 every queue row closed by its acceptance in its own commit, owed with what it owes, routed, or waiting on its trigger; R2 the queue + ledger grader; R3 the standing censuses; R4 the full gate on a clean tree at this commit. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | 29 open rows, each with a Status line: routed 20 (survivor backlog p93 + p99-p102 + p104-p116, and the p32 + p33 refactor; owner-ruled), owed-go 6 (p34 p37 p87-p90, offered and not selected), queued 2 (p35 p36, owner-ruled for a later session), trigger 1 (p52); every other row closed in its own commit (p05 + p92 share one gate-boundary commit, stated there). |
+| R2 | acceptance | pass | `m3-deferred-validate.py` VERDICT: PASS. |
+| R3 | integrity | pass | p03 / p10 / p76 / p94 censuses + p73 coverage rc 0; tripwires PASS; `m3-report-validate.py --all` 5 graded, 0 failed. |
+| R4 | acceptance | see final message | the closing gate runs on this commit after it lands (a commit cannot carry its own gate result). |
+
 ## p77 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section
 
 Check set: R1 one committed command fires every listed seed from a clean checkout in a disposable worktree; R2 byte-identical restoration; R3 per-seed rc + record line printed; R4 the rule names the command; R5 neutralizing one check flips exactly its seed; R6 harvest integrity. general-purpose-3 built; MAIN reran.

@@ -97,8 +97,8 @@ def main(argv: list[str]) -> int:
 
 # Records `--all` skips, each with its reason (owner-ruled at the MAINTAIN queue run's close, p05).
 EXEMPT = {
-    ".agent/decisions/m3-plan-review.md": "its 48 anchors point into the gitignored, deleted"
-    " `.scratch/agents/plan-m3.md` (p10), so it reds at every revision, its adding commit included",
+    ".agent/decisions/m3-plan-review.md": "its 48 anchors point into a deleted, machine-local"
+    " scratch report (p10), so it reds at every revision, its adding commit included",
 }
 
 
