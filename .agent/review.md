@@ -17,6 +17,15 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p06 close (MAINTAIN queue run, owner ruling) — target = the commit landing this section
+
+Check set: R1 the owner ruling; R2 the replayable catalogues. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | owner: accept expired-source for u4c1; close on u4c5a + u4c5b. |
+| R2 | acceptance | pass | both catalogues replay rc 0 (16/16; 12 + 1 ruled equivalent), recorded in the ledger entry. |
+
 ## p48 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 two-id order pinned; R2 duplicate → IntegrityError; R3 empty → zero SQL; R4 half-missing inputs; R5 M02/M03/M15/M26 rerun + killed; R6 credentials. MAIN alone.
