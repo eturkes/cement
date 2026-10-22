@@ -21,6 +21,19 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p77 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section
+
+Check set: R1 one committed command fires every listed seed from a clean checkout in a disposable worktree; R2 byte-identical restoration; R3 per-seed rc + record line printed; R4 the rule names the command; R5 neutralizing one check flips exactly its seed; R6 harvest integrity. general-purpose-3 built; MAIN reran.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | 20 groups for 20 bullets (coverage check refuses drift); MAIN added S19 + S20 for the p92 + p05 records written after the teammate base. |
+| R2 | acceptance | pass | every tree reports `sha256-equal git-diff=0` on restore (MAIN runs). |
+| R3 | acceptance | pass | each case line names `gate-checks.md:<line>`, expected vs observed rc + tokens. |
+| R4 | acceptance | pass | intro paragraph of `gate-checks.md` (prose, so the bullet count stays the group count). |
+| R5 | acceptance | pass | `--self-test`: only S12's four cases flip (teammate over all 18 groups; MAIN over S12 S13 S19 S20). |
+| R6 | integrity | pass | `.agent/seeds` taken from `wt/general-purpose-3` @ `98ce02e` sha256-equal, then extended; S18 rerun on main's `.agent/mutate` 5/5. |
+
 ## p97 close (MAINTAIN queue run, owner ruling, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 the ruled ABI (v2 with `:` + `：`, v1 unchanged); R2 Japanese fixture: one layout, shared key; R3 threat-model claims re-checked; R4 pins moved + oracle; R5 run the real path. MAIN alone.

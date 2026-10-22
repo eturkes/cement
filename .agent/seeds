@@ -1,0 +1,712 @@
+#!/usr/bin/env python3
+"""Fire the recorded gate-check seeds in disposable detached worktrees (p77).
+
+Usage: uv run python .agent/seeds [--rev REV] [--only S01 ...] [--list]
+       uv run python .agent/seeds --self-test
+
+Every recorded recipe has an S01–S18 group, with a result per constituent case.
+rc 0 = every selected expectation matched and every worktree restored; 1 = a
+verdict differs; 2 = setup/restoration failure. --self-test repeats the selected
+set after neutralizing skip-census: exactly S12's four red seeds must change.
+Slow commands acquire a local `heavy` slot. Network is required by uv audit and
+an uncached gitleaks download. A private mirror keeps test commits, worktrees,
+and D28 cache writes out of the calling repository. Existing GREEN D28 records
+are copied as a cache only; D28 itself validates their content keys.
+"""
+from __future__ import annotations
+
+import argparse
+import ast
+import contextlib
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import secrets
+import shlex
+import shutil
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+
+ROOT = Path(__file__).resolve().parents[1]
+RULE = ".claude/rules/gate-checks.md"
+D28 = "test_d28_gate_1_stays_green_at_every_commit_never_only_at_the_last"
+D19 = "test_d19_the_walkthrough_promotes_its_function_set_immediately"
+PIN = "tests.test_json_value.CanonicalJSONTests.test_parser_rejects_ambiguous_or_unbounded_values"
+GROUPS = [
+    ("S01", "`.agent/gate` (", "gate", True),
+    ("S02", "`tests/test_read_capability_census.py` (", "read census", False),
+    ("S03", "`.agent/spec-lint`:", "spec lint", False),
+    ("S04", "`.agent/decisions/m3-deferred-validate.py`,", "queue validator @21b7463", False),
+    ("S05", "D28 verdict cache (", "D28 cache @1935f68", True),
+    ("S06", "D28 (`", "D28 and census floors", False),
+    ("S07", "D28 pairing (", "D28 pairing", True),
+    ("S08", "`SWAPPED_ROOTS` purge (", "import composition", False),
+    ("S09", "Static checks (", "static checks", False),
+    ("S10", "`uv audit` (", "dependency audit", False),
+    ("S11", "`.agent/gitleaks` (", "secret scanner", False),
+    ("S12", "`.agent/skip-census` (", "skip census", False),
+    ("S13", "`.agent/register-audit --gate` (", "register audit", False),
+    ("S14", "`.agent/replay-mutants` (", "catalogue replay @d4746ef", False),
+    ("S15", "`.agent/validate-anchors` (", "anchor validator", False),
+    ("S16", "`.agent/contract-claims` (", "contract claims", False),
+    ("S17", "`.agent/article-audit` (", "article audit", False),
+    ("S18", "`.agent/mutate` (", "mutation credit", True),
+    ("S19", "`.agent/register-audit --gate` CLI help (", "CLI help register", False),
+    ("S20", "`.agent/decisions/m3-report-validate.py --all` (", "report anchors", False),
+]
+
+
+def run(argv, cwd, *, env=None, slow=False, timeout=None):
+    environment = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
+    for key in ("VIRTUAL_ENV", "UV_PROJECT_ENVIRONMENT", "CEMENT_D28_INNER_REPLAY"):
+        environment.pop(key, None)
+    environment["PYTHONPATH"] = os.pathsep.join((str(cwd), str(Path(cwd) / "src")))
+    if env:
+        for key, value in env.items():
+            if value is None:
+                environment.pop(key, None)
+            else:
+                environment[key] = value
+    command = [str(arg) for arg in argv]
+    if slow:
+        command = ["heavy", *command]
+    # Noninteractive background shells can pass SIG_IGN; the historical p25
+    # interrupt probe requires the ordinary executable signal dispositions.
+    def signals():
+        for sig in (signal.SIGINT, signal.SIGPIPE, signal.SIGXFSZ):
+            signal.signal(sig, signal.SIG_DFL)
+    started = time.monotonic()
+    process = subprocess.Popen(command, cwd=cwd, env=environment, stdout=subprocess.PIPE,
+                               stderr=subprocess.STDOUT, text=True, start_new_session=True,
+                               preexec_fn=signals if os.name == "posix" else None)
+    try:
+        output, _ = process.communicate(timeout=timeout)
+    except BaseException as exc:
+        if os.name == "posix":
+            os.killpg(process.pid, signal.SIGTERM)
+        else:
+            process.terminate()
+        try:
+            output, _ = process.communicate(timeout=10)
+        except subprocess.TimeoutExpired:
+            if os.name == "posix":
+                os.killpg(process.pid, signal.SIGKILL)
+            else:
+                process.kill()
+            output, _ = process.communicate()
+        if not isinstance(exc, subprocess.TimeoutExpired):
+            raise
+        return 124, output + "\nSEED-TIMEOUT\n", time.monotonic() - started
+    return process.returncode, output, time.monotonic() - started
+
+
+def git(root, *args):
+    rc, output, _ = run(["git", *args], root)
+    if rc:
+        raise RuntimeError(f"git {' '.join(args)}: rc={rc} {output[-2000:]}")
+    return output.strip()
+
+
+def digest(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def tracked_digest(root):
+    names = git(root, "ls-files", "-z").split("\0")
+    return {name: (digest(root / name), (root / name).stat().st_mode & 0o777)
+            for name in names if name}
+
+
+@contextlib.contextmanager
+def changed(path, text=None):
+    original = path.read_bytes() if path.exists() else None
+    mode = path.stat().st_mode if original is not None else None
+    before = hashlib.sha256(original).hexdigest() if original is not None else "absent"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if text is None:
+        path.unlink(missing_ok=True)
+    else:
+        path.write_bytes(text if isinstance(text, bytes) else text.encode())
+    try:
+        yield
+    finally:
+        if original is None:
+            path.unlink(missing_ok=True)
+        else:
+            path.write_bytes(original)
+            path.chmod(mode)
+        after = digest(path) if path.exists() else "absent"
+        if before != after:
+            raise RuntimeError(f"RESTORE-DIFF {path}: {before} != {after}")
+        print(f"RESTORED {path.name} sha256={after}", flush=True)
+
+
+def replace(text, old, new):
+    count = text.count(old)
+    if count != 1:
+        raise RuntimeError(f"anchor count={count}, want 1: {old!r}")
+    return text.replace(old, new, 1)
+
+
+class Runner:
+    def __init__(self, revision, temporary):
+        self.temp = Path(temporary)
+        self.repo = self.temp / "repo.git"
+        git(ROOT, "clone", "--mirror", "--shared", str(ROOT), str(self.repo))
+        self.revision = git(self.repo, "rev-parse", "--verify", f"{revision}^{{commit}}")
+        git(self.repo, "config", "user.name", "cement seed")
+        git(self.repo, "config", "user.email", "seed@example.invalid")
+        common = Path(git(ROOT, "rev-parse", "--path-format=absolute", "--git-common-dir"))
+        old = common / "cement-d28-verdicts"
+        if old.is_dir():
+            shutil.copytree(old, self.repo / old.name)
+        self.results = {}
+        self.setup_failures = []
+        self.neutral = False
+        self.counter = 0
+        self.lines = {}
+        record = git(self.repo, "show", f"{self.revision}:{RULE}").splitlines()
+        bullets = [(n, line) for n, line in enumerate(record, 1) if line.startswith("- ")]
+        if len(bullets) != len(GROUPS):
+            raise RuntimeError(f"seed coverage: {len(bullets)} bullets, {len(GROUPS)} groups")
+        for sid, anchor, _, _ in GROUPS:
+            hits = [n for n, line in bullets if line.startswith("- " + anchor)]
+            if len(hits) != 1:
+                raise RuntimeError(f"{sid} record anchor has {len(hits)} matches")
+            self.lines[sid] = hits[0]
+
+    @contextlib.contextmanager
+    def tree(self, revision=None):
+        self.counter += 1
+        root = self.temp / f"tree-{self.counter}"
+        base = git(self.repo, "rev-parse", "--verify", f"{revision or self.revision}^{{commit}}")
+        git(self.repo, "worktree", "add", "--detach", str(root), base)
+        before = tracked_digest(root)
+        try:
+            if self.neutral and (root / ".agent/skip-census").is_file():
+                path = root / ".agent/skip-census"
+                text = replace(path.read_text(),
+                               "if unlisted or missing or len(found) != len(set(found)):",
+                               "if False:  # p77 neutralized verdict")
+                with changed(path, text):
+                    yield root
+            else:
+                yield root
+        finally:
+            git(root, "reset", "--hard", base)
+            after = tracked_digest(root)
+            if before != after:
+                raise RuntimeError(f"RESTORE-DIFF tree {root}")
+            git(root, "diff", "--quiet")
+            git(root, "diff", "--cached", "--quiet")
+            print(f"TREE-RESTORED {root.name} {len(before)} files sha256-equal git-diff=0", flush=True)
+            git(self.repo, "worktree", "remove", "--force", str(root))
+
+    def case(self, sid, name, root, argv, rc, tokens=(), *, env=None, slow=False, timeout=None):
+        actual, output, seconds = run(argv, root, env=env, slow=slow, timeout=timeout)
+        return self.observe(sid, name, actual, output, rc, tokens, seconds=seconds)
+
+    def observe(self, sid, name, actual, output, rc, tokens=(), *, seconds=0):
+        matches = [re.search(token, output, re.MULTILINE) for token in tokens]
+        passed = actual == rc and all(matches)
+        observed = [match.group(0).replace("\n", " ") if match else "ABSENT" for match in matches]
+        key = f"{sid}.{name}"
+        self.results[key] = passed
+        print(f"{key} {RULE}:{self.lines[sid]} expected rc={rc} token={json.dumps(tokens)} "
+              f"observed rc={actual} token={json.dumps(observed)} "
+              f"{'MATCH' if passed else 'DIFF'} {seconds:.1f}s", flush=True)
+        if not passed:
+            print(output[-5000:], flush=True)
+        return actual, output
+
+    def python(self, sid, name, root, path, rc, tokens=(), **kwargs):
+        return self.case(sid, name, root, [sys.executable, path], rc, tokens, **kwargs)
+
+    def suite(self, sid, name, root, tests, rc, tokens=(), **kwargs):
+        return self.case(sid, name, root, [sys.executable, "-m", "unittest", *tests], rc, tokens, **kwargs)
+
+    def execute(self, selected):
+        self.results = {}
+        for sid, _, name, _ in GROUPS:
+            if sid not in selected:
+                continue
+            start = time.monotonic()
+            print(f"BEGIN {sid} {name} neutralized={self.neutral}", flush=True)
+            try:
+                getattr(self, sid)()
+            except Exception as exc:
+                self.setup_failures.append(sid)
+                self.observe(sid, "setup", 2, f"SETUP {type(exc).__name__}: {exc}", 0, ["ready"])
+            verdicts = [value for key, value in self.results.items() if key.startswith(sid + ".")]
+            print(f"{sid} {RULE}:{self.lines[sid]} {sum(verdicts)}/{len(verdicts)} "
+                  f"{'MATCH' if verdicts and all(verdicts) else 'DIFF'} "
+                  f"{time.monotonic() - start:.1f}s", flush=True)
+        return dict(self.results)
+
+    def S01(self):
+        sid = "S01"
+        with self.tree() as root:
+            self.case(sid, "missing-module", root, [".agent/gate", "tests.test_no_such_module"], 1,
+                      [r"^unittest\s+1\s", "ModuleNotFoundError", r"FAILED \(errors=1\)"])
+            version_rc, version_output, _ = run(
+                ["uv", "run", "python", "-c", "import sys; sys.exit(sys.version_info < (3, 12))"], root)
+            if version_rc not in (0, 1):
+                raise RuntimeError(f"Python version probe rc={version_rc}: {version_output}")
+            duration_token = "Slowest test durations" if version_rc == 0 else "slowest tests unavailable:"
+            self.case(sid, "durations", root, [".agent/gate", "tests.test_read_capability_census"], 0,
+                      [duration_token])
+            shim = self.temp / "uv-shim"
+            shim.mkdir(exist_ok=True)
+            executable = shim / "uv"
+            executable.write_text("#!/bin/sh\ncase \"$*\" in *sys.version_info*) exit 1;; esac\nexec "
+                                  + shlex.quote(shutil.which("uv")) + " \"$@\"\n")
+            executable.chmod(0o755)
+            rc, out = self.case(sid, "old-python", root,
+                                [".agent/gate", "tests.test_read_capability_census"], 0,
+                                [r"^slowest tests unavailable:"],
+                                env={"PATH": str(shim) + os.pathsep + os.environ["PATH"]})
+            self.observe(sid, "old-python-no-list", rc, str("Slowest test durations" not in out), 0, ["True"])
+            self.case(sid, "full-table", root, [".agent/gate"], 0,
+                      [r"^unittest\s+0\s", r"^build\s+0\s", r"^spec-lint\s+0\s",
+                       r"D28: \d+ revisions, \d+ replayed, \d+ from green verdicts",
+                       r"^Ran \d+ tests? in [^\n]+"], slow=True)
+
+    def S02(self):
+        with self.tree() as root:
+            path = root / "src/cement_runtime/system.py"
+            text = path.read_text()
+            source = ast.parse(text)
+            owners = [node for node in ast.walk(source) if isinstance(node, ast.FunctionDef)
+                      and node.name == "latest_function_receipt"]
+            if len(owners) != 1:
+                raise RuntimeError(f"read block owners: {len(owners)}")
+            sites = [node for node in ast.walk(owners[0]) if isinstance(node, ast.With)
+                     and any(isinstance(item.context_expr, ast.Call)
+                             and any(k.arg == "write" and isinstance(k.value, ast.Constant)
+                                     and k.value.value is False for k in item.context_expr.keywords)
+                             for item in node.items)
+                     and "SELECT revision FROM operations" in ast.get_source_segment(text, node)]
+            if len(sites) != 1:
+                raise RuntimeError(f"read block sites: {len(sites)}")
+            node = sites[0]
+            lines = text.splitlines(keepends=True)
+            lines.insert(node.lineno, " " * (node.col_offset + 4)
+                         + 'connection.execute("UPDATE operations SET revision = revision")\n')
+            with changed(path, "".join(lines)):
+                self.suite("S02", "update", root, ["tests.test_read_capability_census"], 1,
+                           [f"line {node.lineno}: UPDATE operations SET revision = revision",
+                            r"FAILED \(failures=1\)"])
+            self.suite("S02", "restored", root, ["tests.test_read_capability_census"], 0, [r"^OK$"])
+
+    def S03(self):
+        with self.tree() as root:
+            old = self.temp / "historical-spec.md"
+            old.write_text(git(self.repo, "show", "b8a0703:.agent/spec.md") + "\n")
+            self.case("S03", "history", root, [".agent/spec-lint", old], 1,
+                      [r":116: .*89 line\(s\) of history"])
+            self.case("S03", "shipped", root, [".agent/spec-lint"], 0)
+
+    def S04(self):
+        sid = "S04"
+        with self.tree("21b7463") as root:
+            checker = root / ".agent/decisions/m3-deferred-validate.py"
+            current = git(self.repo, "show", f"{self.revision}:.agent/decisions/m3-deferred-validate.py") + "\n"
+            historical = checker.read_text()
+            queue = root / ".agent/deferred.md"
+            ledger = root / ".agent/archive/deferred-closed.md"
+            q, closed = queue.read_text(), ledger.read_text()
+            def entry(text, row):
+                pattern = rf"(?m)^- `{row}`[^\n]*(?:\n[ \t]+[^\n]*)*\n?"
+                hits = list(re.finditer(pattern, text))
+                if len(hits) != 1:
+                    raise RuntimeError(f"entry {row}: {len(hits)}")
+                return hits[0].group()
+            def check(name, rc, tokens, env=None, extra=()):
+                return self.case(sid, name, root, [sys.executable, checker, *extra], rc, tokens, env=env)
+            p62, p01 = entry(q, "p62"), entry(closed, "p01")
+            with changed(checker, current):
+                check("clean", 0, ["COMMITTED-FLOOR: 105 over 54 queue \\+ 26 ledger revisions", "CLOSED-ROWS: 28"])
+                with changed(queue, q.replace(p62, "")):
+                    check("drop-born", 1, [r"MISSING: 1 \['p62'\]"])
+                    git(root, "add", str(queue))
+                    git(root, "commit", "-qm", "seed: committed omission")
+                    check("drop-born-committed", 1, [r"over 55 queue", r"MISSING: 1 \['p62'\]"])
+                    git(root, "reset", "--soft", "HEAD^")
+                    git(root, "reset", "--", str(queue))
+                with changed(ledger, closed.replace(p01, "")):
+                    check("drop-closed", 1, [r"MISSING: 1 \['p01'\]"])
+                opened = re.sub(r" `closed(?:=[^`]*)?`", "", p01).split("\n  Closed:")[0].rstrip() + "\n"
+                first = re.search(r"(?m)^- `p", q).start()
+                with changed(queue, q[:first] + opened + q[first:]):
+                    check("open-and-closed", 1, [r"open AND closed: \['p01'\]"])
+                off = git(root, "commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "seed: off-history")
+                for name, sha, token in [("bad-sha", "0000000", "does not resolve to a commit"),
+                                         ("symbolic-sha", "HEAD", "is not a 7-40 hex commit id"),
+                                         ("off-history", off, "is not an ancestor of HEAD")]:
+                    replacement = re.sub(r"`closed(?:=[^`]*)?`", f"`closed={sha}`", p01, count=1)
+                    with changed(ledger, closed.replace(p01, replacement)):
+                        check(name, 1, [token])
+                with changed(ledger, closed.replace(p01, p01.replace("Closed:", "Resolved:"))):
+                    check("no-closed", 1, ["has no `Closed:` clause"])
+                with changed(ledger, closed + "\n- `p990` `pri=4` `closed` — seeded. Accept: check.\n  Closed: checked.\n"):
+                    check("never-queued", 1, ["closed but never queued"])
+                for path, text, name in ((queue, q, "queue"), (ledger, closed, "ledger")):
+                    with changed(path, text.replace("# ", "# Seed ", 1)):
+                        check(name + "-header", 1, ["header has drifted"])
+                before = digest(queue)
+                check("refuse-stub", 2, ["REFUSING-OVERWRITE"], extra=["--emit-stub"])
+                self.observe(sid, "stub-no-write", 0, str(before == digest(queue)), 0, ["True"])
+                with changed(queue), changed(ledger):
+                    check("emit-stub", 0, ["WROTE .agent/deferred.md: 61 rows"], extra=["--emit-stub"])
+                    check("stub-fails", 1, ["UNKNOWN-ROWS: 61", "MISSING: 44"])
+                quoted = p62.replace(" — ", " — The `unknown` word is quoted. ", 1)
+                with changed(queue, q.replace(p62, quoted)):
+                    check("quoted-placeholder", 0, ["UNKNOWN-ROWS: 0"])
+                    with changed(checker, historical):
+                        check("old-substring", 1, ["UNKNOWN-ROWS: 1"])
+                shim = self.temp / "git-shim"
+                shim.mkdir(exist_ok=True)
+                executable = shim / "git"
+                real = shutil.which("git")
+                for name, script, tokens in [
+                    ("missing-git", "exit 127\n", ["does not resolve to a commit", "COMMITTED-FLOOR: 61 over 0"]),
+                    ("shallow-query", 'case "$*" in *--is-shallow-repository*) exit 127;; esac\nexec '
+                     + shlex.quote(real) + ' "$@"\n',
+                     ["git rev-parse --is-shallow-repository failed", "COMMITTED-FLOOR: 105 over 54"]),
+                ]:
+                    executable.write_text("#!/bin/sh\n" + script)
+                    executable.chmod(0o755)
+                    check(name, 1, tokens, env={"PATH": str(shim) + os.pathsep + os.environ["PATH"]})
+                continued = p62.replace("Accept:", "\n  Accept:", 1)
+                with changed(queue, q.replace(p62, continued)):
+                    check("accept-continuation", 0, ["VERDICT: PASS"])
+                with changed(queue, q.replace(p62, p62.rstrip() + "\n  unknown\n")):
+                    check("placeholder-continuation", 1, ["UNKNOWN-ROWS: 1"])
+                with changed(queue, q.replace(p62, p62.replace("Accept:", "Check:"))):
+                    check("no-accept", 1, ["has no `Accept:` clause"])
+
+    def S05(self):
+        sid = "S05"
+        with self.tree("1935f68") as root:
+            self.suite(sid, "damaged-records", root, ["tests.test_migration_battery.D28VerdictCacheTests"], 0,
+                       [r"Ran 5 tests", r"^OK$"])
+            test = [f"tests.test_migration_battery.MigrationBatteryTests.{D28}"]
+            self.suite(sid, "warm-control", root, test, 0, [r"D28: 12 revisions, \d+ replayed", r"^OK$"], slow=True)
+            path = root / "tests/test_json_value.py"
+            text = path.read_text() + '\nclass PlantedRed(unittest.TestCase):\n    def test_planted_red(self):\n        self.fail("p77 planted red")\n'
+            with changed(path, text):
+                git(root, "add", str(path))
+                git(root, "commit", "-qm", "seed: D28 red never cached")
+                store = self.repo / "cement-d28-verdicts"
+                for index in (1, 2):
+                    before = {p.name: digest(p) for p in store.glob("*.json")}
+                    self.suite(sid, f"red-{index}", root, test, 1,
+                               [r"FAILED \(failures=1\)", "PlantedRed.test_planted_red",
+                                "D28: 13 revisions, 1 replayed, 12 from green verdicts"], slow=True)
+                    after = {p.name: digest(p) for p in store.glob("*.json")}
+                    self.observe(sid, f"uncached-{index}", 0,
+                                 f"verdicts {len(before)} -> {len(after)} unchanged={before == after}", 0,
+                                 [r"verdicts \d+ -> \d+ unchanged=True"])
+
+    def S06(self):
+        with self.tree() as root:
+            # Exercise the actual assertions with empty boundary results. These
+            # are floor probes, not a substitute for S05's real inner suites.
+            code = r'''
+import subprocess, unittest
+from unittest import mock
+from tests import test_migration_battery as m, test_read_capability_census as c
+class FloorSeeds(unittest.TestCase):
+    def test_no_revisions(self):
+        with mock.patch.object(m, "_run", return_value=subprocess.CompletedProcess([], 0, "", "")):
+            m.MigrationBatteryTests.test_d28_gate_1_stays_green_at_every_commit_never_only_at_the_last(self)
+    def test_small_replay(self):
+        with mock.patch.object(m, "_run", return_value=subprocess.CompletedProcess([], 0, "HEAD\n", "")), mock.patch.object(m, "_d28_verdict", return_value=(948, "OK")):
+            m.MigrationBatteryTests.test_d28_gate_1_stays_green_at_every_commit_never_only_at_the_last(self)
+    def test_collapsed_census(self):
+        for field in ("read_sites", "write_sites", "helpers"):
+            values = {"read_sites": 17, "write_sites": 13, "helpers": list(range(12))}
+            values[field] = [] if field == "helpers" else 0
+            with self.subTest(field=field), mock.patch.object(c, "census", return_value=values):
+                c.ReadReachabilityTests.test_the_census_still_finds_the_surface_it_was_measured_against(self)
+unittest.main()
+'''
+            self.case("S06", "floors", root, [sys.executable, "-c", code], 1,
+                      [r"FAILED \(failures=5\)", "no migration commit", "948 not greater than or equal to 949",
+                       "0 not greater than or equal to 17", "0 not greater than or equal to 13",
+                       "0 not greater than or equal to 12"])
+            self.suite("S06", "census-control", root, ["tests.test_read_capability_census"], 0, [r"^OK$"])
+
+    def S07(self):
+        sid = "S07"
+        with self.tree() as root:
+            path = root / "tests/test_migration_battery.py"
+            lifecycle = ast.parse((root / "tests/test_lifecycle_removal_battery.py").read_text())
+            names = [node.name for node in ast.walk(lifecycle) if isinstance(node, ast.FunctionDef)
+                     and node.name.startswith("test_")
+                     and any(isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
+                             and call.func.id == "instrument_pruned" for call in ast.walk(node))]
+            if len(names) != 5:
+                raise RuntimeError(f"pairing frames {len(names)}, want 5")
+            tests = ["tests.test_lifecycle_removal_battery.LifecycleRemovalBattery." + name for name in names]
+            self.suite(sid, "announced-present", root, tests, 1,
+                       [r"FAILED \(failures=5\)", "set=True contradicts .*present=True"],
+                       env={"CEMENT_D28_INNER_REPLAY": "1"}, slow=True)
+            with changed(path):
+                self.suite(sid, "absent-unannounced", root, tests, 1,
+                           [r"FAILED \(failures=5\)", "set=False contradicts .*present=False"], slow=True)
+                self.suite(sid, "announced-pruned", root, tests, 0, [r"OK \(skipped=1\)"],
+                           env={"CEMENT_D28_INNER_REPLAY": "1"}, slow=True)
+            self.suite(sid, "ordinary", root, tests, 0, [r"^OK$"], slow=True)
+
+    def S08(self):
+        sid = "S08"
+        with self.tree() as root:
+            tests = ["tests.test_hospital_ocr_example", f"tests.test_migration_battery.MigrationBatteryTests.{D19}"]
+            self.suite(sid, "composed", root, tests, 0, [r"^OK$"])
+            path = root / "tests/test_migration_battery.py"
+            text = replace(path.read_text(),
+                           'SWAPPED_ROOTS = ("cement_runtime", "pipeline", "plan_adapter", "run_demo")',
+                           'SWAPPED_ROOTS = ("cement_runtime",)')
+            with changed(path, text):
+                self.suite(sid, "purge-removed", root, tests, 1,
+                           [r"FAILED \(errors=1\)", "CandidateSourceError: candidate source failed"])
+            for index, test in enumerate(tests, 1):
+                self.suite(sid, f"alone-{index}", root, [test], 0, [r"^OK$"])
+
+    def S09(self):
+        with self.tree() as root:
+            path = root / "src/cement_runtime/errors.py"
+            original = path.read_text()
+            cases = [("format", "x  =  1\n", ["uv", "run", "ruff", "format", "--check"], ["file would be reformatted"]),
+                     ("unused", "import os\n", ["uv", "run", "ruff", "check"], ["F401"]),
+                     ("suppression", "ok = 1  # noqa: F401\n", ["uv", "run", "ruff", "check"], ["RUF100"]),
+                     ("type", 'def _seed() -> int: return "x"\n', ["uv", "run", "mypy"], ["return-value"])]
+            for name, seed, command, tokens in cases:
+                with changed(path, original + "\n" + seed):
+                    self.case("S09", name, root, command, 1, tokens)
+            for name, _, command, _ in cases:
+                self.case("S09", name + "-control", root, command, 0)
+
+    def S10(self):
+        with self.tree() as root:
+            project = self.temp / "audit-project"
+            project.mkdir(exist_ok=True)
+            (project / "pyproject.toml").write_text('[project]\nname="seed-audit"\nversion="0"\nrequires-python=">=3.11"\ndependencies=[]\n[dependency-groups]\ndev=["jinja2==2.10"]\n')
+            self.case("S10", "lock", project, ["uv", "lock"], 0, ["Resolved"])
+            command = ["uv", "audit", "--locked", "--preview-features", "audit-command"]
+            self.case("S10", "vulnerable", project, command, 1, [r"Found \d+ known vulnerabilities", "jinja2"])
+            self.case("S10", "shipped", root, command, 0, [r"Found no known vulnerabilities.*in \d+ packages"])
+
+    def S11(self):
+        with self.tree() as root:
+            repo = self.temp / ("secret-repo-neutral" if self.neutral else "secret-repo")
+            repo.mkdir()
+            git(repo, "init", "-q")
+            git(repo, "config", "user.name", "seed")
+            git(repo, "config", "user.email", "seed@example.invalid")
+            # Generated credential-shaped data is local, never a real credential.
+            alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+            token = "".join(secrets.SystemRandom().sample(alphabet, 36))
+            (repo / "seed.txt").write_text("ghp_" + token + "\n")
+            git(repo, "add", "seed.txt")
+            git(repo, "commit", "-qm", "seed")
+            self.case("S11", "token", root,
+                      [".agent/gitleaks", "git", "--no-banner", "--redact", "--log-level", "warn", str(repo)],
+                      1, [r"leaks found: 1"])
+            self.case("S11", "shipped", root, [".agent/gitleaks"], 0)
+
+    def S12(self):
+        sid = "S12"
+        with self.tree() as root:
+            self.python(sid, "shipped", root, ".agent/skip-census", 0,
+                        ["3 skip sites, 3 allowed", "platform", "replay-pruned"])
+            seeds = [
+                ("flat", "test_seed.py", 'import unittest\nclass SeededSkip(unittest.TestCase):\n def test_seed(self): self.skipTest("seed")\n'),
+                ("nested", "nested/test_seed.py", 'import unittest\nclass SeededSkip(unittest.TestCase):\n def test_seed(self): self.skipTest("seed")\n'),
+                ("alias", "test_seed.py", 'from unittest import TestCase, skip as not_ready\n@not_ready("seed")\nclass SeededSkip(TestCase):\n def test_seed(self): pass\n'),
+                ("reimport", "test_seed.py", 'from unittest import TestCase\nfrom tests.seed_helper import later as soon\n@soon("seed")\nclass SeededSkip(TestCase):\n def test_seed(self): pass\n'),
+            ]
+            for name, relative, text in seeds:
+                with changed(root / "tests" / relative, text), \
+                     changed(root / "tests/nested/__init__.py", ""), \
+                     changed(root / "tests/seed_helper.py", "import unittest\nlater = unittest.skip\n"):
+                    self.python(sid, name, root, ".agent/skip-census", 1,
+                                ["UNLISTED.*SeededSkip", r"FAIL \(unlisted 1, missing 0\)"])
+
+    def S13(self):
+        with self.tree() as root:
+            path = self.temp / "register-seed.md"
+            path.write_text("Run the command simply to check its result.\n")
+            self.case("S13", "filler", root, [sys.executable, ".agent/register-audit", "--gate", path], 1,
+                      ["FILLER .* simply"])
+            sentence = " ".join(["Word"] * 30) + ".\n"
+            path.write_text(sentence + "\n- A punctuation-free bullet\n\nCement's [guide](https://example.com/simply-start).\n")
+            self.case("S13", "judgment-only", root, [sys.executable, ".agent/register-audit", path], 0,
+                      [r"\[30\]", "filler 0", "contraction 0"])
+            self.case("S13", "gate-control", root, [sys.executable, ".agent/register-audit", "--gate", path], 0,
+                      ["longest 30 words, filler 0"])
+
+    def S19(self):
+        with self.tree() as root:
+            cli = root / "src/cement_runtime/cli.py"
+            text = cli.read_text()
+            at = text.index('help="', text.index('function_commands.add_parser("switch"')) + len('help="')
+            with changed(cli, text[:at] + "simply " + text[at:]):
+                self.case("S19", "help-filler", root, [sys.executable, ".agent/register-audit", "--gate"], 1,
+                          [r"FILLER `cement function switch --help`: simply", r"FAIL \(1 filler hits\)"])
+            self.case("S19", "help-control", root, [sys.executable, ".agent/register-audit", "--gate"], 0,
+                      [r"== cli --help: \d+ pages, filler 0"])
+
+    def S20(self):
+        validator = ".agent/decisions/m3-report-validate.py"
+        fixtures = ".agent/fixtures/report-anchors"
+        with self.tree() as root:
+            self.case("S20", "one-stale", root, [sys.executable, validator, f"{fixtures}/one-stale.md"], 1,
+                      [r"lacks \['beta line'\]"])
+            self.case("S20", "resolving", root, [sys.executable, validator, f"{fixtures}/resolving.md"], 0)
+            source = root / validator
+            text = source.read_text()
+            stale = text.replace('".agent/decisions/m3-plan-review.md": "its 48', '".agent/decisions/no-such.md": "its 48')
+            with changed(source, stale):
+                self.case("S20", "stale-exempt", root, [sys.executable, validator, "--all"], 1,
+                          [r"STALE-EXEMPT \.agent/decisions/no-such\.md", r"RECORDS: 6 graded, 2 failed"])
+            self.case("S20", "shipped", root, [sys.executable, validator, "--all"], 0,
+                      [r"EXEMPT \.agent/decisions/m3-plan-review\.md", r"RECORDS: 5 graded, 0 failed"])
+
+    def S14(self):
+        sid = "S14"
+        with self.tree() as root:
+            source = root / ".agent/decisions/replay-mutants-seeds.jsonl"
+            rows = [json.loads(line) for line in source.read_text().splitlines()]
+            catalogue = self.temp / "catalogue.jsonl"
+            def replay(name, mutated, rc, tokens):
+                catalogue.write_text("\n".join(json.dumps(row) for row in mutated) + "\n")
+                return self.case(sid, name, root,
+                                 [sys.executable, ".agent/replay-mutants", catalogue, "--workers", "1"], rc, tokens)
+            replay("shipped", rows, 0, ["SEED-DEAD.*killed", "SEED-LIVE.*survived", "SEED-GONE.*superseded",
+                                        "all restored: True"])
+            copy = json.loads(json.dumps(rows))
+            copy[0]["expect"]["equivalent"] = {}
+            replay("unexpected-survivor", copy, 1, ["verdicts differ from expect", "all restored: True"])
+            copy = json.loads(json.dumps(rows))
+            copy[0]["ran"] = 5
+            replay("wrong-count", copy, 2, ["CONTROL red"])
+            copy = json.loads(json.dumps(rows))
+            copy[1].update(old="    ", new="        ", line=1)
+            replay("ambiguous-anchor", copy, 2, ["anchor-miss", "all restored: True"])
+            copy = json.loads(json.dumps(rows))
+            copy[1]["new"] = "this is not Python !"
+            replay("not-importable", copy, 2, ["not-loaded", "all restored: True"])
+
+    def S15(self):
+        with self.tree() as root:
+            for name, rc, tokens in [("good", 0, ["ANCHORS-CHECKED: 2", "ANCHORS-BAD: 0"]),
+                                     ("bad-anchor", 1, ["ANCHOR-BAD", "report:5", "want 'beta line', got 'alpha line'"]),
+                                     ("todo-fill", 1, ["TODO-FILL\\s+report:5"])]:
+                self.case("S15", name, root,
+                          [sys.executable, ".agent/validate-anchors", f".agent/fixtures/anchors/{name}.md"], rc, tokens)
+
+    def S16(self):
+        with self.tree() as root:
+            for name, rc, tokens in [("good", 0, ["1 graded rows", "0 failures"]),
+                                     ("wrong-count", 1, ["MISMATCH"]),
+                                     ("unclaimed", 1, ["UNCLAIMED 3"]),
+                                     ("stale-anchor", 1, ["STALE", "UNCLAIMED"])]:
+                self.case("S16", name, root,
+                          [sys.executable, ".agent/contract-claims", f".agent/fixtures/contract-claims/{name}.md"], rc, tokens)
+            self.case("S16", "shipped", root,
+                      [sys.executable, ".agent/contract-claims", ".agent/decisions/m3u6a1-contract.md"], 0,
+                      [r"contract-claims: \d+ count-bearing lines, \d+ graded rows, \d+ unchecked, 0 failures"])
+
+    def S17(self):
+        with self.tree() as root:
+            self.python("S17", "shipped", root, ".agent/article-audit", 0,
+                        [r"article-audit: \d+ files, \d+ grounded words, 0 ungrounded"])
+            path = root / "docs/architecture.md"
+            with changed(path, path.read_text() + "\nCement withholds the cached output from `follow`.\n"):
+                self.python("S17", "cached", root, ".agent/article-audit", 1, ["the cached"])
+            old = git(self.repo, "show", "4c4e32c^:docs/architecture.md") + "\n"
+            with changed(path, old):
+                self.case("S17", "historical", root, [sys.executable, ".agent/article-audit", path], 1,
+                          [":150 the cached"])
+
+    def S18(self):
+        sid = "S18"
+        with self.tree() as root:
+            self.case(sid, "resolves", root, [sys.executable, ".agent/mutate", "--help"], 0,
+                      ["--rev", "--workers"])
+            record = (root / ".agent/decisions/m3u10-gate-tooling.md").read_text()
+            self.observe(sid, "record", 0, record, 0,
+                         [r"^\| `593df5a`[^\n]*\| 131 \| 126 \| 1 \|$",
+                          r"^\| `97d5d01`[^\n]*\| 124 \| 133 \| 1 \|$"])
+            counts = []
+            def campaign(name):
+                revision = git(root, "rev-parse", "HEAD")
+                _, output = self.case(sid, name, root,
+                                      [sys.executable, ".agent/mutate", PIN, "--rev", revision, "--workers", "1"],
+                                      0, [r"mutate: killed \d+, survived \d+, incompetent 0, invalid \d+, no-test 0, error 0"],
+                                      slow=True)
+                match = re.search(r"mutate: killed (\d+), survived (\d+),", output)
+                if match:
+                    counts.append(int(match.group(2)))
+            campaign("baseline")
+            path = root / "tests/test_json_value.py"
+            # Reapply the recorded deletion; its original trial commits lived
+            # only on local tags, so using their SHAs breaks a clean main clone.
+            text = replace(path.read_text(),
+                           "            with self.subTest(source=source), self.assertRaises(ValidationError):\n"
+                           "                parse_json(source)\n",
+                           "            with self.subTest(source=source):\n"
+                           "                try:\n"
+                           "                    parse_json(source)\n"
+                           "                except ValidationError:\n"
+                           "                    pass\n")
+            with changed(path, text):
+                git(root, "add", str(path))
+                git(root, "commit", "-qm", "seed: remove parse_json assertion")
+                campaign("assertion-deleted")
+            self.observe(sid, "survivors-rise", 0, f"survivors={counts}; rise={len(counts) == 2 and counts[1] > counts[0]}",
+                         0, ["rise=True"])
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--rev", default="HEAD")
+    parser.add_argument("--only", nargs="+", choices=[row[0] for row in GROUPS])
+    parser.add_argument("--list", action="store_true")
+    parser.add_argument("--self-test", action="store_true", help="repeat every selected seed with S12 neutralized")
+    args = parser.parse_args()
+    if args.list:
+        for sid, _, name, slow in GROUPS:
+            print(f"{sid} {'slow' if slow else 'fast'} {name}")
+        return 0
+    selected = set(args.only or [row[0] for row in GROUPS])
+    if args.self_test and "S12" not in selected:
+        parser.error("--self-test requires S12 in the selected set")
+    with tempfile.TemporaryDirectory(prefix="cement-seeds-") as directory:
+        runner = Runner(args.rev, directory)
+        print(f"REV {runner.revision} isolated mirror; selected={','.join(sorted(selected))}", flush=True)
+        baseline = runner.execute(selected)
+        if args.self_test:
+            runner.neutral = True
+            altered = runner.execute(selected)
+            flips = sorted(key for key in baseline.keys() | altered.keys() if baseline.get(key) != altered.get(key))
+            expected = [f"S12.{name}" for name in ("alias", "flat", "nested", "reimport")]
+            matched = flips == expected and all(baseline.values())
+            print(f"N1 expected={expected} observed={flips} {'MATCH' if matched else 'DIFF'}", flush=True)
+            return 2 if runner.setup_failures else (0 if matched else 1)
+        return 2 if runner.setup_failures else (0 if baseline and all(baseline.values()) else 1)
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+        print(f"seeds: SETUP/RESTORE FAILURE: {exc}", file=sys.stderr)
+        raise SystemExit(2)
