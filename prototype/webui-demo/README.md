@@ -50,6 +50,18 @@ Stop the server with Ctrl+C. The ledger is a temporary SQLite file, and Ctrl+C r
 the process. A server that a signal such as `SIGTERM` stops leaves its `cement-demo-*` directory
 in the system temporary directory. Remove that directory by hand.
 
+## Japanese
+
+Select **日本語** in the header to show the page in Japanese. Select **English** to go back.
+The language switch keeps the state of the demo. You can also open
+<http://127.0.0.1:8765/?lang=ja> directly.
+
+The Japanese page translates the headings, the buttons, the labels, the band and the story
+notes. The forms, the requests, the replies and the scripts stay in English, because they are
+the contents of the chat. The technical details and the code in the **Read** view also stay in
+English. The page uses the Japanese font of your operating system. No native speaker has
+reviewed the Japanese text.
+
 ## Five tasks, four functions
 
 The tray holds five tasks. Each task carries several requests that ask for one job in
@@ -174,7 +186,8 @@ Query parameters help with capture. `?reset=1` starts a new ledger. `?scene=N` p
 story to step N + 1. `?expand=1` removes the internal scrollbars for a full-page screenshot.
 `?source=<operation>` opens the source overlay for that promoted operation.
 `?drawer=<operation>` opens the drawer for that operation. `?tech=1` shows the technical
-details, and `?drawer`, `?source` and `?open` also show them. The source overlay opens the
+details, and `?drawer`, `?source` and `?open` also show them. `?lang=ja` shows the page in
+Japanese. The source overlay opens the
 lineage of its first entry, because a screenshot cannot select a disclosure.
 
 ## Visual check

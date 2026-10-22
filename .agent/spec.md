@@ -90,6 +90,12 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
     no manual compile/verify/promote, no revoke (r12 + close review R1).
   - The learning pass reads `learning simulated` on the right half's tag + its story beat;
     `Read` heads `readable rendering`, since Cement seals exact entries and emits no code.
+  - Japanese UI (owner-ruled: quick + cheap): `?lang=ja` or the header link (`日本語` |
+    `English`, keeps the demo state) = the default page + tour in Japanese — chrome, band,
+    narration, beats, tour buttons, `title`/`aria-label`; forms, requests, replies, script rows,
+    the Read view's code + the whole technical layer stay English. Copy = MAIN's draft, shipped
+    unreviewed (owner); fonts = each OS's Japanese family, none vendored. Mechanism →
+    `.claude/rules/prototype.md`.
   The right half runs the operator lifecycle as REAL `cement` subprocesses against the demo
   ledger (`_cli`), printing the command, its rc and a condensed reading of the bytes it
   returned, with verbatim stdout + exact argv one click away; an argument over 80 chars prints

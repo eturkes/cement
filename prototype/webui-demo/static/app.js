@@ -923,17 +923,18 @@ function showBeat() {
   narrate(beat.text());
   tour().highlight({
     element: element || "#side-hidden",
+    /* driver.js sizes the popover from these strings, so they arrive translated (i18n.js). */
     popover: {
-      title: beat.title,
-      description: beat.text(),
+      title: tr(beat.title),
+      description: tr(beat.text()),
       side: beat.side,
       /* highlight() mode shows only the buttons a step lists itself. */
       showButtons: ["previous", "next", "close"],
       disableButtons: STORY_AT === 0 && BEAT === 0 ? ["previous"] : [],
-      prevBtnText: "Back",
+      prevBtnText: tr("Back"),
       showProgress: true,
       progressText: `${STORY_AT + 1} / ${STORY.length}`,
-      nextBtnText: last ? "Done" : "Next",
+      nextBtnText: tr(last ? "Done" : "Next"),
     },
   });
 }

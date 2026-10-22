@@ -743,3 +743,15 @@ body:not(.tech) #operator-view {
 @media (prefers-reduced-motion: reduce) {
   .dots span { animation: none; }
 }
+
+/* Japanese UI (i18n.js): Space carries Latin glyphs alone, so each OS's Japanese family follows it. */
+body:lang(ja),
+.button:lang(ja),
+.driver-popover.cement-pop:lang(ja) {
+  font-family: Space, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", Meiryo,
+    "Noto Sans CJK JP", "Noto Sans JP", sans-serif;
+}
+/* A narrow bubble would otherwise split 使用 between its two characters. */
+.tool-call summary:lang(ja) {
+  word-break: keep-all;
+}
