@@ -51,8 +51,34 @@ def reset() -> demo.Session:
     with _state_lock:
         if _session is not None:
             _session.close()
+        for kept in _checkpoints.values():
+            kept.close()
+        _checkpoints.clear()
         _session = demo.Session(seed=_seed)
         return _session
+
+
+# Story Back (p86): one detached copy per finished story step, so Back restores instead of replaying.
+_checkpoints: dict[str, demo.Session] = {}
+
+
+def checkpoint(key: str) -> None:
+    copy = session().clone()
+    with _state_lock:
+        if key in _checkpoints:
+            _checkpoints[key].close()
+        _checkpoints[key] = copy
+
+
+def restore(key: str) -> None:
+    global _session
+    with _state_lock:
+        if key not in _checkpoints:
+            raise KeyError(f"no checkpoint for story step {key}")
+        fresh = _checkpoints[key].clone()
+        if _session is not None:
+            _session.close()
+        _session = fresh
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -151,6 +177,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 str(body["operation"]) if body.get("operation") else None,
             ),
             "/api/reset": lambda body: reset(),
+            "/api/checkpoint": lambda body: checkpoint(str(body["key"])),
+            "/api/restore": lambda body: restore(str(body["key"])),
         }
         action = actions.get(path)
         if action is None:

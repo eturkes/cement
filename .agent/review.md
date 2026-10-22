@@ -21,6 +21,16 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p86 close (MAINTAIN queue run, owner ruling, tier `docs` — PROTOTYPE law) — target = the commit landing this section
+
+Check set: R1 Back restores a per-step snapshot of ledger + session; R2 Back across the third learn step < 500 ms; R3 state string after Back + forward equals the forward pass. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | checkpoint = `Session.clone()` per finished step (SQLite backup + deep copy); restore swaps in a copy; reset clears; replay remains the fallback. |
+| R2 | acceptance | pass | 7 → 6 (third learn step) 50 ms; 8 → 7 51 ms. |
+| R3 | acceptance | pass | both crossings: state after Back = forward state of the target step; after Back + forward = forward state again (fields STORY_AT, AI count, function count, switched-on count, chat length). |
+
 ## p30 close (MAINTAIN queue run, unit, tier `kernel`) — target = the commit landing this section
 
 Check set: R1 the wrap asserts the transaction state before delegation; R2 one successful result; R3 credential. MAIN alone.

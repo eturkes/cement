@@ -82,7 +82,8 @@ async function call(path, body) {
   INFLIGHT.add(abort);
   BUSY = true;
   render();
-  if (path !== "/api/reset") startPolling();
+  if (path === "/api/reset") CHECKPOINTS.clear(); // the server drops its checkpoints too
+  else startPolling();
   try {
     const options = body === undefined
       ? { signal: abort.signal }
@@ -944,8 +945,11 @@ function nextBeat() {
   else leaveStory();
 }
 
-/* Back inside a step = the previous beat. Across steps = reset + replay up to the previous
-   step (deterministic scripts + seeded latencies ⇒ the same state), then its last beat. */
+/* Back inside a step = the previous beat. Across steps = restore the server's checkpoint of the
+   previous step (p86); without one, reset + replay up to it (deterministic scripts + seeded
+   latencies ⇒ the same state). Then its last beat. */
+const CHECKPOINTS = new Set();
+
 async function prevBeat() {
   if (BUSY) return;
   if (BEAT > 0) { BEAT -= 1; showBeat(); return; }
@@ -954,6 +958,14 @@ async function prevBeat() {
   if (TOUR && TOUR.isActive()) TOUR.destroy();
   RUN += 1;
   const run = RUN;
+  if (CHECKPOINTS.has(target) && await call("/api/restore", { key: String(target) })) {
+    if (run !== RUN) return;
+    STORY_AT = target;
+    BEAT = STORY[target].beats.length - 1;
+    showBeat();
+    document.body.dataset.sceneDone = String(target);
+    return;
+  }
   narrate("Going back…");
   FAST = true;
   try {
@@ -981,6 +993,7 @@ async function advanceStory(index) {
   narrate("…");
   if (step.run) await step.run();
   if (run !== RUN) return;
+  if (await call("/api/checkpoint", { key: String(index) })) CHECKPOINTS.add(index);
   showBeat();
   document.body.dataset.sceneDone = String(index);
 }

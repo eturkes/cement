@@ -16,12 +16,14 @@ so routing the chat through it would report startup cost as the function's cost.
 from __future__ import annotations
 
 from collections.abc import Callable
+from contextlib import closing
 import copy
 import hashlib
 import json
 from pathlib import Path
 import random
 import shlex
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -899,6 +901,32 @@ class Session:
         )
 
     # -- plumbing --
+
+    def clone(self) -> "Session":
+        """A detached copy for the story's Back (p86): its own ledger (SQLite backup) and a deep copy
+        of every plain field, the old ledger path rewritten to the copy's in recorded commands."""
+        with self._lock:
+            twin = Session.__new__(Session)
+            twin._lock = threading.RLock()
+            twin._closed = threading.Event()
+            twin._temporary = tempfile.TemporaryDirectory(prefix="cement-demo-")
+            twin.database = str(Path(twin._temporary.name) / "cement.db")
+            with closing(sqlite3.connect(self.database)) as source, closing(
+                sqlite3.connect(twin.database)
+            ) as target:
+                source.backup(target)
+            skip = {"_lock", "_closed", "_temporary", "database", "system"}
+            plain = {k: v for k, v in vars(self).items() if k not in skip}
+            copied = copy.deepcopy(plain)
+            for key in ("terminal", "log"):
+                copied[key] = json.loads(
+                    json.dumps(copied[key]).replace(
+                        json.dumps(self.database)[1:-1], json.dumps(twin.database)[1:-1]
+                    )
+                )
+            vars(twin).update(copied)
+            twin.system = System(twin.database, create=False)
+            return twin
 
     def close(self) -> None:
         self._closed.set()
