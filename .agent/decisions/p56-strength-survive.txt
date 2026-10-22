@@ -1,0 +1,12 @@
+REV: f1f00412ca12e4c42b71622a01ec849e867bb72f
+SELECTED: uv run python .agent/suite --omit-d28
+EXCLUDED: D28 (insensitive by construction: committed history, untouched by a working-tree weakening)
+CONTROL: OK ran=1314
+W1  survived  ran=1314  named-oracle=no  tests/test_system.py:test_counterexample_and_revocation_quarantine
+W2  survived  ran=1314  named-oracle=no  tests/test_system.py:test_runtime_integrity_failure_quarantines_then_falls_back
+W3  survived  ran=1314  named-oracle=no  tests/test_system.py:test_operation_revision_retires_old_artifacts
+W4  survived  ran=1314  named-oracle=no  tests/test_proposal_binding_battery.py:test_b30_the_six_owned_event_payloads_are_2
+W5  survived  ran=1314  named-oracle=no  tests/test_submission_battery.py:test_d03_the_event_is_proposal_created_with
+W6  survived  ran=1314  named-oracle=no  examples/hospital_ocr/run_demo.py:main
+W7  survived  ran=1314  named-oracle=no  examples/hospital_ocr/run_demo.py:main
+RESULT: PASS

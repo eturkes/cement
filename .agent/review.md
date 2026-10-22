@@ -17,6 +17,18 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p56 close (MAINTAIN queue run, unit, tier `kernel`, two commits: `35411af` + this) — target = the commit landing this section
+
+Check set: R1 a committed campaign over the migrated assertions + demo verdicts; R2 every named-obligation mutant killed; R3 the three named survive-then-die cases; R4 premise re-derived at HEAD; R5 the oracle can fire and cannot pass vacuously. MAIN alone (advisor consulted on the design).
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | `p56-strength.py` + `.json` (7 rows) + outputs `p56-strength-{survive,die}.txt` committed. |
+| R2 | acceptance | pass | die half at `35411af`: 7/7 killed, each by its named oracle id (`named-oracle=yes` ×7). |
+| R3 | acceptance | pass | survive half at `35411af~1`: 7/7 survived the full suite minus D28 (CONTROL OK ran 1314) → die at `35411af`. |
+| R4 | correctness | pass | request-id payload pin gone at HEAD → family moved to the empty-payload equality pins (B30, submission D03); battery frozen to `dc4ab5e` → named obligation = the oracle test id; both stated in `35411af`'s body. |
+| R5 | integrity | pass | targets pass bare (asserted per row); kills come through the witness (a missing statement leaves no line, so the witness decides); wrong-oracle seed → rc 1. |
+
 ## p46 close (MAINTAIN queue run, unit, tier `data`) — target = the commit landing this section
 
 Check set: R1 one shared engine, each existing validator a schema; R2 old/new identical rc + unfilled count on every artifact; R3 blank seed rc 1, filled control rc 0; R4 harvest integrity. general-purpose-4 built; MAIN reran.

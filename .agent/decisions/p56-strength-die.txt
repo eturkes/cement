@@ -1,0 +1,18 @@
+REV: 35411af2cb3f7822eddacf87e42140d9773225ba
+SELECTED: uv run python -m unittest tests.test_assertion_strength
+CONTROL: OK ran=3
+W1  killed    ran=3  named-oracle=yes  tests/test_system.py:test_counterexample_and_revocation_quarantine
+      killer tests.test_assertion_strength.AssertionStrengthTests.test_a_quarantined_case_misses_by_its_matched_flag
+W2  killed    ran=3  named-oracle=yes  tests/test_system.py:test_runtime_integrity_failure_quarantines_then_falls_back
+      killer tests.test_assertion_strength.AssertionStrengthTests.test_a_quarantined_case_misses_by_its_matched_flag
+W3  killed    ran=3  named-oracle=yes  tests/test_system.py:test_operation_revision_retires_old_artifacts
+      killer tests.test_assertion_strength.AssertionStrengthTests.test_a_quarantined_case_misses_by_its_matched_flag
+W4  killed    ran=3  named-oracle=yes  tests/test_proposal_binding_battery.py:test_b30_the_six_owned_event_payloads_are_2
+      killer tests.test_assertion_strength.AssertionStrengthTests.test_the_proposal_created_payload_is_pinned_empty_by_equality
+W5  killed    ran=3  named-oracle=yes  tests/test_submission_battery.py:test_d03_the_event_is_proposal_created_with
+      killer tests.test_assertion_strength.AssertionStrengthTests.test_the_proposal_created_payload_is_pinned_empty_by_equality
+W6  killed    ran=3  named-oracle=yes  examples/hospital_ocr/run_demo.py:main
+      killer tests.test_assertion_strength.AssertionStrengthTests.test_the_demo_pins_flat_model_calls_by_equality_on_each_hit
+W7  killed    ran=3  named-oracle=yes  examples/hospital_ocr/run_demo.py:main
+      killer tests.test_assertion_strength.AssertionStrengthTests.test_the_demo_pins_flat_model_calls_by_equality_on_each_hit
+RESULT: PASS
