@@ -29,7 +29,7 @@
       "test": "test_d22c_the_opening_text_handle_request_fence_is_protected_and"
     }
   ],
-  "head": "52a846be0c8a4c86c20f851974571582b978f225",
+  "head": "00dc010a03edd8082cc35fd5bc111f0e332643c1",
   "pins": [
     {
       "lines": 76,
@@ -331,13 +331,63 @@
         }
       ],
       "owner": "M5.3"
+    },
+    {
+      "document": "examples/nucllei/README.md",
+      "grounds": "chat requests describe the nucllei skill example, not the deleted lifecycle",
+      "hit_lines": 7,
+      "hits": [
+        {
+          "text": "| `skills/cement.md` | The skill `cement` | The chat model, for each request of a Cement operation |",
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "text": "therefore learns from the requests of one user, and each user switches their own functions on.",
+          "tokens": [
+            "requests"
+          ]
+        },
+        {
+          "text": "When a switched-on function covers a request, the output that the model receives is the output",
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "text": "A request that no function covers goes to the model, as before. Cement learns only from the",
+          "tokens": [
+            "request"
+          ]
+        },
+        {
+          "text": "name, the requests that it covers and the exact shape of its input and output. Then add those",
+          "tokens": [
+            "requests"
+          ]
+        },
+        {
+          "text": "requests to the description of the skill, so that the model loads the skill for them. Cement",
+          "tokens": [
+            "requests"
+          ]
+        },
+        {
+          "text": "| `record <ticket> [--request <text>]` | Retains the output for the input of the ticket. | `cement` |",
+          "tokens": [
+            "request"
+          ]
+        }
+      ],
+      "owner": "MAINTAIN nucllei"
     }
   ],
   "totals": {
     "pins": 15,
     "pins_working_tree": 12,
     "prose_documents_owned": 4,
-    "prose_hit_lines": 16
+    "prose_hit_lines": 23
   },
   "unit": "M3.6a2",
   "vocabulary": "\\bhandle\\b|request_status|retry_failed|invalidated_generators|resolved_by_artifact|\\brequests?\\b|\\blease\\b|in_progress|fallback_failed|reconciliation_required|[Aa]mbigu\\w*"

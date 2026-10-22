@@ -1,0 +1,894 @@
+"""`/ext/bin/cement`: Cement for one nucllei user, run by the chat model through `run_shell`.
+
+The nucllei sandbox jail has no network, a read-only root and one persistent `/workspace` per
+user, and llens keeps patient data in that workspace alone, so each user's ledger lives there
+(`CEMENT_HOME`, default `/workspace/.cement`). The model reads every line this command prints:
+the text is Japanese in llens style, a refusal reads `中止: <fact>`, and the last line names the
+next step after `次の手:`. `generate.py` embeds `cement_runtime` and writes `ext/bin/cement`.
+"""
+
+from __future__ import annotations
+
+import argparse
+import dataclasses
+import datetime
+import json
+import os
+import pathlib
+import re
+import secrets
+import sys
+import time
+from collections.abc import Callable
+from typing import Any
+
+from cement_runtime import (
+    Candidate,
+    CementError,
+    ConflictError,
+    IntegrityError,
+    NotFoundError,
+    StateError,
+    System,
+    ValidationError,
+)
+from cement_runtime.function import evaluate
+from cement_runtime.json_value import canonicalize
+from cement_runtime.projection import draft_program
+from cement_runtime.system import PROVENANCE_MAX_BYTES
+
+COMMAND = "/ext/bin/cement"
+HOME = "/workspace/.cement"
+PARTITION = "nucllei"
+CHAT = "nucllei-chat"
+REVIEWER = "learning-pass"
+PERSON = "nucllei-user"
+PAGE = 1_000
+TICKET = re.compile(r"t_[0-9a-f]{16}")
+TICKET_TTL_US = 24 * 3600 * 1_000_000
+# A regenerated reply looks up and records the same input again within minutes; nucllei gives
+# the jail no chat or message id that could tell it from a genuine repeat.
+REGENERATION_US = 10 * 60 * 1_000_000
+REASONS = {
+    "absent": "学習済みの版がまだ無い",
+    "off": "関数がオフ",
+    "failed": "関数の検証が通らなかった",
+    "unrecognized": "関数にこの入力の場合が無い",
+}
+PUBLISH_REASONS = {
+    "failed": "下書きの検証が通らなかった",
+    "empty": "確認が 2 件そろった場合がまだ無い",
+    "same": "最新の版が既に同じ中身を持つ",
+}
+NEXT = {
+    2: "次の手: 引数か入力を直して流し直す。",
+    3: "次の手: 名前・番号・控えを確かめて流し直す。",
+    4: "次の手: 1 回だけ流し直す。続くなら、中止したことをユーザーに伝える。",
+    5: "次の手: 流し直さない。Cement の台帳が壊れているとユーザーに伝える。",
+}
+
+
+class _RefusalError(Exception):
+    def __init__(self, status: int, fact: str, next_step: str | None = None) -> None:
+        super().__init__(fact)
+        self.status = status
+        self.next_step = next_step or NEXT[status]
+
+
+def _clock_us() -> int:
+    return time.time_ns() // 1_000
+
+
+def _status(exc: CementError) -> int:
+    if isinstance(exc, NotFoundError):
+        return 3
+    if isinstance(exc, (ConflictError, StateError)):
+        return 4
+    return 5 if isinstance(exc, IntegrityError) else 2
+
+
+def _say(*lines: str) -> None:
+    sys.stdout.write("\n".join(lines) + "\n")
+
+
+def _json(value: object) -> str:
+    return json.dumps(value, ensure_ascii=False, indent=2)
+
+
+def _plain(value: object) -> object:
+    if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        return dataclasses.asdict(value)
+    return value
+
+
+def _same(left: object, right: object) -> bool:
+    return canonicalize(left).digest == canonicalize(right).digest
+
+
+def _when(microseconds: int) -> str:
+    moment = datetime.datetime.fromtimestamp(microseconds / 1_000_000).astimezone()
+    return moment.strftime("%Y-%m-%d %H:%M")
+
+
+# -- the user's place --------------------------------------------------------
+
+
+def _home() -> pathlib.Path:
+    return pathlib.Path(os.environ.get("CEMENT_HOME") or HOME)
+
+
+def _system() -> System:
+    """The existing ledger; only `use` creates one."""
+
+    if not (_home() / "ledger.db").is_file():
+        raise _RefusalError(3, "Cement の台帳がまだ無い (まだ何も記録していない)。")
+    return System(_home() / "ledger.db", create=False, clock_us=_clock_us)
+
+
+def _write(path: pathlib.Path, value: object) -> None:
+    # One whole file or none: a crash mid-write must not leave a ticket that record misreads.
+    temporary = path.with_name(f".{path.name}.{secrets.token_hex(4)}")
+    temporary.write_text(json.dumps(value, ensure_ascii=False), encoding="utf-8")
+    os.replace(temporary, path)
+
+
+def _state() -> dict[str, Any]:
+    try:
+        state = json.loads((_home() / "state.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return state if isinstance(state, dict) else {}
+
+
+def _projectable_state(operation: str) -> bool | None:
+    known = _state().get("projectable")
+    value = known.get(operation) if isinstance(known, dict) else None
+    return value if isinstance(value, bool) else None
+
+
+def _remember(operation: str, projectable: bool) -> None:
+    state = _state()
+    known = state.get("projectable")
+    state["projectable"] = (known if isinstance(known, dict) else {}) | {operation: projectable}
+    _write(_home() / "state.json", state)
+
+
+def _read(path: str | None) -> str:
+    if path is None:
+        return sys.stdin.read()
+    try:
+        return pathlib.Path(path).read_text(encoding="utf-8")
+    except (OSError, ValueError) as exc:
+        raise _RefusalError(2, f"ファイル {path} を読めない ({exc.__class__.__name__})。") from None
+
+
+def _parse(text: str, what: str) -> object:
+    try:
+        value = json.loads(text)
+    except ValueError:
+        raise _RefusalError(2, f"{what}が JSON でない。") from None
+    try:
+        canonicalize(value)
+    except ValidationError as exc:
+        raise _RefusalError(2, f"{what}が Cement の JSON の形でない ({exc})。") from None
+    return value
+
+
+# -- reading the ledger ------------------------------------------------------
+
+
+def _versions(system: System, operation: str, *, check: bool = False) -> list[Any]:
+    """Every version, newest first: version N = the N-th promotion, so a number never moves."""
+
+    versions: list[Any] = []
+    before = None
+    while True:
+        page = system.function_versions(
+            PARTITION, operation, before_sequence=before, limit=PAGE, check=check
+        )
+        versions += page.versions
+        if page.next_before_sequence is None:
+            return versions
+        before = page.next_before_sequence
+
+
+def _number(versions: list[Any], function_hash: str | None) -> int | None:
+    for index, version in enumerate(versions):
+        if version.receipt.function_hash == function_hash:
+            return len(versions) - index
+    return None
+
+
+def _version(versions: list[Any], number: int) -> Any:
+    if not 1 <= number <= len(versions):
+        raise _RefusalError(3, f"版 {number} は無い (版は 1 から {len(versions)})。")
+    return versions[len(versions) - number]
+
+
+def _proposals(system: System, operation: str) -> list[dict[str, Any]]:
+    found: list[dict[str, Any]] = []
+    after = 0
+    while True:
+        rows = system.proposals(PARTITION, status="all", after_sequence=after, limit=PAGE)
+        found += [row for row in rows if row["operation"] == operation]
+        if len(rows) < PAGE:
+            return sorted(found, key=lambda row: (row["created_at_us"], row["id"]))
+        after = int(rows[-1]["sequence"])
+
+
+def _suspects(system: System, operation: str) -> set[str]:
+    """Pending proposals recorded within minutes of an earlier one with the same input."""
+
+    last: dict[str, int] = {}
+    suspects: set[str] = set()
+    for row in _proposals(system, operation):
+        digest = canonicalize(row["input"]).digest
+        earlier = last.get(digest)
+        if (
+            row["status"] == "pending"
+            and earlier is not None
+            and row["created_at_us"] - earlier <= REGENERATION_US
+        ):
+            suspects.add(str(row["id"]))
+        last[digest] = row["created_at_us"]
+    return suspects
+
+
+def _inputs(system: System, operation: str, *, pending: bool) -> list[object]:
+    """Raw inputs of the active examples, plus the current pending proposals when asked."""
+
+    revision = system.learning_cases(PARTITION, operation)["operation_revision"]
+    found: list[object] = []
+    after = 0
+    while True:
+        page = system.examples(PARTITION, operation, after_sequence=after, limit=PAGE)
+        found += [
+            row["input"]
+            for row in page
+            if row["superseded_by"] is None and row["operation_revision"] == revision
+        ]
+        if len(page) < PAGE:
+            break
+        after = int(page[-1]["sequence"])
+    after = 0
+    while pending:
+        rows = system.proposals(PARTITION, status="pending", after_sequence=after, limit=PAGE)
+        found += [
+            row["input"]
+            for row in rows
+            if row["operation"] == operation and row["operation_revision"] == revision
+        ]
+        if len(rows) < PAGE:
+            break
+        after = int(rows[-1]["sequence"])
+    return found
+
+
+def _cases(system: System, operation: str, projectable: bool) -> dict[str, Any]:
+    if not projectable:
+        return system.learning_cases(PARTITION, operation)
+    program = draft_program(_inputs(system, operation, pending=True))
+    return system.learning_cases(PARTITION, operation, program=program) | {"program": program}
+
+
+def _newest(system: System, operation: str) -> Any:
+    versions = _versions(system, operation)
+    if not versions:
+        return None
+    return system.reconstruct_function_receipt(PARTITION, versions[0].receipt.id).document
+
+
+def _learnable(system: System, operation: str, proposal_id: str, output: object) -> int:
+    """Count of the new proposal's case when a learning pass would change something, else 0."""
+
+    suspects = _suspects(system, operation)
+    if proposal_id in suspects:
+        return 0
+    record = system.proposal(PARTITION, proposal_id)
+    newest = _newest(system, operation)
+    if newest is not None:
+        match = evaluate(newest, input_json=canonicalize(record["input"]))
+        if match.matched and _same(match.output, output):
+            return 0
+    (registered,) = [row for row in system.operations(PARTITION) if row["name"] == operation]
+    minimum = int(registered["policy"]["min_confirmations"])
+    groupings: list[object] = [None]
+    if _projectable_state(operation) is not False:
+        try:
+            groupings.append(draft_program(_inputs(system, operation, pending=True)))
+        except ValidationError:
+            pass
+    for program in groupings:
+        for case in system.learning_cases(PARTITION, operation, program=program)["cases"]:
+            if proposal_id in case["pending_proposal_ids"]:
+                count = len(case["active_example_ids"]) + sum(
+                    1 for p in case["pending_proposal_ids"] if p not in suspects
+                )
+                if count >= minimum:
+                    return count
+    return 0
+
+
+# -- chat: use + record ------------------------------------------------------
+
+
+def _registered(system: System, operation: str) -> None:
+    if all(row["name"] != operation for row in system.operations(PARTITION)):
+        try:
+            system.register_operation(PARTITION, operation, registered_by=CHAT)
+        except ConflictError:
+            pass  # another run registered it first
+
+
+def _lookup(system: System, operation: str, value: object) -> tuple[str, object, int | None]:
+    resolution = system.resolve(PARTITION, operation, value)
+    verification = resolution.verification
+    versions = _versions(system, operation)
+    if not versions:
+        return "absent", None, None
+    if resolution.switch.mode == "off" or verification is None:
+        return "off", None, None
+    if not verification.passed:
+        return "failed", None, None
+    if verification.entries == 0:
+        return "absent", None, None
+    match = resolution.match
+    if match is not None and match.matched:
+        return "hit", match.output, _number(versions, verification.function_hash)
+    return "unrecognized", None, None
+
+
+def _prune(tickets: pathlib.Path, now: int) -> None:
+    for path in tickets.glob("t_*.json"):
+        try:
+            used = json.loads(path.read_text(encoding="utf-8"))["used_at_us"]
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+        if isinstance(used, int) and now - used > TICKET_TTL_US:
+            path.unlink(missing_ok=True)
+
+
+def _use(args: argparse.Namespace) -> int:
+    text = _read(args.input_file)
+    value = {args.field: text.rstrip("\n")} if args.field else _parse(text, "入力")
+    if args.field:
+        _parse(json.dumps(value), "入力")
+    try:
+        _home().mkdir(parents=True, exist_ok=True)
+        system = System(_home() / "ledger.db", clock_us=_clock_us)
+        _registered(system, args.operation)
+        reason, output, number = _lookup(system, args.operation, value)
+    except ValidationError as exc:
+        raise _RefusalError(2, str(exc)) from None
+    except CementError as exc:
+        # The chat never fails because Cement did: the model answers, and nothing is retained.
+        _say(
+            f"中止: Cement が使えない ({exc})。",
+            "次の手: Cement を使わずに自分で答える。record は流さない。",
+        )
+        return _status(exc)
+    if reason == "hit":
+        _say(
+            f"学習済みの関数が答えた ({args.operation} の版 {number})。",
+            "出力:",
+            _json(output),
+            "次の手: この出力をそのまま使って返答を書く。record は流さない。",
+        )
+        return 0
+    now = _clock_us()
+    tickets = _home() / "tickets"
+    tickets.mkdir(exist_ok=True)
+    _prune(tickets, now)
+    ticket = f"t_{secrets.token_hex(8)}"
+    _write(
+        tickets / f"{ticket}.json",
+        {"operation": args.operation, "input": value, "used_at_us": now},
+    )
+    _say(
+        f"学習済みの関数はこの頼みに答えない ({REASONS[reason]})。",
+        f"控え: {ticket}",
+        "次の手: 自分で答えの出力を作る。返答を書く前に、その出力 (JSON) を"
+        f" {COMMAND} record {ticket} に渡して記録する。",
+    )
+    return 0
+
+
+def _provenance(ticket: str, used_at_us: int, request: str | None) -> dict[str, Any]:
+    """The ticket and the user's request, or the request's longest start within the bound."""
+
+    base: dict[str, Any] = {"ticket": ticket, "used_at_us": used_at_us}
+    if request is None:
+        return base | {"request": None, "request_truncated": False}
+
+    def fits(length: int) -> bool:
+        candidate = base | {"request": request[:length], "request_truncated": length < len(request)}
+        try:
+            canonicalize(candidate, max_bytes=PROVENANCE_MAX_BYTES)
+        except ValidationError:
+            return False
+        return True
+
+    if fits(len(request)):
+        return base | {"request": request, "request_truncated": False}
+    low, high = 0, len(request)  # fits(low) holds; fits(high) does not
+    while high - low > 1:
+        middle = (low + high) // 2
+        low, high = (middle, high) if fits(middle) else (low, middle)
+    return base | {"request": request[:low], "request_truncated": True}
+
+
+def _record(args: argparse.Namespace) -> int:
+    if not TICKET.fullmatch(args.ticket):
+        raise _RefusalError(
+            2, f"控え {args.ticket!r} の形が違う (use が出した t_ で始まる控えを渡す)。"
+        )
+    path = _home() / "tickets" / f"{args.ticket}.json"
+    try:
+        held = json.loads(path.read_text(encoding="utf-8"))
+        operation, value, used = held["operation"], held["input"], held["used_at_us"]
+    except FileNotFoundError:
+        raise _RefusalError(
+            3,
+            f"控え {args.ticket} が無い (記録済みか、24 時間を過ぎた)。",
+            "次の手: 記録は済んだものとして返答を書く。",
+        ) from None
+    except (OSError, ValueError, KeyError, TypeError):
+        raise _RefusalError(
+            5, f"控え {args.ticket} が読めない。", "次の手: 記録せずに返答を書く。"
+        ) from None
+    output = _parse(_read(args.output_file), "出力")
+    system = _system()
+    try:
+        proposal_id = system.submit_proposal(
+            PARTITION,
+            operation,
+            value,
+            candidate=Candidate(
+                output=output, provenance=_provenance(args.ticket, used, args.request)
+            ),
+            source_id=f"nucllei:{args.ticket}",
+        )
+    except ConflictError:
+        path.unlink(missing_ok=True)
+        _say(f"控え {args.ticket} は記録済み。", "次の手: 返答を書く。")
+        return 0
+    path.unlink(missing_ok=True)
+    try:
+        count = _learnable(system, operation, proposal_id, output)
+    except CementError:
+        count = 0  # the proposal is retained; a later record or a requested pass learns it
+    if count:
+        _say(
+            f"記録した ({operation} の提案 {proposal_id})。同じ場合の答えが {count} 件そろった。",
+            "次の手: 返答を書く前に load_skill で cement-learn を読み込み、"
+            f"{operation} の学習を済ませる。",
+        )
+    else:
+        _say(f"記録した ({operation} の提案 {proposal_id})。", "次の手: 返答を書く。")
+    return 0
+
+
+# -- learning pass -----------------------------------------------------------
+
+
+def _flag(text: str) -> bool:
+    return text == "yes"
+
+
+def _learn(args: argparse.Namespace) -> int:
+    system = _system()
+    projectable = _flag(args.projectable)
+    try:
+        work = _cases(system, args.operation, projectable)
+    except ValidationError as exc:
+        raise _RefusalError(
+            2,
+            f"用紙の形でまとめられない ({exc})。",
+            "次の手: --projectable no で一覧を出し直す。",
+        ) from None
+    suspects = _suspects(system, args.operation)
+    cases = [
+        {
+            "key": case["key"],
+            "key_hash": case["key_hash"],
+            "support": case["support"],
+            "pending_proposal_ids": case["pending_proposal_ids"],
+            "active_example_ids": case["active_example_ids"],
+            "regeneration_suspects": [p for p in case["pending_proposal_ids"] if p in suspects],
+            "outputs": case["outputs"],
+        }
+        for case in work["cases"]
+    ]
+    shown: dict[str, Any] = {
+        "operation": args.operation,
+        "grouped_by": work["grouped_by"],
+        "nothing_to_learn": work["nothing_to_learn"],
+        "cases": cases,
+        "unprojected": work["unprojected"],
+        "stale_pending_proposal_ids": work["stale_pending_proposal_ids"],
+    }
+    if projectable:
+        shown["layouts"] = [layout["title"] for layout in work["program"]["layouts"]]
+    grouping = "用紙の形" if projectable else "入力そのもの"
+    _say(f"{args.operation} の学習の作業一覧 (まとめ方: {grouping})。", _json(shown))
+    return 0
+
+
+def _show(args: argparse.Namespace) -> int:
+    record = _system().proposal(PARTITION, args.proposal_id)
+    shown = {
+        key: record[key]
+        for key in ("id", "operation", "status", "input", "proposed_output", "provenance")
+    }
+    _say(f"提案 {args.proposal_id}。", _json(shown))
+    return 0
+
+
+def _ids(text: str | None) -> list[str]:
+    return [part.strip() for part in (text or "").split(",") if part.strip()]
+
+
+def _merge(args: argparse.Namespace) -> int:
+    proposals, examples = _ids(args.proposals), _ids(args.examples)
+    if not proposals and not examples:
+        raise _RefusalError(2, "--proposals か --examples で 1 つの場合の id を渡していない。")
+    if len(set(proposals)) != len(proposals) or len(set(examples)) != len(examples):
+        raise _RefusalError(2, "同じ id を 2 回渡している。")
+    output = _parse(_read(args.output_file), "まとめた出力")
+    projectable = _flag(args.projectable)
+    system = _system()
+    cases = _cases(system, args.operation, projectable)["cases"]
+    owner = [
+        case
+        for case in cases
+        if set(proposals) <= set(case["pending_proposal_ids"])
+        and set(examples) <= set(case["active_example_ids"])
+    ]
+    if len(owner) != 1:
+        raise _RefusalError(2, "渡した id は 1 つの場合の未確認の提案・確認済みの例ではない。")
+    # The case already lists every output with its examples; a paged read could miss one.
+    outputs = {
+        example: entry["output"]
+        for entry in owner[0]["outputs"]
+        for example in entry["example_ids"]
+    }
+    note = f"{args.note} (nucllei)"
+    done: dict[str, Any] = {
+        "key_hash": owner[0]["key_hash"],
+        "reviewed": [],
+        "superseded_example_ids": [],
+        "new_example_ids": [],
+    }
+    try:
+        for proposal_id in proposals:
+            proposed = system.proposal(PARTITION, proposal_id)["proposed_output"]
+            extra = {} if _same(proposed, output) else {"corrected_output": output}
+            result = system.review(
+                PARTITION,
+                proposal_id,
+                reviewer=REVIEWER,
+                decision="correct" if extra else "accept",
+                note=note,
+                **extra,
+            )
+            done["reviewed"].append({"proposal_id": proposal_id, "status": result.status})
+        differing = [example for example in examples if not _same(outputs[example], output)]
+        if differing:
+            created = system.supersede_examples(
+                PARTITION,
+                args.operation,
+                example_ids=differing,
+                output=output,
+                reviewer=REVIEWER,
+                note=note,
+            )
+            done["superseded_example_ids"] = differing
+            done["new_example_ids"] = list(created)
+    except CementError as exc:
+        # Each write commits alone, so a later refusal must not hide the earlier ones.
+        _say(
+            f"中止: 途中で止まった ({exc})。ここまでに書いたもの:", _json(done), NEXT[_status(exc)]
+        )
+        return _status(exc)
+    # Only a pass that wrote rules on projectability; a refused or confused one rules nothing.
+    _remember(args.operation, projectable)
+    _say("場合をまとめた。", _json(done))
+    return 0
+
+
+def _reject(args: argparse.Namespace) -> int:
+    result = _system().review(
+        PARTITION,
+        args.proposal_id,
+        reviewer=REVIEWER,
+        decision="reject",
+        note=f"{args.note} (nucllei)",
+    )
+    _say(f"提案 {args.proposal_id} を退けた ({result.status})。")
+    return 0
+
+
+def _revoke(args: argparse.Namespace) -> int:
+    suspended = _system().revoke_example(
+        PARTITION, args.example_id, revoked_by=REVIEWER, reason=f"{args.reason} (nucllei)"
+    )
+    _say(
+        f"例 {args.example_id} を取り下げた。これに頼る版は答えなくなる。",
+        _json({"suspended_artifact_ids": list(suspended)}),
+    )
+    return 0
+
+
+def _publish(args: argparse.Namespace) -> int:
+    projectable = _flag(args.projectable)
+    system = _system()
+    operation = args.operation
+    layouts: list[str] = []
+    confirmed = _inputs(system, operation, pending=False) if projectable else []
+    if projectable and not confirmed:
+        # No merge confirmed anything yet: a program over no documents would only be refused.
+        _say(
+            f"版を作らなかった ({PUBLISH_REASONS['empty']})。",
+            "次の手: 学習の結果をそのまま報告する。",
+        )
+        return 0
+    if projectable:
+        program = draft_program(confirmed)
+        system.set_projection(PARTITION, operation, program, actor=REVIEWER)
+        layouts = [str(layout["title"]) for layout in program["layouts"]]
+    system.compile(PARTITION, operation, compiled_by=REVIEWER)
+    drafts = system.verify_drafts(PARTITION, operation, verified_by=REVIEWER)
+    manifest = system.inspect_function_promotion(PARTITION, operation)
+    before = _versions(system, operation)
+    reason = (
+        "failed"
+        if not drafts.passed
+        else "empty"
+        if not manifest.entries
+        else "same"
+        if before and manifest.function_hash == before[0].receipt.function_hash
+        else None
+    )
+    if reason == "same":
+        _remember(operation, projectable)
+    if reason is not None:
+        _say(
+            f"版を作らなかった ({PUBLISH_REASONS[reason]})。",
+            "次の手: 学習の結果をそのまま報告する。",
+        )
+        return 0
+    system.promote_function(
+        PARTITION, operation, expected_function_hash=manifest.function_hash, promoted_by=REVIEWER
+    )
+    _remember(operation, projectable)
+    versions = _versions(system, operation)
+    serving = versions[0].selected
+    lines = [
+        (
+            f"新しい版を作った: {operation} の版 {len(versions)} (場合 {len(manifest.entries)} 件、"
+            f"{manifest.function_hash[:12]})。"
+        )
+    ]
+    if layouts:
+        lines.append(f"用紙の形: {'、'.join(layouts)} (同じ形なら同じ手順で読める、という前提)。")
+    lines.append(
+        "スイッチが最新の版に追従しているので、この版がすぐに答える。"
+        if serving
+        else "この版は、ユーザーが /cement-switch でオンにするまで答えない。"
+    )
+    _say(*lines)
+    return 0
+
+
+def _list_versions(args: argparse.Namespace) -> int:
+    system = _system()
+    versions = _versions(system, args.operation, check=True)
+    _say(
+        f"{args.operation} の版 (新しい順):",
+        *_version_lines(versions),
+        _switch_line(system, args.operation, versions),
+    )
+    return 0
+
+
+def _version_lines(versions: list[Any]) -> list[str]:
+    lines = []
+    for index, version in enumerate(versions):
+        receipt = version.receipt
+        notes = [
+            f"場合 {receipt.member_count} 件",
+            _when(receipt.promoted_at_us),
+            receipt.function_hash[:12],
+        ]
+        if version.selected:
+            notes.append("いま答えている")
+        if version.servable is False:
+            notes.append("検証が通らない")
+        lines.append(f"- 版 {len(versions) - index}: {'、'.join(notes)}")
+    return lines or ["- まだ版が無い"]
+
+
+def _switch_line(system: System, operation: str, versions: list[Any]) -> str:
+    state = system.switch(PARTITION, operation)
+    if state.mode == "off":
+        return "スイッチ: オフ (この種類の頼みにはモデルが答える)。"
+    if state.mode == "follow":
+        return "スイッチ: オン (最新の版に追従)。"
+    return f"スイッチ: 版 {_number(versions, state.function_hash)} に固定。"
+
+
+def _diff(args: argparse.Namespace) -> int:
+    system = _system()
+    versions = _versions(system, args.operation)
+    old, new = _version(versions, args.old), _version(versions, args.new)
+    diff = system.diff_versions(
+        PARTITION,
+        args.operation,
+        from_hash=old.receipt.function_hash,
+        to_hash=new.receipt.function_hash,
+    )
+    _say(
+        f"{args.operation} の版 {args.old} → 版 {args.new}: 足した場合 {len(diff.added)} 件、"
+        f"消えた場合 {len(diff.removed)} 件、出力が変わった場合 {len(diff.changed)} 件、"
+        f"用紙の形の読み方は{'変わった' if diff.projection_changed else '同じ'}。"
+    )
+    return 0
+
+
+def _read_version(args: argparse.Namespace) -> int:
+    system = _system()
+    versions = _versions(system, args.operation)
+    if not versions:
+        raise _RefusalError(3, f"{args.operation} にはまだ版が無い。")
+    number = args.version or len(versions)
+    receipt = _version(versions, number).receipt
+    document = system.reconstruct_function_receipt(PARTITION, receipt.id).document
+    lines = [
+        (
+            f"{args.operation} の版 {number} の中身 (場合 {len(document.entries)} 件、"
+            f"{receipt.function_hash[:12]})。"
+        ),
+        (
+            "Cement が持つのは、決まった入力と出力の組だけ (コードではない)。"
+            "どの場合にも当たらない入力にはモデルが答える。"
+        ),
+    ]
+    if document.projection is not None:
+        titles = [str(layout["title"]) for layout in document.projection.canonical.value["layouts"]]
+        lines.append(
+            f"用紙の形でまとめている: {'、'.join(titles)}。同じ形の用紙には同じ出力を返す"
+            " (同じ形なら同じ手順で読める、という前提)。"
+        )
+    keyed = " (用紙の形)" if document.projection is not None else ""
+    for index, entry in enumerate(document.entries, start=1):
+        lines += [
+            f"場合 {index}:",
+            f"  入力{keyed}: {json.dumps(entry.input.value, ensure_ascii=False)}",
+            f"  出力: {json.dumps(entry.output.value, ensure_ascii=False)}",
+        ]
+    _say(*lines)
+    return 0
+
+
+# -- the person's switch -----------------------------------------------------
+
+
+def _show_status(_args: argparse.Namespace) -> int:
+    system = _system()
+    lines = []
+    for row in system.operations(PARTITION):
+        versions = _versions(system, row["name"], check=True)
+        lines += [
+            f"{row['name']}:",
+            *_version_lines(versions),
+            _switch_line(system, row["name"], versions),
+        ]
+    _say(*(lines or ["まだ何も記録していない。"]))
+    return 0
+
+
+def _switch(args: argparse.Namespace) -> int:
+    system = _system()
+    versions = _versions(system, args.operation)
+    function_hash = None
+    if args.state == "pin":
+        if args.version is None:
+            raise _RefusalError(2, "pin には版の番号が要る (例: switch extraction_plan pin 2)。")
+        function_hash = _version(versions, args.version).receipt.function_hash
+    elif args.version is not None:
+        raise _RefusalError(2, "版の番号は pin のときだけ渡す。")
+    mode = {"off": "off", "follow": "follow", "pin": "pinned"}[args.state]
+    state = system.set_switch(
+        PARTITION, args.operation, mode=mode, actor=PERSON, function_hash=function_hash
+    )
+    if state.mode == "off":
+        _say(f"{args.operation} をオフにした。この種類の頼みにはモデルが答える。")
+    elif state.mode == "follow":
+        _say(f"{args.operation} をオンにした。最新の版 (いまは版 {len(versions)}) が答える。")
+    else:
+        _say(f"{args.operation} を版 {args.version} に固定した。後の学習で版が増えても変わらない。")
+    return 0
+
+
+# -- command line ------------------------------------------------------------
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog=COMMAND,
+        description="Cement for one nucllei user: learned functions in /workspace/.cement.",
+        allow_abbrev=False,
+    )
+    commands = parser.add_subparsers(dest="command", required=True)
+    projectable = {"choices": ("yes", "no"), "required": True}
+
+    def command(name: str, handler: Callable[[argparse.Namespace], int], text: str) -> Any:
+        sub = commands.add_parser(name, help=text, description=text, allow_abbrev=False)
+        sub.set_defaults(handler=handler)
+        return sub
+
+    use = command("use", _use, "answer one request from the switched-on function, or mint a ticket")
+    use.add_argument("operation")
+    use.add_argument("--field", help="read stdin as the text of this one input field")
+    use.add_argument("--input-file", help="read the input from this file instead of stdin")
+    record = command("record", _record, "retain the output that answered a ticket's request")
+    record.add_argument("ticket")
+    record.add_argument("--request", help="the user's request, as written")
+    record.add_argument("--output-file", help="read the output from this file instead of stdin")
+    learn = command("learn", _learn, "list the learning work of one operation")
+    learn.add_argument("operation")
+    learn.add_argument("--projectable", **projectable)
+    show = command("show", _show, "show one retained proposal")
+    show.add_argument("proposal_id")
+    merge = command("merge", _merge, "confirm the merged output of one case")
+    merge.add_argument("operation")
+    merge.add_argument("--projectable", **projectable)
+    # A model copies the flag of a case that has no ids of that kind, so a bare flag = no ids.
+    merge.add_argument(
+        "--proposals", nargs="?", const="", help="the case's pending proposal ids, comma-separated"
+    )
+    merge.add_argument(
+        "--examples", nargs="?", const="", help="the case's active example ids, comma-separated"
+    )
+    merge.add_argument("--note", required=True, help="what the merge kept or added")
+    merge.add_argument("--output-file", help="read the merged output from this file")
+    reject = command("reject", _reject, "reject one pending proposal")
+    reject.add_argument("proposal_id")
+    reject.add_argument("--note", required=True)
+    revoke = command("revoke", _revoke, "withdraw one wrong confirmed example")
+    revoke.add_argument("example_id")
+    revoke.add_argument("--reason", required=True)
+    publish = command("publish", _publish, "compile, verify and promote a new version")
+    publish.add_argument("operation")
+    publish.add_argument("--projectable", **projectable)
+    versions = command("versions", _list_versions, "list the versions of one operation")
+    versions.add_argument("operation")
+    diff = command("diff", _diff, "compare two versions by number")
+    diff.add_argument("operation")
+    diff.add_argument("old", type=int)
+    diff.add_argument("new", type=int)
+    read = command("read", _read_version, "show the cases of one version")
+    read.add_argument("operation")
+    read.add_argument("version", type=int, nargs="?")
+    command("status", _show_status, "show each operation's switch and versions")
+    switch = command("switch", _switch, "switch one operation off, on (follow) or to a version")
+    switch.add_argument("operation")
+    switch.add_argument("state", choices=("off", "follow", "pin"))
+    switch.add_argument("version", type=int, nargs="?")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
+    try:
+        return int(args.handler(args))
+    except _RefusalError as refusal:
+        _say(f"中止: {refusal}", refusal.next_step)
+        return refusal.status
+    except CementError as exc:
+        _say(f"中止: {exc}", NEXT[_status(exc)])
+        return _status(exc)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

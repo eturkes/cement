@@ -33,6 +33,7 @@ complete
 configured
 confirmed
 consistency
+container
 context
 contradicted
 contradicting
@@ -73,6 +74,7 @@ final
 finite
 first
 fixture
+form
 four
 full
 gate
@@ -130,6 +132,7 @@ pipe
 pipeline
 plan
 plans
+preset
 preview
 primary
 printed
@@ -160,6 +163,7 @@ root
 runtime
 safety
 same
+sandbox
 schema
 scripted
 scripts
@@ -187,6 +191,7 @@ supervisor
 table
 tasks
 three
+ticket
 tool
 transcript
 trusted
@@ -201,4 +206,5 @@ walkthrough
 wall
 wheel
 whole
+workspace
 write
