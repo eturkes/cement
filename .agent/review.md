@@ -17,6 +17,15 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## Owner rulings recorded (MAINTAIN queue run, closing question) — target = the commit landing this section
+
+Check set: R1 each ruled row carries its new status; R2 the approved survivor-scope rule is written where credit law lives. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | routed: p93 + p99-p115 (survivors, own MAINTAIN request), p32 + p33 (refactor request); queued: p35 p36 (later MAINTAIN session), p34 p37 p87-p90 (no selection); deferred grader PASS. |
+| R2 | acceptance | pass | `.claude/rules/assurance.md` `## Verification integrity` gains the survivor-scope rule (subject = diff lines / named subject function; outside = contract-open by construction). |
+
 ## p95 close (MAINTAIN queue run, owner ruling) — target = the commit landing this section
 
 Check set: R1 the owner ruling; R2 Decisions match the shipped header. MAIN alone.
