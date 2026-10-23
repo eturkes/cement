@@ -148,7 +148,9 @@ web page that you open can be a caller. An administrator token can run code on y
 earlier `local.py` started the instance without a login, the next start replaces the old password
 `admin`. Use the instance for tests on your own computer, not as a shared server.
 
-1. Install Open WebUI into `.open-webui/` once:
+1. Install Open WebUI into `.open-webui/` once. The command installs the packages that
+   `local-requirements.txt` lists, and it stops if the hash of a package differs from the hash
+   in that file:
 
    ```sh
    uv run python examples/open_webui/local.py setup

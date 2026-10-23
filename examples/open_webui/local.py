@@ -29,6 +29,9 @@ PASTE_IN = HERE / "paste-in"
 SKILL = HERE / "cement-learn" / "SKILL.md"
 DOCUMENTS = HERE.parent / "hospital_ocr" / "documents"
 OPEN_WEBUI = "open-webui==0.12.3"
+# Every package `OPEN_WEBUI` pulls in, pinned with its hashes; the file header names the command
+# that regenerates it after a bump.
+LOCK = HERE / "local-requirements.txt"
 # The official 0.12.3 image runs `python:3.11-slim-bookworm`.
 PYTHON = "3.11"
 PARTITION = "local"
@@ -309,8 +312,9 @@ def setup(directory: pathlib.Path) -> int:
     if not paths["python"].is_file():
         # Fixed arguments: uv creates the instance venv on the pinned interpreter.
         subprocess.run([uv, "venv", "--python", PYTHON, str(paths["venv"])], check=True)  # noqa: S603
-    subprocess.run(  # noqa: S603 — fixed arguments: uv installs one pinned package
-        [uv, "pip", "install", "--python", str(paths["python"]), OPEN_WEBUI], check=True
+    python = str(paths["python"])
+    subprocess.run(  # noqa: S603 — fixed arguments: uv installs the hash-pinned lock alone
+        [uv, "pip", "install", "--python", python, "--require-hashes", "-r", str(LOCK)], check=True
     )
     _write(f"Open WebUI is installed in {paths['venv']}. Cement is not: the paste-ins carry it.")
     return 0

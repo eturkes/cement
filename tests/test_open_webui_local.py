@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib.util
 import pathlib
+import re
 import tempfile
 import types
 import unittest
@@ -240,6 +241,33 @@ class LocalLauncherBattery(unittest.TestCase):
         with mock.patch.object(LOCAL.os, "killpg", lambda pid, sig: sent.append((pid, sig))):
             LOCAL._stop(Stubborn())
         self.assertEqual(sent, [(4242, signal.SIGTERM), (4242, signal.SIGKILL)])
+
+    def test_p128_setup_installs_the_hash_pinned_lock_alone(self) -> None:
+        directory = self.paths["venv"].parent / "fresh"
+        calls: list[list[str]] = []
+        with mock.patch.object(LOCAL.shutil, "which", return_value="/bin/uv"), \
+                mock.patch.object(LOCAL.subprocess, "run", lambda argv, **kwargs: calls.append(argv)):
+            self.assertEqual(LOCAL.setup(directory), 0)
+        python = str(directory / "venv" / "bin" / "python")
+        lock = str(EXAMPLE / "local-requirements.txt")
+        self.assertEqual(calls, [
+            ["/bin/uv", "venv", "--python", "3.11", str(directory / "venv")],
+            ["/bin/uv", "pip", "install", "--python", python, "--require-hashes", "-r", lock],
+        ])
+
+    def test_p128_the_lock_pins_the_target_and_hashes_every_package(self) -> None:
+        text = (EXAMPLE / "local-requirements.txt").read_text(encoding="utf-8")
+        _, _, body = text.partition("\n#    ")
+        command = body.splitlines()[0]
+        self.assertIn(f"echo {LOCAL.OPEN_WEBUI} | uv pip compile", command)
+        self.assertIn(f"--python-version {LOCAL.PYTHON} --universal --generate-hashes", command)
+        entries = re.split(r"(?m)^(?=[A-Za-z0-9])", body.partition("\n")[2])[1:]
+        self.assertGreater(len(entries), 1)
+        for entry in entries:
+            with self.subTest(entry=entry.split(" ", 1)[0]):
+                self.assertRegex(entry, r"^[A-Za-z0-9._-]+==[^ ;\\]+ ")
+                self.assertRegex(entry, r"--hash=sha256:[0-9a-f]{64}")
+        self.assertIn(f"\n{LOCAL.OPEN_WEBUI} \\\n", text)
 
     def test_w5_a_server_that_is_not_listening_yet_reads_as_not_ready(self) -> None:
         import socket
