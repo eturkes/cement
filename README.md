@@ -149,7 +149,7 @@ remain available for one artifact at a time in exact mode. Per-artifact promotio
 set check failing until you promote a set checkpoint. A live export then exits 6.
 
 `compile` creates drafts and never verifies or promotes them. In production, the learning pass runs
-these commands: see [The learning pass](#the-learning-pass).
+these commands: see [The learning pass](https://github.com/eturkes/cement#the-learning-pass).
 
 ### The function group
 
@@ -172,7 +172,7 @@ these commands: see [The learning pass](#the-learning-pass).
 
 Pass `--expected-function-hash` to `function verify` to pin the verified snapshot. The check then fails
 on set growth and on any other drift. That result is one read snapshot, not a lease. A later export can
-still see a different set. [docs/architecture.md](docs/architecture.md) names the seven checks in their
+still see a different set. [docs/architecture.md](https://github.com/eturkes/cement/blob/main/docs/architecture.md) names the seven checks in their
 returned order.
 
 A newly registered operation starts with its switch `off`, so `resolve` answers nothing until a
@@ -577,28 +577,28 @@ The root `verify` command does not use exit 6. It reports a failed verification 
 the exit status to get the verdict from the `function` commands in the table above. A script that
 changes between these two commands must change its verdict check at the same time.
 
-Read [examples/command_source/README.md](examples/command_source/README.md) for the optional command
+Read [examples/command_source/README.md](https://github.com/eturkes/cement/blob/main/examples/command_source/README.md) for the optional command
 candidate source and its protocol. Read
-[docs/architecture.md](docs/architecture.md) and [docs/threat-model.md](docs/threat-model.md) for the
+[docs/architecture.md](https://github.com/eturkes/cement/blob/main/docs/architecture.md) and [docs/threat-model.md](https://github.com/eturkes/cement/blob/main/docs/threat-model.md) for the
 full state model and trust boundaries.
 
 ## Examples
 
-- [Hospital OCR](examples/hospital_ocr/README.md): an offline walkthrough. Raw documents of three
+- [Hospital OCR](https://github.com/eturkes/cement/blob/main/examples/hospital_ocr/README.md): an offline walkthrough. Raw documents of three
   form layouts become proposals, a scripted learning pass learns a projection and promotes a version,
   a person switches it on, a later pass adds a case, and a pin rolls back to the first version. It
   ends by exporting the version and answering a document from the bundle alone.
-- [Open WebUI](examples/open_webui/README.md): Cement as a tool that the chat model calls, plus a
+- [Open WebUI](https://github.com/eturkes/cement/blob/main/examples/open_webui/README.md): Cement as a tool that the chat model calls, plus a
   filter that retains the model's answers for the learning pass. The learning pass and the switch
   also run inside Open WebUI. Every part installs by paste, and `local.py` starts a local instance
   for a test with a real model.
-- [nucllei](examples/nucllei/README.md): Cement as a skill in nucllei, the chat platform of the
+- [nucllei](https://github.com/eturkes/cement/blob/main/examples/nucllei/README.md): Cement as a skill in nucllei, the chat platform of the
   LLENS deployment. The chat model runs one sandbox command, and each user has a ledger of their own.
   The learning pass runs in the chat, and the user switches each function on with `/cement-switch`.
-- [Caller outbox](examples/outbox/README.md): a caller-side intent table and relay that keep an
+- [Caller outbox](https://github.com/eturkes/cement/blob/main/examples/outbox/README.md): a caller-side intent table and relay that keep an
   answer durable until Cement records it. It protects against a lost intent, and it shows why
   delivery is at least once.
-- [Command candidate source](examples/command_source/README.md): an optional source that runs a
+- [Command candidate source](https://github.com/eturkes/cement/blob/main/examples/command_source/README.md): an optional source that runs a
   trusted adapter executable for one candidate. It also builds as a separate wheel, which adds the
   `cement-command-source` command.
 

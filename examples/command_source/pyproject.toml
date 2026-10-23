@@ -10,6 +10,10 @@ requires-python = ">=3.12"
 # minor release of the core may break both, so the range stops at the next minor.
 dependencies = ["cement-runtime>=0.2.0,<0.3"]
 
+[project.urls]
+Repository = "https://github.com/eturkes/cement"
+Documentation = "https://github.com/eturkes/cement/tree/main/examples/command_source"
+
 [project.scripts]
 cement-command-source = "cement_command_source.command_source:main"
 

@@ -21,6 +21,17 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p90 close (MAINTAIN queue run 3, tier `docs`: metadata + links; PyPI's own renderer = the live spot-check) — target = the commit landing this section
+
+Check set = the row's three acceptance clauses A1-A3 + a prose lens P1, fixed before the diff was reread.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | `[project.urls]` names repository + docs | pass | root: `Repository` + `Documentation` (`tree/main/docs`); the p34 provider wheel too (`tree/main/examples/command_source`); `tests/test_publication_metadata.py` pins both + the docs directory exists. |
+| A2 | every README link resolves on PyPI's renderer | pass | 10 links → absolute repository URLs (9 relative paths + the bare `#the-learning-pass`, which `readme-renderer` 46.0 would render beside its own `user-content-` heading ids); `readme-renderer[md]==46.0` (PyPI's renderer, latest) → 10 repository hrefs + 15 generated heading self-links, every self-link matching an emitted id; curl on remote `main` (dbe9db0): 7 of 8 targets 200, `examples/outbox/README.md` 404 until the owner pushes 5660494 (the test binds each `blob/main/<path>` to a tracked file). |
+| A3 | no trusted-publishing workflow without approval | pass | none added; publishing stays outside this phase. |
+| P1 | prose pins | pass | link targets only (register + article audits blank them): register gate rc 0, article audit 0 ungrounded, tripwires PASS, fast gate 9 modules / 313 tests rc 0. |
+
 ## p87 close (MAINTAIN queue run 3, tier `docs`: a milestone plan; the build = row p135, tier `kernel`) — target = the commit landing this section
 
 Check set V1-V10 fixed before MAIN's review pass (seeded for consultant-1, who declined it: trust-gate reviews route to MAIN under the user's global instructions, so MAIN ran it).
