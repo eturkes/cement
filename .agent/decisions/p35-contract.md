@@ -91,3 +91,5 @@ a `BEGIN` proves no lock release.
 3. `uv run python .agent/decisions/p32-differential.py --base <parent>` → `SAME` (the uncached
    path unchanged; the corpus builds a fresh process per tree).
 4. Bench C8.
+
+Machine-local: each `.scratch/` path in this file names a gitignored input or output of the session that wrote it; no clone retrieves it, and the file states the substance it relied on (p10).

@@ -1,0 +1,3 @@
+{
+  "tests.test_cli.ParserShapeTests.test_the_live_grammar_digest_covers_help_choices_and_type": ["cli.py:_parser"]
+}

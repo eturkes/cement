@@ -78,3 +78,5 @@ preimage, the race is about the DISPLAYED plan, and a quarantine does not restor
    a planted event failure rolls the suspensions back; CLI exit codes + JSON.
 2. Full gate = CI gate.
 3. `p32-differential.py --base <parent>` → `SAME` (existing surfaces unchanged).
+
+Machine-local: each `.scratch/` path in this file names a gitignored input or output of the session that wrote it; no clone retrieves it, and the file states the substance it relied on (p10).
