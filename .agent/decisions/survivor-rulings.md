@@ -28,7 +28,11 @@ Subjects: the eval path the pin's audited child runs — `cli.py` `_read_functio
 
 ## p104 — `p09-mutate.txt` (`SubmissionTests.test_a_non_mapping_provenance_is_refused_never_normalized` @ 06ab393)
 
-Subjects: `system.py` `System._canonical_candidate` (the provenance type check) + `System.submit_proposal`. Tally: 281 survivors — 280 out of scope → `contract-open` by construction (`store.py` 79, `models.py` 76 = `CompilePolicy.__post_init__`, `json_value.py` 74, `system.py` 51 outside the subjects: the fixture's ledger, policy and candidate canonicalization); 1 in scope, `system.py:739` `System._canonical_candidate` `ReplaceComparisonOperator_IsNot_NotEq #10` → killed by the 16 modules naming a subject (D28 excluded). No ruling owed.
+Subjects: `system.py` `System._canonical_candidate` (the provenance type check) + `System.submit_proposal`. Tally: 281 survivors — 280 out of scope → `contract-open` by construction (`store.py` 79, `models.py` 76 = `CompilePolicy.__post_init__`, `json_value.py` 74, `system.py` 51 outside the subjects: the fixture's ledger, policy and candidate canonicalization); 1 in scope, `system.py:739` `System._canonical_candidate` `ReplaceComparisonOperator_IsNot_NotEq #10`. The first triage reported it killed, a phantom: its 16 killer modules included `tests/test_open_webui_paste_in.py`, whose freshness test (W1) reds every `system.py` mutant left un-regenerated; the corrected tool (regenerated embeds) → `out-of-scope 280, survived 1`, ruled:
+
+| survivor (`06ab393`) | ruling | basis |
+|---|---|---|
+| `system.py:739` `_canonical_candidate` `ReplaceComparisonOperator_IsNot_NotEq #10` (`type(candidate) is not Candidate` → `!=`) | missing-test → added | the contract refuses anything but a `Candidate` (`candidate must be a Candidate`); equality on a class can be forged through its metaclass, identity cannot. `tests/test_survivor_pins.py` `test_p104_a_class_forging_equality_is_no_candidate` is green on the tree and red on the mutant (`ValidationError not raised`). |
 
 ## p105 — `p14-mutate.txt` (`test_main_returns_with_stdout_still_buffered` + `test_a_closed_stdout_exits_120_with_python_s_notice` @ 5a44733)
 

@@ -35,7 +35,13 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SUBJECTS = ROOT / ".agent/decisions/survivor-subjects.json"
 SECTION = re.compile(r"^mutate: (\S+) @ ([0-9a-f]+)")
-SURVIVOR = re.compile(r"^\s+SURVIVED src/cement_runtime/(\w+\.py):(\d+) (\S+) #(\d+)$")
+SURVIVOR = re.compile(r"^\s+SURVIVED (?:src/cement_runtime/)?([\w/.-]+\.py):(\d+) (\S+) #(\d+)$")
+
+
+def _path(module: str) -> str:
+    # `src/cement_runtime` modules are keyed by file name; a `.agent/mutate --subject` file elsewhere
+    # (p93: `examples/open_webui/cement_filter.py`) by its repo path.
+    return module if "/" in module else f"src/cement_runtime/{module}"
 
 
 def _git(*args: str, cwd: pathlib.Path = ROOT) -> str:
@@ -83,13 +89,34 @@ def _killers(revision: str, subjects: list[str]) -> list[str]:
     return sorted(path[:-3].replace("/", ".") for path in found)
 
 
+# Generated copies embed these sources; a mutant left un-regenerated reds their freshness tests
+# (W1, N7) whatever it does, a phantom kill. Regenerated, those modules judge the mutant's code.
+GENERATORS = ("examples/open_webui/generate.py", "examples/nucllei/generate.py")
+GENERATED = ("examples/open_webui/paste-in", "examples/nucllei/ext/bin/cement")
+
+
+def _embedded(module: str) -> bool:
+    if "/" not in module:
+        return module.removesuffix(".py") not in {"cli", "__main__"}
+    return module.startswith("examples/open_webui/cement_") or module == "examples/nucllei/cement_nucllei.py"
+
+
+def _regenerate(tree: pathlib.Path) -> bool:
+    # An older record revision predates some generators; regenerate what that tree ships.
+    for generator in (name for name in GENERATORS if (tree / name).is_file()):
+        if subprocess.run([sys.executable, generator], cwd=tree, env=_environment(tree),
+                          capture_output=True, text=True).returncode != 0:
+            return False
+    return True
+
+
 def _replay(tree: pathlib.Path, rows: list[dict[str, object]], modules: list[str],
             timeout: float) -> None:
     import cosmic_ray.plugins
     from cosmic_ray.mutating import mutate_code
 
     for row in rows:
-        path = tree / "src/cement_runtime" / str(row["module"])
+        path = tree / _path(str(row["module"]))
         original = path.read_text(encoding="utf-8")
         operator = cosmic_ray.plugins.get_operator(str(row["operator"]))()
         try:
@@ -102,7 +129,13 @@ def _replay(tree: pathlib.Path, rows: list[dict[str, object]], modules: list[str
             row["verdict"] = "unbuildable"
             continue
         path.write_text(mutated, encoding="utf-8")
+        embedded = _embedded(str(row["module"]))
         try:
+            if embedded and not _regenerate(tree):
+                # The gate's freshness tests run the generators, so a mutant they refuse is detected.
+                row["verdict"] = "killed"
+                row["note"] = "generator refused"
+                continue
             result = subprocess.run([sys.executable, "-m", "unittest", *modules], cwd=tree,
                                     env=_environment(tree), capture_output=True, text=True,
                                     timeout=timeout)
@@ -112,6 +145,11 @@ def _replay(tree: pathlib.Path, rows: list[dict[str, object]], modules: list[str
             row["note"] = "timeout"
         finally:
             path.write_text(original, encoding="utf-8")
+            if embedded:
+                shipped = [name for name in GENERATED if (tree / name).exists()]
+                if shipped:
+                    subprocess.run(["git", "-C", str(tree), "checkout", "--", *shipped],
+                                   capture_output=True, check=True)
 
 
 def main() -> int:
@@ -139,7 +177,7 @@ def main() -> int:
             print(f"survivor-triage: no subject for {test_id}", file=sys.stderr)
             return 2
         revision = _git("rev-parse", "--verify", f"{short}^{{commit}}").strip()
-        spans = {module: _functions(_git("show", f"{revision}:src/cement_runtime/{module}"))
+        spans = {module: _functions(_git("show", f"{revision}:{_path(module)}"))
                  for module in {str(row["module"]) for row in rows}}
         wanted = {tuple(subject.split(":", 1)) for subject in subjects[test_id]}
         inside: list[dict[str, object]] = []
