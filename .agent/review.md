@@ -21,6 +21,14 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p132 close (MAINTAIN queue run 3, owner ruling: "Choose the more correct one, even if it takes more work now") — target = the commit landing this section
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| O1 | the more correct form | pass | PEP 695 `type` statements (the typing docs deprecate `TypeAlias` since 3.12; every supported target runs 3.12+, `Decisions`): `json_value.py` `JSONScalar` + `JSONValue`, the hospital example's own aliases; `UP040` no longer ignored, so ruff enforces the form. |
+| O2 | public surface | pass | no runtime `isinstance` use in `src/` or `examples/`; README `## Library API` states that the aliases serve annotations and `isinstance` refuses them; `test_the_json_aliases_are_type_statements` pins the shape (red at HEAD: `bool | int | str | None is not an instance of TypeAliasType`). |
+| O3 | regressions | pass | mypy + ruff clean; paste-ins + `ext/bin/cement` regenerated; fast gate over every module but D28 + `test_source` → 1425 tests OK; the p89 census drops its `JSONValue`-union exemption (a `type` alias stays whole in hints). |
+
 ## p132 agent part (MAINTAIN queue run 3, tier `kernel`: connection setup; the row stays open for the owner's `JSONValue` ruling) — target = the commit landing this section
 
 Check set = the row's acceptance clauses A1-A4, fixed before the diff was reread.

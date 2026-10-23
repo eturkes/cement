@@ -18,8 +18,8 @@ from pydantic import BaseModel, Field
 # The embedded source keeps its own line breaks; one of its pragma comments runs past 100
 # columns inside the string, where ruff reads no pragma.
 # ruff: noqa: E501
-_CEMENT_PACKAGE = "_cement_runtime_ac49966e20363e00"
-_CEMENT_DIGEST = "ac49966e20363e0061813cecde3226dd55eaac8dd8d896dcef05cda42667b6fa"
+_CEMENT_PACKAGE = "_cement_runtime_bb07b6fbd8417423"
+_CEMENT_DIGEST = "bb07b6fbd841742385edb63197c4112549fd60e17b07af747b4a31c9e0bf419f"
 _CEMENT_SOURCES = {
     "__init__": r'''
 """Cement public API."""
@@ -767,12 +767,12 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from typing import Any, TypeAlias
+from typing import Any
 
 from .errors import ValidationError
 
-JSONScalar: TypeAlias = bool | int | str | None
-JSONValue: TypeAlias = JSONScalar | list["JSONValue"] | dict[str, "JSONValue"]
+type JSONScalar = bool | int | str | None
+type JSONValue = JSONScalar | list[JSONValue] | dict[str, JSONValue]
 
 CANONICALIZER = "cement-json-v1"
 DEFAULT_MAX_BYTES = 1_048_576

@@ -5,12 +5,12 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from typing import Any, TypeAlias
+from typing import Any
 
 from .errors import ValidationError
 
-JSONScalar: TypeAlias = bool | int | str | None
-JSONValue: TypeAlias = JSONScalar | list["JSONValue"] | dict[str, "JSONValue"]
+type JSONScalar = bool | int | str | None
+type JSONValue = JSONScalar | list[JSONValue] | dict[str, JSONValue]
 
 CANONICALIZER = "cement-json-v1"
 DEFAULT_MAX_BYTES = 1_048_576

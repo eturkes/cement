@@ -8,10 +8,9 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import TypeAlias
 
-JSONValue: TypeAlias = bool | int | str | list["JSONValue"] | dict[str, "JSONValue"] | None
-_ParsedEntry: TypeAlias = tuple[str, str, str]
+type JSONValue = bool | int | str | list[JSONValue] | dict[str, JSONValue] | None
+type _ParsedEntry = tuple[str, str, str]
 
 REFERENCE_PLANS: dict[str, JSONValue] = {
     "physician_progress_note": {

@@ -454,7 +454,8 @@ its own type. `cement_runtime.models` defines the records, for example `Proposal
 `ProjectionPreview` and `LearningCasesRecord`. `cement_runtime.projection` defines
 `ProgramDocument`, which `draft_program` returns. At run time each record is a plain `dict`, so
 the CLI prints the same JSON. A field that holds stored JSON, such as an input or an output, has
-the type `JSONValue`.
+the type `JSONValue`. `cement_runtime.json_value` declares `JSONValue` and `JSONScalar` with `type`
+statements, so they serve annotations, and `isinstance` refuses them.
 
 ### Explicit proposal submission
 

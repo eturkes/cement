@@ -13,7 +13,6 @@ import os
 import pathlib
 import subprocess
 import sys
-import types
 import typing
 import unittest
 
@@ -23,16 +22,13 @@ MODULES = tuple(sorted(path.stem for path in (ROOT / "src" / "cement_runtime").g
 
 
 def _untyped(annotation: object) -> bool:
-    """A bare `dict[...]` at the top, or inside a list, tuple or optional; `JSONValue` (the union
-    that admits a dict among its JSON shapes) is a JSON document, not a record."""
+    """A bare `dict[...]` at the top, or inside a list, tuple or optional; `JSONValue` (a `type`
+    alias, so hints keep it whole) is a JSON document, not a record."""
 
     origin = typing.get_origin(annotation)
-    arguments = typing.get_args(annotation)
     if annotation is dict or origin is dict:
         return True
-    if origin in (typing.Union, types.UnionType) and {bool, int, str, type(None)} <= set(arguments):
-        return False
-    return any(_untyped(argument) for argument in arguments) if origin else False
+    return any(_untyped(argument) for argument in typing.get_args(annotation)) if origin else False
 
 
 class TypedRecordTests(unittest.TestCase):
@@ -96,6 +92,18 @@ class TypedRecordTests(unittest.TestCase):
             (checked.returncode, checked.stdout.strip()),
             (0, "Success: no issues found in 1 source file"),
             checked.stdout + checked.stderr,
+        )
+
+    def test_the_json_aliases_are_type_statements(self) -> None:
+        # p132 (owner: the more correct form): PEP 695 aliases, recursive without string forward refs.
+        from cement_runtime.json_value import JSONScalar, JSONValue
+
+        for alias in (JSONScalar, JSONValue):
+            self.assertIsInstance(alias, typing.TypeAliasType)
+        self.assertEqual(JSONScalar.__value__, bool | int | str | None)
+        self.assertEqual(typing.get_args(JSONValue.__value__)[0], JSONScalar)
+        self.assertEqual(
+            typing.get_args(JSONValue.__value__)[1:], (list[JSONValue], dict[str, JSONValue])
         )
 
 
