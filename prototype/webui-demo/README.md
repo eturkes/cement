@@ -113,6 +113,12 @@ build, its style sheet and its license are copied into `static/vendor/driver.js-
 from the npm package, which was checked against the registry integrity hash. The demo needs
 no build step and no network access.
 
+The page uses the Space Grotesk and JetBrains Mono fonts under the SIL Open Font License 1.1.
+The latin font files come from the npm packages `@fontsource/space-grotesk` 5.3.0 and
+`@fontsource/jetbrains-mono` 5.3.0, which were checked against the registry integrity hash.
+The license of each family is copied from its package into `static/fonts/` as
+`LICENSE-space-grotesk` and `LICENSE-jetbrains-mono`.
+
 ## Real and simulated
 
 The model is simulated. `StubProvider` in `demo.py` returns a fixed script and samples one

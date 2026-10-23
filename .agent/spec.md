@@ -138,6 +138,8 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.11 under `uv`.
 
 ## Tasks
 
+- [ ] MAINTAIN queue run 3 (owner body `auto/maintain.md` Queue): every `.agent/deferred.md` row in rank order (`pri`, then id), one unit + one scoped commit per row, the row pruned into `.agent/archive/deferred-closed.md` in its closing commit; full gate per commit = `.agent/ci-gate <pid>` while `main` is green. Funded order: p123 (agent part: measure + options → owner ruling), p124, p127, p129, p122, p125, p126 (upstream check), p128; finds born this run after them. Standing statuses (routed p32 p33 p93 p99-p116, owed go p34 p37 p87-p90, queued p35 p36, trigger p52) → the one owner question.
+  - Met when: every row closed by its acceptance check in its own commit, recorded as blocked on the owner with what it owes, waiting on its re-open trigger, or routed (`route.md` `Met when`), and the full gate passes on a clean tree at the closing commit.
 - Queue = `.agent/deferred.md` (`p<nn>`, one entry + acceptance each, unattached; p01-p61 keep full text + evidence + grounds in `.agent/archive/polish.md`, a born row's entry is its whole record; closed rows → `.agent/archive/deferred-closed.md`; grader `uv run python .agent/decisions/m3-deferred-validate.py`); a bare `p<nn>` in a row = that unit owns the queue row.
 
 ## Phase
