@@ -21,6 +21,21 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p32 close (MAINTAIN queue run 3, tier `kernel`) — target = the commit landing this section, base `1b5b7d7`
+
+Check set fixed before the diff was read: reviewer-1's R1-R11 (frozen refactor `archive/p32-wip`) + MAIN's M1-M4. Blind equivalence corpus = tester-1 (`archive/p32-tester`), written against the baseline alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1-R8 | correctness: stage order, SQL order, the seven-check vector + previews, exception classes + messages, operators + operand order per family site | pass | reviewer-1: source audit + a same-ledger trace differential (six calls; payloads + ordered SQL, executions, callbacks; 94,379 bytes each side, `cmp` rc 0; controls: swapped SQL and a changed `FunctionCheck.detail` both caught). MAIN reran tester-1's blind corpus on the final tree: `uv run python .agent/decisions/p32-differential.py --base 1b5b7d7` → `SAME 2712`, `RESULT: PASS` (13 families); its `--self-test` mutants (a detail literal, two swapped checks) → `DIFF`. |
+| R9 | test edits keep strength | pass | B20 expected set + exactly the 11 connection-taking helpers the census itself derives (owner-approved extension); X11 + D16 name `_learning_case_groups` where they named `learning_cases` (the provenance parse moved unchanged; set size 3 either way) → put to the owner at the run's close. Register RG1 (census blind spellings): reversed scope operands + inline sealed-field compares now caught, each control reds its own test; a policy re-encoded through a temporary variable stays a disclosed limit. |
+| R10 | generated copies | finding F1 → fixed | a late `system.py` edit left the paste-ins + the nucllei command stale (W1/N7 red); regenerated; W1 + N7 green. |
+| R11 | dead code, misleading text | pass | removed inline stages each have a called replacement; the binding-family comment matches the sites. |
+| M1 | no E/F System method | pass | `uvx radon cc -s -n E src/cement_runtime/system.py` → none (was F 70 + E 37/35/34/31); `cli._run` F 77 sits outside `System`. |
+| M2 | public facade | pass | 41 public `System` methods, signatures + `__init__` exports identical (`1b5b7d7` vs this commit); control `6e9e715~1` → `6e9e715` reports 39 vs 41. |
+| M3 | operators under the suite's fakes | finding → fixed before review | a first draft spelled member scope as `==`; `_LeftMismatchText` overrides `__ne__` alone → 8 subtests of `test_function_report_member_rows_validate_middle_and_last_scalars_and_bindings` red; every predicate now keeps the original `!=` with the stored value on the left. |
+| M4 | stored-int census | finding → fixed | three `bool(...)` wrappers added for mypy read as unguarded coercions (`p03-stored-int-census.py` rc 1); replaced by annotated locals + `any(...)`; census 91 sites, 0 unguarded. |
+
 ## Security review (MAINTAIN, ad-hoc) — target = the implementation at `99f260a`, fixes `4eaf102` `5c81bde` `95fb113`
 
 Owner body: threat surface from `Intent` + `Artifacts`; committed scanners run (a stack with none = a finding); a manual pass over remotely reachable code on a check set fixed before any code was read; trust model: env vars + CLI flags trusted, the server = the enforcement boundary, auto-escaping holds outside raw-HTML sinks; every finding above informational fixed, the rest → `.agent/deferred.md`. MAIN alone (security vocabulary stays off the teammate route). Surfaces: L library + CLI; O Open WebUI paste-ins (remote via Open WebUI) + `local.py`; N nucllei jail command (via the chat model's `run_shell`); P prototype server (loopback); X other examples; K skills; G CI + gate tooling. Every scanner verdict carries a positive control run beside it.

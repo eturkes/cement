@@ -17517,5 +17517,169 @@ class PreservedInvariantCensusTests(unittest.TestCase):
         self.assertEqual(observed, expected)
 
 
+class BindingOwnerCensusTests(unittest.TestCase):
+    """p33: each binding family has ONE owner in `system.py`, and every report check names its depth.
+
+    Owners: `_policy_binding` re-encodes a stored operation policy (the two writers encode a new
+    one); `_REPORT_BINDING_FIELDS` + `_report_field_mismatch` compare a bound report's sealed
+    fields; `_report_scope_mismatch` its scope; `_member_scope_mismatch` a receipt member's scope;
+    `_function_entry` builds an entry from artifact + report. A second site re-assembling one
+    of them is the drift p33 names: a correction landing on one surface while another keeps
+    accepting a different record.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.tree = ast.parse(pathlib.Path(system_module.__file__).read_text(encoding="utf-8"))
+        cls.functions = [
+            node
+            for node in ast.walk(cls.tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        ]
+
+    @staticmethod
+    def _own_nodes(function: ast.AST):
+        stack = list(ast.iter_child_nodes(function))
+        while stack:
+            node = stack.pop()
+            yield node
+            stack.extend(
+                child
+                for child in ast.iter_child_nodes(node)
+                if not isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+            )
+
+    def _owners(self, predicate) -> set[str]:
+        return {
+            function.name
+            for function in self.functions
+            if any(predicate(node) for node in self._own_nodes(function))
+        }
+
+    def test_operation_policy_is_re_encoded_by_one_owner(self) -> None:
+        def encodes_policy(node: ast.AST) -> bool:
+            return (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "canonicalize"
+                and bool(node.args)
+                and isinstance(node.args[0], ast.Call)
+                and isinstance(node.args[0].func, ast.Attribute)
+                and node.args[0].func.attr == "as_json"
+            )
+
+        self.assertEqual(
+            self._owners(encodes_policy),
+            {"_policy_binding", "register_operation", "revise_operation"},
+        )
+
+    def test_a_bound_report_s_sealed_fields_are_listed_once(self) -> None:
+        sealed = {"artifact_hash", "build_hash", "policy_hash", "evidence_snapshot_hash"}
+        listings = [
+            node
+            for node in ast.walk(self.tree)
+            if isinstance(node, (ast.Tuple, ast.List, ast.Set))
+            and {
+                element.value
+                for element in node.elts
+                if isinstance(element, ast.Constant) and isinstance(element.value, str)
+            }
+            >= sealed
+        ]
+        self.assertEqual(len(listings), 1)
+        owner = next(
+            node
+            for node in self.tree.body
+            if isinstance(node, ast.Assign) and node.value is listings[0]
+        )
+        self.assertEqual([target.id for target in owner.targets], ["_REPORT_BINDING_FIELDS"])
+        self.assertEqual(
+            self._owners(
+                lambda node: isinstance(node, ast.Name) and node.id == "_REPORT_BINDING_FIELDS"
+            ),
+            {"_report_field_mismatch"},
+        )
+
+        def sealed_key(node: ast.AST) -> str | None:
+            if (
+                isinstance(node, ast.Subscript)
+                and isinstance(node.slice, ast.Constant)
+                and node.slice.value in sealed - {"policy_hash"}
+            ):
+                return str(node.slice.value)
+            return None
+
+        # The owner compares through a loop variable; an inline `report["build_hash"] !=
+        # row["build_hash"]` anywhere is a second owner spelled without the listing.
+        # `policy_hash` also binds an artifact to its operation (`_run_verification`), so the
+        # three report-only fields carry the inline check.
+        self.assertEqual(
+            self._owners(
+                lambda node: isinstance(node, ast.Compare)
+                and sealed_key(node.left) is not None
+                and any(sealed_key(other) == sealed_key(node.left) for other in node.comparators)
+            ),
+            set(),
+        )
+
+    def test_report_scope_and_member_scope_are_compared_by_one_owner_each(self) -> None:
+        def reads_details_scope(node: ast.AST) -> bool:
+            return (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "get"
+                and any(
+                    isinstance(argument, ast.Constant) and argument.value == "scope_hash"
+                    for argument in node.args
+                )
+            )
+
+        def compares_report_scope(node: ast.AST) -> bool:
+            return isinstance(node, ast.Compare) and any(
+                reads_details_scope(operand) for operand in (node.left, *node.comparators)
+            )
+
+        def compares_member_scope(node: ast.AST) -> bool:
+            return isinstance(node, ast.Compare) and any(
+                isinstance(comparator, ast.Attribute)
+                and isinstance(comparator.value, ast.Name)
+                and comparator.value.id == "receipt"
+                and comparator.attr
+                in {"partition", "operation", "operation_revision", "policy_hash"}
+                for comparator in node.comparators
+            )
+
+        self.assertEqual(self._owners(compares_report_scope), {"_report_scope_mismatch"})
+        self.assertEqual(self._owners(compares_member_scope), {"_member_scope_mismatch"})
+
+    def test_function_entries_are_built_by_one_owner(self) -> None:
+        self.assertEqual(
+            self._owners(
+                lambda node: isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "FunctionEntry"
+            ),
+            {"_function_entry"},
+        )
+
+    def test_every_report_validation_names_its_depth(self) -> None:
+        calls = [
+            node
+            for node in ast.walk(self.tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "_validate_report"
+        ]
+        self.assertGreaterEqual(len(calls), 8)
+        self.assertEqual(
+            [
+                node.lineno
+                for node in calls
+                if not any(keyword.arg == "verify_test_set" for keyword in node.keywords)
+            ],
+            [],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

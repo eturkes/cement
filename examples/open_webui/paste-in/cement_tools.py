@@ -18,8 +18,8 @@ from pydantic import BaseModel, Field
 # The embedded source keeps its own line breaks; one of its pragma comments runs past 100
 # columns inside the string, where ruff reads no pragma.
 # ruff: noqa: E501
-_CEMENT_PACKAGE = "_cement_runtime_2bebee7a351d94db"
-_CEMENT_DIGEST = "2bebee7a351d94dbc6146404855475a6129e74d6c68100df3bf76301b82d5b32"
+_CEMENT_PACKAGE = "_cement_runtime_1a9f7cffee444a5a"
+_CEMENT_DIGEST = "1a9f7cffee444a5a0607aa9c90a8f8195bec9335312826c13a0093eeff6d2bae"
 _CEMENT_SOURCES = {
     "__init__": r'''
 """Cement public API."""
@@ -2767,6 +2767,7 @@ from .artifacts import (
     ARTIFACT_ABI,
     ARTIFACT_MAX_BYTES,
     ArtifactDocument,
+    Execution,
     build_digest,
     build_exact_lookup,
     execute,
@@ -3174,6 +3175,587 @@ def _policy_from_text(text: str) -> CompilePolicy:
         return CompilePolicy.from_json(value)
     except ValidationError as exc:
         raise IntegrityError("stored policy is invalid") from exc
+
+
+# -- binding families: one owner each, every caller choosing its depth -----------
+#
+# Operation policy: row-only = `_policy_from_text` (`test_projection`, `_run_verification`);
+# digest-bound = `_policy_binding(...).digest_mismatch` (`_project_current_build`); text- and
+# digest-bound = both flags (`function_report`, `_verify_function_snapshot`,
+# `_function_promotion_plan`). Bound report: `_validate_report(verify_test_set=...)` owns the
+# details (full reconstruction = True, bounded projection + live receipt = False), the two
+# predicates below own the scope and sealed-field bindings. Each caller keeps its own scalar
+# guards, stage order, raise-or-collect and wording, which the suite pins per surface.
+
+
+@dataclass(frozen=True, slots=True)
+class _PolicyBinding:
+    policy: CompilePolicy
+    text_mismatch: bool
+    digest_mismatch: bool
+
+
+def _policy_binding(policy_json: str, policy_hash: str) -> _PolicyBinding:
+    """Parse and re-encode one stored policy; raises as `_policy_from_text` + `canonicalize`."""
+
+    policy = _policy_from_text(policy_json)
+    encoded = canonicalize(policy.as_json(), max_bytes=16_384)
+    return _PolicyBinding(
+        policy=policy,
+        text_mismatch=encoded.text != policy_json,
+        digest_mismatch=encoded.digest != policy_hash,
+    )
+
+
+_REPORT_BINDING_FIELDS = ("artifact_hash", "build_hash", "policy_hash", "evidence_snapshot_hash")
+
+
+def _report_field_mismatch(
+    report: sqlite3.Row | Mapping[str, Any],
+    artifact: sqlite3.Row | Mapping[str, Any],
+) -> str | None:
+    """The first sealed field, in binding order, on which a report and its artifact differ."""
+
+    return next(
+        (field for field in _REPORT_BINDING_FIELDS if report[field] != artifact[field]),
+        None,
+    )
+
+
+def _report_scope_mismatch(
+    details: Mapping[str, JSONValue],
+    artifact: sqlite3.Row | Mapping[str, Any],
+) -> bool:
+    mismatch: bool = details.get("scope_hash") != artifact["scope_hash"]
+    return mismatch
+
+
+def _member_scope_mismatch(
+    artifact: sqlite3.Row | Mapping[str, Any],
+    receipt: FunctionReceipt,
+) -> bool:
+    mismatch: bool = (
+        artifact["partition"] != receipt.partition
+        or artifact["operation"] != receipt.operation
+        or artifact["operation_revision"] != receipt.operation_revision
+        or artifact["policy_hash"] != receipt.policy_hash
+    )
+    return mismatch
+
+
+def _function_entry(
+    artifact: ArtifactDocument,
+    row: sqlite3.Row | Mapping[str, Any],
+    report: sqlite3.Row | Mapping[str, Any],
+    *,
+    entry_seal: str | None = None,
+) -> FunctionEntry:
+    return FunctionEntry(
+        input=artifact.input.value,
+        output=artifact.output.value,
+        artifact_hash=str(row["artifact_hash"]),
+        evidence_snapshot_hash=str(row["evidence_snapshot_hash"]),
+        entry_seal=_function_entry_seal(row, report) if entry_seal is None else entry_seal,
+        report_details_hash=str(report["details_hash"]),
+        report_test_set_hash=str(report["test_set_hash"]),
+    )
+
+
+def _reported_operation(
+    operation_row: sqlite3.Row, *, partition: str, operation: str
+) -> tuple[int, str]:
+    """`function_report`'s operation row at text- and digest-bound depth, raised on first defect."""
+
+    if operation_row["partition"] != partition or operation_row["name"] != operation:
+        raise IntegrityError("stored operation scope is invalid")
+    revision = _stored_int(
+        operation_row["revision"],
+        "stored operation revision",
+        minimum=1,
+    )
+    policy_json = operation_row["policy_json"]
+    try:
+        if type(policy_json) is not str:
+            raise TypeError("policy text is not a string")
+        policy_hash = _digest(
+            operation_row["policy_hash"],
+            "stored operation policy_hash",
+        )
+        binding = _policy_binding(policy_json, policy_hash)
+    except (TypeError, ValidationError) as exc:
+        raise IntegrityError("stored operation policy is invalid") from exc
+    if binding.text_mismatch:
+        raise IntegrityError("stored operation policy is not canonical")
+    if binding.digest_mismatch:
+        raise IntegrityError("operation policy digest mismatch")
+    return revision, policy_hash
+
+
+def _structural_edit_leaves(program: ProjectionProgram, input_text: str, key_text: str) -> bool:
+    """Deleting the example's LAST structural line (contract §5) moves it off this case: body
+    lines hold no `:` (the grammar), so that line is the last one carrying one."""
+
+    raw = parse_json(input_text).value
+    if type(raw) is dict and type(raw.get(program.text)) is str:
+        lines = str(raw[program.text]).replace("\r\n", "\n").split("\n")
+        last = max(i for i, line in enumerate(lines) if ":" in line)
+        probed = {**raw, program.text: "\n".join(lines[:last] + lines[last + 1 :])}
+        projected = project(program, probed)
+        return not projected.matched or (
+            projected.key is not None and projected.key.text != key_text
+        )
+    return False
+
+
+def _boundary_executions(
+    artifact: ArtifactDocument,
+    *,
+    partition: str,
+    operation: str,
+    revision: int,
+    input_json: CanonicalJSON,
+) -> tuple[tuple[str, Execution], ...]:
+    """The four out-of-scope probes, each executed now, before any is recorded."""
+
+    different_input = canonicalize({"$cement_boundary_probe": artifact.digest})
+    if different_input.text == input_json.text:
+        different_input = canonicalize(["$cement_boundary_probe", artifact.digest])
+    return (
+        (
+            "boundary:partition",
+            execute(
+                artifact,
+                partition="cement-boundary"
+                if partition != "cement-boundary"
+                else "cement-boundary-2",
+                operation=operation,
+                operation_revision=revision,
+                input_json=input_json,
+            ),
+        ),
+        (
+            "boundary:operation",
+            execute(
+                artifact,
+                partition=partition,
+                operation="cement-boundary"
+                if operation != "cement-boundary"
+                else "cement-boundary-2",
+                operation_revision=revision,
+                input_json=input_json,
+            ),
+        ),
+        (
+            "boundary:revision",
+            execute(
+                artifact,
+                partition=partition,
+                operation=operation,
+                operation_revision=revision + 1,
+                input_json=input_json,
+            ),
+        ),
+        (
+            "boundary:input",
+            execute(
+                artifact,
+                partition=partition,
+                operation=operation,
+                operation_revision=revision,
+                input_json=different_input,
+            ),
+        ),
+    )
+
+
+_PlannedMembers = dict[str, tuple[sqlite3.Row, sqlite3.Row, FunctionEntry]]
+
+
+def _promotion_plan(
+    *,
+    partition: str,
+    operation: str,
+    revision: int,
+    policy_hash: str,
+    build_program: ProjectionProgram | None,
+    retained: _PlannedMembers,
+    candidates: _PlannedMembers,
+    superseded: dict[str, sqlite3.Row],
+    skipped: list[dict[str, JSONValue]],
+    dropped: list[str],
+) -> _FunctionPromotionPlan:
+    """The final set (candidates replace retained members on their key) + its manifest."""
+
+    final = dict(retained)
+    final.update(candidates)
+    planned: list[_FunctionPromotionPlanEntry] = []
+    for input_hash in sorted(final):
+        row, report, function_entry = final[input_hash]
+        candidate = input_hash in candidates
+        predecessor = retained.get(input_hash)
+        replaced = (
+            str(predecessor[0]["id"])
+            if predecessor is not None
+            else (str(superseded[input_hash]["id"]) if input_hash in superseded else None)
+        )
+        planned.append(
+            _FunctionPromotionPlanEntry(
+                row=row,
+                report=report,
+                function_entry=function_entry,
+                public=FunctionPromotionEntry(
+                    artifact_id=str(row["id"]),
+                    input_hash=input_hash,
+                    artifact_hash=str(row["artifact_hash"]),
+                    output_hash=str(row["output_hash"]),
+                    entry_seal=function_entry.entry_seal,
+                    disposition="candidate" if candidate else "retained",
+                    replaces_artifact_id=replaced if candidate else None,
+                ),
+            )
+        )
+    planned_entries = tuple(planned)
+    document = build_function(
+        partition=partition,
+        operation=operation,
+        operation_revision=revision,
+        policy_hash=policy_hash,
+        entries=(entry.function_entry for entry in planned_entries),
+        projection=build_program,
+    )
+    public_entries = tuple(entry.public for entry in planned_entries)
+    skipped_entries = tuple(skipped)
+    encoded = canonicalize(
+        {
+            "abi": FUNCTION_PROMOTION_MANIFEST_ABI,
+            "entries": [
+                {
+                    "artifact_hash": entry.artifact_hash,
+                    "artifact_id": entry.artifact_id,
+                    "disposition": entry.disposition,
+                    "entry_seal": entry.entry_seal,
+                    "input_hash": entry.input_hash,
+                    "output_hash": entry.output_hash,
+                    "replaces_artifact_id": entry.replaces_artifact_id,
+                }
+                for entry in public_entries
+            ],
+            "function": document.value,
+            "function_hash": document.function_hash,
+            "scope": {
+                "operation": operation,
+                "operation_revision": revision,
+                "partition": partition,
+                "policy_hash": policy_hash,
+            },
+            "skipped": list(skipped_entries),
+        },
+        max_bytes=_FUNCTION_MANIFEST_MAX_BYTES,
+        max_depth=_FUNCTION_MANIFEST_MAX_DEPTH,
+        max_items=_FUNCTION_MANIFEST_MAX_ITEMS,
+    )
+    return _FunctionPromotionPlan(
+        manifest=FunctionPromotionManifest(
+            operation_revision=revision,
+            function_hash=document.function_hash,
+            text=encoded.text,
+            document=document,
+            entries=public_entries,
+            skipped=skipped_entries,
+        ),
+        policy_hash=policy_hash,
+        entries=planned_entries,
+        dropped=tuple(dropped),
+    )
+
+
+# -- function set verification: stages of `System._verify_function_snapshot` ------
+
+
+@dataclass(frozen=True, slots=True)
+class _SnapshotMember:
+    abi_failure: str | None
+    report_failure: str | None
+    receipt_failure: str | None
+    projection_failure: str | None
+    projected: tuple[str, str, str, FunctionEntry] | None
+
+
+def _summarized_check(key: str, failures: list[str], passed_detail: str) -> FunctionCheck:
+    if not failures:
+        return FunctionCheck(key=key, passed=True, detail=passed_detail)
+    return FunctionCheck(
+        key=key,
+        passed=False,
+        detail=(f"{len(failures)} failure(s): " + "; ".join(failures[:3])),
+    )
+
+
+def _snapshot_policy_failures(policy_json: str, policy_hash: str) -> list[str]:
+    """Text- and digest-bound depth, collected: the snapshot reports every policy defect."""
+
+    failures: list[str] = []
+    try:
+        binding = _policy_binding(policy_json, policy_hash)
+    except (IntegrityError, ValidationError) as exc:
+        failures.append(f"operation policy is invalid: {exc}")
+    else:
+        if binding.text_mismatch:
+            failures.append("operation policy JSON is not canonical")
+        if binding.digest_mismatch:
+            failures.append("operation policy digest does not match policy_hash")
+    return failures
+
+
+def _over_capacity_verification(
+    entry_count: int, operation_policy_failures: list[str]
+) -> FunctionVerification:
+    skipped = (
+        f"not evaluated because {entry_count} promoted entries exceed "
+        f"FUNCTION_MAX_ENTRIES={FUNCTION_MAX_ENTRIES}"
+    )
+    receipt_detail = skipped
+    if operation_policy_failures:
+        receipt_detail = "; ".join(operation_policy_failures) + "; " + skipped
+    checks = (
+        FunctionCheck(
+            key="duplicate-input-digests",
+            passed=False,
+            detail=skipped,
+        ),
+        FunctionCheck(
+            key="abi-canonicalizer-uniform",
+            passed=False,
+            detail=skipped,
+        ),
+        FunctionCheck(
+            key="sealed-passing-reports",
+            passed=False,
+            detail=skipped,
+        ),
+        FunctionCheck(
+            key="current-promotion-receipts",
+            passed=False,
+            detail=receipt_detail,
+        ),
+        FunctionCheck(
+            key="function-hash-matches-snapshot",
+            passed=False,
+            detail=(
+                f"promoted set has {entry_count} entries and exceeds "
+                f"FUNCTION_MAX_ENTRIES={FUNCTION_MAX_ENTRIES}"
+            ),
+        ),
+        FunctionCheck(
+            key="persisted-function-receipt",
+            passed=False,
+            detail=skipped,
+        ),
+        FunctionCheck(key="projection-uniform", passed=False, detail=skipped),
+    )
+    return FunctionVerification(
+        passed=False,
+        entries=entry_count,
+        document=None,
+        function_hash=None,
+        checks=checks,
+    )
+
+
+def _duplicate_digest_check(rows: Sequence[sqlite3.Row], entry_count: int) -> FunctionCheck:
+    first_digest_source: dict[str, str] = {}
+    duplicate_sources: dict[str, list[str]] = {}
+    for row in rows:
+        digest = str(row["input_hash"])
+        artifact_id = str(row["id"])
+        if digest not in first_digest_source:
+            first_digest_source[digest] = artifact_id
+            continue
+        sources = duplicate_sources.setdefault(digest, [first_digest_source[digest]])
+        if len(sources) < 3:
+            sources.append(artifact_id)
+    duplicates = sorted(duplicate_sources.items())
+    if duplicates:
+        preview = "; ".join(
+            f"{digest}:{','.join(source_ids)}" for digest, source_ids in duplicates[:3]
+        )
+        return FunctionCheck(
+            key="duplicate-input-digests",
+            passed=False,
+            detail=f"{len(duplicates)} duplicate digest(s): {preview}",
+        )
+    return FunctionCheck(
+        key="duplicate-input-digests",
+        passed=True,
+        detail=f"{entry_count} entries have unique input digests",
+    )
+
+
+def _snapshot_abi_failure(row: sqlite3.Row) -> str | None:
+    artifact_id = str(row["id"])
+    try:
+        raw_artifact = parse_json(str(row["artifact_json"]), max_bytes=ARTIFACT_MAX_BYTES).value
+        if type(raw_artifact) is not dict:
+            raise IntegrityError("artifact document is not an object")
+        raw_scope = raw_artifact.get("scope")
+        artifact_abi = raw_artifact.get("abi")
+        canonicalizer = raw_scope.get("canonicalizer") if type(raw_scope) is dict else None
+        if artifact_abi != ARTIFACT_ABI or canonicalizer != CANONICALIZER:
+            return f"{artifact_id}: abi={artifact_abi!r}, canonicalizer={canonicalizer!r}"
+    except (IntegrityError, ValidationError) as exc:
+        return f"{artifact_id}: {exc}"
+    return None
+
+
+def _snapshot_scope_failures(
+    row: sqlite3.Row, *, revision: int, policy_hash: str, policy_json: str
+) -> list[str]:
+    scope_failures: list[str] = []
+    stored_revision = row["operation_revision"]
+    if type(stored_revision) is not int:
+        scope_failures.append("stored operation revision is not an integer")
+    elif stored_revision != revision:
+        scope_failures.append(
+            f"operation revision {stored_revision} does not match current {revision}"
+        )
+    if row["policy_hash"] != policy_hash:
+        scope_failures.append("policy hash does not match current operation")
+    if row["policy_json"] != policy_json:
+        scope_failures.append("policy JSON does not match current operation")
+    return scope_failures
+
+
+def _snapshot_projection(
+    row: sqlite3.Row,
+    artifact: ArtifactDocument | None,
+    artifact_error: str | None,
+    report: sqlite3.Row | None,
+    scope_failures: list[str],
+) -> tuple[str | None, tuple[str, str, str, FunctionEntry] | None]:
+    """A member's entry, or why it cannot project: invalid artifact, missing report, scope."""
+
+    artifact_id = str(row["id"])
+    if artifact is None:
+        return f"{artifact_id}: {artifact_error or 'artifact is invalid'}", None
+    if report is None:
+        return f"{artifact_id}: bound report is missing", None
+    if scope_failures:
+        return f"{artifact_id}: {'; '.join(scope_failures)}", None
+    entry = _function_entry(artifact, row, report)
+    input_json = canonicalize(entry.input)
+    output_json = canonicalize(entry.output)
+    if input_json.digest != row["input_hash"]:
+        return f"{artifact_id}: input digest changed during projection", None
+    if output_json.digest != row["output_hash"]:
+        return f"{artifact_id}: output digest changed during projection", None
+    return None, (artifact_id, input_json.digest, output_json.digest, entry)
+
+
+def _snapshot_hash_check(
+    projection_failures: list[str],
+    projected: list[tuple[str, str, str, FunctionEntry]],
+    *,
+    partition: str,
+    operation: str,
+    revision: int,
+    policy_hash: str,
+    program: ProjectionProgram | None,
+    entry_count: int,
+    expected_function_hash: str | None,
+) -> tuple[FunctionCheck, FunctionDocument | None, str | None]:
+    """Build the set and self-check it; a document built before a failed self-check stays."""
+
+    if projection_failures:
+        return (
+            FunctionCheck(
+                key="function-hash-matches-snapshot",
+                passed=False,
+                detail=(
+                    f"{len(projection_failures)} unprojectable entry/entries: "
+                    + "; ".join(projection_failures[:3])
+                ),
+            ),
+            None,
+            None,
+        )
+    document: FunctionDocument | None = None
+    try:
+        document = build_function(
+            partition=partition,
+            operation=operation,
+            operation_revision=revision,
+            policy_hash=policy_hash,
+            entries=(item[3] for item in projected),
+            projection=program,
+        )
+        if document.value.get("abi") != FUNCTION_ABI:
+            raise IntegrityError("function ABI changed during projection")
+        if document.value.get("canonicalizer") != CANONICALIZER:
+            raise IntegrityError("function canonicalizer changed during projection")
+        if document.value.get("function_hash") != document.function_hash:
+            raise IntegrityError("function hash changed during projection")
+        expected_scope: dict[str, JSONValue] = {
+            "operation": operation,
+            "operation_revision": revision,
+            "partition": partition,
+            "policy_hash": policy_hash,
+        }
+        if document.value.get("scope") != expected_scope:
+            raise IntegrityError("function scope does not equal the promoted snapshot")
+        actual_entries = document.value.get("entries")
+        if type(actual_entries) is not list:
+            raise IntegrityError("function entries are not an array")
+        if len(actual_entries) != len(projected):
+            raise IntegrityError("function entry count does not equal the promoted snapshot")
+        projected.sort(key=lambda item: item[1])
+        for actual, (
+            artifact_id,
+            input_hash,
+            output_hash,
+            entry,
+        ) in zip(actual_entries, projected, strict=True):
+            expected_entry: dict[str, JSONValue] = {
+                "artifact_hash": entry.artifact_hash,
+                "evidence_snapshot_hash": entry.evidence_snapshot_hash,
+                "input": entry.input,
+                "input_hash": input_hash,
+                "output": entry.output,
+                "output_hash": output_hash,
+                "entry_seal": entry.entry_seal,
+                "report": {
+                    "details_hash": entry.report_details_hash,
+                    "test_set_hash": entry.report_test_set_hash,
+                },
+            }
+            if actual != expected_entry:
+                raise IntegrityError(f"{artifact_id} function entry changed during projection")
+        validated = validate_function(
+            document.value,
+            expected_function_hash=(
+                document.function_hash if expected_function_hash is None else expected_function_hash
+            ),
+        )
+        if validated.text != document.text:
+            raise IntegrityError("function normalization changed during self-check")
+    except (IntegrityError, ValidationError) as exc:
+        return (
+            FunctionCheck(
+                key="function-hash-matches-snapshot",
+                passed=False,
+                detail=str(exc),
+            ),
+            document,
+            None if document is None else document.function_hash,
+        )
+    return (
+        FunctionCheck(
+            key="function-hash-matches-snapshot",
+            passed=True,
+            detail=(f"{document.function_hash} binds {entry_count} snapshot entry/entries"),
+        ),
+        document,
+        document.function_hash,
+    )
 
 
 # -- private proposal binding adapter ---------------------------------------
@@ -4109,9 +4691,10 @@ class System:
         revision = _stored_int(operation_row["revision"], "stored operation revision", minimum=1)
         policy_json = str(operation_row["policy_json"])
         policy_hash = str(operation_row["policy_hash"])
-        policy = _policy_from_text(policy_json)
-        if canonicalize(policy.as_json(), max_bytes=16_384).digest != policy_hash:
+        binding = _policy_binding(policy_json, policy_hash)
+        if binding.digest_mismatch:
             raise IntegrityError("operation policy digest mismatch")
+        policy = binding.policy
 
         canonical_input = parse_json(input_json)
         if canonical_input.text != input_json or canonical_input.digest != input_hash:
@@ -4887,12 +5470,7 @@ class System:
             report_id = str(membership["report_id"])
             artifact_row = artifacts_by_id[artifact_id]
             report_row = reports_by_id[report_id]
-            if (
-                artifact_row["partition"] != receipt.partition
-                or artifact_row["operation"] != receipt.operation
-                or artifact_row["operation_revision"] != receipt.operation_revision
-                or artifact_row["policy_hash"] != receipt.policy_hash
-            ):
+            if _member_scope_mismatch(artifact_row, receipt):
                 raise IntegrityError(f"function receipt member {ordinal} scope binding mismatch")
             if artifact_row["projection_hash"] != receipt_row["projection_hash"]:
                 # One program per set (contract §5): the receipt's program alone serves it.
@@ -4913,17 +5491,11 @@ class System:
                 )
                 if type(details.value) is not dict:
                     raise IntegrityError("bound report details are not an object")
-                details_value = details.value
-                if details_value.get("scope_hash") != artifact_row["scope_hash"]:
+                if _report_scope_mismatch(details.value, artifact_row):
                     raise IntegrityError("bound report scope mismatch")
-                for field in (
-                    "artifact_hash",
-                    "build_hash",
-                    "policy_hash",
-                    "evidence_snapshot_hash",
-                ):
-                    if report_row[field] != artifact_row[field]:
-                        raise IntegrityError(f"bound report {field} mismatch")
+                field = _report_field_mismatch(report_row, artifact_row)
+                if field is not None:
+                    raise IntegrityError(f"bound report {field} mismatch")
             except (IntegrityError, ValidationError) as exc:
                 raise IntegrityError(
                     f"function receipt member {ordinal} report is invalid: {exc}"
@@ -4934,15 +5506,7 @@ class System:
             if membership["entry_seal"] != entry_seal:
                 raise IntegrityError(f"function receipt member {ordinal} entry seal mismatch")
             entries.append(
-                FunctionEntry(
-                    input=artifact.input.value,
-                    output=artifact.output.value,
-                    artifact_hash=str(artifact_row["artifact_hash"]),
-                    evidence_snapshot_hash=str(artifact_row["evidence_snapshot_hash"]),
-                    entry_seal=entry_seal,
-                    report_details_hash=str(report_row["details_hash"]),
-                    report_test_set_hash=str(report_row["test_set_hash"]),
-                )
+                _function_entry(artifact, artifact_row, report_row, entry_seal=entry_seal)
             )
 
         try:
@@ -5200,12 +5764,7 @@ class System:
             raise IntegrityError("function report member function hash mismatch")
         if row["id"] != artifact_id:
             raise IntegrityError("function report member artifact binding mismatch")
-        if (
-            row["partition"] != receipt.partition
-            or row["operation"] != receipt.operation
-            or row["operation_revision"] != receipt.operation_revision
-            or row["policy_hash"] != receipt.policy_hash
-        ):
+        if _member_scope_mismatch(row, receipt):
             raise IntegrityError("function report member scope binding mismatch")
         if row["input_hash"] != input_hash:
             raise IntegrityError("function report member input digest mismatch")
@@ -5241,17 +5800,11 @@ class System:
                 report_row,
                 verify_test_set=False,
             )
-            details_value = cast(dict[str, JSONValue], details.value)
-            if details_value.get("scope_hash") != row["scope_hash"]:
+            if _report_scope_mismatch(cast(dict[str, JSONValue], details.value), row):
                 raise IntegrityError("bound report scope mismatch")
-            for field in (
-                "artifact_hash",
-                "build_hash",
-                "policy_hash",
-                "evidence_snapshot_hash",
-            ):
-                if report_row[field] != row[field]:
-                    raise IntegrityError(f"bound report {field} mismatch")
+            field = _report_field_mismatch(report_row, row)
+            if field is not None:
+                raise IntegrityError(f"bound report {field} mismatch")
         except (
             IndexError,
             KeyError,
@@ -5402,131 +5955,20 @@ class System:
             ).fetchone()
             if operation_row is None:
                 raise NotFoundError("operation is not registered in this partition")
-            if operation_row["partition"] != partition or operation_row["name"] != operation:
-                raise IntegrityError("stored operation scope is invalid")
-            revision = _stored_int(
-                operation_row["revision"],
-                "stored operation revision",
-                minimum=1,
+            revision, policy_hash = _reported_operation(
+                operation_row, partition=partition, operation=operation
             )
-            policy_json = operation_row["policy_json"]
-            try:
-                if type(policy_json) is not str:
-                    raise TypeError("policy text is not a string")
-                policy_hash = _digest(
-                    operation_row["policy_hash"],
-                    "stored operation policy_hash",
-                )
-                policy = _policy_from_text(policy_json)
-                normalized_policy = canonicalize(policy.as_json(), max_bytes=16_384)
-            except (TypeError, ValidationError) as exc:
-                raise IntegrityError("stored operation policy is invalid") from exc
-            if normalized_policy.text != policy_json:
-                raise IntegrityError("stored operation policy is not canonical")
-            if normalized_policy.digest != policy_hash:
-                raise IntegrityError("operation policy digest mismatch")
-
-            if receipt_id is None:
-                receipt_row = self._latest_function_receipt_row(
-                    connection,
-                    partition=partition,
-                    operation=operation,
-                    operation_revision=revision,
-                )
-            else:
-                receipt_row = connection.execute(
-                    """
-                    SELECT * FROM function_receipts
-                    WHERE partition = ? AND operation = ? AND id = ?
-                    """,
-                    (partition, operation, receipt_id),
-                ).fetchone()
-                if receipt_row is None:
-                    raise NotFoundError("function receipt does not exist for this operation")
-
-            function_anchor: FunctionAnchorReport | None = None
-            if receipt_row is not None:
-                receipt = _function_receipt_from_row(receipt_row)
-                member_rows = connection.execute(
-                    """
-                    SELECT a.*,
-                           m.ordinal AS membership_ordinal,
-                           m.function_hash AS membership_function_hash,
-                           m.artifact_id AS membership_artifact_id,
-                           m.report_id AS membership_report_id,
-                           m.input_hash AS membership_input_hash,
-                           m.entry_seal AS membership_entry_seal,
-                           r.id AS bound_report_id,
-                           r.artifact_id AS bound_report_artifact_id,
-                           r.artifact_hash AS bound_report_artifact_hash,
-                           r.build_hash AS bound_report_build_hash,
-                           r.policy_hash AS bound_report_policy_hash,
-                           r.evidence_snapshot_hash
-                               AS bound_report_evidence_snapshot_hash,
-                           r.passed AS bound_report_passed,
-                           r.details_json AS bound_report_details_json,
-                           r.details_hash AS bound_report_details_hash,
-                           r.test_count AS bound_report_test_count,
-                           r.test_set_hash AS bound_report_test_set_hash
-                    FROM function_memberships AS m
-                    JOIN artifacts AS a ON a.id = m.artifact_id
-                    JOIN test_reports AS r
-                      ON r.id = m.report_id AND r.artifact_id = m.artifact_id
-                    WHERE m.receipt_id = ?
-                    ORDER BY m.ordinal LIMIT ?
-                    """,
-                    (receipt.id, projection_limit),
-                ).fetchall()
-                expected_members = min(receipt.member_count, projection_limit)
-                if len(member_rows) != expected_members:
-                    raise IntegrityError("function receipt projected membership count mismatch")
-                members = tuple(
-                    self._function_report_member(
-                        connection,
-                        row,
-                        receipt=receipt,
-                        expected_ordinal=ordinal,
-                    )
-                    for ordinal, row in enumerate(member_rows)
-                )
-                member_input_hashes = [member.input_hash for member in members]
-                if member_input_hashes != sorted(member_input_hashes):
-                    raise IntegrityError("function report member order is not canonical")
-                function_anchor = FunctionAnchorReport(
-                    receipt=receipt,
-                    member_count=receipt.member_count,
-                    members=members,
-                )
-
-            ready_scopes: list[CompileScope] = []
-            blocked_scopes: list[CompileScope] = []
-            ready_count = 0
-            blocked_count = 0
-            try:
-                projections = self._current_build_projections(
-                    connection,
-                    operation_row,
-                )
-                for input_hash, _input_text, projection in projections:
-                    scope = CompileScope(
-                        input_hash=input_hash,
-                        active_support=projection.support,
-                        active_reviewer_count=projection.reviewer_count,
-                        active_span_seconds=projection.span_seconds,
-                        reasons=(
-                            projection.reasons if isinstance(projection, _BlockedBuild) else ()
-                        ),
-                    )
-                    if isinstance(projection, _BlockedBuild):
-                        blocked_count += 1
-                        if len(blocked_scopes) < projection_limit:
-                            blocked_scopes.append(scope)
-                    else:
-                        ready_count += 1
-                        if len(ready_scopes) < projection_limit:
-                            ready_scopes.append(scope)
-            except (TypeError, ValidationError, ValueError, OverflowError) as exc:
-                raise IntegrityError(f"current build projection is invalid: {exc}") from exc
+            function_anchor = self._report_function_anchor(
+                connection,
+                partition=partition,
+                operation=operation,
+                revision=revision,
+                receipt_id=receipt_id,
+                projection_limit=projection_limit,
+            )
+            ready_scopes, blocked_scopes, ready_count, blocked_count = self._report_compile_scopes(
+                connection, operation_row, projection_limit
+            )
 
             pending_bindings = _proposal_bindings(
                 connection,
@@ -5548,128 +5990,19 @@ class System:
                 for binding in pending_bindings.rows
             )
 
-            artifact_status_order = (
-                "draft",
-                "verified",
-                "promoted",
-                "suspended",
-                "retired",
+            artifact_statuses, promoted_count = self._report_artifact_statuses(
+                connection,
+                partition=partition,
+                operation=operation,
+                projection_limit=projection_limit,
             )
-            artifact_counts = dict.fromkeys(artifact_status_order, 0)
-            for count_row in connection.execute(
-                """
-                SELECT status, COUNT(*) AS item_count
-                FROM artifacts
-                WHERE partition = ? AND operation = ?
-                GROUP BY status
-                """,
-                (partition, operation),
-            ).fetchall():
-                status = count_row["status"]
-                if status == "building":
-                    raise IntegrityError("operation contains a persisted building artifact")
-                if type(status) is not str or status not in artifact_counts:
-                    raise IntegrityError("operation contains an unknown artifact status")
-                artifact_counts[status] = _stored_int(
-                    count_row["item_count"],
-                    f"{status} artifact count",
-                )
-
-            artifact_statuses: list[OperationArtifactStatus] = []
-            for status in artifact_status_order:
-                artifact_rows = connection.execute(
-                    """
-                    SELECT * FROM artifacts
-                    WHERE partition = ? AND operation = ? AND status = ?
-                    ORDER BY sequence DESC LIMIT ?
-                    """,
-                    (partition, operation, status, projection_limit),
-                ).fetchall()
-                if len(artifact_rows) != min(
-                    artifact_counts[status],
-                    projection_limit,
-                ):
-                    raise IntegrityError(f"{status} artifact projection count mismatch")
-                artifacts = tuple(
-                    self._operation_report_artifact(
-                        connection,
-                        row,
-                        partition=partition,
-                        operation=operation,
-                        expected_status=status,
-                    )
-                    for row in artifact_rows
-                )
-                artifact_statuses.append(
-                    OperationArtifactStatus(
-                        status=cast(
-                            Literal[
-                                "draft",
-                                "verified",
-                                "promoted",
-                                "suspended",
-                                "retired",
-                            ],
-                            status,
-                        ),
-                        count=artifact_counts[status],
-                        artifacts=artifacts,
-                    )
-                )
-
-            stale_count_row = connection.execute(
-                """
-                SELECT COUNT(*) AS item_count FROM artifacts
-                WHERE partition = ? AND operation = ?
-                  AND status IN ('draft', 'verified', 'promoted')
-                  AND operation_revision <> ?
-                """,
-                (partition, operation, revision),
-            ).fetchone()
-            if stale_count_row is None:
-                raise IntegrityError("stale revision anomaly count is missing")
-            stale_count = _stored_int(
-                stale_count_row["item_count"],
-                "stale revision anomaly count",
+            stale_count, stale_anomalies = self._report_stale_anomalies(
+                connection,
+                partition=partition,
+                operation=operation,
+                revision=revision,
+                projection_limit=projection_limit,
             )
-            stale_rows = connection.execute(
-                """
-                SELECT * FROM artifacts
-                WHERE partition = ? AND operation = ?
-                  AND status IN ('draft', 'verified', 'promoted')
-                  AND operation_revision <> ?
-                ORDER BY sequence DESC LIMIT ?
-                """,
-                (partition, operation, revision, projection_limit),
-            ).fetchall()
-            if len(stale_rows) != min(stale_count, projection_limit):
-                raise IntegrityError("stale revision anomaly projection count mismatch")
-            stale_anomalies: list[StaleRevisionAnomaly] = []
-            for row in stale_rows:
-                status = str(row["status"])
-                artifact = self._operation_report_artifact(
-                    connection,
-                    row,
-                    partition=partition,
-                    operation=operation,
-                    expected_status=status,
-                )
-                artifact_revision = artifact.operation_revision
-                stale_anomalies.append(
-                    StaleRevisionAnomaly(
-                        artifact_id=artifact.artifact_id,
-                        status=cast(
-                            Literal["draft", "verified", "promoted"],
-                            status,
-                        ),
-                        artifact_revision=artifact_revision,
-                        current_revision=revision,
-                        reason=(
-                            f"{status} artifact belongs to stale operation revision "
-                            f"{artifact_revision}; current revision is {revision}"
-                        ),
-                    )
-                )
 
             return FunctionReport(
                 partition=partition,
@@ -5679,18 +6012,282 @@ class System:
                     operation_revision=revision,
                     policy_hash=policy_hash,
                     projection_limit=projection_limit,
-                    promoted_entry_count=artifact_counts["promoted"],
+                    promoted_entry_count=promoted_count,
                     compile_ready_scope_count=ready_count,
                     compile_ready_scopes=tuple(ready_scopes),
                     compile_blocked_scope_count=blocked_count,
                     compile_blocked_scopes=tuple(blocked_scopes),
                     pending_proposal_count=pending_count,
                     pending_proposals=pending_proposals,
-                    artifact_statuses=tuple(artifact_statuses),
+                    artifact_statuses=artifact_statuses,
                     stale_revision_anomaly_count=stale_count,
-                    stale_revision_anomalies=tuple(stale_anomalies),
+                    stale_revision_anomalies=stale_anomalies,
                 ),
             )
+
+    def _report_function_anchor(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        partition: str,
+        operation: str,
+        revision: int,
+        receipt_id: str | None,
+        projection_limit: int,
+    ) -> FunctionAnchorReport | None:
+        """The receipt `function_report` anchors on, its members validated at bounded depth."""
+
+        if receipt_id is None:
+            receipt_row = self._latest_function_receipt_row(
+                connection,
+                partition=partition,
+                operation=operation,
+                operation_revision=revision,
+            )
+        else:
+            receipt_row = connection.execute(
+                """
+                SELECT * FROM function_receipts
+                WHERE partition = ? AND operation = ? AND id = ?
+                """,
+                (partition, operation, receipt_id),
+            ).fetchone()
+            if receipt_row is None:
+                raise NotFoundError("function receipt does not exist for this operation")
+        if receipt_row is None:
+            return None
+        receipt = _function_receipt_from_row(receipt_row)
+        member_rows = connection.execute(
+            """
+            SELECT a.*,
+                   m.ordinal AS membership_ordinal,
+                   m.function_hash AS membership_function_hash,
+                   m.artifact_id AS membership_artifact_id,
+                   m.report_id AS membership_report_id,
+                   m.input_hash AS membership_input_hash,
+                   m.entry_seal AS membership_entry_seal,
+                   r.id AS bound_report_id,
+                   r.artifact_id AS bound_report_artifact_id,
+                   r.artifact_hash AS bound_report_artifact_hash,
+                   r.build_hash AS bound_report_build_hash,
+                   r.policy_hash AS bound_report_policy_hash,
+                   r.evidence_snapshot_hash
+                       AS bound_report_evidence_snapshot_hash,
+                   r.passed AS bound_report_passed,
+                   r.details_json AS bound_report_details_json,
+                   r.details_hash AS bound_report_details_hash,
+                   r.test_count AS bound_report_test_count,
+                   r.test_set_hash AS bound_report_test_set_hash
+            FROM function_memberships AS m
+            JOIN artifacts AS a ON a.id = m.artifact_id
+            JOIN test_reports AS r
+              ON r.id = m.report_id AND r.artifact_id = m.artifact_id
+            WHERE m.receipt_id = ?
+            ORDER BY m.ordinal LIMIT ?
+            """,
+            (receipt.id, projection_limit),
+        ).fetchall()
+        expected_members = min(receipt.member_count, projection_limit)
+        if len(member_rows) != expected_members:
+            raise IntegrityError("function receipt projected membership count mismatch")
+        members = tuple(
+            self._function_report_member(
+                connection,
+                row,
+                receipt=receipt,
+                expected_ordinal=ordinal,
+            )
+            for ordinal, row in enumerate(member_rows)
+        )
+        member_input_hashes = [member.input_hash for member in members]
+        if member_input_hashes != sorted(member_input_hashes):
+            raise IntegrityError("function report member order is not canonical")
+        return FunctionAnchorReport(
+            receipt=receipt,
+            member_count=receipt.member_count,
+            members=members,
+        )
+
+    def _report_compile_scopes(
+        self,
+        connection: sqlite3.Connection,
+        operation_row: sqlite3.Row,
+        projection_limit: int,
+    ) -> tuple[list[CompileScope], list[CompileScope], int, int]:
+        """Every current build counted; each readiness list keeps its first `projection_limit`."""
+
+        ready_scopes: list[CompileScope] = []
+        blocked_scopes: list[CompileScope] = []
+        ready_count = 0
+        blocked_count = 0
+        try:
+            projections = self._current_build_projections(
+                connection,
+                operation_row,
+            )
+            for input_hash, _input_text, projection in projections:
+                scope = CompileScope(
+                    input_hash=input_hash,
+                    active_support=projection.support,
+                    active_reviewer_count=projection.reviewer_count,
+                    active_span_seconds=projection.span_seconds,
+                    reasons=(projection.reasons if isinstance(projection, _BlockedBuild) else ()),
+                )
+                if isinstance(projection, _BlockedBuild):
+                    blocked_count += 1
+                    if len(blocked_scopes) < projection_limit:
+                        blocked_scopes.append(scope)
+                else:
+                    ready_count += 1
+                    if len(ready_scopes) < projection_limit:
+                        ready_scopes.append(scope)
+        except (TypeError, ValidationError, ValueError, OverflowError) as exc:
+            raise IntegrityError(f"current build projection is invalid: {exc}") from exc
+        return ready_scopes, blocked_scopes, ready_count, blocked_count
+
+    def _report_artifact_statuses(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        partition: str,
+        operation: str,
+        projection_limit: int,
+    ) -> tuple[tuple[OperationArtifactStatus, ...], int]:
+        """Each status's count and newest artifacts, plus the promoted count."""
+
+        artifact_status_order = (
+            "draft",
+            "verified",
+            "promoted",
+            "suspended",
+            "retired",
+        )
+        artifact_counts = dict.fromkeys(artifact_status_order, 0)
+        for count_row in connection.execute(
+            """
+            SELECT status, COUNT(*) AS item_count
+            FROM artifacts
+            WHERE partition = ? AND operation = ?
+            GROUP BY status
+            """,
+            (partition, operation),
+        ).fetchall():
+            status = count_row["status"]
+            if status == "building":
+                raise IntegrityError("operation contains a persisted building artifact")
+            if type(status) is not str or status not in artifact_counts:
+                raise IntegrityError("operation contains an unknown artifact status")
+            artifact_counts[status] = _stored_int(
+                count_row["item_count"],
+                f"{status} artifact count",
+            )
+
+        artifact_statuses: list[OperationArtifactStatus] = []
+        for status in artifact_status_order:
+            artifact_rows = connection.execute(
+                """
+                SELECT * FROM artifacts
+                WHERE partition = ? AND operation = ? AND status = ?
+                ORDER BY sequence DESC LIMIT ?
+                """,
+                (partition, operation, status, projection_limit),
+            ).fetchall()
+            if len(artifact_rows) != min(
+                artifact_counts[status],
+                projection_limit,
+            ):
+                raise IntegrityError(f"{status} artifact projection count mismatch")
+            artifacts = tuple(
+                self._operation_report_artifact(
+                    connection,
+                    row,
+                    partition=partition,
+                    operation=operation,
+                    expected_status=status,
+                )
+                for row in artifact_rows
+            )
+            artifact_statuses.append(
+                OperationArtifactStatus(
+                    status=cast(
+                        Literal[
+                            "draft",
+                            "verified",
+                            "promoted",
+                            "suspended",
+                            "retired",
+                        ],
+                        status,
+                    ),
+                    count=artifact_counts[status],
+                    artifacts=artifacts,
+                )
+            )
+        return tuple(artifact_statuses), artifact_counts["promoted"]
+
+    def _report_stale_anomalies(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        partition: str,
+        operation: str,
+        revision: int,
+        projection_limit: int,
+    ) -> tuple[int, tuple[StaleRevisionAnomaly, ...]]:
+        stale_count_row = connection.execute(
+            """
+            SELECT COUNT(*) AS item_count FROM artifacts
+            WHERE partition = ? AND operation = ?
+              AND status IN ('draft', 'verified', 'promoted')
+              AND operation_revision <> ?
+            """,
+            (partition, operation, revision),
+        ).fetchone()
+        if stale_count_row is None:
+            raise IntegrityError("stale revision anomaly count is missing")
+        stale_count = _stored_int(
+            stale_count_row["item_count"],
+            "stale revision anomaly count",
+        )
+        stale_rows = connection.execute(
+            """
+            SELECT * FROM artifacts
+            WHERE partition = ? AND operation = ?
+              AND status IN ('draft', 'verified', 'promoted')
+              AND operation_revision <> ?
+            ORDER BY sequence DESC LIMIT ?
+            """,
+            (partition, operation, revision, projection_limit),
+        ).fetchall()
+        if len(stale_rows) != min(stale_count, projection_limit):
+            raise IntegrityError("stale revision anomaly projection count mismatch")
+        stale_anomalies: list[StaleRevisionAnomaly] = []
+        for row in stale_rows:
+            status = str(row["status"])
+            artifact = self._operation_report_artifact(
+                connection,
+                row,
+                partition=partition,
+                operation=operation,
+                expected_status=status,
+            )
+            artifact_revision = artifact.operation_revision
+            stale_anomalies.append(
+                StaleRevisionAnomaly(
+                    artifact_id=artifact.artifact_id,
+                    status=cast(
+                        Literal["draft", "verified", "promoted"],
+                        status,
+                    ),
+                    artifact_revision=artifact_revision,
+                    current_revision=revision,
+                    reason=(
+                        f"{status} artifact belongs to stale operation revision "
+                        f"{artifact_revision}; current revision is {revision}"
+                    ),
+                )
+            )
+        return stale_count, tuple(stale_anomalies)
 
     def reconstruct_function_receipt(
         self,
@@ -5754,19 +6351,6 @@ class System:
     ) -> FunctionVerification:
         """`verify_function`'s checks inside a caller-held read snapshot (one-snapshot serving)."""
 
-        def summarized(
-            key: str,
-            failures: list[str],
-            passed_detail: str,
-        ) -> FunctionCheck:
-            if not failures:
-                return FunctionCheck(key=key, passed=True, detail=passed_detail)
-            return FunctionCheck(
-                key=key,
-                passed=False,
-                detail=(f"{len(failures)} failure(s): " + "; ".join(failures[:3])),
-            )
-
         registered = connection.execute(
             "SELECT * FROM operations WHERE partition = ? AND name = ?",
             (partition, operation),
@@ -5782,20 +6366,7 @@ class System:
             raise IntegrityError("stored operation policy hash is invalid")
         if type(policy_json) is not str:
             raise IntegrityError("stored operation policy JSON is invalid")
-
-        operation_policy_failures: list[str] = []
-        try:
-            policy = _policy_from_text(policy_json)
-            canonical_policy = canonicalize(policy.as_json(), max_bytes=16_384)
-        except (IntegrityError, ValidationError) as exc:
-            operation_policy_failures.append(f"operation policy is invalid: {exc}")
-        else:
-            if canonical_policy.text != policy_json:
-                operation_policy_failures.append("operation policy JSON is not canonical")
-            if canonical_policy.digest != policy_hash:
-                operation_policy_failures.append(
-                    "operation policy digest does not match policy_hash"
-                )
+        operation_policy_failures = _snapshot_policy_failures(policy_json, policy_hash)
 
         entry_count = self._promoted_function_count(
             connection,
@@ -5803,56 +6374,7 @@ class System:
             operation=operation,
         )
         if entry_count > FUNCTION_MAX_ENTRIES:
-            skipped = (
-                f"not evaluated because {entry_count} promoted entries exceed "
-                f"FUNCTION_MAX_ENTRIES={FUNCTION_MAX_ENTRIES}"
-            )
-            receipt_detail = skipped
-            if operation_policy_failures:
-                receipt_detail = "; ".join(operation_policy_failures) + "; " + skipped
-            checks = (
-                FunctionCheck(
-                    key="duplicate-input-digests",
-                    passed=False,
-                    detail=skipped,
-                ),
-                FunctionCheck(
-                    key="abi-canonicalizer-uniform",
-                    passed=False,
-                    detail=skipped,
-                ),
-                FunctionCheck(
-                    key="sealed-passing-reports",
-                    passed=False,
-                    detail=skipped,
-                ),
-                FunctionCheck(
-                    key="current-promotion-receipts",
-                    passed=False,
-                    detail=receipt_detail,
-                ),
-                FunctionCheck(
-                    key="function-hash-matches-snapshot",
-                    passed=False,
-                    detail=(
-                        f"promoted set has {entry_count} entries and exceeds "
-                        f"FUNCTION_MAX_ENTRIES={FUNCTION_MAX_ENTRIES}"
-                    ),
-                ),
-                FunctionCheck(
-                    key="persisted-function-receipt",
-                    passed=False,
-                    detail=skipped,
-                ),
-                FunctionCheck(key="projection-uniform", passed=False, detail=skipped),
-            )
-            return FunctionVerification(
-                passed=False,
-                entries=entry_count,
-                document=None,
-                function_hash=None,
-                checks=checks,
-            )
+            return _over_capacity_verification(entry_count, operation_policy_failures)
 
         rows = self._promoted_function_rows(
             connection,
@@ -5861,34 +6383,7 @@ class System:
         )
         if len(rows) != entry_count:
             raise IntegrityError("promoted-set count changed during enumeration")
-
-        first_digest_source: dict[str, str] = {}
-        duplicate_sources: dict[str, list[str]] = {}
-        for row in rows:
-            digest = str(row["input_hash"])
-            artifact_id = str(row["id"])
-            if digest not in first_digest_source:
-                first_digest_source[digest] = artifact_id
-                continue
-            sources = duplicate_sources.setdefault(digest, [first_digest_source[digest]])
-            if len(sources) < 3:
-                sources.append(artifact_id)
-        duplicates = sorted(duplicate_sources.items())
-        if duplicates:
-            preview = "; ".join(
-                f"{digest}:{','.join(source_ids)}" for digest, source_ids in duplicates[:3]
-            )
-            duplicate_check = FunctionCheck(
-                key="duplicate-input-digests",
-                passed=False,
-                detail=f"{len(duplicates)} duplicate digest(s): {preview}",
-            )
-        else:
-            duplicate_check = FunctionCheck(
-                key="duplicate-input-digests",
-                passed=True,
-                detail=f"{entry_count} entries have unique input digests",
-            )
+        duplicate_check = _duplicate_digest_check(rows, entry_count)
 
         abi_failures: list[str] = []
         report_failures: list[str] = []
@@ -5896,115 +6391,25 @@ class System:
         projection_failures = [f"operation: {failure}" for failure in operation_policy_failures]
         projected: list[tuple[str, str, str, FunctionEntry]] = []
         for row in rows:
-            artifact_id = str(row["id"])
-            try:
-                raw_artifact = parse_json(
-                    str(row["artifact_json"]), max_bytes=ARTIFACT_MAX_BYTES
-                ).value
-                if type(raw_artifact) is not dict:
-                    raise IntegrityError("artifact document is not an object")
-                raw_scope = raw_artifact.get("scope")
-                artifact_abi = raw_artifact.get("abi")
-                canonicalizer = raw_scope.get("canonicalizer") if type(raw_scope) is dict else None
-                if artifact_abi != ARTIFACT_ABI or canonicalizer != CANONICALIZER:
-                    abi_failures.append(
-                        f"{artifact_id}: abi={artifact_abi!r}, canonicalizer={canonicalizer!r}"
-                    )
-            except (IntegrityError, ValidationError) as exc:
-                abi_failures.append(f"{artifact_id}: {exc}")
+            member = self._snapshot_member(
+                connection,
+                row,
+                revision=revision,
+                policy_hash=policy_hash,
+                policy_json=policy_json,
+            )
+            for failures, failure in (
+                (abi_failures, member.abi_failure),
+                (report_failures, member.report_failure),
+                (receipt_failures, member.receipt_failure),
+                (projection_failures, member.projection_failure),
+            ):
+                if failure is not None:
+                    failures.append(failure)
+            if member.projected is not None:
+                projected.append(member.projected)
 
-            report: sqlite3.Row | None = None
-            if row["verified_report_id"] is not None:
-                report = connection.execute(
-                    "SELECT * FROM test_reports WHERE id = ? AND artifact_id = ?",
-                    (row["verified_report_id"], artifact_id),
-                ).fetchone()
-            try:
-                if report is None or report["passed"] != 1:
-                    raise IntegrityError("missing passing bound report")
-                details = self._validate_report(connection, report, verify_test_set=True)
-                if type(details.value) is not dict:
-                    raise IntegrityError("report details are not an object")
-                if details.value.get("scope_hash") != row["scope_hash"]:
-                    raise IntegrityError("report scope binding mismatch")
-                for field in (
-                    "artifact_hash",
-                    "build_hash",
-                    "policy_hash",
-                    "evidence_snapshot_hash",
-                ):
-                    if report[field] != row[field]:
-                        raise IntegrityError(f"report {field} binding mismatch")
-            except (IntegrityError, ValidationError) as exc:
-                report_failures.append(f"{artifact_id}: {exc}")
-
-            artifact: ArtifactDocument | None = None
-            artifact_error: str | None = None
-            try:
-                artifact = self._artifact_from_row(row)
-            except (IntegrityError, ValidationError) as exc:
-                artifact_error = str(exc)
-
-            scope_failures: list[str] = []
-            stored_revision = row["operation_revision"]
-            if type(stored_revision) is not int:
-                scope_failures.append("stored operation revision is not an integer")
-            elif stored_revision != revision:
-                scope_failures.append(
-                    f"operation revision {stored_revision} does not match current {revision}"
-                )
-            if row["policy_hash"] != policy_hash:
-                scope_failures.append("policy hash does not match current operation")
-            if row["policy_json"] != policy_json:
-                scope_failures.append("policy JSON does not match current operation")
-            try:
-                if artifact is None:
-                    raise IntegrityError(artifact_error or "artifact is invalid")
-                if scope_failures:
-                    raise IntegrityError("; ".join(scope_failures))
-                self._validate_live_promoted(connection, row)
-            except (IntegrityError, ValidationError) as exc:
-                receipt_failures.append(f"{artifact_id}: {exc}")
-
-            if artifact is None:
-                projection_failures.append(
-                    f"{artifact_id}: {artifact_error or 'artifact is invalid'}"
-                )
-            elif report is None:
-                projection_failures.append(f"{artifact_id}: bound report is missing")
-            elif scope_failures:
-                projection_failures.append(f"{artifact_id}: {'; '.join(scope_failures)}")
-            else:
-                entry = FunctionEntry(
-                    input=artifact.input.value,
-                    output=artifact.output.value,
-                    artifact_hash=str(row["artifact_hash"]),
-                    evidence_snapshot_hash=str(row["evidence_snapshot_hash"]),
-                    entry_seal=_function_entry_seal(row, report),
-                    report_details_hash=str(report["details_hash"]),
-                    report_test_set_hash=str(report["test_set_hash"]),
-                )
-                input_json = canonicalize(entry.input)
-                output_json = canonicalize(entry.output)
-                if input_json.digest != row["input_hash"]:
-                    projection_failures.append(
-                        f"{artifact_id}: input digest changed during projection"
-                    )
-                elif output_json.digest != row["output_hash"]:
-                    projection_failures.append(
-                        f"{artifact_id}: output digest changed during projection"
-                    )
-                else:
-                    projected.append(
-                        (
-                            artifact_id,
-                            input_json.digest,
-                            output_json.digest,
-                            entry,
-                        )
-                    )
-
-        abi_check = summarized(
+        abi_check = _summarized_check(
             "abi-canonicalizer-uniform",
             abi_failures,
             (
@@ -6015,125 +6420,30 @@ class System:
                 f"{ARTIFACT_ABI} + {CANONICALIZER}"
             ),
         )
-        report_check = summarized(
+        report_check = _summarized_check(
             "sealed-passing-reports",
             report_failures,
             f"{entry_count} entries carry passing full-seal reports",
         )
-        receipt_check = summarized(
+        receipt_check = _summarized_check(
             "current-promotion-receipts",
             receipt_failures,
             f"{entry_count} entries carry current valid promotion receipts",
         )
         member_programs = {row["projection_hash"] for row in rows}
         del rows
-        program: ProjectionProgram | None = None
-        projection_detail = "exact mode: no member carries a projection"
-        projection_ok = len(member_programs) <= 1
-        if not projection_ok:
-            projection_detail = f"{len(member_programs)} programs across one set"
-        elif member_programs and next(iter(member_programs)) is not None:
-            try:
-                program = self._program_by_hash(connection, next(iter(member_programs)))
-                projection_detail = (
-                    f"every member projects with {program.program_hash if program else ''}"
-                )
-            except IntegrityError as exc:
-                projection_ok = False
-                projection_detail = str(exc)
-        projection_check = FunctionCheck(
-            key="projection-uniform", passed=projection_ok, detail=projection_detail
+        projection_check, program = self._projection_uniform_check(connection, member_programs)
+        hash_check, document, function_hash = _snapshot_hash_check(
+            projection_failures,
+            projected,
+            partition=partition,
+            operation=operation,
+            revision=revision,
+            policy_hash=policy_hash,
+            program=program,
+            entry_count=entry_count,
+            expected_function_hash=expected_function_hash,
         )
-
-        document = None
-        function_hash: str | None = None
-        if projection_failures:
-            hash_check = FunctionCheck(
-                key="function-hash-matches-snapshot",
-                passed=False,
-                detail=(
-                    f"{len(projection_failures)} unprojectable entry/entries: "
-                    + "; ".join(projection_failures[:3])
-                ),
-            )
-        else:
-            try:
-                document = build_function(
-                    partition=partition,
-                    operation=operation,
-                    operation_revision=revision,
-                    policy_hash=policy_hash,
-                    entries=(item[3] for item in projected),
-                    projection=program,
-                )
-                function_hash = document.function_hash
-                if document.value.get("abi") != FUNCTION_ABI:
-                    raise IntegrityError("function ABI changed during projection")
-                if document.value.get("canonicalizer") != CANONICALIZER:
-                    raise IntegrityError("function canonicalizer changed during projection")
-                if document.value.get("function_hash") != document.function_hash:
-                    raise IntegrityError("function hash changed during projection")
-                expected_scope: dict[str, JSONValue] = {
-                    "operation": operation,
-                    "operation_revision": revision,
-                    "partition": partition,
-                    "policy_hash": policy_hash,
-                }
-                if document.value.get("scope") != expected_scope:
-                    raise IntegrityError("function scope does not equal the promoted snapshot")
-                actual_entries = document.value.get("entries")
-                if type(actual_entries) is not list:
-                    raise IntegrityError("function entries are not an array")
-                if len(actual_entries) != len(projected):
-                    raise IntegrityError(
-                        "function entry count does not equal the promoted snapshot"
-                    )
-                projected.sort(key=lambda item: item[1])
-                for actual, (
-                    artifact_id,
-                    input_hash,
-                    output_hash,
-                    entry,
-                ) in zip(actual_entries, projected, strict=True):
-                    expected_entry: dict[str, JSONValue] = {
-                        "artifact_hash": entry.artifact_hash,
-                        "evidence_snapshot_hash": entry.evidence_snapshot_hash,
-                        "input": entry.input,
-                        "input_hash": input_hash,
-                        "output": entry.output,
-                        "output_hash": output_hash,
-                        "entry_seal": entry.entry_seal,
-                        "report": {
-                            "details_hash": entry.report_details_hash,
-                            "test_set_hash": entry.report_test_set_hash,
-                        },
-                    }
-                    if actual != expected_entry:
-                        raise IntegrityError(
-                            f"{artifact_id} function entry changed during projection"
-                        )
-                validated = validate_function(
-                    document.value,
-                    expected_function_hash=(
-                        document.function_hash
-                        if expected_function_hash is None
-                        else expected_function_hash
-                    ),
-                )
-                if validated.text != document.text:
-                    raise IntegrityError("function normalization changed during self-check")
-            except (IntegrityError, ValidationError) as exc:
-                hash_check = FunctionCheck(
-                    key="function-hash-matches-snapshot",
-                    passed=False,
-                    detail=str(exc),
-                )
-            else:
-                hash_check = FunctionCheck(
-                    key="function-hash-matches-snapshot",
-                    passed=True,
-                    detail=(f"{document.function_hash} binds {entry_count} snapshot entry/entries"),
-                )
 
         persisted_receipt_check = self._persisted_function_receipt_check(
             connection,
@@ -6159,6 +6469,96 @@ class System:
             document=document if passed else None,
             function_hash=function_hash,
             checks=checks,
+        )
+
+    def _snapshot_member(
+        self,
+        connection: sqlite3.Connection,
+        row: sqlite3.Row,
+        *,
+        revision: int,
+        policy_hash: str,
+        policy_json: str,
+    ) -> _SnapshotMember:
+        """One promoted row's findings; each check stays independent of the others' failures."""
+
+        artifact_id = str(row["id"])
+        abi_failure = _snapshot_abi_failure(row)
+
+        report: sqlite3.Row | None = None
+        if row["verified_report_id"] is not None:
+            report = connection.execute(
+                "SELECT * FROM test_reports WHERE id = ? AND artifact_id = ?",
+                (row["verified_report_id"], artifact_id),
+            ).fetchone()
+        report_failure: str | None = None
+        try:
+            if report is None or report["passed"] != 1:
+                raise IntegrityError("missing passing bound report")
+            details = self._validate_report(connection, report, verify_test_set=True)
+            if type(details.value) is not dict:
+                raise IntegrityError("report details are not an object")
+            if _report_scope_mismatch(details.value, row):
+                raise IntegrityError("report scope binding mismatch")
+            field = _report_field_mismatch(report, row)
+            if field is not None:
+                raise IntegrityError(f"report {field} binding mismatch")
+        except (IntegrityError, ValidationError) as exc:
+            report_failure = f"{artifact_id}: {exc}"
+
+        artifact: ArtifactDocument | None = None
+        artifact_error: str | None = None
+        try:
+            artifact = self._artifact_from_row(row)
+        except (IntegrityError, ValidationError) as exc:
+            artifact_error = str(exc)
+
+        scope_failures = _snapshot_scope_failures(
+            row, revision=revision, policy_hash=policy_hash, policy_json=policy_json
+        )
+        receipt_failure: str | None = None
+        try:
+            if artifact is None:
+                raise IntegrityError(artifact_error or "artifact is invalid")
+            if scope_failures:
+                raise IntegrityError("; ".join(scope_failures))
+            self._validate_live_promoted(connection, row)
+        except (IntegrityError, ValidationError) as exc:
+            receipt_failure = f"{artifact_id}: {exc}"
+
+        projection_failure, projected = _snapshot_projection(
+            row, artifact, artifact_error, report, scope_failures
+        )
+        return _SnapshotMember(
+            abi_failure=abi_failure,
+            report_failure=report_failure,
+            receipt_failure=receipt_failure,
+            projection_failure=projection_failure,
+            projected=projected,
+        )
+
+    def _projection_uniform_check(
+        self,
+        connection: sqlite3.Connection,
+        member_programs: set[Any],
+    ) -> tuple[FunctionCheck, ProjectionProgram | None]:
+        program: ProjectionProgram | None = None
+        projection_detail = "exact mode: no member carries a projection"
+        projection_ok = len(member_programs) <= 1
+        if not projection_ok:
+            projection_detail = f"{len(member_programs)} programs across one set"
+        elif member_programs and next(iter(member_programs)) is not None:
+            try:
+                program = self._program_by_hash(connection, next(iter(member_programs)))
+                projection_detail = (
+                    f"every member projects with {program.program_hash if program else ''}"
+                )
+            except IntegrityError as exc:
+                projection_ok = False
+                projection_detail = str(exc)
+        return (
+            FunctionCheck(key="projection-uniform", passed=projection_ok, detail=projection_detail),
+            program,
         )
 
     def resolve(
@@ -7367,16 +7767,9 @@ class System:
                     )
                     == input_json.text
                 )
-                raw = parse_json(str(example["input_json"])).value
-                probe_ok = False
-                if type(raw) is dict and type(raw.get(program.text)) is str:
-                    lines = str(raw[program.text]).replace("\r\n", "\n").split("\n")
-                    last = max(i for i, line in enumerate(lines) if ":" in line)
-                    probed = {**raw, program.text: "\n".join(lines[:last] + lines[last + 1 :])}
-                    projected = project(program, probed)
-                    probe_ok = not projected.matched or (
-                        projected.key is not None and projected.key.text != input_json.text
-                    )
+                probe_ok = _structural_edit_leaves(
+                    program, str(example["input_json"]), input_json.text
+                )
                 test(
                     f"structure:{example['id']}",
                     str(example["id"]),
@@ -7409,54 +7802,12 @@ class System:
         if replay_failures:
             failures.append(f"{replay_failures} exact fixture replay tests failed")
 
-        different_input = canonicalize({"$cement_boundary_probe": artifact.digest})
-        if different_input.text == input_json.text:
-            different_input = canonicalize(["$cement_boundary_probe", artifact.digest])
-        boundary_cases = (
-            (
-                "boundary:partition",
-                execute(
-                    artifact,
-                    partition="cement-boundary"
-                    if partition != "cement-boundary"
-                    else "cement-boundary-2",
-                    operation=operation,
-                    operation_revision=revision,
-                    input_json=input_json,
-                ),
-            ),
-            (
-                "boundary:operation",
-                execute(
-                    artifact,
-                    partition=partition,
-                    operation="cement-boundary"
-                    if operation != "cement-boundary"
-                    else "cement-boundary-2",
-                    operation_revision=revision,
-                    input_json=input_json,
-                ),
-            ),
-            (
-                "boundary:revision",
-                execute(
-                    artifact,
-                    partition=partition,
-                    operation=operation,
-                    operation_revision=revision + 1,
-                    input_json=input_json,
-                ),
-            ),
-            (
-                "boundary:input",
-                execute(
-                    artifact,
-                    partition=partition,
-                    operation=operation,
-                    operation_revision=revision,
-                    input_json=different_input,
-                ),
-            ),
+        boundary_cases = _boundary_executions(
+            artifact,
+            partition=partition,
+            operation=operation,
+            revision=revision,
+            input_json=input_json,
         )
         for key, execution in boundary_cases:
             ok = not execution.matched
@@ -7480,16 +7831,11 @@ class System:
         if report is None or report["passed"] != 1:
             raise IntegrityError(f"{artifact_id} has no passing bound report")
         details = self._validate_report(connection, report, verify_test_set=True)
-        if type(details.value) is not dict or details.value.get("scope_hash") != row["scope_hash"]:
+        if type(details.value) is not dict or _report_scope_mismatch(details.value, row):
             raise IntegrityError(f"{artifact_id} report scope binding mismatch")
-        for field in (
-            "artifact_hash",
-            "build_hash",
-            "policy_hash",
-            "evidence_snapshot_hash",
-        ):
-            if report[field] != row[field]:
-                raise IntegrityError(f"{artifact_id} report {field} binding mismatch")
+        field = _report_field_mismatch(report, row)
+        if field is not None:
+            raise IntegrityError(f"{artifact_id} report {field} binding mismatch")
         if promoted:
             artifact = self._artifact_from_row(row)
             self._validate_promoted(connection, row)
@@ -7499,15 +7845,7 @@ class System:
                 raise StateError(
                     f"function candidate {artifact_id} stopped qualifying: {failures[0]}"
                 )
-        return report, FunctionEntry(
-            input=artifact.input.value,
-            output=artifact.output.value,
-            artifact_hash=str(row["artifact_hash"]),
-            evidence_snapshot_hash=str(row["evidence_snapshot_hash"]),
-            entry_seal=_function_entry_seal(row, report),
-            report_details_hash=str(report["details_hash"]),
-            report_test_set_hash=str(report["test_set_hash"]),
-        )
+        return report, _function_entry(artifact, row, report)
 
     def _function_promotion_plan(
         self,
@@ -7532,9 +7870,8 @@ class System:
         revision = int(registered["revision"])
         policy_json = str(registered["policy_json"])
         policy_hash = str(registered["policy_hash"])
-        policy = _policy_from_text(policy_json)
-        canonical_policy = canonicalize(policy.as_json(), max_bytes=16_384)
-        if canonical_policy.text != policy_json or canonical_policy.digest != policy_hash:
+        binding = _policy_binding(policy_json, policy_hash)
+        if binding.text_mismatch or binding.digest_mismatch:
             raise IntegrityError("operation policy binding mismatch")
 
         promoted_rows = connection.execute(
@@ -7545,16 +7882,83 @@ class System:
             """,
             (partition, operation),
         ).fetchall()
-        retained: dict[
-            str,
-            tuple[sqlite3.Row, sqlite3.Row, FunctionEntry],
-        ] = {}
         build_program = self._build_program(
             connection, partition=partition, operation=operation, revision=revision
         )
-        build_program_hash = None if build_program is None else build_program.program_hash
-        # Members built under another program leave the set (contract §5: replaced, never
-        # mixed); a candidate on the same key replaces one, the rest retire as superseded.
+        retained, superseded = self._promotion_retained(
+            connection,
+            promoted_rows,
+            revision=revision,
+            policy_json=policy_json,
+            policy_hash=policy_hash,
+            build_program_hash=None if build_program is None else build_program.program_hash,
+        )
+
+        verified_rows = connection.execute(
+            """
+            SELECT * FROM artifacts
+            WHERE partition = ? AND operation = ? AND operation_revision = ?
+              AND status = 'verified'
+            ORDER BY operation_revision, input_hash, sequence, id
+            """,
+            (partition, operation, revision),
+        ).fetchall()
+        # The same enumerator compile uses: eligibility is reconstruction under the
+        # build-current program, so a set never mixes programs (contract §5).
+        if projections is None:
+            projections = self._build_projections(connection, registered)
+        candidates, skipped = self._promotion_candidates(
+            connection, verified_rows, projections, retained
+        )
+
+        dropped: list[str] = []
+        for input_hash, row in sorted(superseded.items()):
+            if input_hash not in candidates:
+                dropped.append(str(row["id"]))
+                skipped.append(
+                    {
+                        "artifact_id": str(row["id"]),
+                        "input_hash": input_hash,
+                        "reason": "projection-superseded",
+                    }
+                )
+        for input_hash, (row, _, _) in sorted(retained.items()):
+            if input_hash not in candidates and self._contradicted(connection, row):
+                raise StateError(
+                    f"promoted artifact {row['id']} conflicts with active evidence and no verified"
+                    " build replaces it; supersede or revoke the conflicting examples, or suspend"
+                    " the artifact"
+                )
+        return _promotion_plan(
+            partition=partition,
+            operation=operation,
+            revision=revision,
+            policy_hash=policy_hash,
+            build_program=build_program,
+            retained=retained,
+            candidates=candidates,
+            superseded=superseded,
+            skipped=skipped,
+            dropped=dropped,
+        )
+
+    def _promotion_retained(
+        self,
+        connection: sqlite3.Connection,
+        promoted_rows: list[sqlite3.Row],
+        *,
+        revision: int,
+        policy_json: str,
+        policy_hash: str,
+        build_program_hash: str | None,
+    ) -> tuple[_PlannedMembers, dict[str, sqlite3.Row]]:
+        """Promoted members that stay, and those another program supersedes.
+
+        Members built under another program leave the set (contract §5: replaced, never mixed);
+        a candidate on the same key replaces one, the rest retire as superseded.
+        """
+
+        retained: _PlannedMembers = {}
         superseded: dict[str, sqlite3.Row] = {}
         for row in promoted_rows:
             artifact_id = str(row["id"])
@@ -7576,24 +7980,18 @@ class System:
                 promoted=True,
             )
             retained[input_hash] = (row, report, function_entry)
+        return retained, superseded
 
-        verified_rows = connection.execute(
-            """
-            SELECT * FROM artifacts
-            WHERE partition = ? AND operation = ? AND operation_revision = ?
-              AND status = 'verified'
-            ORDER BY operation_revision, input_hash, sequence, id
-            """,
-            (partition, operation, revision),
-        ).fetchall()
-        # The same enumerator compile uses: eligibility is reconstruction under the
-        # build-current program, so a set never mixes programs (contract §5).
-        if projections is None:
-            projections = self._build_projections(connection, registered)
-        candidates: dict[
-            str,
-            tuple[sqlite3.Row, sqlite3.Row, FunctionEntry],
-        ] = {}
+    def _promotion_candidates(
+        self,
+        connection: sqlite3.Connection,
+        verified_rows: list[sqlite3.Row],
+        projections: dict[str, _CurrentBuild | _BlockedBuild],
+        retained: _PlannedMembers,
+    ) -> tuple[_PlannedMembers, list[dict[str, JSONValue]]]:
+        """Verified rows the build-current reconstruction still makes; the rest are skipped."""
+
+        candidates: _PlannedMembers = {}
         skipped: list[dict[str, JSONValue]] = []
         for row in verified_rows:
             artifact_id = str(row["id"])
@@ -7630,106 +8028,7 @@ class System:
                 promoted=False,
             )
             candidates[input_hash] = (row, report, function_entry)
-
-        dropped: list[str] = []
-        for input_hash, row in sorted(superseded.items()):
-            if input_hash not in candidates:
-                dropped.append(str(row["id"]))
-                skipped.append(
-                    {
-                        "artifact_id": str(row["id"]),
-                        "input_hash": input_hash,
-                        "reason": "projection-superseded",
-                    }
-                )
-        for input_hash, (row, _, _) in sorted(retained.items()):
-            if input_hash not in candidates and self._contradicted(connection, row):
-                raise StateError(
-                    f"promoted artifact {row['id']} conflicts with active evidence and no verified"
-                    " build replaces it; supersede or revoke the conflicting examples, or suspend"
-                    " the artifact"
-                )
-        final = dict(retained)
-        final.update(candidates)
-        planned: list[_FunctionPromotionPlanEntry] = []
-        for input_hash in sorted(final):
-            row, report, function_entry = final[input_hash]
-            candidate = input_hash in candidates
-            predecessor = retained.get(input_hash)
-            replaced = (
-                str(predecessor[0]["id"])
-                if predecessor is not None
-                else (str(superseded[input_hash]["id"]) if input_hash in superseded else None)
-            )
-            planned.append(
-                _FunctionPromotionPlanEntry(
-                    row=row,
-                    report=report,
-                    function_entry=function_entry,
-                    public=FunctionPromotionEntry(
-                        artifact_id=str(row["id"]),
-                        input_hash=input_hash,
-                        artifact_hash=str(row["artifact_hash"]),
-                        output_hash=str(row["output_hash"]),
-                        entry_seal=function_entry.entry_seal,
-                        disposition="candidate" if candidate else "retained",
-                        replaces_artifact_id=replaced if candidate else None,
-                    ),
-                )
-            )
-        planned_entries = tuple(planned)
-        document = build_function(
-            partition=partition,
-            operation=operation,
-            operation_revision=revision,
-            policy_hash=policy_hash,
-            entries=(entry.function_entry for entry in planned_entries),
-            projection=build_program,
-        )
-        public_entries = tuple(entry.public for entry in planned_entries)
-        skipped_entries = tuple(skipped)
-        encoded = canonicalize(
-            {
-                "abi": FUNCTION_PROMOTION_MANIFEST_ABI,
-                "entries": [
-                    {
-                        "artifact_hash": entry.artifact_hash,
-                        "artifact_id": entry.artifact_id,
-                        "disposition": entry.disposition,
-                        "entry_seal": entry.entry_seal,
-                        "input_hash": entry.input_hash,
-                        "output_hash": entry.output_hash,
-                        "replaces_artifact_id": entry.replaces_artifact_id,
-                    }
-                    for entry in public_entries
-                ],
-                "function": document.value,
-                "function_hash": document.function_hash,
-                "scope": {
-                    "operation": operation,
-                    "operation_revision": revision,
-                    "partition": partition,
-                    "policy_hash": policy_hash,
-                },
-                "skipped": list(skipped_entries),
-            },
-            max_bytes=_FUNCTION_MANIFEST_MAX_BYTES,
-            max_depth=_FUNCTION_MANIFEST_MAX_DEPTH,
-            max_items=_FUNCTION_MANIFEST_MAX_ITEMS,
-        )
-        return _FunctionPromotionPlan(
-            manifest=FunctionPromotionManifest(
-                operation_revision=revision,
-                function_hash=document.function_hash,
-                text=encoded.text,
-                document=document,
-                entries=public_entries,
-                skipped=skipped_entries,
-            ),
-            policy_hash=policy_hash,
-            entries=planned_entries,
-            dropped=tuple(dropped),
-        )
+        return candidates, skipped
 
     def inspect_function_promotion(
         self,
@@ -8000,20 +8299,14 @@ class System:
                 report["passed"], "stored report passed", maximum=1
             ):
                 raise StateError("artifact's bound verification report is missing or failed")
-            report_details = self._validate_report(connection, report)
-            if (
-                type(report_details.value) is not dict
-                or report_details.value.get("scope_hash") != row["scope_hash"]
+            report_details = self._validate_report(connection, report, verify_test_set=True)
+            if type(report_details.value) is not dict or _report_scope_mismatch(
+                report_details.value, row
             ):
                 raise IntegrityError("verification report scope binding mismatch")
-            for field in (
-                "artifact_hash",
-                "build_hash",
-                "policy_hash",
-                "evidence_snapshot_hash",
-            ):
-                if report[field] != row[field]:
-                    raise IntegrityError(f"verification report {field} binding mismatch")
+            field = _report_field_mismatch(report, row)
+            if field is not None:
+                raise IntegrityError(f"verification report {field} binding mismatch")
             failures, _, artifact = self._run_verification(connection, row)
             if failures:
                 raise StateError(
@@ -8337,158 +8630,32 @@ class System:
                 connection, partition=partition, operation=operation, revision=revision
             )
             grouping = candidate if candidate is not None else build_program
-            cases: dict[str, dict[str, Any]] = {}
-            unprojected: dict[str, list[JSONValue]] = {"example_ids": [], "proposal_ids": []}
-            stale: list[JSONValue] = []
-            unsourced: list[JSONValue] = []
-
-            def carry(
-                input_text: str, input_hash: str, output_text: str, kind: str, ident: str
-            ) -> None:
-                key_text = (
-                    input_text
-                    if grouping is None
-                    else self._case_key_text(grouping, input_text, input_hash)
-                )
-                if key_text is None:
-                    unprojected[f"{kind}_ids"].append(ident)
-                    return
-                entry = cases.setdefault(key_text, {"example": [], "proposal": [], "outputs": {}})
-                entry[kind].append(ident)
-                slot = entry["outputs"].setdefault(
-                    output_text, {"example_ids": [], "proposal_ids": []}
-                )
-                slot[f"{kind}_ids"].append(ident)
-
-            for row in connection.execute(
-                """
-                SELECT id, operation_revision, input_json, input_hash, proposed_output_json,
-                    source_id, provenance_json
-                FROM proposals
-                WHERE partition = ? AND operation = ? AND status = 'pending'
-                ORDER BY status_sequence
-                """,
-                (partition, operation),
-            ):
-                proposal_id = str(row["id"])
-                if row["operation_revision"] != revision:
-                    stale.append(proposal_id)
-                    continue
-                if row["source_id"] is None:
-                    unsourced.append(
-                        {
-                            "proposal_id": proposal_id,
-                            "provenance": parse_json(
-                                str(row["provenance_json"]), max_bytes=PROVENANCE_MAX_BYTES
-                            ).value,
-                        }
-                    )
-                carry(
-                    str(row["input_json"]),
-                    str(row["input_hash"]),
-                    str(row["proposed_output_json"]),
-                    "proposal",
-                    proposal_id,
-                )
-            for row in connection.execute(
-                """
-                SELECT e.id, e.input_json, e.input_hash, e.output_json FROM examples AS e
-                LEFT JOIN example_revocations AS x ON x.example_id = e.id
-                WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
-                  AND x.example_id IS NULL
-                  AND NOT EXISTS (SELECT 1 FROM examples AS s WHERE s.supersedes_example_id = e.id)
-                ORDER BY e.sequence
-                """,
-                (partition, operation, revision),
-            ):
-                carry(
-                    str(row["input_json"]),
-                    str(row["input_hash"]),
-                    str(row["output_json"]),
-                    "example",
-                    str(row["id"]),
-                )
+            cases, unprojected, stale, unsourced = self._learning_case_groups(
+                connection,
+                partition=partition,
+                operation=operation,
+                revision=revision,
+                grouping=grouping,
+            )
 
             # One reconstruction per case per snapshot: the build-current builds feed the case
             # list (when they group it), the work queues and both publication plans.
             current = self._build_projections(connection, registered)
-            listed: list[JSONValue] = []
-            for key_text, entry in cases.items():
-                key = parse_json(key_text)
-                known = current.get(key.digest) if candidate is None else None
-                build = known or self._project_current_build(
-                    connection, registered, key.digest, key.text, program=grouping
-                )
-                built = (
-                    self._live_build(connection, build.build_hash)
-                    if isinstance(build, _CurrentBuild)
-                    else None
-                )
-                listed.append(
-                    {
-                        "key": key.value,
-                        "key_hash": key.digest,
-                        "pending_proposal_ids": entry["proposal"],
-                        "active_example_ids": entry["example"],
-                        "outputs": [
-                            {"output": parse_json(text).value, **ids}
-                            for text, ids in sorted(entry["outputs"].items())
-                        ],
-                        "support": build.support,
-                        "ready": isinstance(build, _CurrentBuild),
-                        "blocked_reasons": (
-                            [] if isinstance(build, _CurrentBuild) else list(build.reasons)
-                        ),
-                        "artifact": (
-                            None
-                            if built is None
-                            else {"id": str(built["id"]), "status": str(built["status"])}
-                        ),
-                    }
-                )
-            listed.sort(key=lambda item: str(cast(dict[str, JSONValue], item)["key_hash"]))
-
-            compile_work: list[JSONValue] = []
-            merge_work: list[JSONValue] = []
-            for key_hash, build in current.items():
-                if isinstance(build, _CurrentBuild):
-                    if self._live_build(connection, build.build_hash) is None:
-                        compile_work.append(key_hash)
-                elif "confirmed outputs conflict" in build.reasons:
-                    # An interrupted merge leaves no pending proposal and nothing to compile; the
-                    # case's differing confirmations are the only sign the pass must resume.
-                    merge_work.append(key_hash)
-            _, drafts, _ = self._draft_verification_plan(
-                connection, partition=partition, operation=operation, projections=current
+            listed = self._learning_case_list(
+                connection,
+                registered,
+                cases,
+                current=current,
+                grouping=grouping,
+                regrouped=candidate is not None,
             )
-            promote_work: list[JSONValue] = []
-            promote_blocked: str | None = None
-            prospective: str | None = None
-            try:
-                plan = self._function_promotion_plan(
-                    connection, partition=partition, operation=operation, projections=current
-                )
-            except StateError as exc:
-                promote_blocked = str(exc)
-            else:
-                prospective = plan.manifest.function_hash
-                promote_work = [
-                    entry.artifact_id
-                    for entry in plan.manifest.entries
-                    if entry.disposition == "candidate"
-                ]
-            live = self._latest_function_receipt_row(
-                connection, partition=partition, operation=operation, operation_revision=revision
+            work, unfinished = self._learning_work(
+                connection,
+                partition=partition,
+                operation=operation,
+                revision=revision,
+                current=current,
             )
-            work: dict[str, JSONValue] = {
-                "merge_key_hashes": merge_work,
-                "compile_key_hashes": compile_work,
-                "verify_artifact_ids": [str(row["id"]) for row in drafts],
-                "promote_artifact_ids": promote_work,
-                "promote_blocked": promote_blocked,
-                "prospective_function_hash": prospective,
-                "live_function_hash": None if live is None else str(live["function_hash"]),
-            }
             pending = sum(len(entry["proposal"]) for entry in cases.values()) + len(
                 unprojected["proposal_ids"]
             )
@@ -8509,16 +8676,201 @@ class System:
                 "stale_pending_proposal_ids": stale,
                 "unsourced_pending": unsourced,
                 "work": work,
-                "nothing_to_learn": not (
-                    pending
-                    or stale
-                    or merge_work
-                    or compile_work
-                    or drafts
-                    or promote_work
-                    or promote_blocked is not None
-                ),
+                "nothing_to_learn": not (pending or stale or unfinished),
             }
+
+    def _learning_case_groups(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        partition: str,
+        operation: str,
+        revision: int,
+        grouping: ProjectionProgram | None,
+    ) -> tuple[
+        dict[str, dict[str, Any]],
+        dict[str, list[JSONValue]],
+        list[JSONValue],
+        list[JSONValue],
+    ]:
+        """Pending proposals (arrival order), then active examples, grouped by case key."""
+
+        cases: dict[str, dict[str, Any]] = {}
+        unprojected: dict[str, list[JSONValue]] = {"example_ids": [], "proposal_ids": []}
+        stale: list[JSONValue] = []
+        unsourced: list[JSONValue] = []
+
+        def carry(
+            input_text: str, input_hash: str, output_text: str, kind: str, ident: str
+        ) -> None:
+            key_text = (
+                input_text
+                if grouping is None
+                else self._case_key_text(grouping, input_text, input_hash)
+            )
+            if key_text is None:
+                unprojected[f"{kind}_ids"].append(ident)
+                return
+            entry = cases.setdefault(key_text, {"example": [], "proposal": [], "outputs": {}})
+            entry[kind].append(ident)
+            slot = entry["outputs"].setdefault(output_text, {"example_ids": [], "proposal_ids": []})
+            slot[f"{kind}_ids"].append(ident)
+
+        for row in connection.execute(
+            """
+            SELECT id, operation_revision, input_json, input_hash, proposed_output_json,
+                source_id, provenance_json
+            FROM proposals
+            WHERE partition = ? AND operation = ? AND status = 'pending'
+            ORDER BY status_sequence
+            """,
+            (partition, operation),
+        ):
+            proposal_id = str(row["id"])
+            if row["operation_revision"] != revision:
+                stale.append(proposal_id)
+                continue
+            if row["source_id"] is None:
+                unsourced.append(
+                    {
+                        "proposal_id": proposal_id,
+                        "provenance": parse_json(
+                            str(row["provenance_json"]), max_bytes=PROVENANCE_MAX_BYTES
+                        ).value,
+                    }
+                )
+            carry(
+                str(row["input_json"]),
+                str(row["input_hash"]),
+                str(row["proposed_output_json"]),
+                "proposal",
+                proposal_id,
+            )
+        for row in connection.execute(
+            """
+            SELECT e.id, e.input_json, e.input_hash, e.output_json FROM examples AS e
+            LEFT JOIN example_revocations AS x ON x.example_id = e.id
+            WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
+              AND x.example_id IS NULL
+              AND NOT EXISTS (SELECT 1 FROM examples AS s WHERE s.supersedes_example_id = e.id)
+            ORDER BY e.sequence
+            """,
+            (partition, operation, revision),
+        ):
+            carry(
+                str(row["input_json"]),
+                str(row["input_hash"]),
+                str(row["output_json"]),
+                "example",
+                str(row["id"]),
+            )
+        return cases, unprojected, stale, unsourced
+
+    def _learning_case_list(
+        self,
+        connection: sqlite3.Connection,
+        registered: sqlite3.Row,
+        cases: dict[str, dict[str, Any]],
+        *,
+        current: dict[str, _CurrentBuild | _BlockedBuild],
+        grouping: ProjectionProgram | None,
+        regrouped: bool,
+    ) -> list[JSONValue]:
+        """Each case with its build; a candidate grouping reconstructs instead of reusing."""
+
+        listed: list[JSONValue] = []
+        for key_text, entry in cases.items():
+            key = parse_json(key_text)
+            known = None if regrouped else current.get(key.digest)
+            build = known or self._project_current_build(
+                connection, registered, key.digest, key.text, program=grouping
+            )
+            built = (
+                self._live_build(connection, build.build_hash)
+                if isinstance(build, _CurrentBuild)
+                else None
+            )
+            listed.append(
+                {
+                    "key": key.value,
+                    "key_hash": key.digest,
+                    "pending_proposal_ids": entry["proposal"],
+                    "active_example_ids": entry["example"],
+                    "outputs": [
+                        {"output": parse_json(text).value, **ids}
+                        for text, ids in sorted(entry["outputs"].items())
+                    ],
+                    "support": build.support,
+                    "ready": isinstance(build, _CurrentBuild),
+                    "blocked_reasons": (
+                        [] if isinstance(build, _CurrentBuild) else list(build.reasons)
+                    ),
+                    "artifact": (
+                        None
+                        if built is None
+                        else {"id": str(built["id"]), "status": str(built["status"])}
+                    ),
+                }
+            )
+        listed.sort(key=lambda item: str(cast(dict[str, JSONValue], item)["key_hash"]))
+        return listed
+
+    def _learning_work(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        partition: str,
+        operation: str,
+        revision: int,
+        current: dict[str, _CurrentBuild | _BlockedBuild],
+    ) -> tuple[dict[str, JSONValue], bool]:
+        """The unfinished publication steps under the build-current program, and whether any."""
+
+        compile_work: list[JSONValue] = []
+        merge_work: list[JSONValue] = []
+        for key_hash, build in current.items():
+            if isinstance(build, _CurrentBuild):
+                if self._live_build(connection, build.build_hash) is None:
+                    compile_work.append(key_hash)
+            elif "confirmed outputs conflict" in build.reasons:
+                # An interrupted merge leaves no pending proposal and nothing to compile; the
+                # case's differing confirmations are the only sign the pass must resume.
+                merge_work.append(key_hash)
+        _, drafts, _ = self._draft_verification_plan(
+            connection, partition=partition, operation=operation, projections=current
+        )
+        promote_work: list[JSONValue] = []
+        promote_blocked: str | None = None
+        prospective: str | None = None
+        try:
+            plan = self._function_promotion_plan(
+                connection, partition=partition, operation=operation, projections=current
+            )
+        except StateError as exc:
+            promote_blocked = str(exc)
+        else:
+            prospective = plan.manifest.function_hash
+            promote_work = [
+                entry.artifact_id
+                for entry in plan.manifest.entries
+                if entry.disposition == "candidate"
+            ]
+        live = self._latest_function_receipt_row(
+            connection, partition=partition, operation=operation, operation_revision=revision
+        )
+        work: dict[str, JSONValue] = {
+            "merge_key_hashes": merge_work,
+            "compile_key_hashes": compile_work,
+            "verify_artifact_ids": [str(row["id"]) for row in drafts],
+            "promote_artifact_ids": promote_work,
+            "promote_blocked": promote_blocked,
+            "prospective_function_hash": prospective,
+            "live_function_hash": None if live is None else str(live["function_hash"]),
+        }
+        unfinished = any(
+            (merge_work, compile_work, drafts, promote_work, promote_blocked is not None)
+        )
+        return work, unfinished
 
     def supersede_examples(
         self,
@@ -8924,7 +9276,7 @@ class System:
             ).fetchone()
             if row is None:
                 raise NotFoundError("verification report does not exist in this partition")
-            details = self._validate_report(connection, row)
+            details = self._validate_report(connection, row, verify_test_set=True)
             tests = connection.execute(
                 """
                 SELECT test_key, example_id, passed, detail FROM artifact_tests
@@ -9001,7 +9353,7 @@ class System:
             ).fetchall()
             result: list[dict[str, JSONValue]] = []
             for row in rows:
-                self._validate_report(connection, row)
+                self._validate_report(connection, row, verify_test_set=True)
                 result.append(
                     {
                         "artifact_id": str(row["artifact_id"]),
@@ -9137,19 +9489,14 @@ class System:
         ).fetchone()
         if report is None or not _stored_int(report["passed"], "stored report passed", maximum=1):
             raise IntegrityError("promoted artifact has no passing bound report")
-        for field in (
-            "artifact_hash",
-            "build_hash",
-            "policy_hash",
-            "evidence_snapshot_hash",
-        ):
-            if report[field] != row[field]:
-                raise IntegrityError(f"promoted artifact report {field} binding mismatch")
+        field = _report_field_mismatch(report, row)
+        if field is not None:
+            raise IntegrityError(f"promoted artifact report {field} binding mismatch")
         # Artifact tests and reports are sealed by schema triggers. Promotion
         # performed the full child-set replay/hash; dispatch verifies its bound
         # receipt without re-hashing up to one million immutable test rows.
         details = System._validate_report(connection, report, verify_test_set=False)
-        if type(details.value) is not dict or details.value.get("scope_hash") != row["scope_hash"]:
+        if type(details.value) is not dict or _report_scope_mismatch(details.value, row):
             raise IntegrityError("promoted artifact report scope mismatch")
         expected = _digest_strings(
             "cement-promotion-v2",

@@ -1768,7 +1768,7 @@ class ObligationBatteryTests(unittest.TestCase):
                 and any(isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)
                         and node.id == "PROVENANCE_MAX_BYTES" for node in ast.walk(function))
             },
-            {"_canonical_candidate", "_proposal_content", "learning_cases"},
+            {"_canonical_candidate", "_proposal_content", "_learning_case_groups"},
         )
         cap_assignment = next(
             node
