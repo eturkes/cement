@@ -29,3 +29,12 @@ Subjects: the eval path the pin's audited child runs — `cli.py` `_read_functio
 ## p104 — `p09-mutate.txt` (`SubmissionTests.test_a_non_mapping_provenance_is_refused_never_normalized` @ 06ab393)
 
 Subjects: `system.py` `System._canonical_candidate` (the provenance type check) + `System.submit_proposal`. Tally: 281 survivors — 280 out of scope → `contract-open` by construction (`store.py` 79, `models.py` 76 = `CompilePolicy.__post_init__`, `json_value.py` 74, `system.py` 51 outside the subjects: the fixture's ledger, policy and candidate canonicalization); 1 in scope, `system.py:739` `System._canonical_candidate` `ReplaceComparisonOperator_IsNot_NotEq #10` → killed by the 16 modules naming a subject (D28 excluded). No ruling owed.
+
+## p105 — `p14-mutate.txt` (`test_main_returns_with_stdout_still_buffered` + `test_a_closed_stdout_exits_120_with_python_s_notice` @ 5a44733)
+
+Subjects: `cli.py` `_emit` + `main` (the stdout channel both pins name). Tally: 389 survivors — 372 out of scope → `contract-open` by construction (`store.py` 153, `cli.py` 110 outside `_emit` + `main`, `models.py` 75, `system.py` 34: the ledger, parser and policy code the pins' commands run); 17 in scope (the first pin; the second holds none): 15 killed by the 29 modules naming a subject, 2 survived and ruled:
+
+| survivor (`5a44733`) | ruling | basis |
+|---|---|---|
+| `cli.py:409` `_emit` `ReplaceBinaryOperator_Mul_Div #3` | equivalent | cosmic-ray rewrites the keyword-only `*` of `def _emit(value, *, stream=None)` into `/`: `stream` becomes positional-or-keyword, and every call site passes `stream=` by keyword, so no call behaves differently. |
+| `cli.py:414` `_emit` `ReplaceFalseWithTrue #10` (`ensure_ascii=False` → `True`) | missing-test → added | the CLI prints non-ASCII JSON as raw UTF-8 (the implementation and every byte-comparing CLI test use `ensure_ascii=False`), but each such test prints ASCII alone; `tests/test_survivor_pins.py` `test_p105_the_cli_prints_non_ascii_json_as_raw_utf8` (a `proposal show` of a Japanese input + output) is green on the tree and red on the mutant (`'"患者": "山田"' not found`). |
