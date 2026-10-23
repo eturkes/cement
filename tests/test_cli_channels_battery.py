@@ -3341,7 +3341,12 @@ class ObligationBatteryTests(unittest.TestCase):
             operator_prose.lower(),
             rf"full\s+{number_words[check_count]}-check\s+verification",
         )
-        self.assertIn("Cement caches no verification between calls", operator_prose)
+        # Re-targeted (p35, standing pin-repair approval): in-process reuse, with its scope.
+        self.assertRegex(
+            operator_prose,
+            r"a later call reuses that verification until a\s+commit through SQLite changes the ledger",
+        )
+        self.assertRegex(operator_prose, r"`cement function\s+verify` always runs the full verification")
         self.assertNotRegex(operator_prose.lower(), r"\b(?:fast|cheap)\b")
         # Docs may write `cached output` and `Quick start` about other subjects;
         # a help screen has no such room, so the whole cost vocabulary is banned

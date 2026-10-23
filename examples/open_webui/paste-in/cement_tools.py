@@ -18,8 +18,8 @@ from pydantic import BaseModel, Field
 # The embedded source keeps its own line breaks; one of its pragma comments runs past 100
 # columns inside the string, where ruff reads no pragma.
 # ruff: noqa: E501
-_CEMENT_PACKAGE = "_cement_runtime_1a9f7cffee444a5a"
-_CEMENT_DIGEST = "1a9f7cffee444a5a0607aa9c90a8f8195bec9335312826c13a0093eeff6d2bae"
+_CEMENT_PACKAGE = "_cement_runtime_9bac8a88e40f7dcc"
+_CEMENT_DIGEST = "9bac8a88e40f7dcc48a8566213cb93388c476cb40d6895eac8fa9667dc9256dd"
 _CEMENT_SOURCES = {
     "__init__": r'''
 """Cement public API."""
@@ -2752,15 +2752,20 @@ class Store:
 
 from __future__ import annotations
 
+import copy
 import hashlib
+import itertools
 import os
 import re
 import sqlite3
+import threading
 import time
 import unicodedata
 import uuid
+from collections import OrderedDict
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Literal, cast
 
 from .artifacts import (
@@ -3466,6 +3471,155 @@ def _promotion_plan(
         policy_hash=policy_hash,
         entries=planned_entries,
         dropped=tuple(dropped),
+    )
+
+
+# -- serving cache (p35) -----------------------------------------------------------
+#
+# Scope (owner-ruled): every commit made through SQLite, by any connection or process, changes
+# the key; a raw byte edit that bypasses SQLite, or a ledger path replaced while a snapshot is
+# open, is outside it (`verify_function` stays the uncached full check). Closing a second
+# descriptor on the ledger would release this process's SQLite locks (POSIX), so the change
+# token is `PRAGMA data_version` on a separate SQLite "observer" connection, read while the
+# serving snapshot holds SHARED: no writer can commit then, and WAL (where readers do not block
+# writers) cannot be switched on. A fresh observer restarts at 1, hence a never-reused
+# generation per observer. The cache keeps a private master copy and hands every hit a deep copy,
+# so a caller mutating a returned value never reaches a later call; memory = one document per
+# cached verification (at most `_SERVING_CACHE_MAX`).
+
+_SERVING_CACHE_MAX = 8
+_SERVING_OBSERVERS_MAX = 8
+
+
+@dataclass(frozen=True, slots=True)
+class _CachedServing:
+    """A private master copy: no caller ever holds it, every hit gets its own deep copy (half
+    the cost of re-parsing the document text, which also re-validates every entry)."""
+
+    verification: FunctionVerification
+
+    @staticmethod
+    def of(verification: FunctionVerification) -> _CachedServing:
+        return _CachedServing(copy.deepcopy(verification))
+
+    def served(self) -> FunctionVerification:
+        return copy.deepcopy(self.verification)
+
+
+class _ServingCache:
+    """Process-wide verifications by ledger state; one per process (a fork child starts anew)."""
+
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        self.verifications: OrderedDict[tuple[object, ...], _CachedServing] = OrderedDict()
+        self.observers: OrderedDict[tuple[int, int], tuple[int, sqlite3.Connection]] = OrderedDict()
+        self.generations = itertools.count(1)
+        self._inherited: list[object] = []
+
+    def forget_after_fork(self) -> None:
+        """A fork child starts empty: the parent's lock may be held by a thread the child lacks,
+        and closing a connection the parent opened is SQLite's documented across-fork hazard, so
+        the parent's observers stay referenced and unused."""
+
+        self._inherited.append((self.observers, self.verifications))
+        self.lock = threading.Lock()
+        self.verifications = OrderedDict()
+        self.observers = OrderedDict()
+        self.generations = itertools.count(1)
+
+    def token(self, uri: str, identity: tuple[int, int]) -> tuple[int, int] | None:
+        """`(generation, data_version)` of this inode's observer; None = verify uncached.
+
+        Called only while the serving snapshot holds SHARED. A same-process writer holding
+        PENDING makes the observer BUSY (busy timeout 0): that call bypasses the cache.
+        """
+
+        with self.lock:
+            observer = self.observers.get(identity)
+            if observer is None:
+                try:
+                    connection = sqlite3.connect(
+                        uri, timeout=0, isolation_level=None, uri=True, check_same_thread=False
+                    )
+                except sqlite3.Error:
+                    return None
+                observer = (next(self.generations), connection)
+                self.observers[identity] = observer
+                while len(self.observers) > _SERVING_OBSERVERS_MAX:
+                    self.observers.popitem(last=False)[1][1].close()
+            else:
+                self.observers.move_to_end(identity)
+            generation, connection = observer
+            try:
+                # data_version first: it refreshes the observer's view of the file, and until then
+                # `journal_mode` answers from connection state (a switch to WAL would read
+                # `delete`). fetchall: a statement left unfinished would keep its read lock.
+                version = connection.execute("PRAGMA data_version").fetchall()
+                mode = connection.execute("PRAGMA journal_mode").fetchall()
+            except sqlite3.Error:
+                del self.observers[identity]
+                connection.close()
+                return None
+            if mode != [("delete",)] or len(version) != 1:
+                # An idle observer that has seen WAL would block a later switch back to DELETE.
+                del self.observers[identity]
+                connection.close()
+                return None
+            if type(version[0][0]) is not int:
+                return None
+            return generation, version[0][0]
+
+    def get(self, key: tuple[object, ...]) -> _CachedServing | None:
+        with self.lock:
+            cached = self.verifications.get(key)
+            if cached is not None:
+                self.verifications.move_to_end(key)
+            return cached
+
+    def put(self, key: tuple[object, ...], cached: _CachedServing) -> None:
+        with self.lock:
+            self.verifications[key] = cached
+            self.verifications.move_to_end(key)
+            while len(self.verifications) > _SERVING_CACHE_MAX:
+                self.verifications.popitem(last=False)
+
+
+_SERVING = _ServingCache()
+if hasattr(os, "register_at_fork"):  # POSIX alone forks
+    os.register_at_fork(after_in_child=_SERVING.forget_after_fork)
+
+
+def _serving_key(
+    path: Path,
+    *,
+    partition: str,
+    operation: str,
+    state: SwitchState,
+    expected_function_hash: str | None,
+) -> tuple[object, ...] | None:
+    """The ledger state + selection a served verification is reused for; None = uncached."""
+
+    try:
+        stat = os.stat(path)
+    except OSError:
+        return None
+    token = _SERVING.token(f"{path.absolute().as_uri()}?mode=ro", (stat.st_dev, stat.st_ino))
+    if token is None:
+        return None
+    return (
+        stat.st_dev,
+        stat.st_ino,
+        stat.st_size,
+        stat.st_mtime_ns,
+        stat.st_ctime_ns,
+        *token,
+        partition,
+        operation,
+        state.mode,
+        state.function_hash,
+        state.receipt_id,
+        expected_function_hash,
+        FUNCTION_MAX_ENTRIES,
     )
 
 
@@ -6574,13 +6728,14 @@ class System:
         One read snapshot holds the switch, the served version and its checks, so a writer
         committing in between changes the next call, never this one. ``off`` runs no
         verification and answers nothing. ``follow`` runs the full set verification over the
-        live promoted set (it costs what ``verify_function`` costs: ~36.5 s and ~963 MiB at
-        50,000 entries, ``.agent/decisions/m3u2b-resolve-bench.json``). ``pinned`` rebuilds the
-        pinned receipt and checks that no explicit negative judgment (revoked evidence, a
-        suspended member, a counterexample) has reached it since. Arguments are validated
-        first, so a rejected call reads no ledger. This call writes nothing and caches no
-        verification result (projection keys are memoized by content, never by verdict). A
-        failed verdict returns ``match`` ``None`` and is never a miss.
+        live promoted set on a cold call (it costs what ``verify_function`` costs: ~36.5 s and
+        ~963 MiB at 50,000 entries, ``.agent/decisions/m3u2b-resolve-bench.json``). ``pinned``
+        rebuilds the pinned receipt and checks that no explicit negative judgment (revoked
+        evidence, a suspended member, a counterexample) has reached it since. Arguments are
+        validated first, so a rejected call reads no ledger. This call writes nothing; a later
+        call in the same process reuses the served verification until a commit through SQLite
+        changes the ledger (``serving``). A failed verdict returns ``match`` ``None`` and is
+        never a miss.
         """
 
         partition = _name(partition, "partition")
@@ -6613,6 +6768,10 @@ class System:
 
         ``off`` returns ``None`` and runs no check; ``follow`` = the live set's verification;
         ``pinned`` = the pin checks. ``resolve`` and the CLI export both serve through this.
+        The verification is reused process-wide while the ledger is unchanged: any commit
+        through SQLite, by any connection or process, invalidates it; a raw byte edit that
+        bypasses SQLite, or a ledger path replaced during an open snapshot, is outside that
+        guarantee; a WAL ledger is never reused. ``verify_function`` stays uncached.
         """
 
         partition = _name(partition, "partition")
@@ -6623,19 +6782,35 @@ class System:
             state = self._switch_state(connection, partition=partition, operation=operation)
             if state.mode == "off":
                 return state, None
+            # The switch read above holds SHARED, so the key names this snapshot's state.
+            key = _serving_key(
+                self.store.path,
+                partition=partition,
+                operation=operation,
+                state=state,
+                expected_function_hash=expected_function_hash,
+            )
+            if key is not None:
+                cached = _SERVING.get(key)
+                if cached is not None:
+                    return state, cached.served()
             if state.mode == "follow":
-                return state, self._verify_function_snapshot(
+                verification = self._verify_function_snapshot(
                     connection,
                     partition=partition,
                     operation=operation,
                     expected_function_hash=expected_function_hash,
                 )
-            return state, self._verify_pinned_snapshot(
-                connection,
-                partition=partition,
-                state=state,
-                expected_function_hash=expected_function_hash,
-            )
+            else:
+                verification = self._verify_pinned_snapshot(
+                    connection,
+                    partition=partition,
+                    state=state,
+                    expected_function_hash=expected_function_hash,
+                )
+            if key is not None:
+                _SERVING.put(key, _CachedServing.of(verification))
+            return state, verification
 
     # -- projection settings (M4.2) --------------------------------------------
 

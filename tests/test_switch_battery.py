@@ -239,6 +239,11 @@ class SwitchBattery(unittest.TestCase):
             seen.append((connection, connection.in_transaction))
             return pin_checks(instance, connection, **kwargs)
 
+        # p35: the first resolve's verification is reused while the ledger is unchanged; this
+        # frame grades the verifying call, so it starts from an empty serving cache.
+        from cement_runtime import system as system_module
+
+        system_module._SERVING.verifications.clear()
         with (
             unittest.mock.patch.object(store.Store, "transaction", recording),
             unittest.mock.patch.object(System, "_pin_checks", spy),

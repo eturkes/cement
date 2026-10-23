@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import ast
 import gc
+import os
 import hashlib
 import inspect
 import json
 import pathlib
 import shutil
 import sqlite3
+import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -17679,6 +17682,439 @@ class BindingOwnerCensusTests(unittest.TestCase):
             ],
             [],
         )
+
+
+class ServingCacheTests(unittest.TestCase):
+    """p35: `serving` reuses a verification while the ledger is unchanged (`.agent/decisions/p35-contract.md`).
+
+    Every test first shows a warm call served from the cache (one snapshot verification for two
+    calls), so each is red where no cache exists; the property it pins comes after.
+    """
+
+    PARTITION = "tenant-p35"
+    OPERATION = "echo"
+
+    def setUp(self) -> None:
+        directory = tempfile.TemporaryDirectory(prefix="cement-p35-")
+        self.addCleanup(directory.cleanup)
+        self.directory = pathlib.Path(directory.name)
+        self.ledgers = 0
+        self.calls: list[str] = []
+        for name in ("_verify_function_snapshot", "_verify_pinned_snapshot"):
+            original = getattr(System, name)
+
+            def counted(system, *args, _original=original, _name=name, **kwargs):
+                self.calls.append(_name)
+                return _original(system, *args, **kwargs)
+
+            patcher = mock.patch.object(System, name, counted)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def _ledger(self, members: int = 3, *, mode: str = "follow") -> tuple[System, str]:
+        self.ledgers += 1
+        database = str(self.directory / f"ledger-{self.ledgers}.db")
+        system = System(database)
+        system.register_operation(self.PARTITION, self.OPERATION, policy=CompilePolicy(2, 1, 0))
+        for value in range(members):
+            for reviewer in ("alice", "bob"):
+                proposal = system.submit_proposal(
+                    self.PARTITION,
+                    self.OPERATION,
+                    {"x": value},
+                    candidate=Candidate(output={"y": value}, provenance={}),
+                    source_id=f"{value}-{reviewer}",
+                )
+                system.review(self.PARTITION, proposal, reviewer=reviewer, decision="accept")
+        system.compile(self.PARTITION, self.OPERATION)
+        system.verify_drafts(self.PARTITION, self.OPERATION, verified_by="verifier")
+        manifest = system.inspect_function_promotion(self.PARTITION, self.OPERATION)
+        promotion = system.promote_function(
+            self.PARTITION,
+            self.OPERATION,
+            expected_function_hash=manifest.function_hash,
+            promoted_by="release",
+        )
+        if mode == "pinned":
+            system.set_switch(
+                self.PARTITION,
+                self.OPERATION,
+                mode="pinned",
+                actor="person",
+                function_hash=promotion.function_hash,
+            )
+        else:
+            system.set_switch(self.PARTITION, self.OPERATION, mode=mode, actor="person")
+        self.calls.clear()
+        return system, database
+
+    def _resolve(self, database: str, value: int = 1):
+        return System(database, create=False).resolve(self.PARTITION, self.OPERATION, {"x": value})
+
+    @staticmethod
+    def _corrupt(database: str, position: int) -> None:
+        """Trigger-preserving, committed, out-of-band SQL: the promoted member at `position`."""
+
+        connection = sqlite3.connect(database, isolation_level=None)
+        try:
+            triggers = connection.execute(
+                "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' ORDER BY rowid"
+            ).fetchall()
+            connection.execute("BEGIN IMMEDIATE")
+            for name, _ in triggers:
+                connection.execute(f'DROP TRIGGER "{name}"')
+            ids = [
+                row[0]
+                for row in connection.execute(
+                    "SELECT id FROM artifacts WHERE status = 'promoted' ORDER BY input_hash"
+                )
+            ]
+            cursor = connection.execute(
+                "UPDATE artifacts SET artifact_json = '{}' WHERE id = ?", (ids[position],)
+            )
+            assert cursor.rowcount == 1
+            for _, sql in triggers:
+                connection.execute(sql)
+            connection.execute("COMMIT")
+        finally:
+            connection.close()
+
+    def test_a_warm_call_verifies_once_and_a_second_system_shares_it(self) -> None:
+        _, database = self._ledger()
+        cold = self._resolve(database)
+        warm = System(database, create=False).resolve(self.PARTITION, self.OPERATION, {"x": 1})
+        self.assertEqual(self.calls, ["_verify_function_snapshot"])
+        self.assertEqual(warm, cold)
+        self.assertTrue(warm.verification.passed)
+        self.assertEqual(warm.match.output, {"y": 1})
+
+    def test_verify_function_stays_uncached(self) -> None:
+        system, database = self._ledger()
+        self._resolve(database)
+        self._resolve(database)
+        self.assertEqual(len(self.calls), 1)
+        system.verify_function(self.PARTITION, self.OPERATION)
+        system.verify_function(self.PARTITION, self.OPERATION)
+        self.assertEqual(len(self.calls), 3)
+
+    def test_a_write_through_the_system_or_another_process_invalidates(self) -> None:
+        system, database = self._ledger()
+        self._resolve(database)
+        self._resolve(database)
+        self.assertEqual(len(self.calls), 1)
+        system.set_switch(self.PARTITION, self.OPERATION, mode="follow", actor="other")
+        self._resolve(database)
+        self.assertEqual(len(self.calls), 2)
+        writer = (
+            "import sys; from cement_runtime import System; "
+            "System(sys.argv[1], create=False).set_switch("
+            f"{self.PARTITION!r}, {self.OPERATION!r}, mode='follow', actor='process')"
+        )
+        source = str(pathlib.Path(cement_runtime.__file__).resolve().parents[1])
+        completed = subprocess.run(
+            [sys.executable, "-c", writer, database],
+            capture_output=True,
+            text=True,
+            env={**os.environ, "PYTHONPATH": source},
+            timeout=60,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self._resolve(database)
+        self.assertEqual(len(self.calls), 3)
+
+    def test_a_thread_writing_between_calls_invalidates(self) -> None:
+        system, database = self._ledger()
+        self._resolve(database)
+        self._resolve(database)
+        writer = threading.Thread(
+            target=lambda: System(database, create=False).set_switch(
+                self.PARTITION, self.OPERATION, mode="follow", actor="thread"
+            )
+        )
+        writer.start()
+        writer.join(timeout=30)
+        self._resolve(database)
+        self.assertEqual(len(self.calls), 2)
+
+    def test_corrupting_the_first_middle_or_last_member_never_serves_a_cached_pass(self) -> None:
+        for position in (0, 1, 2):
+            with self.subTest(position=position):
+                _, database = self._ledger()
+                self.assertTrue(self._resolve(database).verification.passed)
+                self.assertTrue(self._resolve(database).verification.passed)
+                self.assertEqual(len(self.calls), 1)
+                self._corrupt(database, position)
+                corrupted = self._resolve(database)
+                self.assertEqual(len(self.calls), 2)
+                self.assertFalse(corrupted.verification.passed)
+                self.assertIsNone(corrupted.match)
+
+    def test_a_commit_that_writes_nothing_keeps_the_hit(self) -> None:
+        _, database = self._ledger()
+        self._resolve(database)
+        connection = sqlite3.connect(database, isolation_level=None)
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute("UPDATE operations SET name = name WHERE 0")
+            connection.execute("COMMIT")
+        finally:
+            connection.close()
+        self._resolve(database)
+        self.assertEqual(len(self.calls), 1)
+
+    def test_a_caller_mutating_a_served_document_never_reaches_a_later_call(self) -> None:
+        _, database = self._ledger()
+        first = self._resolve(database)
+        first.verification.document.value["entries"].clear()
+        second = self._resolve(database)
+        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(len(second.verification.document.value["entries"]), 3)
+        second.match.output["y"] = "mutated"
+        third = self._resolve(database)
+        self.assertEqual(third.match.output, {"y": 1})
+
+    def test_a_cached_result_equals_the_uncached_one_in_every_mode(self) -> None:
+        cases = {
+            "follow": ("follow", None),
+            "pinned": ("pinned", None),
+            "follow-failed": ("follow", 1),
+            "pinned-failed": ("pinned", 1),
+        }
+        for label, (mode, corrupt) in cases.items():
+            with self.subTest(case=label):
+                _, database = self._ledger(mode=mode)
+                if corrupt is not None:
+                    self._corrupt(database, corrupt)
+                cold = self._resolve(database)
+                warm = self._resolve(database)
+                self.assertEqual(len(self.calls), 1)
+                self.assertEqual(warm, cold)
+                self.assertEqual(warm.verification.passed, corrupt is None)
+                self.calls.clear()
+        _, database = self._ledger(mode="off")
+        self.assertEqual(self._resolve(database), self._resolve(database))
+        self.assertEqual(self.calls, [])
+
+    def test_the_runtime_set_cap_is_part_of_the_key(self) -> None:
+        _, database = self._ledger()
+        self._resolve(database)
+        self._resolve(database)
+        self.assertEqual(len(self.calls), 1)
+        with mock.patch.object(system_module, "FUNCTION_MAX_ENTRIES", 2):
+            capped = self._resolve(database)
+        self.assertEqual(len(self.calls), 2)
+        self.assertFalse(capped.verification.passed)
+
+    def test_wal_bypasses_the_cache_and_retires_its_observer(self) -> None:
+        _, database = self._ledger()
+        self._resolve(database)
+        self._resolve(database)
+        self.assertEqual(len(self.calls), 1)
+
+        def switch(mode: str) -> None:
+            connection = sqlite3.connect(database, isolation_level=None, timeout=0)
+            try:
+                self.assertEqual(
+                    connection.execute(f"PRAGMA journal_mode = {mode}").fetchone()[0], mode
+                )
+            finally:
+                connection.close()
+
+        switch("wal")
+        # ONE call after the switch already bypasses and retires the observer: the switch back
+        # to DELETE succeeds at busy timeout 0, and that call stored nothing.
+        self._resolve(database)
+        self.assertEqual(len(self.calls), 2)
+        switch("delete")
+        self._resolve(database)
+        self._resolve(database)
+        self.assertEqual(len(self.calls), 3)
+
+    def test_an_observer_error_bypasses_and_stores_nothing(self) -> None:
+        _, database = self._ledger()
+
+        class Busy:
+            def execute(self, sql: str):
+                raise sqlite3.OperationalError("database is locked")
+
+            def close(self) -> None:
+                return None
+
+        connect = sqlite3.connect
+
+        def observer_busy(*args, **kwargs):
+            # The observer alone opens with `check_same_thread=False`; Store connections pass.
+            if kwargs.get("check_same_thread") is False:
+                return Busy()
+            return connect(*args, **kwargs)
+
+        with mock.patch.object(system_module.sqlite3, "connect", side_effect=observer_busy):
+            self._resolve(database)
+            self._resolve(database)
+        self.assertEqual(len(self.calls), 2)
+        self._resolve(database)
+        self._resolve(database)
+        self.assertEqual(len(self.calls), 3)
+
+    def test_a_recreated_observer_never_reuses_an_entry(self) -> None:
+        _, first = self._ledger()
+        _, second = self._ledger()
+        with mock.patch.object(system_module, "_SERVING_OBSERVERS_MAX", 1):
+            self._resolve(first)
+            self._resolve(first)
+            self.assertEqual(len(self.calls), 1)
+            self._resolve(second)
+            self._resolve(first)
+        # The evicted observer's successor restarts `data_version` at 1 under a new generation.
+        self.assertEqual(len(self.calls), 3)
+
+    def test_the_cache_is_bounded(self) -> None:
+        _, database = self._ledger()
+        with mock.patch.object(system_module, "_SERVING_CACHE_MAX", 1):
+            self._resolve(database)
+            self._resolve(database)
+            self.assertEqual(len(self.calls), 1)
+            System(database, create=False).resolve(
+                self.PARTITION, self.OPERATION, {"x": 1}, expected_function_hash="0" * 64
+            )
+            self._resolve(database)
+        self.assertEqual(len(self.calls), 3)
+
+    def test_after_a_cached_call_another_process_commits_at_busy_timeout_zero(self) -> None:
+        system, database = self._ledger()
+        self._resolve(database)
+        self._resolve(database)
+        self.assertEqual(len(self.calls), 1)
+        writer = (
+            "import sqlite3, sys; c = sqlite3.connect(sys.argv[1], timeout=0, isolation_level=None)\n"
+            "c.execute('BEGIN IMMEDIATE'); c.execute('UPDATE operations SET name = name')\n"
+            "c.execute('COMMIT'); print('committed')"
+        )
+
+        def commit() -> subprocess.CompletedProcess[str]:
+            return subprocess.run(
+                [sys.executable, "-c", writer, database],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+            )
+
+        self.assertEqual(commit().stdout.strip(), "committed")
+        # Control: an open read snapshot does block that COMMIT.
+        with system.store.transaction(write=False) as connection:
+            connection.execute("SELECT 1 FROM operations").fetchall()
+            blocked = commit()
+        self.assertNotEqual(blocked.returncode, 0)
+        self.assertIn("database is locked", blocked.stderr)
+
+    def test_a_same_process_writer_holding_pending_makes_the_call_bypass(self) -> None:
+        _, database = self._ledger()
+        self._resolve(database)
+        self._resolve(database)
+        self.assertEqual(len(self.calls), 1)
+        writers: list[sqlite3.Connection] = []
+        switch_state = System._switch_state
+
+        def then_pending(connection, **kwargs):
+            state = switch_state(connection, **kwargs)
+            # The snapshot now holds SHARED: a writer's COMMIT fails at timeout 0 and keeps
+            # PENDING, which this process's observer then meets as BUSY.
+            writer = sqlite3.connect(database, isolation_level=None, timeout=0)
+            writers.append(writer)
+            writer.execute("BEGIN IMMEDIATE")
+            writer.execute("UPDATE operations SET name = name")
+            with self.assertRaises(sqlite3.OperationalError):
+                writer.execute("COMMIT")
+            return state
+
+        with mock.patch.object(System, "_switch_state", staticmethod(then_pending)):
+            pending = self._resolve(database)
+        writers[0].execute("ROLLBACK")
+        writers[0].close()
+        self.assertEqual(len(self.calls), 2)
+        self.assertTrue(pending.verification.passed)
+        # Any observer error retires that observer: the next call opens a new generation.
+        self.assertEqual(self._resolve(database), pending)
+        self.assertEqual(len(self.calls), 3)
+
+    def test_evicting_an_observer_keeps_another_reader_s_lock(self) -> None:
+        held, first = self._ledger()
+        _, second = self._ledger()
+        writer = (
+            "import sqlite3, sys; c = sqlite3.connect(sys.argv[1], timeout=0, isolation_level=None)\n"
+            "c.execute('BEGIN IMMEDIATE'); c.execute('UPDATE operations SET name = name')\n"
+            "c.execute('COMMIT'); print('committed')"
+        )
+
+        def commit() -> subprocess.CompletedProcess[str]:
+            return subprocess.run(
+                [sys.executable, "-c", writer, first], capture_output=True, text=True, timeout=60
+            )
+
+        with mock.patch.object(system_module, "_SERVING_OBSERVERS_MAX", 1):
+            self._resolve(first)
+            with held.store.transaction(write=False) as connection:
+                connection.execute("SELECT 1 FROM operations").fetchall()
+                self._resolve(second)  # evicts and closes the first ledger's observer
+                blocked = commit()
+            released = commit()
+        self.assertIn("database is locked", blocked.stderr)
+        self.assertEqual(released.stdout.strip(), "committed")
+
+    def test_a_fork_while_another_thread_holds_the_cache_lock(self) -> None:
+        _, database = self._ledger()
+        self._resolve(database)
+        taken, release = threading.Event(), threading.Event()
+
+        def hold() -> None:
+            with system_module._SERVING.lock:
+                taken.set()
+                release.wait(timeout=30)
+
+        holder = threading.Thread(target=hold)
+        holder.start()
+        self.assertTrue(taken.wait(timeout=30))
+        reader, writer = os.pipe()
+        try:
+            child = os.fork()
+            if child == 0:  # pragma: no cover - the child reports through the pipe
+                try:
+                    state = system_module._SERVING
+                    fresh = not state.verifications and not state.observers
+                    acquired = state.lock.acquire(timeout=1)
+                    os.write(writer, b"ok" if fresh and acquired else b"stale")
+                finally:
+                    os._exit(0)
+        finally:
+            release.set()
+            holder.join(timeout=30)
+        os.close(writer)
+        _, status = os.waitpid(child, 0)
+        self.assertEqual(os.read(reader, 16), b"ok")
+        os.close(reader)
+        self.assertEqual(status, 0)
+
+    def test_a_fork_child_starts_with_an_empty_cache(self) -> None:
+        _, database = self._ledger()
+        self._resolve(database)
+        self.assertTrue(system_module._SERVING.verifications)
+        reader, writer = os.pipe()
+        child = os.fork()
+        if child == 0:  # pragma: no cover - the child reports through the pipe
+            try:
+                state = system_module._SERVING
+                fresh = not state.verifications and not state.observers
+                acquired = state.lock.acquire(timeout=1)
+                os.write(writer, b"ok" if fresh and acquired else b"stale")
+            finally:
+                os._exit(0)
+        os.close(writer)
+        _, status = os.waitpid(child, 0)
+        self.assertEqual(os.read(reader, 16), b"ok")
+        os.close(reader)
+        self.assertEqual(status, 0)
 
 
 if __name__ == "__main__":

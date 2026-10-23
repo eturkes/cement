@@ -1559,6 +1559,9 @@ class CliChannelTests(unittest.TestCase):
             function_hash=None,
             checks=(),
         )
+        # p35: the CLI resolves above left this ledger's verification in the serving cache;
+        # the injected verifier must run, so the cache starts empty.
+        system_module._SERVING.verifications.clear()
         with mock.patch.object(
             system,
             "_verify_function_snapshot",
@@ -3108,6 +3111,11 @@ class CliChannelTests(unittest.TestCase):
         those meaning-bearing tokens, NOT the literal string `caches nothing`, which appears
         only in the method docstring. This row is D27's rule applied to cost: `resolve writes
         nothing` invites a cheapness inference that only the caching sentence closes.
+
+        RE-TARGETED (p35, standing pin-repair approval): `serving` now reuses a verification
+        in-process until a commit through SQLite changes the ledger, so `caches no verification
+        between calls` is superseded. The positive half pins the new claim: the reuse sentence
+        with its invalidation scope, and `function verify` always running the full verification.
         """
         node = self.parser_node("resolve")
         self.assertIsNotNone(node)
@@ -3149,11 +3157,11 @@ class CliChannelTests(unittest.TestCase):
             or "full verification" in scoped
             or "seven checks" in scoped
         )
-        self.assertTrue(
-            "caches no verification between calls" in scoped
-            or "does not cache verification" in scoped
-            or "caches nothing" in scoped
+        self.assertIn(
+            "a later call reuses that verification until a commit through sqlite changes the ledger",
+            scoped,
         )
+        self.assertIn("`cement function verify` always runs the full verification", scoped)
 
 
 if __name__ == "__main__":

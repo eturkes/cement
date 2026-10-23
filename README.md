@@ -246,7 +246,11 @@ One resolve under `follow` runs the full seven-check verification, so it costs w
 end to end through the shipped method, in exact mode before the seventh check existed: 5.7 ms for
 one entry, 613 ms for 1,000 entries, and 36,452 ms with 985,696 KiB peak resident memory at the
 50,000-entry maximum (`.agent/decisions/m3u2b-resolve-bench.json`). The cost grows with the size of
-the set, not with the size of the input. Cement caches no verification between calls.
+the set, not with the size of the input. In one process, a later call reuses that verification until a
+commit through SQLite changes the ledger, from any connection or any process. Each `cement` command is
+a new process, so each command pays the full cost.
+A raw edit of the ledger file that bypasses SQLite is outside this guarantee, and `cement function
+verify` always runs the full verification.
 
 ### Submitting a candidate you already hold
 
