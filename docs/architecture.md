@@ -306,7 +306,7 @@ channel that the database file does not protect.
 
 ## Tooling decision
 
-The runtime uses Python 3.11+ and the standard library alone. It imports no test framework and no
+The runtime uses Python 3.12+ and the standard library alone. It imports no test framework and no
 third-party package. Examples of that use are `sqlite3` for the store and `json` for canonical
 encoding. Others are `hashlib` for content addressing and `unicodedata` for control-character
 validation. The core imports neither `subprocess` nor `signal`: the optional command candidate source

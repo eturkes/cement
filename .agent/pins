@@ -26,7 +26,6 @@ import urllib.request
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 # pin name -> the open queue row that holds it below latest.
 HELD = {
-    "python full leg": "p123",
     "open-webui mirror python": "p126",
     "nucllei jail stand-in python": "p126",
 }
@@ -132,11 +131,15 @@ def pins() -> list[tuple[str, str, object, str]]:
     runners = sorted(set(re.findall(r"runs-on: (\S+)", workflow)))
     for runner in runners:
         rows.append((f"runner {runner}", runner, newest_runner, "actions/runner-images README"))
+    # Supported Python (owner-ruled) = the latest line (full leg, D28) + the Kimi target's line,
+    # the nucllei jail's (split leg + the `requires-python` floor).
+    jail = one(r"docker\.io/library/python:(3\.\d+)-slim", read(".agent/decisions/nucllei-jail-smoke.sh"), "nucllei-jail-smoke.sh")
     full = one(r'^\s+python-version: "(3\.\d+)"$', workflow, "gate.yml full leg")
-    legs = re.findall(r'^\s+- "(3\.\d+)"$', workflow, re.M) + [full]
-    newest_leg = max(legs, key=lambda v: int(v.split(".")[1]))
-    rows.append(("python newest leg", newest_leg, newest_cpython_line, "uv python list --only-downloads"))
+    split = " ".join(re.findall(r'^\s+- "(3\.\d+)"$', workflow, re.M))
+    floor = one(r'^requires-python = ">=(3\.\d+)"$', pyproject, "pyproject.toml")
     rows.append(("python full leg", full, newest_cpython_line, "uv python list --only-downloads"))
+    rows.append(("python split leg", split, lambda: jail, "nucllei jail stand-in"))
+    rows.append(("requires-python floor", floor, lambda: jail, "nucllei jail stand-in"))
     package = json.loads(read("prototype/webui-demo/package.json"))
     rows.append(("playwright", package["devDependencies"]["playwright"], lambda: npm("playwright"), "npm playwright"))
     vendor = [p.name for p in (ROOT / "prototype/webui-demo/static/vendor").iterdir()]
@@ -153,7 +156,6 @@ def pins() -> list[tuple[str, str, object, str]]:
     rows.append(("open-webui mirror python", mirror, newest_cpython_line, "uv python list --only-downloads"))
     nucllei = one(r"nucllei-sandbox (v\d{8}-\d\d)", read(".claude/rules/nucllei.md"), "nucllei.md")
     rows.append(("nucllei target", nucllei, lambda: gh_tag("technoplasm/nucllei"), "GitHub technoplasm/nucllei tags"))
-    jail = one(r"docker\.io/library/python:(3\.\d+)-slim", read(".agent/decisions/nucllei-jail-smoke.sh"), "nucllei-jail-smoke.sh")
     rows.append(("nucllei jail stand-in python", jail, newest_cpython_line, "uv python list --only-downloads"))
     return rows
 

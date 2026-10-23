@@ -5,7 +5,7 @@ description = "Supervised LLM fallback that compiles confirmed behavior into exa
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = []
 
 [project.scripts]
@@ -28,7 +28,7 @@ dev = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py312"
 # tests/ + .agent/ pin live source text (`inspect.getsource`, byte freezes), so the formatter
 # never touches them; prototype/ runs under PROTOTYPE law (`.claude/rules/ops.md`).
 extend-exclude = ["tests", ".agent", "prototype"]
@@ -40,7 +40,9 @@ select = [
 ]
 # SIM105: an explicit `try`/`except X: pass` names the swallowed class at the call site, where
 # `contextlib.suppress` moves it into a context manager; the runtime's totality reviews read it.
-ignore = ["SIM105"]
+# UP040: `JSONValue` + `JSONScalar` are exported `TypeAlias` unions; a `type` statement would
+# turn them into `TypeAliasType` objects at runtime, a public-surface change of its own (p132).
+ignore = ["SIM105", "UP040"]
 
 [tool.ruff.lint.per-file-ignores]
 # The demo's verdicts are asserts behind its own `-O` refusal, and its transcript is stdout.
@@ -48,7 +50,7 @@ ignore = ["SIM105"]
 
 [tool.mypy]
 strict = true
-python_version = "3.11"
+python_version = "3.12"
 files = ["src/cement_runtime"]
 warn_unreachable = true
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]

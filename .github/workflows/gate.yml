@@ -24,9 +24,10 @@ concurrency:
 
 jobs:
   full:
-    # The one leg that grades history: D28 replays every range revision without a green verdict
-    # (`.claude/rules/history-gates.md`), so a cold cache costs one suite per revision.
-    name: Full gate (Python 3.13, D28 included)
+    # The one leg that grades history, on the latest Python line: D28 replays every range
+    # revision without a green verdict (`.claude/rules/history-gates.md`), so a cold cache costs
+    # one suite per revision.
+    name: Full gate (Python 3.15, D28 included)
     runs-on: ubuntu-26.04
     timeout-minutes: 330
     steps:
@@ -40,7 +41,7 @@ jobs:
         uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.13.5"
-          python-version: "3.13"
+          python-version: "3.15"
           enable-cache: true
           prune-cache: true
 
@@ -53,8 +54,8 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .git/cement-d28-verdicts
-          key: d28-${{ runner.os }}-py3.13-${{ hashFiles('uv.lock') }}-${{ github.run_id }}
-          restore-keys: d28-${{ runner.os }}-py3.13-${{ hashFiles('uv.lock') }}-
+          key: d28-${{ runner.os }}-py3.15-${{ hashFiles('uv.lock') }}-${{ github.run_id }}
+          restore-keys: d28-${{ runner.os }}-py3.15-${{ hashFiles('uv.lock') }}-
 
       - name: Run the full gate
         run: .agent/gate
@@ -65,10 +66,11 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .git/cement-d28-verdicts
-          key: d28-${{ runner.os }}-py3.13-${{ hashFiles('uv.lock') }}-${{ github.run_id }}
+          key: d28-${{ runner.os }}-py3.15-${{ hashFiles('uv.lock') }}-${{ github.run_id }}
 
   split:
-    # A NAMED split run: every check except D28, on the other supported Pythons.
+    # A NAMED split run: every check except D28, on the Kimi target's Python (the nucllei jail
+    # runs 3.12); the full leg covers the latest line.
     name: Split gate (Python ${{ matrix.python-version }}, D28 omitted)
     runs-on: ubuntu-26.04
     timeout-minutes: 60
@@ -76,10 +78,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version:
-          - "3.11"
           - "3.12"
-          - "3.14"
-          - "3.15"
     steps:
       - name: Check out the repository with its history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

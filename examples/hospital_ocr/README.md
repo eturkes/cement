@@ -6,7 +6,7 @@ This offline example follows seven synthetic documents across three layouts. The
 
 ## Run
 
-Use Python 3.11 or later, SQLite 3.37 or later, and `uv`. From the repository root, run:
+Use Python 3.12 or later, SQLite 3.37 or later, and `uv`. From the repository root, run:
 
 ```bash
 uv sync

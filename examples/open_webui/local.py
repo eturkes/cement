@@ -4,7 +4,7 @@
     OPENAI_API_KEY=... uv run python examples/open_webui/local.py serve \\
         --base-url http://127.0.0.1:8000/v1 --model MODEL
 
-The instance mirrors a network-less deployment: the official image's Python 3.11, no Cement
+The instance mirrors a network-less deployment on Cement's target Python 3.12, with no Cement
 package installed beside Open WebUI, and every Cement part pasted in through the REST API.
 """
 
@@ -32,8 +32,8 @@ OPEN_WEBUI = "open-webui==0.12.3"
 # Every package `OPEN_WEBUI` pulls in, pinned with its hashes; the file header names the command
 # that regenerates it after a bump.
 LOCK = HERE / "local-requirements.txt"
-# The official 0.12.3 image runs `python:3.11-slim-bookworm`.
-PYTHON = "3.11"
+# Cement's target line, the nucllei jail's (owner-ruled); Open WebUI 0.12.3 admits 3.11-3.12.
+PYTHON = "3.12"
 PARTITION = "local"
 OPERATIONS = (
     "extraction_plan: The user pastes one form, such as a progress note, an intake form or a lab"
@@ -303,15 +303,30 @@ def _banner(url: str, model: str, paths: dict[str, pathlib.Path]) -> str:
     )
 
 
+def _venv_line(venv: pathlib.Path) -> str | None:
+    """The `major.minor` line an existing venv runs (`pyvenv.cfg` `version_info`), else None."""
+    try:
+        config = (venv / "pyvenv.cfg").read_text(encoding="utf-8")
+    except OSError:
+        return None
+    for line in config.splitlines():
+        key, _, value = line.partition("=")
+        if key.strip() == "version_info":
+            return ".".join(value.strip().split(".")[:2])
+    return None
+
+
 def setup(directory: pathlib.Path) -> int:
     paths = _paths(directory)
     uv = shutil.which("uv")
     if uv is None:
         raise SystemExit("local: uv is not on PATH")
     directory.mkdir(parents=True, exist_ok=True)
-    if not paths["python"].is_file():
-        # Fixed arguments: uv creates the instance venv on the pinned interpreter.
-        subprocess.run([uv, "venv", "--python", PYTHON, str(paths["venv"])], check=True)  # noqa: S603
+    if _venv_line(paths["venv"]) != PYTHON or not paths["python"].is_file():
+        # Fixed arguments: uv (re)creates the instance venv on the pinned interpreter; a venv on
+        # another line would take a lock resolved for this one.
+        venv = str(paths["venv"])
+        subprocess.run([uv, "venv", "--clear", "--python", PYTHON, venv], check=True)  # noqa: S603
     python = str(paths["python"])
     subprocess.run(  # noqa: S603 — fixed arguments: uv installs the hash-pinned lock alone
         [uv, "pip", "install", "--python", python, "--require-hashes", "-r", str(LOCK)], check=True
@@ -392,7 +407,7 @@ def _parser() -> argparse.ArgumentParser:
         "--dir", type=pathlib.Path, default=HERE.parents[1] / ".open-webui", help="state directory"
     )
     commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser("setup", help="install Open WebUI 0.12.3 in a Python 3.11 environment")
+    commands.add_parser("setup", help="install Open WebUI 0.12.3 in a Python 3.12 environment")
     run = commands.add_parser("serve", help="start Open WebUI and paste in every Cement part")
     run.add_argument("--base-url", required=True, help="OpenAI-compatible endpoint of the model")
     run.add_argument("--model", required=True, help="model id at that endpoint")

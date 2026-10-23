@@ -1602,13 +1602,17 @@ class MigrationBatteryTests(unittest.TestCase):
         `tests/test_migration_battery.py` before the inner run. Keeping it turns D28 into its
         own subject — each battery-bearing revision re-enters this method, and the nesting
         alone exhausts the timeout.
+
+        The range opens at `D28_START` (owner-ruled, p123): replays run on the full leg's
+        Python, the latest line, and a revision whose own suite pins an older interpreter's
+        behavior cannot pass there.
         """
         revision_result = _run(
             [
                 "git",
                 "rev-list",
                 "--reverse",
-                f"{BASELINE}..HEAD",
+                f"{D28_START}^..HEAD",
                 "--",
                 ".agent/decisions/m3u6a1-surgery.py",
                 "tests",
@@ -1832,6 +1836,11 @@ class MigrationBatteryTests(unittest.TestCase):
                 self.assertIsNone(defaults[required])
 
 
+# D28's first revision (p123, owner-ruled): `99f260a` gave the CLI its own invalid-choice
+# wording, and every earlier revision pins argparse's, to which 3.15 appends `maybe you meant`
+# (V18 + D14 at `e7137f3` on 3.15.1: `FAILED (failures=2)`). The 77 revisions before it hold
+# green verdicts on the 3.13 full leg (run 39962224658: all 81 range revisions green).
+D28_START = "99f260a"
 D28_VERDICT_FORMAT = "cement-d28-verdict-v1"
 # The inner run, verbatim: it is part of what a verdict proved, so it is part of the key.
 D28_INNER = ("-m", "unittest", "discover", "-s", "tests", "-t", ".")

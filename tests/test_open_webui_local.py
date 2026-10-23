@@ -251,9 +251,27 @@ class LocalLauncherBattery(unittest.TestCase):
         python = str(directory / "venv" / "bin" / "python")
         lock = str(EXAMPLE / "local-requirements.txt")
         self.assertEqual(calls, [
-            ["/bin/uv", "venv", "--python", "3.11", str(directory / "venv")],
+            ["/bin/uv", "venv", "--clear", "--python", "3.12", str(directory / "venv")],
             ["/bin/uv", "pip", "install", "--python", python, "--require-hashes", "-r", lock],
         ])
+
+    def test_p123_setup_recreates_a_venv_on_another_python_line_alone(self) -> None:
+        venv = self.paths["venv"]
+        (venv / "bin").mkdir(parents=True)
+        cases = (("3.11", True, True), ("3.11.17", True, True), ("3.12", True, False),
+                 ("3.12.15", True, False), ("3.12", False, True))
+        for written, python, recreated in cases:
+            (venv / "pyvenv.cfg").write_text(f"home = /x\nversion_info = {written}\n")
+            if python:
+                self.paths["python"].write_text("")
+            else:
+                self.paths["python"].unlink()
+            calls: list[list[str]] = []
+            with self.subTest(version_info=written, python=python), \
+                    mock.patch.object(LOCAL.shutil, "which", return_value="/bin/uv"), \
+                    mock.patch.object(LOCAL.subprocess, "run", lambda argv, **kwargs: calls.append(argv)):
+                self.assertEqual(LOCAL.setup(venv.parent), 0)
+                self.assertEqual([argv[1] for argv in calls], ["venv", "pip"] if recreated else ["pip"])
 
     def test_p128_the_lock_pins_the_target_and_hashes_every_package(self) -> None:
         text = (EXAMPLE / "local-requirements.txt").read_text(encoding="utf-8")

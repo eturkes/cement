@@ -5,7 +5,7 @@
 #                                included) + uv build + spec-lint
 #   .agent/gate <tests.module>…  fast gate: static checks + those modules + spec-lint; iteration only
 #   .agent/gate --omit-d28       full gate with the suite minus D28, NAMED as a split run
-#                                (`.claude/rules/history-gates.md`); CI's non-3.13 legs
+#                                (`.claude/rules/history-gates.md`); CI's split leg
 set -u
 cd "$(dirname "$0")/.." || exit 2
 names=() rcs=() secs=()
@@ -17,7 +17,8 @@ step() { # step <name> <cmd…>
   rc=$?
   names+=("$name") rcs+=("$rc") secs+=("$(awk -v a="$t0" -v b="$EPOCHREALTIME" 'BEGIN{printf "%.1f", b - a}')")
 }
-# `--durations` arrived in Python 3.12; pyproject admits 3.11.
+# `--durations` arrived in Python 3.12, the floor pyproject admits; an interpreter that fails the
+# probe still runs the suite, without the list.
 durations=() note="slowest tests unavailable: unittest --durations needs Python >= 3.12"
 uv run python -c 'import sys; sys.exit(sys.version_info < (3, 12))' && durations=(--durations 10) note=
 step format uv run ruff format --check

@@ -137,7 +137,7 @@ Choose a change and confirm it. The ledger records your Open WebUI user id as th
 
 ## Try it locally
 
-`local.py` starts Open WebUI 0.12.3 on Python 3.11, the Python of the official image. It installs no
+`local.py` starts Open WebUI 0.12.3 on Python 3.12, the Python that Cement targets. It installs no
 Cement package beside Open WebUI, and it pastes in every part through the Open WebUI API. Use any
 OpenAI-compatible endpoint for the model. You do not need an OpenAI API account: a local proxy that
 signs in with your ChatGPT subscription and serves an OpenAI-compatible endpoint also works. The
@@ -150,7 +150,8 @@ earlier `local.py` started the instance without a login, the next start replaces
 
 1. Install Open WebUI into `.open-webui/` once. The command installs the packages that
    `local-requirements.txt` lists, and it stops if the hash of a package differs from the hash
-   in that file:
+   in that file. If `.open-webui/` holds an environment on another Python, the command replaces
+   that environment. It keeps `.open-webui/data/`:
 
    ```sh
    uv run python examples/open_webui/local.py setup
