@@ -26,6 +26,47 @@ print(candidate.output)
 `example_adapter.py` is a protocol stub, not an LLM. It echoes the input so that you can try the
 protocol locally. The block prints `{'kind': 'echo', 'value': {'domain': 'value'}}`.
 
+## Install the provider distribution
+
+This directory is also the source of a separate distribution, `cement-command-source`. Its wheel
+installs the `cement_command_source` package beside a `cement-runtime` wheel. The core never
+imports this package. The wheel adds one command, `cement-command-source`. The command runs the
+adapter for one input through `System.propose`. Then it prints the new proposal ID.
+
+Build both wheels from the repository root. The second build installs hatchling, its build backend,
+from `build-constraints.txt`, which pins each build dependency by hash:
+
+```sh
+uv build --out-dir dist
+uv build --out-dir dist --build-constraints examples/command_source/build-constraints.txt \
+  --require-hashes examples/command_source
+```
+
+Install both wheels in an environment that runs Cement. Then register an operation and propose
+one candidate through `example_adapter.py`:
+
+```sh
+pip install dist/*.whl
+export CEMENT_DB=cement.db CEMENT_PARTITION=tenant-42
+cement operation register support.reply
+cement-command-source support.reply --input '{"domain": "value"}' \
+  -- python examples/command_source/example_adapter.py
+```
+
+The last command prints `{"proposal_id": "prop_…"}`. Put the adapter argv after `--`. The
+command runs it without a shell, and `--timeout` sets its time limit in seconds (default 60).
+`--input -` reads the input from stdin. A refusal writes a JSON object with `error` and `message`
+to stderr. The exit classes are those of `cement`: 2 for an invalid argument or an adapter
+failure, 3 for an unregistered operation, 4 for a conflict, and 5 for an integrity failure, such
+as a missing ledger. An adapter failure writes no proposal.
+
+Each distribution has its own version. `cement-command-source` 0.1.0 depends on
+`cement-runtime>=0.2.0,<0.3`, because a new minor version of the core can change the candidate
+protocol or the public names that the provider imports. Maintainers of this repository release
+both distributions. When the provider code or its core range changes, increase the provider
+version. When the core starts a new minor version, test the provider against it and then move the
+provider range.
+
 ## Protocol
 
 `CommandCandidateSource` invokes a trusted executable directly with `shell=False`. It writes one

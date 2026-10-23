@@ -596,7 +596,8 @@ full state model and trust boundaries.
   LLENS deployment. The chat model runs one sandbox command, and each user has a ledger of their own.
   The learning pass runs in the chat, and the user switches each function on with `/cement-switch`.
 - [Command candidate source](examples/command_source/README.md): an optional source that runs a
-  trusted adapter executable for one candidate.
+  trusted adapter executable for one candidate. It also builds as a separate wheel, which adds the
+  `cement-command-source` command.
 
 ## Development
 

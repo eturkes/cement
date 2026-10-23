@@ -24,6 +24,8 @@ import sys
 import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+PROVIDER = "examples/command_source/pyproject.toml"
+CONSTRAINTS = "examples/command_source/build-constraints.txt"
 # pin name -> the open queue row that holds it below latest.
 HELD = {
     "open-webui mirror python": "p126",
@@ -103,6 +105,23 @@ def lock_status() -> str:
     return "; ".join(updates) if updates else "locked"
 
 
+def constraints_status(backend: str, python: str) -> str:
+    """Drift of the provider's hashed build constraints against a fresh compile of their header."""
+
+    pinned = dict(re.findall(r"^([a-z0-9-]+)==(\S+) \\$", read(CONSTRAINTS), re.M))
+    argv = ["uv", "pip", "compile", "--python-version", python, "--universal", "--no-header",
+            "--no-annotate", "-"]
+    result = subprocess.run(argv, input=f"{backend}\n", capture_output=True, text=True, check=False,  # noqa: S603 fixed argv
+                            cwd=ROOT)
+    if result.returncode != 0:
+        raise SourceError(f"uv pip compile {backend}: rc {result.returncode} {result.stderr.strip()[:200]}")
+    fresh = dict(re.findall(r"^([a-z0-9-]+)==(\S+)$", result.stdout, re.M))
+    drift = [f"{name} {pinned.get(name)} -> {version}" for name, version in sorted(fresh.items())
+             if pinned.get(name) != version]
+    drift += [f"{name} {version} -> gone" for name, version in sorted(pinned.items()) if name not in fresh]
+    return "; ".join(drift) if drift else "locked"
+
+
 def pins() -> list[tuple[str, str, object, str]]:
     """(name, current, latest thunk, source) — latest thunks run in parallel."""
 
@@ -113,6 +132,13 @@ def pins() -> list[tuple[str, str, object, str]]:
     floor = one(r'"uv_build>=([0-9.]+),', pyproject, "pyproject.toml")
     rows.append(("uv_build floor", floor, lambda: pypi("uv_build"), "PyPI uv_build"))
     rows.append(("uv.lock transitive", "locked", lock_status, "uv lock --upgrade --dry-run"))
+    provider = read(PROVIDER)
+    backend = one(r'^requires = \["(hatchling==[0-9.]+)"\]$', provider, PROVIDER)
+    provider_floor = one(r'^requires-python = ">=(3\.\d+)"$', provider, PROVIDER)
+    rows.append(("command-source hatchling", backend.split("==")[1], lambda: pypi("hatchling"),
+                 "PyPI hatchling"))
+    rows.append(("command-source build constraints", "locked",
+                 lambda: constraints_status(backend, provider_floor), f"uv pip compile ({CONSTRAINTS})"))
     for tool in sorted((ROOT / ".agent").iterdir()):
         text = tool.read_text(encoding="utf-8") if tool.is_file() else ""
         if tool.name == "fetch-tool" or "\nfetch_tool " not in text:

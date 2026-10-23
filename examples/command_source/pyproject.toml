@@ -1,0 +1,36 @@
+[project]
+name = "cement-command-source"
+version = "0.1.0"
+description = "Command candidate source for Cement: run a trusted adapter executable for one candidate"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+# The provider speaks `cement-candidate-v2` and imports public `cement_runtime` names; a 0.x
+# minor release of the core may break both, so the range stops at the next minor.
+dependencies = ["cement-runtime>=0.2.0,<0.3"]
+
+[project.scripts]
+cement-command-source = "cement_command_source.command_source:main"
+
+# uv_build packages a module directory only, while the relocation battery pins these modules as
+# flat files here; hatchling maps them into `cement_command_source/` (`sources` prefix).
+[build-system]
+requires = ["hatchling==1.32.4"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+only-include = ["command_source.py", "_command_supervisor.py"]
+
+[tool.hatch.build.targets.wheel.sources]
+"" = "cement_command_source"
+
+[tool.hatch.build.targets.sdist]
+only-include = [
+    "README.md",
+    "LICENSE",
+    "build-constraints.txt",
+    "command_source.py",
+    "_command_supervisor.py",
+    "example_adapter.py",
+]

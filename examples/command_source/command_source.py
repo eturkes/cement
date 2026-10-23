@@ -8,6 +8,7 @@ it by file name.
 
 from __future__ import annotations
 
+import argparse
 import base64
 import json
 import math
@@ -19,10 +20,19 @@ import threading
 import unicodedata
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
-from cement_runtime.errors import CandidateSourceError, ValidationError
-from cement_runtime.json_value import JSONValue, canonicalize, parse_json
+from cement_runtime import System
+from cement_runtime.errors import (
+    CandidateSourceError,
+    CementError,
+    ConflictError,
+    IntegrityError,
+    NotFoundError,
+    StateError,
+    ValidationError,
+)
+from cement_runtime.json_value import DEFAULT_MAX_BYTES, JSONValue, canonicalize, parse_json
 from cement_runtime.models import Candidate, CandidateRequest
 
 SOURCE_PROTOCOL = "cement-candidate-v2"
@@ -299,3 +309,97 @@ class CommandCandidateSource:
             "source_id": self._source_id,
         }
         return Candidate(output=response["output"], provenance=combined)
+
+
+class _UsageError(Exception):
+    pass
+
+
+class _Parser(argparse.ArgumentParser):
+    def error(self, message: str) -> NoReturn:
+        raise _UsageError(message)
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = _Parser(
+        prog="cement-command-source",
+        allow_abbrev=False,
+        description=(
+            "Run a trusted adapter command for one input. Cement retains the candidate"
+            " that the adapter returns as a pending proposal."
+        ),
+    )
+    parser.add_argument("--db", default=os.environ.get("CEMENT_DB"), help="SQLite ledger path")
+    parser.add_argument(
+        "--partition",
+        default=os.environ.get("CEMENT_PARTITION"),
+        help="explicit tenant/workflow isolation key",
+    )
+    parser.add_argument("operation", help="a registered operation")
+    parser.add_argument("--input", required=True, help="JSON text; '-' reads stdin")
+    parser.add_argument(
+        "--timeout", type=float, default=60.0, help="seconds that the adapter can run"
+    )
+    parser.add_argument(
+        "adapter", nargs="+", help="the adapter argv after '--'; Cement runs it without a shell"
+    )
+    return parser
+
+
+def _input(value: str) -> JSONValue:
+    if value == "-":
+        # A text-only stream (an embedding host's StringIO) has no `buffer`; `parse_json` still
+        # grades the UTF-8 byte size after this bounded read.
+        stream = getattr(sys.stdin, "buffer", sys.stdin)
+        try:
+            raw = stream.read(DEFAULT_MAX_BYTES + 1)
+        except OSError as exc:
+            raise ValidationError("JSON stdin could not be read") from exc
+        if len(raw) > DEFAULT_MAX_BYTES:
+            unit = "bytes" if isinstance(raw, bytes) else "characters"
+            raise ValidationError(f"JSON stdin exceeds {DEFAULT_MAX_BYTES} {unit}")
+        try:
+            value = raw.decode("utf-8") if isinstance(raw, bytes) else raw
+        except UnicodeDecodeError as exc:
+            raise ValidationError("JSON stdin is not valid UTF-8") from exc
+    return parse_json(value).value
+
+
+def _emit(value: object, stream: Any) -> None:
+    stream.write(json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """`cement-command-source`: propose one candidate through the adapter, as `System.propose`.
+
+    stdout = `{"proposal_id": ...}`; a refusal = `{"error", "message"}` on stderr with the exit
+    classes of `cement` (2 invalid, an adapter failure included; 3 not found; 4 conflict;
+    5 integrity).
+    """
+    try:
+        args = _parser().parse_args(argv)
+        if not args.db:
+            raise _UsageError("--db or CEMENT_DB is required")
+        if not args.partition:
+            raise _UsageError("--partition or CEMENT_PARTITION is required")
+        source = CommandCandidateSource(args.adapter, timeout_seconds=args.timeout)
+        input_value = _input(args.input)
+        system = System(args.db, create=False, candidate_source=source)
+        proposal_id = system.propose(args.partition, args.operation, input_value)
+    except _UsageError as exc:
+        _emit({"error": "invalid", "message": str(exc)}, sys.stderr)
+        return 2
+    except NotFoundError as exc:
+        _emit({"error": "not_found", "message": str(exc)}, sys.stderr)
+        return 3
+    except (ConflictError, StateError) as exc:
+        _emit({"error": "conflict", "message": str(exc)}, sys.stderr)
+        return 4
+    except IntegrityError as exc:
+        _emit({"error": "integrity", "message": str(exc)}, sys.stderr)
+        return 5
+    except CementError as exc:
+        _emit({"error": "invalid", "message": str(exc)}, sys.stderr)
+        return 2
+    _emit({"proposal_id": proposal_id}, sys.stdout)
+    return 0

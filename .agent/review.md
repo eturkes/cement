@@ -21,6 +21,23 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p34 close (MAINTAIN queue run 3, tier `data`: `System.propose` + `parse_json` re-grade every byte the runner passes; the smoke + metadata pins = structural validator + live spot-check) — target = the commit landing this section
+
+Check set = `CLAUDE.md` `Engineering` code diff lenses (correctness, cleanup, altitude) + the row's five acceptance clauses A1-A5, fixed before the diff was reread.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | second wheel beside a wheel-only core | pass | `.agent/decisions/p34-two-wheel-smoke.sh <tree>`: the core wheel alone installs no `cement-command-source`; both install offline; wheel members = `cement_command_source/{_command_supervisor,command_source}.py` + dist-info, license bytes = `LICENSE`. |
+| A2 | core loads no optional module | pass | smoke: `cement_runtime.cli.main(["--help"])` in the installed venv leaves no `*command_source*` in `sys.modules`; R4 (`tests/test_relocation_battery.py`) unchanged. |
+| A3 | one documented runner command | pass | `cement-command-source` = `command_source.main`; README block run literally in a scratch copy (`pip install dist/*.whl` → `{"proposal_id": …}`); D23/D24 + R5 green (one Python block kept). |
+| A4 | root gate + clean smoke | pass | fast gate over the 9 touched modules (309 tests, rc 0) + the CI gate in the commit body; smoke fires both ways (wrong `sources` prefix → rc 1, every hatchling hash wrong → `Hash mismatch`). |
+| A5 | release/version ownership | pass | README paragraph; `test_the_core_range_admits_this_core_and_stops_at_its_next_minor` binds the range to the core's own version. |
+| C1 | correctness: exit map, input, abbreviation | pass | the core's class table copied in order (CandidateSourceError ⊂ CementError → 2); `allow_abbrev=False` (`--inp` refused); stdin bounded on byte + text streams, the unit named as measured (finding during review: a text stream reported `bytes` → `characters`, tested). |
+| C2 | cleanup: duplication vs coupling | pass | `_emit`/`_input`/the exit table restate ~30 lines of `cement_runtime.cli` privates; importing those privates would bind a separately versioned wheel to unpublished names. |
+| C3 | altitude | pass | no core change; hatchling only because `uv_build` packages a module directory and R1/R2/R5 pin the flat files in place. |
+| C4 | pins law | pass | hatchling + 5 build dependencies hash-pinned; `.agent/pins` rows `command-source hatchling` + `command-source build constraints` fire (seeds in `gate-checks.md`), shipped rc 0 (26 pins). |
+| F1 | smoke runs by hand alone | find → row `p133` | a gate change, so it is put to the owner at the run's close. |
+
 ## p35 close (MAINTAIN queue run 3, tier `kernel`) — target = `d155dca` (implementation) + the commit landing this section (bench)
 
 | id | lens | verdict | basis (MAIN-verified) |
