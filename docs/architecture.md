@@ -148,7 +148,7 @@ Both call `cement_runtime.learning`, which the Open WebUI and nucllei examples a
 reviews the pending proposals of one case against one merged output and supersedes the examples
 that differ. It refuses ids that are not the pending or active ids of one case, before any write.
 Each write commits alone, so a failure after the writes start reports the writes that returned,
-and the failed write can also have committed.
+and the write that failed can also have committed.
 A publication sets a program derived from the confirmed inputs (`--projectable`), compiles, verifies the drafts, and
 promotes the verified set. It leaves the switch as it is: under `follow`, the new version answers
 at once.
