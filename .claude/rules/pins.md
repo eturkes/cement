@@ -15,7 +15,7 @@ paths:
 
 # Dependency + toolchain pins
 
-- Law (owner): every pin at its latest release; a held-back pin = a `.agent/deferred.md` row naming its blocker. Dependabot (`.github/dependabot.yml`: `uv` + `github-actions`) bumps `pyproject.toml`, `uv.lock` + action refs, and moves a range (the `uv_build` floor) only once latest leaves it; the setup-uv `version:`, runner, Python legs, gitleaks, zizmor, ShellCheck, prototype + targets have no updater ⇒ checked by hand (p125).
+- Law (owner): every pin at its latest release; a held-back pin = a `.agent/deferred.md` row naming its blocker. Dependabot (`.github/dependabot.yml`: `uv` + `github-actions`) bumps `pyproject.toml`, `uv.lock` + action refs, and moves a range (the `uv_build` floor) only once latest leaves it; the setup-uv `version:`, runner, Python legs, gitleaks, zizmor, ShellCheck, prototype + targets have no updater ⇒ `uv run python .agent/pins` (p125) prints current vs latest + source per pin (rows derived from the pinned files), rc 1 = a pin behind with no open queue row or a hold whose row is gone (holds = its `HELD` map: pin → row), rc 2 = a source failed; run it before + after any upgrade.
 - Where each lives:
   - Python dev tools (exact `==`) + the `uv_build` floor = `pyproject.toml`; transitive = `uv.lock` (`uv lock --upgrade`).
   - gitleaks, zizmor, ShellCheck = `.agent/gitleaks`, `.agent/zizmor`, `.agent/shellcheck` (`version=` + the release asset's sha256 per platform = GitHub's asset `digest`; download + refusal = `.agent/fetch-tool`).

@@ -4,7 +4,7 @@
 Usage: uv run python .agent/seeds [--rev REV] [--only S01 ...] [--list]
        uv run python .agent/seeds --self-test
 
-Every recorded recipe has an S01–S22 group, with a result per constituent case.
+Every recorded recipe has an S01–S23 group, with a result per constituent case.
 rc 0 = every selected expectation matched and every worktree restored; 1 = a
 verdict differs; 2 = setup/restoration failure. --self-test repeats the selected
 set after neutralizing skip-census: exactly S12's four red seeds must change.
@@ -62,6 +62,7 @@ GROUPS = [
     ("S20", "`.agent/decisions/m3-report-validate.py --all` (", "report anchors", False),
     ("S21", "`.agent/zizmor` (", "Actions audit", False),
     ("S22", "`.agent/shellcheck` (", "shell lint", False),
+    ("S23", "`.agent/pins` (", "pin census", False),
 ]
 
 
@@ -611,6 +612,24 @@ unittest.main()
                 self.case("S22", "sourced-library", root, [".agent/shellcheck"], 1,
                           [r"In \.agent/fetch-tool line \d+", "SC2086"])
             self.case("S22", "shipped", root, [".agent/shellcheck"], 0, [r"shellcheck: \d+ scripts"])
+
+    def S23(self):
+        with self.tree() as root:
+            # A fetched tool's `version=` reaches no resolver, so the lowered pin stays a pure census input.
+            tool = root / ".agent/zizmor"
+            current = re.search(r"(?m)^version=(\S+)$", tool.read_text()).group(1)
+            with changed(tool, replace(tool.read_text(), f"version={current}\n", "version=1.0.0\n")):
+                self.case("S23", "lowered", root, [sys.executable, ".agent/pins"], 1,
+                          [r"^zizmor +1\.0\.0 +\S+ +BEHIND \(no queue row\)"])
+            # A hold outlives its row: the full leg stays below latest after p123 leaves the queue.
+            queue = root / ".agent/deferred.md"
+            rows = re.split(r"(?m)^(?=- `p\d+` )", queue.read_text())
+            kept = "".join(row for row in rows if not row.startswith("- `p123` "))
+            with changed(queue, kept):
+                self.case("S23", "hold-gone", root, [sys.executable, ".agent/pins"], 1,
+                          [r"^python full leg .*HOLD-GONE \(p123 not open\)"])
+            self.case("S23", "shipped", root, [sys.executable, ".agent/pins"], 0,
+                      [r"^pins: \d+ pins, rc 0$"])
 
     def S14(self):
         sid = "S14"

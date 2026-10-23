@@ -1,0 +1,196 @@
+#!/usr/bin/env python3
+"""pins — current vs latest for every pin `.claude/rules/pins.md` names (p125).
+
+Dependabot covers `pyproject.toml`, `uv.lock` + action refs but leaves a range floor inside its
+range and has no updater for the rest, so each pin here reads its CURRENT value from the file
+that sets it and its LATEST from its own source. Rows are derived where a file lists several
+pins: every `==` dev dependency, every `uses:` action, every `.agent/<tool>` that calls
+`fetch_tool`. A pin held below latest needs an open `.agent/deferred.md` row naming its
+blocker: `HELD` maps the pin to that row.
+
+Usage: uv run python .agent/pins
+rc 0 = every pin at latest or held by an open row; 1 = a pin behind with no open row, or a hold
+whose row is gone; 2 = a source failed to answer (network, `gh` auth, a changed file shape).
+"""
+
+from __future__ import annotations
+
+import concurrent.futures
+import json
+import pathlib
+import re
+import subprocess
+import sys
+import urllib.request
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+# pin name -> the open queue row that holds it below latest.
+HELD = {
+    "python full leg": "p123",
+    "open-webui mirror python": "p126",
+    "nucllei jail stand-in python": "p126",
+}
+
+
+class SourceError(Exception):
+    pass
+
+
+def read(path: str) -> str:
+    return (ROOT / path).read_text(encoding="utf-8")
+
+
+def one(pattern: str, text: str, where: str) -> str:
+    found = re.findall(pattern, text, re.M)
+    if len(found) != 1:
+        raise SourceError(f"{where}: {len(found)} matches for {pattern!r}")
+    return found[0]
+
+
+def http_json(url: str) -> dict:
+    request = urllib.request.Request(url, headers={"Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310 fixed https hosts
+            return json.load(response)
+    except OSError as error:
+        raise SourceError(f"{url}: {error}") from None
+
+
+def pypi(name: str) -> str:
+    return http_json(f"https://pypi.org/pypi/{name}/json")["info"]["version"]
+
+
+def npm(name: str) -> str:
+    return http_json(f"https://registry.npmjs.org/{name}/latest")["version"]
+
+
+def gh_release(repo: str) -> str:
+    return run("gh", "api", f"repos/{repo}/releases/latest", "--jq", ".tag_name").strip()
+
+
+def gh_tag(repo: str) -> str:
+    return run("gh", "api", f"repos/{repo}/tags?per_page=1", "--jq", ".[0].name").strip()
+
+
+def newest_cpython_line() -> str:
+    listing = run("uv", "python", "list", "--only-downloads")
+    lines = {tuple(map(int, m)) for m in re.findall(r"\bcpython-3\.(\d+)\.(\d+)-", listing)}
+    if not lines:
+        raise SourceError("uv python list --only-downloads: no stable CPython")
+    return f"3.{max(lines)[0]}"
+
+
+def newest_runner() -> str:
+    readme = run("gh", "api", "repos/actions/runner-images/contents/README.md", "-H",
+                 "Accept: application/vnd.github.raw")
+    labels = re.findall(r"`ubuntu-(\d\d)\.(\d\d)`", readme)
+    if not labels:
+        raise SourceError("runner-images README: no ubuntu-YY.MM label")
+    return "ubuntu-{}.{}".format(*max(labels))
+
+
+def run(*argv: str) -> str:
+    """stdout + stderr of a fixed argv (uv reports on stderr); a nonzero rc = a failed source."""
+
+    result = subprocess.run(argv, capture_output=True, text=True, check=False, cwd=ROOT)  # noqa: S603 fixed argv
+    if result.returncode != 0:
+        raise SourceError(f"{' '.join(argv)}: rc {result.returncode} {result.stderr.strip()[:200]}")
+    return result.stdout + result.stderr
+
+
+def lock_status() -> str:
+    output = run("uv", "lock", "--upgrade", "--dry-run")
+    updates = re.findall(r"^Update (\S+ v\S+ -> v\S+)", output, re.M)
+    return "; ".join(updates) if updates else "locked"
+
+
+def pins() -> list[tuple[str, str, object, str]]:
+    """(name, current, latest thunk, source) — latest thunks run in parallel."""
+
+    rows: list[tuple[str, str, object, str]] = []
+    pyproject = read("pyproject.toml")
+    for name, version in re.findall(r'^\s+"([A-Za-z0-9_.-]+)==([^"]+)",$', pyproject, re.M):
+        rows.append((name, version, lambda n=name: pypi(n), f"PyPI {name}"))
+    floor = one(r'"uv_build>=([0-9.]+),', pyproject, "pyproject.toml")
+    rows.append(("uv_build floor", floor, lambda: pypi("uv_build"), "PyPI uv_build"))
+    rows.append(("uv.lock transitive", "locked", lock_status, "uv lock --upgrade --dry-run"))
+    for tool in sorted((ROOT / ".agent").iterdir()):
+        text = tool.read_text(encoding="utf-8") if tool.is_file() else ""
+        if tool.name == "fetch-tool" or "\nfetch_tool " not in text:
+            continue
+        version = one(r"^version=(\S+)$", text, f".agent/{tool.name}")
+        repo = one(r"https://github\.com/([^/]+/[^/]+)/releases/download", text, f".agent/{tool.name}")
+        rows.append((tool.name, version, lambda r=repo: gh_release(r).removeprefix("v"), f"GitHub {repo}"))
+    workflow = read(".github/workflows/gate.yml")
+    actions = sorted(set(re.findall(r"uses: ([\w.-]+/[\w.-]+)(?:/[\w./-]+)?@[0-9a-f]{40} # (v\S+)", workflow)))
+    for repo, tag in actions:
+        rows.append((repo, tag, lambda r=repo: gh_release(r), f"GitHub {repo}"))
+    uv = sorted(set(re.findall(r'^\s+version: "([0-9.]+)"$', workflow, re.M)))
+    if len(uv) != 1:
+        raise SourceError(f"gate.yml: setup-uv versions {uv}")
+    rows.append(("setup-uv uv", uv[0], lambda: pypi("uv"), "PyPI uv"))
+    runners = sorted(set(re.findall(r"runs-on: (\S+)", workflow)))
+    for runner in runners:
+        rows.append((f"runner {runner}", runner, newest_runner, "actions/runner-images README"))
+    full = one(r'^\s+python-version: "(3\.\d+)"$', workflow, "gate.yml full leg")
+    legs = re.findall(r'^\s+- "(3\.\d+)"$', workflow, re.M) + [full]
+    newest_leg = max(legs, key=lambda v: int(v.split(".")[1]))
+    rows.append(("python newest leg", newest_leg, newest_cpython_line, "uv python list --only-downloads"))
+    rows.append(("python full leg", full, newest_cpython_line, "uv python list --only-downloads"))
+    package = json.loads(read("prototype/webui-demo/package.json"))
+    rows.append(("playwright", package["devDependencies"]["playwright"], lambda: npm("playwright"), "npm playwright"))
+    vendor = [p.name for p in (ROOT / "prototype/webui-demo/static/vendor").iterdir()]
+    driver = one(r"^driver\.js-(\S+)$", "\n".join(vendor), "static/vendor")
+    rows.append(("driver.js", driver, lambda: npm("driver.js"), "npm driver.js"))
+    readme = read("prototype/webui-demo/README.md")
+    for font in ("space-grotesk", "jetbrains-mono"):
+        version = one(rf"`@fontsource/{font}` ([0-9.]+)", readme, "prototype README")
+        rows.append((f"@fontsource/{font}", version, lambda f=font: npm(f"@fontsource/{f}"), f"npm @fontsource/{font}"))
+    local = read("examples/open_webui/local.py")
+    webui = one(r'^OPEN_WEBUI = "open-webui==([0-9.]+)"$', local, "local.py")
+    rows.append(("open-webui target", webui, lambda: pypi("open-webui"), "PyPI open-webui"))
+    mirror = one(r'^PYTHON = "(3\.\d+)"$', local, "local.py")
+    rows.append(("open-webui mirror python", mirror, newest_cpython_line, "uv python list --only-downloads"))
+    nucllei = one(r"nucllei-sandbox (v\d{8}-\d\d)", read(".claude/rules/nucllei.md"), "nucllei.md")
+    rows.append(("nucllei target", nucllei, lambda: gh_tag("technoplasm/nucllei"), "GitHub technoplasm/nucllei tags"))
+    jail = one(r"docker\.io/library/python:(3\.\d+)-slim", read(".agent/decisions/nucllei-jail-smoke.sh"), "nucllei-jail-smoke.sh")
+    rows.append(("nucllei jail stand-in python", jail, newest_cpython_line, "uv python list --only-downloads"))
+    return rows
+
+
+def main() -> int:
+    try:
+        rows = pins()
+    except SourceError as error:
+        print(f"pins: {error}", file=sys.stderr)
+        return 2
+    queue = read(".agent/deferred.md")
+    open_rows = set(re.findall(r"^- `(p\d+)` ", queue, re.M))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        futures = [pool.submit(latest) for _, _, latest, _ in rows]
+    rc = 0
+    print(f"{'pin':32} {'current':16} {'latest':16} status / source")
+    for (name, current, _, source), future in zip(rows, futures, strict=True):
+        try:
+            latest = future.result()
+        except SourceError as error:
+            print(f"{name:32} {current:16} {'?':16} ERROR {error}")
+            rc = max(rc, 2)
+            continue
+        same = current == latest
+        hold = HELD.get(name)
+        if same and hold is None:
+            status = "ok"
+        elif hold is None:
+            status, rc = "BEHIND (no queue row)", max(rc, 1)
+        elif hold not in open_rows:
+            status, rc = f"HOLD-GONE ({hold} not open)", max(rc, 1)
+        else:
+            status = f"held {hold}" if not same else f"held {hold}, now at latest"
+        print(f"{name:32} {current:16} {latest:16} {status} / {source}")
+    print(f"pins: {len(rows)} pins, rc {rc}")
+    return rc
+
+
+if __name__ == "__main__":
+    sys.exit(main())
