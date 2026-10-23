@@ -36,6 +36,8 @@ CONTENT_TYPES = {
 _state_lock = threading.Lock()
 _session: demo.Session | None = None
 _seed = 0
+# The Host values a request may name: the loopback names first, then the bound `--host`.
+_hosts: list[str] = []
 
 
 def session() -> demo.Session:
@@ -120,6 +122,25 @@ class Handler(http.server.BaseHTTPRequestHandler):
             CONTENT_TYPES.get(path.suffix, "application/octet-stream"),
         )
 
+    def _refused(self, post: bool) -> bool:
+        """403 for what any web page can send: a foreign Host, or a POST that is not JSON.
+
+        A DNS-rebinding page reaches this port under its own host name, and a `text/plain`
+        POST is a CORS-simple request that no preflight stops.
+        """
+        if self.headers.get("Host") not in _hosts:
+            error = f"Open the demo at http://{_hosts[0]}/ or http://{_hosts[1]}/."
+        elif post and self.headers.get_content_type() != "application/json":
+            error = "Send the request body as application/json."
+        else:
+            return False
+        if post:
+            # Drain the body so the reply reaches the client before the connection closes.
+            self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        self.close_connection = True
+        self._json({"error": error}, status=403)
+        return True
+
     def _body(self) -> dict[str, object]:
         length = int(self.headers.get("Content-Length") or 0)
         if not length:
@@ -130,6 +151,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
     # -- routes --
 
     def do_GET(self) -> None:  # noqa: N802
+        if self._refused(post=False):
+            return
         parts = urlsplit(self.path)
         path = parts.path
         query = parse_qs(parts.query)
@@ -155,6 +178,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self._json({"error": "not found"}, status=404)
 
     def do_POST(self) -> None:  # noqa: N802
+        if self._refused(post=True):
+            return
         path = self.path.split("?", 1)[0]
         actions = {
             "/api/send": lambda body: session().send(
@@ -219,6 +244,8 @@ def main() -> None:
     session()
     url = f"http://{arguments.host}:{arguments.port}/"
     server = Server((arguments.host, arguments.port), Handler)
+    port = server.server_port
+    _hosts.extend([f"127.0.0.1:{port}", f"localhost:{port}", f"{arguments.host}:{port}"])
     print(f"Cement web UI demo: {url}")
     print("The ledger is temporary. Stop the server with Ctrl+C.")
     if arguments.open:
