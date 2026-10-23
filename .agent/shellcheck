@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# .agent/shellcheck — lint every tracked shell script with ONE pinned binary, local + CI alike
+# (download + sha256 refusal = `.agent/fetch-tool`). Script = line 1 is a `#!` naming sh or bash,
+# or a `# shellcheck shell=` directive (a sourced library: `-x` reads it but never reports on
+# it). The set is derived from `git ls-files` on every run, so a new script enters unlisted.
+#   .agent/shellcheck            lint the tracked scripts (rc 1 on any finding, every severity)
+#   .agent/shellcheck <args…>    pass args straight to the pinned binary (e.g. a seed file)
+set -euo pipefail
+cd "$(dirname "$0")/.." || exit 2
+. .agent/fetch-tool
+version=0.11.0
+case "$(uname -s)-$(uname -m)" in
+  Linux-x86_64) asset=linux.x86_64 sum=b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6 ;;
+  Linux-aarch64) asset=linux.aarch64 sum=68a8133197a50beb8803f8d42f9908d1af1c5540d4bb05fdfca8c1fa47decefc ;;
+  Darwin-arm64) asset=darwin.aarch64 sum=339b930feb1ea764467013cc1f72d09cd6b869ebf1013296ba9055ab2ffbd26f ;;
+  *) echo "shellcheck: no pinned release for $(uname -s)-$(uname -m)" >&2; exit 2 ;;
+esac
+fetch_tool shellcheck "$version" \
+  "https://github.com/koalaman/shellcheck/releases/download/v$version/shellcheck-v$version.$asset.tar.gz" \
+  "$sum" "shellcheck-v$version/shellcheck"
+if [ $# -gt 0 ]; then
+  exec "$BIN" "$@"
+fi
+scripts=()
+while IFS= read -r -d '' path; do
+  [ -f "$path" ] || continue
+  read -r first < "$path" || true
+  case "$first" in
+    '#!'*[/\ ]sh | '#!'*[/\ ]bash | '#!'*[/\ ]sh\ * | '#!'*[/\ ]bash\ * | '# shellcheck shell='*) scripts+=("$path") ;;
+  esac
+done < <(git ls-files -z)
+[ ${#scripts[@]} -gt 0 ] || { echo "shellcheck: no tracked shell script found" >&2; exit 2; }
+echo "shellcheck: ${#scripts[@]} scripts"
+# -x follows `. .agent/fetch-tool` (resolved from the repo root) for its definitions alone.
+exec "$BIN" -x "${scripts[@]}"

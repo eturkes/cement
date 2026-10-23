@@ -1,5 +1,7 @@
 version: 2
 
+# cooldown 7 days = zizmor's `dependabot-cooldown` floor (Dependabot's implicit default = 3);
+# security updates ignore it (Dependabot options reference, `cooldown`).
 updates:
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -8,6 +10,8 @@ updates:
       day: "tuesday"
       time: "07:23"
       timezone: "Etc/UTC"
+    cooldown:
+      default-days: 7
 
   - package-ecosystem: "uv"
     directory: "/"
@@ -16,3 +20,5 @@ updates:
       day: "tuesday"
       time: "07:23"
       timezone: "Etc/UTC"
+    cooldown:
+      default-days: 7

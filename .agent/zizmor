@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# zizmor — GitHub Actions + Dependabot config audit (`.github/`) with ONE pinned binary, local + CI
+# alike (download + sha256 refusal = `.agent/fetch-tool`). Offline: the audits that call the GitHub
+# API stay off, so the step needs no token and no network past the first download.
+#   .agent/zizmor            audit `.github/` (rc 0 = no finding; zizmor's own rc 1x per severity)
+#   .agent/zizmor <args…>    pass args straight to the pinned binary (e.g. a seed directory)
+set -euo pipefail
+cd "$(dirname "$0")/.." || exit 2
+. .agent/fetch-tool
+version=1.31.1
+case "$(uname -s)-$(uname -m)" in
+  Linux-x86_64) asset=x86_64-unknown-linux-gnu sum=d185f726bdaf92df78273217dfdd24ebcd6b0ef48cf3ce776ff5762b6e138c99 ;;
+  Linux-aarch64) asset=aarch64-unknown-linux-gnu sum=37eebbd5762a44f262d94875431b14a6d2402991e90a685113ea97b8b41be833 ;;
+  Darwin-arm64) asset=aarch64-apple-darwin sum=ad5aa633cd56215b11e6c51d51f90c7e6b22904a75047d1215abbd422f61d698 ;;
+  *) echo "zizmor: no pinned release for $(uname -s)-$(uname -m)" >&2; exit 2 ;;
+esac
+fetch_tool zizmor "$version" \
+  "https://github.com/zizmorcore/zizmor/releases/download/v$version/zizmor-$asset.tar.gz" \
+  "$sum" zizmor
+if [ $# -gt 0 ]; then
+  exec "$BIN" --offline --no-progress "$@"
+fi
+exec "$BIN" --offline --no-progress --format plain .github/

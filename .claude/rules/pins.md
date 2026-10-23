@@ -4,6 +4,9 @@ paths:
   - "uv.lock"
   - ".github/**"
   - ".agent/gitleaks"
+  - ".agent/zizmor"
+  - ".agent/shellcheck"
+  - ".agent/fetch-tool"
   - "prototype/webui-demo/package.json"
   - "prototype/webui-demo/pnpm-lock.yaml"
   - "prototype/webui-demo/static/vendor/**"
@@ -12,10 +15,10 @@ paths:
 
 # Dependency + toolchain pins
 
-- Law (owner): every pin at its latest release; a held-back pin = a `.agent/deferred.md` row naming its blocker. Dependabot (`.github/dependabot.yml`: `uv` + `github-actions`) bumps `pyproject.toml`, `uv.lock` + action refs, and moves a range (the `uv_build` floor) only once latest leaves it; the setup-uv `version:`, runner, Python legs, gitleaks, prototype + targets have no updater ⇒ checked by hand (p125).
+- Law (owner): every pin at its latest release; a held-back pin = a `.agent/deferred.md` row naming its blocker. Dependabot (`.github/dependabot.yml`: `uv` + `github-actions`) bumps `pyproject.toml`, `uv.lock` + action refs, and moves a range (the `uv_build` floor) only once latest leaves it; the setup-uv `version:`, runner, Python legs, gitleaks, zizmor, ShellCheck, prototype + targets have no updater ⇒ checked by hand (p125).
 - Where each lives:
   - Python dev tools (exact `==`) + the `uv_build` floor = `pyproject.toml`; transitive = `uv.lock` (`uv lock --upgrade`).
-  - gitleaks = `.agent/gitleaks` (`version=` + the release asset's sha256 per platform).
+  - gitleaks, zizmor, ShellCheck = `.agent/gitleaks`, `.agent/zizmor`, `.agent/shellcheck` (`version=` + the release asset's sha256 per platform = GitHub's asset `digest`; download + refusal = `.agent/fetch-tool`).
   - CI = `.github/workflows/gate.yml`: actions by commit SHA + `# v<tag>` (`gh api repos/<r>/commits/<tag>`); uv = setup-uv `version:`; runner = `runs-on`; Python legs = `python-version`. `UV_PYTHON_PREFERENCE=only-managed` ⇒ each leg = the newest patch its pinned uv ships (the image's own Python is older), so a uv bump moves every leg's patch.
   - Prototype: Playwright + the Chromium it installs = `package.json` + `pnpm-lock.yaml`; driver.js = `static/vendor/driver.js-<version>/` (README `Third-party code`); `static/fonts/*.woff2` = `@fontsource/space-grotesk` + `@fontsource/jetbrains-mono` 5.3.0 latin files, byte-identical (`cmp` against the npm tarball).
   - Deployment targets = owner rulings (`.agent/spec.md` `Decisions`), each bumped with its live regimen: Open WebUI (`examples/open_webui/local.py` `OPEN_WEBUI`; `PYTHON` = the official image's) + nucllei (`nucllei.md`; the jail stand-in image mirrors its jail); the mirrors' Python + SQLite follow their targets, below latest (p126).

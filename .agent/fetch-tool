@@ -1,0 +1,22 @@
+# shellcheck shell=bash
+# fetch-tool — sourced by the pinned-binary gate tools (`.agent/gitleaks`, `.agent/zizmor`,
+# `.agent/shellcheck`): one release tarball per version, downloaded once into gitignored `.tools/`,
+# refused unless its sha256 matches the caller's pin, one member extracted.
+#   fetch_tool <name> <version> <url> <sha256> <member>   sets BIN to the extracted binary
+# A reused `.tools/` binary is not re-hashed (local exposure only; CI starts from a clean clone).
+fetch_tool() {
+  local name=$1 version=$2 url=$3 sum=$4 member=$5 dir tarball
+  dir=.tools/$name-$version
+  BIN=$dir/${member##*/}
+  [ -x "$BIN" ] && return 0
+  mkdir -p "$dir"
+  tarball=$dir/${url##*/}
+  curl -fsSL -o "$tarball" "$url"
+  if ! echo "$sum  $tarball" | sha256sum -c --status; then
+    echo "$name: sha256 mismatch for $tarball; refusing it" >&2
+    rm -f "$tarball"
+    exit 2
+  fi
+  tar -xzf "$tarball" -C "$dir" --strip-components="$(tr -cd / <<< "$member" | wc -c)" "$member"
+  rm -f "$tarball"
+}

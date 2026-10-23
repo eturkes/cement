@@ -27,6 +27,8 @@ if [ "${1:-}" = "--omit-d28" ]; then
   shift
   step audit uv audit --locked --preview-features audit-command
   step secrets .agent/gitleaks
+  step actions .agent/zizmor
+  step shell .agent/shellcheck
   step skips uv run python .agent/skip-census
   step register uv run python .agent/register-audit --gate
   step reports uv run python .agent/decisions/m3-report-validate.py --all
@@ -35,6 +37,8 @@ if [ "${1:-}" = "--omit-d28" ]; then
 elif [ $# -eq 0 ]; then
   step audit uv audit --locked --preview-features audit-command
   step secrets .agent/gitleaks
+  step actions .agent/zizmor
+  step shell .agent/shellcheck
   step skips uv run python .agent/skip-census
   step register uv run python .agent/register-audit --gate
   step reports uv run python .agent/decisions/m3-report-validate.py --all

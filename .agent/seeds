@@ -4,14 +4,14 @@
 Usage: uv run python .agent/seeds [--rev REV] [--only S01 ...] [--list]
        uv run python .agent/seeds --self-test
 
-Every recorded recipe has an S01–S18 group, with a result per constituent case.
+Every recorded recipe has an S01–S22 group, with a result per constituent case.
 rc 0 = every selected expectation matched and every worktree restored; 1 = a
 verdict differs; 2 = setup/restoration failure. --self-test repeats the selected
 set after neutralizing skip-census: exactly S12's four red seeds must change.
 CPU-heavy (suites, D28 replays, a mutation run) ⇒ run the whole runner as one
 scheduled job; it schedules nothing itself (machine commands → `CLAUDE.local.md`).
 Network is required by uv
-audit and an uncached gitleaks download. A private mirror keeps test commits, worktrees,
+audit and uncached gitleaks, zizmor and shellcheck downloads. A private mirror keeps test commits, worktrees,
 and D28 cache writes out of the calling repository. Existing GREEN D28 records
 are copied as a cache only; D28 itself validates their content keys.
 """
@@ -60,6 +60,8 @@ GROUPS = [
     ("S18", "`.agent/mutate` (", "mutation credit", True),
     ("S19", "`.agent/register-audit --gate` CLI help (", "CLI help register", False),
     ("S20", "`.agent/decisions/m3-report-validate.py --all` (", "report anchors", False),
+    ("S21", "`.agent/zizmor` (", "Actions audit", False),
+    ("S22", "`.agent/shellcheck` (", "shell lint", False),
 ]
 
 
@@ -578,6 +580,37 @@ unittest.main()
                           [r"STALE-EXEMPT \.agent/decisions/no-such\.md", r"RECORDS: 6 graded, 2 failed"])
             self.case("S20", "shipped", root, [sys.executable, validator, "--all"], 0,
                       [r"EXEMPT \.agent/decisions/m3-plan-review\.md", r"RECORDS: 5 graded, 0 failed"])
+
+    def S21(self):
+        with self.tree() as root:
+            seed = self.temp / ("zizmor-neutral" if self.neutral else "zizmor") / ".github"
+            (seed / "workflows").mkdir(parents=True)
+            workflow = (root / ".github/workflows/gate.yml").read_text()
+            # A pull request title in a `run:` script = shell injection by anyone who opens one.
+            injected = workflow + '\n  greet:\n    runs-on: ubuntu-26.04\n    steps:\n' \
+                '      - run: echo "${{ github.event.pull_request.title }}"\n'
+            with changed(seed / "workflows/gate.yml", injected):
+                self.case("S21", "template-injection", root, [".agent/zizmor", seed], 14,
+                          ["template-injection", r"0 medium, 1 high"])
+            # The Dependabot config before the security review: no cooldown on either ecosystem.
+            with changed(seed / "dependabot.yml", git(self.repo, "show", "99f260a:.github/dependabot.yml") + "\n"):
+                self.case("S21", "cooldown", root, [".agent/zizmor", seed], 13,
+                          ["dependabot-cooldown", r"2 medium, 0 high"])
+            self.case("S21", "shipped", root, [".agent/zizmor"], 0, ["No findings to report"])
+
+    def S22(self):
+        with self.tree() as root:
+            lint = root / ".agent/spec-lint"
+            directive = "# shellcheck disable=SC2016 # the single quotes hold the awk program; its `$` are awk's\n"
+            with changed(lint, replace(lint.read_text(), directive, "")):
+                self.case("S22", "awk-in-a-variable", root, [".agent/shellcheck"], 1,
+                          [r"In \.agent/spec-lint line \d+", "SC2016"])
+            # A sourced library has no `#!`: it enters the set by its `# shellcheck shell=` line alone.
+            helper = root / ".agent/fetch-tool"
+            with changed(helper, helper.read_text().replace('rm -f "$tarball"', "rm -f $tarball")):
+                self.case("S22", "sourced-library", root, [".agent/shellcheck"], 1,
+                          [r"In \.agent/fetch-tool line \d+", "SC2086"])
+            self.case("S22", "shipped", root, [".agent/shellcheck"], 0, [r"shellcheck: \d+ scripts"])
 
     def S14(self):
         sid = "S14"
