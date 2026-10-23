@@ -44,8 +44,9 @@ select = [
 ]
 # SIM105: an explicit `try`/`except X: pass` names the swallowed class at the call site, where
 # `contextlib.suppress` moves it into a context manager; the runtime's totality reviews read it.
-# UP040: `JSONValue` + `JSONScalar` are exported `TypeAlias` unions; a `type` statement would
-# turn them into `TypeAliasType` objects at runtime, a public-surface change of its own (p132).
+# UP040: `JSONValue` + `JSONScalar` are exported `TypeAlias` unions (runtime `UnionType`, so
+# `isinstance(x, JSONScalar)` works); a `type` statement, available at the 3.12 floor, would make them
+# `TypeAliasType` objects that `isinstance` refuses — a public-surface change owed to the owner (p132).
 ignore = ["SIM105", "UP040"]
 
 [tool.ruff.lint.per-file-ignores]

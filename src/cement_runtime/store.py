@@ -671,16 +671,14 @@ class Store:
             )
         try:
             connection.row_factory = sqlite3.Row
-            # One setter per setting (p44): `connect(timeout=10.0)` sets the busy timeout; the
-            # PRAGMA sets trusted_schema, the one setter Python 3.11 has (`setconfig` is 3.12+).
+            # One setter per setting (p44): `connect(timeout=10.0)` sets the busy timeout, the
+            # PRAGMA sets trusted_schema (read back as 0), and `setconfig` sets DEFENSIVE, which no
+            # PRAGMA reaches; both exist on every Python the 3.12 floor admits.
             connection.execute("PRAGMA foreign_keys = ON")
             connection.execute("PRAGMA synchronous = EXTRA")
             connection.execute("PRAGMA temp_store = MEMORY")
             connection.execute("PRAGMA trusted_schema = OFF")
-            if hasattr(connection, "setconfig"):
-                defensive = getattr(sqlite3, "SQLITE_DBCONFIG_DEFENSIVE", None)
-                if defensive is not None:
-                    connection.setconfig(defensive, True)
+            connection.setconfig(sqlite3.SQLITE_DBCONFIG_DEFENSIVE, True)
             if read_only:
                 # Last: the setup pragmas above are writes the allowlist denies.
                 connection.set_authorizer(_read_authorizer)

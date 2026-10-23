@@ -20,8 +20,8 @@ from pydantic import BaseModel, Field
 # The embedded source keeps its own line breaks; one of its pragma comments runs past 100
 # columns inside the string, where ruff reads no pragma.
 # ruff: noqa: E501
-_CEMENT_PACKAGE = "_cement_runtime_05695bc0e5c44993"
-_CEMENT_DIGEST = "05695bc0e5c4499327ded7b51480811175d82d6122bca4ab63c52cdf3632e2f8"
+_CEMENT_PACKAGE = "_cement_runtime_ac49966e20363e00"
+_CEMENT_DIGEST = "ac49966e20363e0061813cecde3226dd55eaac8dd8d896dcef05cda42667b6fa"
 _CEMENT_SOURCES = {
     "__init__": r'''
 """Cement public API."""
@@ -1868,7 +1868,7 @@ class LearningCasesRecord(TypedDict):
 """`cement-projection-v1` + `-v2`: a closed, line-oriented recognizer from raw input to a case key.
 
 Contract: `.agent/decisions/m45-contract.md` §4. The text rules are explicit ASCII on purpose:
-Python 3.11-3.14 ship four Unicode databases (UCD 14.0.0 -> 16.0.0), so `str.isspace`, `lower`
+Python 3.12-3.15 ship four Unicode databases (UCD 15.0.0 -> 17.0.0), so `str.isspace`, `lower`
 or NFKC would make one key depend on the interpreter. No regex runs on input, nothing is
 evaluated, and `work` counts the characters, lines and entries the recognizer touches. v2 (p97)
 differs in one rule: a label ends at the first ASCII colon OR full-width colon (U+FF1A), so forms
@@ -2897,16 +2897,14 @@ class Store:
             )
         try:
             connection.row_factory = sqlite3.Row
-            # One setter per setting (p44): `connect(timeout=10.0)` sets the busy timeout; the
-            # PRAGMA sets trusted_schema, the one setter Python 3.11 has (`setconfig` is 3.12+).
+            # One setter per setting (p44): `connect(timeout=10.0)` sets the busy timeout, the
+            # PRAGMA sets trusted_schema (read back as 0), and `setconfig` sets DEFENSIVE, which no
+            # PRAGMA reaches; both exist on every Python the 3.12 floor admits.
             connection.execute("PRAGMA foreign_keys = ON")
             connection.execute("PRAGMA synchronous = EXTRA")
             connection.execute("PRAGMA temp_store = MEMORY")
             connection.execute("PRAGMA trusted_schema = OFF")
-            if hasattr(connection, "setconfig"):
-                defensive = getattr(sqlite3, "SQLITE_DBCONFIG_DEFENSIVE", None)
-                if defensive is not None:
-                    connection.setconfig(defensive, True)
+            connection.setconfig(sqlite3.SQLITE_DBCONFIG_DEFENSIVE, True)
             if read_only:
                 # Last: the setup pragmas above are writes the allowlist denies.
                 connection.set_authorizer(_read_authorizer)

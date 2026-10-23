@@ -17,10 +17,8 @@ step() { # step <name> <cmd…>
   rc=$?
   names+=("$name") rcs+=("$rc") secs+=("$(awk -v a="$t0" -v b="$EPOCHREALTIME" 'BEGIN{printf "%.1f", b - a}')")
 }
-# `--durations` arrived in Python 3.12, the floor pyproject admits; an interpreter that fails the
-# probe still runs the suite, without the list.
-durations=() note="slowest tests unavailable: unittest --durations needs Python >= 3.12"
-uv run python -c 'import sys; sys.exit(sys.version_info < (3, 12))' && durations=(--durations 10) note=
+# `--durations` (Python 3.12+) = the `requires-python` floor, so every `uv run` interpreter has it.
+durations=(--durations 10)
 step format uv run ruff format --check
 step lint uv run ruff check
 step types uv run mypy
@@ -57,5 +55,4 @@ for i in "${!names[@]}"; do
   printf '%-10s %4s %9s\n' "${names[$i]}" "${rcs[$i]}" "${secs[$i]}"
   [ "${rcs[$i]}" -eq 0 ] || fail=1
 done
-[ -z "$note" ] || printf '%s\n' "$note"
 exit "$fail"

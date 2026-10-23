@@ -1,7 +1,7 @@
 """`cement-projection-v1` + `-v2`: a closed, line-oriented recognizer from raw input to a case key.
 
 Contract: `.agent/decisions/m45-contract.md` §4. The text rules are explicit ASCII on purpose:
-Python 3.11-3.14 ship four Unicode databases (UCD 14.0.0 -> 16.0.0), so `str.isspace`, `lower`
+Python 3.12-3.15 ship four Unicode databases (UCD 15.0.0 -> 17.0.0), so `str.isspace`, `lower`
 or NFKC would make one key depend on the interpreter. No regex runs on input, nothing is
 evaluated, and `work` counts the characters, lines and entries the recognizer touches. v2 (p97)
 differs in one rule: a label ends at the first ASCII colon OR full-width colon (U+FF1A), so forms

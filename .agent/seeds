@@ -256,24 +256,9 @@ class Runner:
         with self.tree() as root:
             self.case(sid, "missing-module", root, [".agent/gate", "tests.test_no_such_module"], 1,
                       [r"^unittest\s+1\s", "ModuleNotFoundError", r"FAILED \(errors=1\)"])
-            version_rc, version_output, _ = run(
-                ["uv", "run", "python", "-c", "import sys; sys.exit(sys.version_info < (3, 12))"], root)
-            if version_rc not in (0, 1):
-                raise RuntimeError(f"Python version probe rc={version_rc}: {version_output}")
-            duration_token = "Slowest test durations" if version_rc == 0 else "slowest tests unavailable:"
+            # p132: `--durations` = the requires-python floor, so every gate run prints the list.
             self.case(sid, "durations", root, [".agent/gate", "tests.test_read_capability_census"], 0,
-                      [duration_token])
-            shim = self.temp / "uv-shim"
-            shim.mkdir(exist_ok=True)
-            executable = shim / "uv"
-            executable.write_text("#!/bin/sh\ncase \"$*\" in *sys.version_info*) exit 1;; esac\nexec "
-                                  + shlex.quote(shutil.which("uv")) + " \"$@\"\n")
-            executable.chmod(0o755)
-            rc, out = self.case(sid, "old-python", root,
-                                [".agent/gate", "tests.test_read_capability_census"], 0,
-                                [r"^slowest tests unavailable:"],
-                                env={"PATH": str(shim) + os.pathsep + os.environ["PATH"]})
-            self.observe(sid, "old-python-no-list", rc, str("Slowest test durations" not in out), 0, ["True"])
+                      ["Slowest test durations"])
             self.case(sid, "full-table", root, [".agent/gate"], 0,
                       [r"^unittest\s+0\s", r"^build\s+0\s", r"^spec-lint\s+0\s",
                        r"D28: \d+ revisions, \d+ replayed, \d+ from green verdicts",

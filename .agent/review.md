@@ -21,6 +21,17 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p132 agent part (MAINTAIN queue run 3, tier `kernel`: connection setup; the row stays open for the owner's `JSONValue` ruling) — target = the commit landing this section
+
+Check set = the row's acceptance clauses A1-A4, fixed before the diff was reread.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | each accommodation removed or its reason restated | pass (one owed) | `store.py`: `setconfig(SQLITE_DBCONFIG_DEFENSIVE, True)` unconditional (both `setconfig` + the constant exist on 3.12-3.15, measured), the `trusted_schema` PRAGMA kept as p44's one setter with that reason; `.agent/gate`'s `--durations` probe removed (+ `.agent/seeds` S01's old-Python cases, `ops.md`, `gate-checks.md`); the battery's `SETCONFIG_PYTHON` branch removed; `cli.py` + `projection.py` comments restated (UCD 15.0.0 / 15.1.0 / 16.0.0 / 17.0.0 on 3.12 / 3.13 / 3.14 / 3.15, measured). Owed: `UP040` — keeping `JSONValue` + `JSONScalar` as `TypeAlias` unions is an owner ruling (a `type` statement makes `isinstance(x, JSONScalar)` raise `TypeError`, measured on 3.12). |
+| A2 | removed branch's invariant pinned where it moved | pass | B23 `test_b23_both_connection_settings_read_back_on_both_paths`: `getconfig` DEFENSIVE `True` + TRUSTED_SCHEMA `False` on the read and the write path; deleting either setter → `FAILED (failures=2)`. B6's event lists drop the 3.11 alternative. |
+| A3 | generated copies | pass | paste-ins + `ext/bin/cement` regenerated (W1/N7 green). |
+| A4 | full gate green | pass | the CI gate in this commit's body; fast gate 8 modules / 206 tests rc 0, the slowest-tests list printed. |
+
 ## p131 close (MAINTAIN queue run 3, tier `data`: dependency instruments; the vulnerability triage = MAIN) — target = the commit landing this section
 
 Check set = the row's acceptance clauses A1-A4 + a security lens S1, fixed before the diff was reread.

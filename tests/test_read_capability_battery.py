@@ -8,7 +8,6 @@ import json
 import pathlib
 import sqlite3
 import subprocess
-import sys
 import tempfile
 import typing
 import unittest
@@ -20,9 +19,6 @@ from cement_runtime import store as store_module
 from cement_runtime.errors import IntegrityError, StateError
 from tests.test_read_capability_census import _sql_values
 
-# `Connection.setconfig` + `sqlite3.SQLITE_DBCONFIG_DEFENSIVE` arrived in Python 3.12; on 3.11
-# `_connect` sets no DBCONFIG flag (pyproject admits 3.11, CI's split leg runs it).
-SETCONFIG_PYTHON = sys.version_info >= (3, 12)
 
 
 class ReadCapabilityBatteryTests(unittest.TestCase):
@@ -284,11 +280,7 @@ class ReadCapabilityBatteryTests(unittest.TestCase):
         _, events = self._record_read_setup()
         self.assertEqual(
             [event[1:] for event in events if event[:1] == ("setconfig",)],
-            [
-                (sqlite3.SQLITE_DBCONFIG_DEFENSIVE, True),
-            ]
-            if SETCONFIG_PYTHON
-            else [],
+            [(sqlite3.SQLITE_DBCONFIG_DEFENSIVE, True)],
         )
 
     def test_b06_authorizer_is_last_then_begin_runs(self):
@@ -304,7 +296,7 @@ class ReadCapabilityBatteryTests(unittest.TestCase):
                 "execute",
                 "execute",
                 "execute",
-                *(["setconfig"] if SETCONFIG_PYTHON else []),
+                "setconfig",
                 "set_authorizer",
                 "execute",
             ],
@@ -924,3 +916,10 @@ class ReadCapabilityBatteryTests(unittest.TestCase):
         self.assertEqual(len(payload), 14_580)
         self.assertEqual(hashlib.sha256(payload).hexdigest(), expected)
         self.assertEqual(store_module.SCHEMA_FINGERPRINT, hashlib.sha256(store_module.SCHEMA.encode("utf-8")).hexdigest())
+
+    def test_b23_both_connection_settings_read_back_on_both_paths(self):
+        """B23 (p132): DEFENSIVE (`setconfig`) and trusted_schema (the PRAGMA) read back on both paths."""
+        for write in (False, True):
+            with self.subTest(write=write), self.store.transaction(write=write) as connection:
+                self.assertIs(connection.getconfig(sqlite3.SQLITE_DBCONFIG_DEFENSIVE), True)
+                self.assertIs(connection.getconfig(sqlite3.SQLITE_DBCONFIG_TRUSTED_SCHEMA), False)
