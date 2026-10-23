@@ -21,3 +21,7 @@ Subject `cli.py:_parser`. Tally: 77 survivors = 75 out-of-scope (`contract-open`
 ## p113 — `p91-mutate.txt` (ABI pin `test_function_report_public_shape_is_exact_frozen_slotted_and_exported` @ 3ef05d3 + `test_parser_rejects_ambiguous_or_unbounded_values` @ 8bef2a0)
 
 Subjects: the report dataclasses (`models.py` `FunctionReport`, `OperationNowReport`, `FunctionAnchorReport`) and `json_value.py` `parse_json`. Tally: 84 survivors, all out of scope → `contract-open` by construction: `store.py` `Store.__init__` 35, `_validate_ledger` 10, `Store._connect` 10, `Store._initialize` 7, `_schema_objects` 5 and `system.py` `System.__init__` 17 — the ledger the pin's fixture opens. The subject module `models.py` holds no survivor (the record: 27 killed of 27); the parser pin's section holds none.
+
+## p112 — `p23-mutate.txt` (`ShippedCommandRoundTripTests.test_the_eval_child_opens_no_database_file` @ e3665b5)
+
+Subjects: the eval path the pin's audited child runs — `cli.py` `_read_function_bundle` and `_run` (its eval branch precedes the ledger gate). Tally: 1483 survivors, all out of scope → `contract-open` by construction: the credit run traces the parent process alone, and the parent builds the promoted ledger the children read (`system.py` 946 — `System._verify_function_snapshot` 92, `System._assess_examples` 83, `System._run_verification` 73 —, `projection.py` 163, `json_value.py` 118, `models.py` 76, `store.py` 76, `function.py` 66, `artifacts.py` 38); no `cli.py` line holds a survivor, because the eval path runs only in the audited child processes.

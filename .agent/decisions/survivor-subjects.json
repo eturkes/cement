@@ -1,18 +1,122 @@
 {
+  "tests.test_cli.CLITests.test_a_closed_stdout_exits_120_with_python_s_notice": [
+    "cli.py:_emit",
+    "cli.py:main"
+  ],
+  "tests.test_cli.CLITests.test_function_export_both_sources_preserve_every_error_payload": [
+    "cli.py:_run"
+  ],
+  "tests.test_cli.CLITests.test_function_export_drift_preserves_the_ordered_verdict_and_stderr_bytes": [
+    "cli.py:_run"
+  ],
+  "tests.test_cli.CLITests.test_function_export_history_reconstructs_once_with_exact_scope": [
+    "cli.py:_run"
+  ],
+  "tests.test_cli.CLITests.test_function_export_live_lookup_is_case_and_like_exact": [
+    "cli.py:_run"
+  ],
+  "tests.test_cli.CLITests.test_function_export_multi_failure_keeps_every_check_field": [
+    "cli.py:_run"
+  ],
+  "tests.test_cli.CLITests.test_function_export_never_inspects_a_prospective_union": [
+    "cli.py:_run"
+  ],
+  "tests.test_cli.CLITests.test_function_export_requires_db_and_partition": [
+    "cli.py:_run"
+  ],
+  "tests.test_cli.CLITests.test_function_export_unicode_is_exact_on_binary_and_text_hosts": [
+    "cli.py:_run"
+  ],
+  "tests.test_cli.CLITests.test_function_promote_actor_bounds_are_adjacent_byte_pairs": [
+    "system.py:System.promote_function",
+    "system.py:_text"
+  ],
+  "tests.test_cli.CLITests.test_function_promote_rejects_stale_hash_after_qualifying_change": [
+    "system.py:System.promote_function"
+  ],
+  "tests.test_cli.CLITests.test_function_show_and_receipts_read_unicode_decimal_digits_as_integers": [
+    "cli.py:_parser"
+  ],
+  "tests.test_cli.CLITests.test_function_show_and_receipts_reject_a_surplus_positional": [
+    "cli.py:_parser"
+  ],
+  "tests.test_cli.CLITests.test_function_show_and_receipts_reject_each_others_flags": [
+    "cli.py:_parser"
+  ],
+  "tests.test_cli.CLITests.test_function_show_and_receipts_take_the_last_of_a_repeated_flag": [
+    "cli.py:_parser"
+  ],
+  "tests.test_cli.CLITests.test_function_verify_drafts_actor_bounds_are_adjacent_pairs": [
+    "system.py:System.verify_drafts",
+    "system.py:_text"
+  ],
+  "tests.test_cli.CLITests.test_main_returns_with_stdout_still_buffered": [
+    "cli.py:_emit",
+    "cli.py:main"
+  ],
   "tests.test_cli.ParserShapeTests.test_the_live_grammar_digest_covers_help_choices_and_type": [
     "cli.py:_parser"
+  ],
+  "tests.test_function.FunctionTests.test_entry_digest_syntax_rejects_after_outer_rehash": [
+    "function.py:_digest",
+    "function.py:validate_function"
   ],
   "tests.test_function.FunctionTests.test_the_real_item_bound_accepts_one_million_and_rejects_one_more": [
     "json_value.py:_validate",
     "json_value.py:canonicalize",
     "json_value.py:parse_json"
   ],
+  "tests.test_hospital_ocr_example.OfflineBundleTests.test_bundle_identity_follows_its_ids_and_clock_alone": [
+    "function.py:build_function",
+    "function.py:_normalize",
+    "system.py:_function_entry_seal"
+  ],
+  "tests.test_hospital_ocr_example.ShippedCommandRoundTripTests.test_the_eval_child_opens_no_database_file": [
+    "cli.py:_read_function_bundle",
+    "cli.py:_run"
+  ],
   "tests.test_json_value.CanonicalJSONTests.test_parser_rejects_ambiguous_or_unbounded_values": [
     "json_value.py:parse_json"
+  ],
+  "tests.test_proposal_binding_battery.ProposalBindingAdapterTests.test_duplicate_identifier_selection_is_rejected": [
+    "system.py:_proposal_bindings"
+  ],
+  "tests.test_proposal_binding_battery.ProposalBindingAdapterTests.test_empty_identifier_selection_returns_empty": [
+    "system.py:_proposal_bindings"
+  ],
+  "tests.test_proposal_binding_battery.ProposalBindingAdapterTests.test_invalid_selection_type_is_rejected": [
+    "system.py:_proposal_bindings"
+  ],
+  "tests.test_submission.SubmissionTests.test_a_non_mapping_provenance_is_refused_never_normalized": [
+    "system.py:System._canonical_candidate",
+    "system.py:System.submit_proposal"
+  ],
+  "tests.test_system.PreservedInvariantCensusTests.test_an_invalid_identity_reaches_no_clock_read_and_no_id_allocation": [
+    "system.py:_text"
+  ],
+  "tests.test_system.PreservedInvariantCensusTests.test_every_event_branch_keeps_its_payload_keys": [
+    "system.py:_event"
+  ],
+  "tests.test_system.PreservedInvariantCensusTests.test_every_identity_writer_records_its_identity_where_it_did": [
+    "system.py:_text",
+    "system.py:_event"
   ],
   "tests.test_system.SystemTests.test_function_report_public_shape_is_exact_frozen_slotted_and_exported": [
     "models.py:FunctionReport",
     "models.py:OperationNowReport",
     "models.py:FunctionAnchorReport"
+  ],
+  "tests.test_system.SystemTests.test_function_verification_enumerates_members_inside_its_read_transaction": [
+    "system.py:System.verify_function",
+    "system.py:System._promoted_function_rows"
+  ],
+  "tests.test_system.SystemTests.test_function_verification_pins_each_projected_document_field": [
+    "system.py:System._verify_function_snapshot"
+  ],
+  "tests.test_system.SystemTests.test_promote_function_rolls_back_when_its_clock_reenters_the_ledger": [
+    "system.py:System.promote_function"
+  ],
+  "tests.test_system.SystemTests.test_verify_drafts_holds_the_write_lock_while_a_blocking_clock_runs": [
+    "system.py:System.verify_drafts"
   ]
 }

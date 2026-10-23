@@ -13,7 +13,9 @@ scope. Per survivor, at the section's revision:
                 module that names a subject (D28's module excluded) → covered elsewhere
   survived      in scope and no such module kills it → needs a ruling (equivalent | contract-open
                 | missing-test)
-Prints one line per in-scope survivor + a tally; `--out` writes every verdict as JSON lines.
+Prints one line per in-scope survivor + a tally; `--out` writes every verdict as JSON lines. A mutant
+already replayed in this run against the same module set (sections of one record share most
+mutants) takes that verdict (`note` = `memo`) instead of a second replay.
 rc 0 = triaged; 2 = setup (unknown pin, unreadable record, red baseline module set).
 """
 
@@ -131,6 +133,7 @@ def main() -> int:
         print(f"survivor-triage: no section in {args.record}", file=sys.stderr)
         return 2
     verdicts: list[dict[str, object]] = []
+    memo: dict[tuple[object, ...], dict[str, object]] = {}
     for test_id, short, rows in sections:
         if test_id not in subjects:
             print(f"survivor-triage: no subject for {test_id}", file=sys.stderr)
@@ -150,7 +153,15 @@ def main() -> int:
         modules = _killers(revision, subjects[test_id])
         print(f"== {test_id} @ {short}: {len(rows)} survivors, {len(inside)} in scope "
               f"{sorted(subjects[test_id])}; killers {len(modules)} modules")
-        if inside:
+
+        def key(row: dict[str, object]) -> tuple[object, ...]:
+            return (revision, row["module"], row["operator"], row["occurrence"], tuple(modules))
+
+        fresh = [row for row in inside if key(row) not in memo]
+        for row in inside:
+            if key(row) in memo:
+                row.update(memo[key(row)], note="memo")
+        if fresh:
             with tempfile.TemporaryDirectory(prefix="cement-triage-") as directory:
                 trees = [pathlib.Path(directory) / f"tree-{index}" for index in range(args.workers)]
                 try:
@@ -163,7 +174,7 @@ def main() -> int:
                         print(f"survivor-triage: killer modules red at {short}:\n"
                               f"{baseline.stderr[-3000:]}", file=sys.stderr)
                         return 2
-                    shares = [inside[index::args.workers] for index in range(args.workers)]
+                    shares = [fresh[index::args.workers] for index in range(args.workers)]
                     with concurrent.futures.ThreadPoolExecutor(args.workers) as pool:
                         list(pool.map(lambda pair: _replay(pair[0], pair[1], modules, args.timeout),
                                       zip(trees, shares, strict=True)))
@@ -171,9 +182,11 @@ def main() -> int:
                     for tree in trees:
                         subprocess.run(["git", "worktree", "remove", "--force", str(tree)],
                                        cwd=ROOT, capture_output=True)
-            for row in inside:
-                print(f"  {row['verdict']:<11} {row['module']}:{row['line']} {row['function']} "
-                      f"{row['operator']} #{row['occurrence']}")
+            for row in fresh:
+                memo[key(row)] = {name: row[name] for name in ("verdict", "note") if name in row}
+        for row in inside:
+            print(f"  {row['verdict']:<11} {row['module']}:{row['line']} {row['function']} "
+                  f"{row['operator']} #{row['occurrence']}{' (memo)' if row.get('note') == 'memo' else ''}")
         verdicts.extend(rows)
     tally: dict[str, int] = {}
     for row in verdicts:
