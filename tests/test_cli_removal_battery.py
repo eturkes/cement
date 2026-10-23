@@ -2988,7 +2988,9 @@ class RemovalObligationBatteryTests(unittest.TestCase):
             "README.md", "examples/command_source/README.md", "docs/architecture.md",
             "docs/threat-model.md", "examples/hospital_ocr/README.md",
         }
-        added_surfaces = {"examples/open_webui/README.md", "examples/nucllei/README.md"}
+        added_surfaces = {
+            "examples/open_webui/README.md", "examples/nucllei/README.md", "examples/outbox/README.md"
+        }
         self.assertEqual(
             {path.relative_to(ROOT).as_posix() for path in surfaces},
             baseline_surfaces | added_surfaces,

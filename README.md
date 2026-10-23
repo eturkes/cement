@@ -595,6 +595,9 @@ full state model and trust boundaries.
 - [nucllei](examples/nucllei/README.md): Cement as a skill in nucllei, the chat platform of the
   LLENS deployment. The chat model runs one sandbox command, and each user has a ledger of their own.
   The learning pass runs in the chat, and the user switches each function on with `/cement-switch`.
+- [Caller outbox](examples/outbox/README.md): a caller-side intent table and relay that keep an
+  answer durable until Cement records it. It protects against a lost intent, and it shows why
+  delivery is at least once.
 - [Command candidate source](examples/command_source/README.md): an optional source that runs a
   trusted adapter executable for one candidate. It also builds as a separate wheel, which adds the
   `cement-command-source` command.

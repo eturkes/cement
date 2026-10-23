@@ -52,6 +52,7 @@ DOCS: tuple[str, ...] = (
     "examples/hospital_ocr/README.md",
     "examples/open_webui/README.md",
     "examples/nucllei/README.md",
+    "examples/outbox/README.md",
 )
 
 # The convention. Every count in the emitted table is taken under exactly this pattern.
@@ -128,6 +129,10 @@ OWNERS: dict[str, tuple[str, str]] = {
     "examples/nucllei/README.md": (
         "MAINTAIN nucllei",
         "chat requests describe the nucllei skill example, not the deleted lifecycle",
+    ),
+    "examples/outbox/README.md": (
+        "MAINTAIN p37",
+        "the caller outbox example describes its own relay, not the deleted lifecycle",
     ),
     "examples/hospital_ocr/README.md": (
         "M3.6a1",

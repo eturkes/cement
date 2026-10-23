@@ -87,6 +87,7 @@ immutable
 import
 inspected
 instance
+intent
 interpreter
 interrupt
 joined
@@ -121,6 +122,7 @@ operator
 optional
 ordered
 other
+outbox
 outer
 package
 parser
@@ -137,6 +139,7 @@ preset
 preview
 primary
 printed
+probe
 process
 production
 projected
@@ -149,6 +152,7 @@ proxy
 pure
 reader
 real
+relay
 remedies
 rename
 replacements

@@ -21,6 +21,20 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p37 close (MAINTAIN queue run 3, tier `data`: `System.submit_proposal` re-grades every field the relay sends; the example is caller code) — target = the commit landing this section
+
+Check set = the row's acceptance clauses A1-A4 + the code diff lenses C1-C3, fixed before the diff was reread.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | id bound to partition + revision + canonical input + candidate + source revision | pass | digest over the canonical envelope; `test_the_id_binds_the_content` varies each of the 7 fields → `IntentConflictError`, same content → no-op, zero proposals. |
+| A2 | same id / different content rejected | pass | A1's subtests; the refusal rolls the `BEGIN IMMEDIATE` back, the table keeps one pending row. |
+| A3 | acknowledgement-crash probe shows duplicates | pass | a real relay process exits 70 between Cement's commit and the acknowledgement: unkeyed → 2 proposals, identical input/output/provenance/revision; keyed (`source_id = outbox:<id>`) → 1 proposal, `replayed`, attempts 2. The row predates core `source_id` uniqueness, so the probe shows both. |
+| A4 | docs = lost-intent protection only | pass | README opening + `## Delivery is at least once`; no exactly-once claim; the revision window published (find p134). |
+| C1 | correctness | pass | acknowledgement guarded by `state = 'pending'`; a revised operation → `stale`, no proposal; the conflict branch accepts only `submit_proposal`'s repeated-`source_id` text and re-raises anything else. |
+| C2 | censuses an addition enters | pass | D23 `added_surfaces` + tripwire `DOCS`/`OWNERS` admit the README (table re-emitted: 1 `request` hit, PASS); L24 green; glossary +4 taught referents (intent, outbox, probe, relay). |
+| C3 | altitude | find → row `p134` | the window is a core gap (`submit_proposal` has no expected revision), so the fix belongs in the core, not the example. |
+
 ## p34 close (MAINTAIN queue run 3, tier `data`: `System.propose` + `parse_json` re-grade every byte the runner passes; the smoke + metadata pins = structural validator + live spot-check) — target = the commit landing this section
 
 Check set = `CLAUDE.md` `Engineering` code diff lenses (correctness, cleanup, altitude) + the row's five acceptance clauses A1-A5, fixed before the diff was reread.

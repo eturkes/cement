@@ -29,7 +29,7 @@
       "test": "test_d22c_the_opening_text_handle_request_fence_is_protected_and"
     }
   ],
-  "head": "00dc010a03edd8082cc35fd5bc111f0e332643c1",
+  "head": "61bca08181a499038f562370820562bb71a0aed3",
   "pins": [
     {
       "lines": 76,
@@ -381,13 +381,27 @@
         }
       ],
       "owner": "MAINTAIN nucllei"
+    },
+    {
+      "document": "examples/outbox/README.md",
+      "grounds": "the caller outbox example describes its own relay, not the deleted lifecycle",
+      "hit_lines": 1,
+      "hits": [
+        {
+          "text": "request lifecycle, so a caller that must not lose an answer keeps its own record and delivers it",
+          "tokens": [
+            "request"
+          ]
+        }
+      ],
+      "owner": "MAINTAIN p37"
     }
   ],
   "totals": {
     "pins": 15,
     "pins_working_tree": 12,
     "prose_documents_owned": 4,
-    "prose_hit_lines": 23
+    "prose_hit_lines": 24
   },
   "unit": "M3.6a2",
   "vocabulary": "\\bhandle\\b|request_status|retry_failed|invalidated_generators|resolved_by_artifact|\\brequests?\\b|\\blease\\b|in_progress|fallback_failed|reconciliation_required|[Aa]mbigu\\w*"
