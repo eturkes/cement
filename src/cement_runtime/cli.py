@@ -52,6 +52,17 @@ class _Unverified(Exception):  # noqa: N818 — a verdict carrier mapped to exit
 
 
 class _JSONArgumentParser(argparse.ArgumentParser):
+    def _check_value(self, action: argparse.Action, value: Any) -> None:
+        # argparse's own wording drifts by interpreter (3.12.8+ drops the quotes around choices,
+        # 3.15 appends `maybe you meant …?`), so the JSON error keeps 3.11/3.13/3.14's one form.
+        # Subparsers inherit this class, which covers every node's choice check.
+        choices = action.choices
+        if choices is not None and value not in choices:
+            listed = ", ".join(repr(str(choice)) for choice in choices)
+            raise argparse.ArgumentError(
+                action, f"invalid choice: {str(value)!r} (choose from {listed})"
+            )
+
     def error(self, message: str) -> Never:
         raise _UsageError(message)
 

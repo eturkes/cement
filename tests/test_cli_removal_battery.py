@@ -234,7 +234,9 @@ def _invalid_choices(message: str) -> set[str]:
     match = re.search(r"\(choose from (.+)\)$", message)
     if match is None:
         raise AssertionError(f"invalid-choice enumeration absent: {message!r}")
-    return set(re.findall(r"'([^']+)'", match.group(1)))
+    # CPython 3.12.8+ lists choices bare (`a, b`), every other line quotes them (`'a', 'b'`); the
+    # frozen modules these frames load keep the interpreter's own wording.
+    return {name.strip("'") for name in match.group(1).split(", ")}
 
 
 def _parser_nodes(

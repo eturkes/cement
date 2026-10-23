@@ -12,7 +12,7 @@ dependencies = []
 cement = "cement_runtime.cli:entry"
 
 [build-system]
-requires = ["uv_build>=0.13.1,<0.14"]
+requires = ["uv_build>=0.13.5,<0.14"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
@@ -23,7 +23,7 @@ source-include = ["docs/**", "examples/**", "skills/**", "tests/**"]
 dev = [
     "cosmic-ray==8.7.0",
     "mypy==2.4.0",
-    "ruff==0.17.1",
+    "ruff==0.17.2",
 ]
 
 [tool.ruff]

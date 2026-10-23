@@ -21,6 +21,26 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## Dependency + toolchain upgrade (MAINTAIN, ad-hoc) — target = the diff this commit lands, base `e7137f3`
+
+Owner request = every dependency + toolchain pin at its latest release or a `.agent/deferred.md` row naming the blocker; owner pick at this request's question = repair D05's message parser (3.12.8+ bare choices). `reviewer-1`, 7 lenses fixed before it read `e7137f3..d27b462`; MAIN re-derived every row, then re-reviewed the later `_check_value` + D05 changes itself against the same lenses.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| L1 | pin completeness | finding F3 (minor), fixed | reviewer's independent inventory (34 locked packages, tools, 4 action SHAs, gitleaks checksums, Playwright, driver.js + 5 fonts byte-equal, Open WebUI 0.12.3, nucllei v20261020-01) = MAIN's; mirrors' Python + SQLite unqueued → p126. |
+| L2 | CLI invalid-choice wording | pass | `_parser()` 48 nodes, all `_JSONArgumentParser` (reviewer probe, 3.11.17-3.15.1); `_check_value` final form: 4 CLI modules `Ran 349` OK on each of 3.11.17 / 3.12.15 / 3.13.17 / 3.14.9 / 3.15.1. |
+| L3 | `gate.yml` | pass | setup-uv v10.3.2 exports `UV_PYTHON`, installs under `RUNNER_TEMP`, `cache-python` false ⇒ `only-managed` = newest patch per leg (CI run 39909959977: 3.12 leg `Using CPython 3.12.15`); `ubuntu-26.04` GA (runner-images README + announcement); actionlint 1.7.12's label table predates it. |
+| L4 | live-law consistency | findings F1 F2 (minor), fixed | no version number left in `ops.md` / `spec.md` / `gate-checks.md`; `CLAUDE.local.md` build string = `uv run python -c 'import sys;print(sys.version)'`. |
+| L5 | queue rows | finding F2 (minor), fixed | p123 blocker: V18 since `9a48c85`, D14 since `861c069`, both in D28's first replayed revision; grader PASS. |
+| L6 | `pins.md` claims | findings F1 F2 (minor), fixed | GitHub cache docs: a run restores current- or default-branch caches, never a sibling's. |
+| L7 | no check weakened | pass | D05 repair = owner-approved; assertions unchanged (exact set equality); seed: one survivor dropped → `failures 1` quoted + bare on 3.12.15 + 3.13.17, control OK. |
+
+- F1 `pins.md` said a runner image re-keys D28 verdicts, while the key holds `sys.platform` (`tests/test_migration_battery.py:1862`) → interpreter build + SQLite re-key, an image alone keeps the key.
+- F2 `pins.md` + p125 said Dependabot bumps `uv.lock` + action SHAs alone, while its `uv` updater rewrites `pyproject.toml` too (dependabot-core `d261cc7` `uv/lib/dependabot/uv/file_updater/lock_file_updater.rb`) → manifests + lock + action refs automated, range floors + the rest by hand.
+- F3 the deployment mirrors (`local.py` `PYTHON = "3.11"`, stand-in `python:3.12-slim-bookworm`, SQLite 3.40.1) sit below latest without a row → p126, blocker = the owner-ruled targets (Open WebUI v0.12.3 `Dockerfile:59`, nucllei sandbox `Dockerfile:22`, both re-fetched by MAIN).
+- Register adopted: p124 `beside` → `with each redistributed copy` (OFL also permits embedded metadata).
+- Re-review (MAIN, each fix against its acceptance): `rg -Fc 'or runner image (' .claude/rules/pins.md` → 0; `rg -Fc 'action SHAs alone' .claude/rules/pins.md .agent/deferred.md` → 0 + 0; grader PASS with p126.
+
 ## `CLAUDE.md` refresh agents@897faa7 → agents@b78f436 + offload move + CI gate + 3.11 leg (MAINTAIN, ad-hoc) — target = the diff this commit lands, base `a1a08de`
 
 Template delta = Git `ci/*` pushes, NEW `CI gate`, `CLAUDE.local.md` tier. Owner request = offload/nixbox law out of `.claude/rules/` into `CLAUDE.local.md`; owner picks at the session's question = CI gate installed + the 3.11 leg fixed now, p119 superseded by the CI gate. `reviewer-1`, 10 lenses fixed before it read the diff, primary tree read-only (target sha256 `4990af7f…` over its run; MAIN's fixes after it). Teammate verdicts re-derived here.

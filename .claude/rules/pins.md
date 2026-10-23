@@ -1,0 +1,23 @@
+---
+paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - ".github/**"
+  - ".agent/gitleaks"
+  - "prototype/webui-demo/package.json"
+  - "prototype/webui-demo/pnpm-lock.yaml"
+  - "prototype/webui-demo/static/vendor/**"
+  - "prototype/webui-demo/static/fonts/**"
+---
+
+# Dependency + toolchain pins
+
+- Law (owner): every pin at its latest release; a held-back pin = a `.agent/deferred.md` row naming its blocker. Dependabot (`.github/dependabot.yml`: `uv` + `github-actions`) bumps `pyproject.toml`, `uv.lock` + action refs, and moves a range (the `uv_build` floor) only once latest leaves it; the setup-uv `version:`, runner, Python legs, gitleaks, prototype + targets have no updater ⇒ checked by hand (p125).
+- Where each lives:
+  - Python dev tools (exact `==`) + the `uv_build` floor = `pyproject.toml`; transitive = `uv.lock` (`uv lock --upgrade`).
+  - gitleaks = `.agent/gitleaks` (`version=` + the release asset's sha256 per platform).
+  - CI = `.github/workflows/gate.yml`: actions by commit SHA + `# v<tag>` (`gh api repos/<r>/commits/<tag>`); uv = setup-uv `version:`; runner = `runs-on`; Python legs = `python-version`. `UV_PYTHON_PREFERENCE=only-managed` ⇒ each leg = the newest patch its pinned uv ships (the image's own Python is older), so a uv bump moves every leg's patch.
+  - Prototype: Playwright + the Chromium it installs = `package.json` + `pnpm-lock.yaml`; driver.js = `static/vendor/driver.js-<version>/` (README `Third-party code`); `static/fonts/*.woff2` = `@fontsource/space-grotesk` + `@fontsource/jetbrains-mono` 5.3.0 latin files, byte-identical (`cmp` against the npm tarball).
+  - Deployment targets = owner rulings (`.agent/spec.md` `Decisions`), each bumped with its live regimen: Open WebUI (`examples/open_webui/local.py` `OPEN_WEBUI`; `PYTHON` = the official image's) + nucllei (`nucllei.md`; the jail stand-in image mirrors its jail); the mirrors' Python + SQLite follow their targets, below latest (p126).
+- Full leg (CI `full`, D28 included) = Python 3.13: D28 replays every range revision's OWN suite on that interpreter ⇒ an interpreter whose behavior change reds a pin at any old revision reds D28. 3.15 does (argparse's default `suggest_on_error` reds V18 + D14 at every revision before `_JSONArgumentParser._check_value` fixed the CLI's own wording) → p123; a 3.12 full leg would too (3.12.8+ lists choices unquoted). A new Python line enters as a split leg.
+- A `uv.lock` change re-keys every D28 verdict (the content key holds its sha256; the CI cache key `hashFiles('uv.lock')`), and so does a new interpreter build (`sys.version`) or SQLite (`sqlite3.sqlite_version`), while a runner image alone keeps the key (`sys.platform`) ⇒ an upgrade's CI gate replays every range revision cold, and `main`'s first run after it replays cold again, because `ci/*` cache saves stay branch-scoped.
