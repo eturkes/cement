@@ -21,6 +21,20 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p36 close (MAINTAIN queue run 3, tier `kernel`) — target = the commit landing this section
+
+Check set = consultant-1's contract rows K1-K6 (before code) + MAIN's implementation lenses M1-M3.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| K1-K2 | affected set, digest preimage | pass after edits | member-local findings from `_snapshot_member` + ambiguity derived from rows (all claimants; a UNIQUE index confines claimants to distinct revisions); P3 refusal; digest = `_digest_strings` length-prefixed, no size ceiling, binds the display. |
+| K3-K4 | one-lock recompute, race, rerun | pass after edits | Q3 rewritten: the immutable event is the receipt and the tagged set must match its full count + id hash (a forged `suspend_artifact` tag and a partial tagged set → conflict, both tested); displayed-plan change → conflict with zero writes; an unrelated commit still applies. |
+| K5 | bounded event | pass | `_id_list_projection` over the complete sorted set; payload keys pinned in `EVENT_PAYLOAD_KEYS`. |
+| K6 | serving after containment | pass | P4 states containment publishes no replacement; test: `follow` stays failed after a quarantine. |
+| M1 | atomicity | pass | a planted event failure rolls every suspension back (`test_a_failing_event_rolls_every_suspension_back`). |
+| M2 | censuses | pass | B20 + `quarantine_plan` read site, `quarantine` write site, `_quarantine_plan` helper (derived); identity + event censuses gain the writer; grammar SHAPE re-pinned (251 rows). |
+| M3 | prose | pass | L24 refused `ambiguous` in a new README line (deleted-surface vocabulary) → reworded; article + register audits rc 0. |
+
 ## p32 close (MAINTAIN queue run 3, tier `kernel`) — target = the commit landing this section, base `1b5b7d7`
 
 Check set fixed before the diff was read: reviewer-1's R1-R11 (frozen refactor `archive/p32-wip`) + MAIN's M1-M4. Blind equivalence corpus = tester-1 (`archive/p32-tester`), written against the baseline alone.

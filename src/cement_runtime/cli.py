@@ -253,6 +253,24 @@ def _parser() -> argparse.ArgumentParser:
         help="repeat the prospective digest `function inspect` reports",
     )
     function_promote.add_argument("--actor", required=True)
+    function_quarantine_plan = function_commands.add_parser(
+        "quarantine-plan",
+        help="show the promoted members that fail their checks, and the plan digest",
+        allow_abbrev=False,
+    )
+    function_quarantine_plan.add_argument("operation")
+    function_quarantine = function_commands.add_parser(
+        "quarantine",
+        help="suspend the promoted members that quarantine-plan showed",
+        allow_abbrev=False,
+    )
+    function_quarantine.add_argument("operation")
+    function_quarantine.add_argument(
+        "--plan-digest",
+        required=True,
+        help="repeat the digest that `function quarantine-plan` reports",
+    )
+    function_quarantine.add_argument("--actor", required=True)
     function_export = function_commands.add_parser("export")
     function_export.add_argument("operation")
     function_export.add_argument(
@@ -1103,6 +1121,17 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
                 "entries": [asdict(entry) for entry in manifest.entries],
                 "skipped": list(manifest.skipped),
             }
+        if args.function_command == "quarantine-plan":
+            return asdict(system.quarantine_plan(args.partition, args.operation))
+        if args.function_command == "quarantine":
+            return asdict(
+                system.quarantine(
+                    args.partition,
+                    args.operation,
+                    plan_digest=args.plan_digest,
+                    actor=args.actor,
+                )
+            )
         if args.function_command == "promote":
             return system.promote_function(
                 args.partition,

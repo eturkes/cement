@@ -5424,7 +5424,7 @@ class ParserShapeTests(unittest.TestCase):
     grammar or help change re-pins it.
     """
 
-    SHAPE = (241, "10ebcb2e630896f1")
+    SHAPE = (251, "b9a8ee5bba6f6c97")
 
     @staticmethod
     def shape(parser: argparse.ArgumentParser) -> tuple[int, str]:

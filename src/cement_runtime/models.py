@@ -204,6 +204,39 @@ class CompileScope:
 
 
 @dataclass(frozen=True, slots=True)
+class QuarantineMember:
+    """One live promoted member and its findings, each tagged with its check channel."""
+
+    artifact_id: str
+    reasons: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class QuarantinePlan:
+    """The live promoted members a quarantine would suspend, and the digest that names them.
+
+    Members carry member-local findings only (ABI, report, receipt, projection, ambiguity), so an
+    empty plan means nothing to contain, never a passing verification. ``plan_digest`` binds this
+    display, not every ledger byte.
+    """
+
+    partition: str
+    operation: str
+    operation_revision: int
+    members: tuple[QuarantineMember, ...]
+    plan_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class QuarantineResult:
+    """What one ``quarantine`` call suspended, or the earlier application it found."""
+
+    plan_digest: str
+    quarantined: tuple[str, ...]
+    already_applied: bool
+
+
+@dataclass(frozen=True, slots=True)
 class PendingProposalGap:
     proposal_id: str
     operation_revision: int

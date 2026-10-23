@@ -20,8 +20,8 @@ from pydantic import BaseModel, Field
 # The embedded source keeps its own line breaks; one of its pragma comments runs past 100
 # columns inside the string, where ruff reads no pragma.
 # ruff: noqa: E501
-_CEMENT_PACKAGE = "_cement_runtime_9bac8a88e40f7dcc"
-_CEMENT_DIGEST = "9bac8a88e40f7dcc48a8566213cb93388c476cb40d6895eac8fa9667dc9256dd"
+_CEMENT_PACKAGE = "_cement_runtime_71d7c68655515e9b"
+_CEMENT_DIGEST = "71d7c68655515e9b00cb30c79349840445d04b4ae02e434d831ccf154807b408"
 _CEMENT_SOURCES = {
     "__init__": r'''
 """Cement public API."""
@@ -1453,6 +1453,39 @@ class CompileScope:
 
 
 @dataclass(frozen=True, slots=True)
+class QuarantineMember:
+    """One live promoted member and its findings, each tagged with its check channel."""
+
+    artifact_id: str
+    reasons: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class QuarantinePlan:
+    """The live promoted members a quarantine would suspend, and the digest that names them.
+
+    Members carry member-local findings only (ABI, report, receipt, projection, ambiguity), so an
+    empty plan means nothing to contain, never a passing verification. ``plan_digest`` binds this
+    display, not every ledger byte.
+    """
+
+    partition: str
+    operation: str
+    operation_revision: int
+    members: tuple[QuarantineMember, ...]
+    plan_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class QuarantineResult:
+    """What one ``quarantine`` call suspended, or the earlier application it found."""
+
+    plan_digest: str
+    quarantined: tuple[str, ...]
+    already_applied: bool
+
+
+@dataclass(frozen=True, slots=True)
 class PendingProposalGap:
     proposal_id: str
     operation_revision: int
@@ -2838,6 +2871,9 @@ from .models import (
     PendingProposalGap,
     Promotion,
     ProposalView,
+    QuarantineMember,
+    QuarantinePlan,
+    QuarantineResult,
     ReviewResult,
     StaleRevisionAnomaly,
     SwitchState,
@@ -9267,6 +9303,203 @@ class System:
                 payload={"reason": reason, "suspended_by": suspended_by},
                 now_us=now,
             )
+
+    # -- quarantine (p36) -----------------------------------------------------------
+
+    def quarantine_plan(self, partition: str, operation: str) -> QuarantinePlan:
+        """Name the live promoted members a quarantine would suspend; writes nothing.
+
+        Each member carries its member-local findings from the set verification, each tagged with
+        its channel (``abi``, ``report``, ``receipt``, ``projection``) plus ``ambiguity`` for every
+        member claiming an input digest another live member also claims. An empty plan means
+        nothing to contain, never a passing verification. Refused when the operation's own policy
+        fails its binding: that fault is the operation's, not its members'.
+        """
+
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        with self.store.transaction(write=False) as connection:
+            return self._quarantine_plan(connection, partition=partition, operation=operation)
+
+    def quarantine(
+        self,
+        partition: str,
+        operation: str,
+        *,
+        plan_digest: str,
+        actor: str,
+    ) -> QuarantineResult:
+        """Suspend exactly the members ``quarantine_plan`` showed under ``plan_digest``.
+
+        One write transaction recomputes the plan first. An equal plan suspends its members and
+        writes one ``function.quarantined`` event (nothing for an empty plan). A rerun after that
+        returns ``already_applied`` and writes nothing. Any other change to the shown plan raises
+        ``ConflictError`` with nothing written. Suspension contains a member; it publishes no
+        replacement, so ``follow`` can stay failed until a new promotion.
+        """
+
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        plan_digest = _digest(plan_digest, "plan_digest")
+        actor = _text(actor, "actor", maximum=256)
+        with self.store.transaction(write=True) as connection:
+            plan = self._quarantine_plan(connection, partition=partition, operation=operation)
+            if plan.plan_digest != plan_digest:
+                applied = self._quarantine_applied(
+                    connection, partition=partition, operation=operation, plan_digest=plan_digest
+                )
+                if applied is None:
+                    raise ConflictError(
+                        "the quarantine plan changed since it was shown; run quarantine-plan again"
+                    )
+                return QuarantineResult(
+                    plan_digest=plan_digest, quarantined=applied, already_applied=True
+                )
+            ids = tuple(member.artifact_id for member in plan.members)
+            if not ids:
+                return QuarantineResult(
+                    plan_digest=plan_digest, quarantined=(), already_applied=False
+                )
+            now = self._now()
+            for artifact_id in ids:
+                cursor = connection.execute(
+                    """
+                    UPDATE artifacts SET status = 'suspended', promotion_hash = NULL,
+                        status_reason = ?
+                    WHERE id = ? AND partition = ? AND operation = ? AND status = 'promoted'
+                    """,
+                    (f"quarantined {plan_digest}", artifact_id, partition, operation),
+                )
+                if cursor.rowcount != 1:
+                    raise IntegrityError("quarantine changed an unexpected artifact row count")
+            count, preview, ids_hash = _id_list_projection(ids)
+            _event(
+                connection,
+                partition=partition,
+                kind="function.quarantined",
+                subject_type="operation",
+                subject_id=f"{partition}/{operation}",
+                payload={
+                    "actor": actor,
+                    "artifact_ids": cast(list[JSONValue], preview),
+                    "artifact_ids_hash": ids_hash,
+                    "count": count,
+                    "plan_digest": plan_digest,
+                },
+                now_us=now,
+            )
+            return QuarantineResult(plan_digest=plan_digest, quarantined=ids, already_applied=False)
+
+    def _quarantine_plan(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        partition: str,
+        operation: str,
+    ) -> QuarantinePlan:
+        registered = connection.execute(
+            "SELECT * FROM operations WHERE partition = ? AND name = ?",
+            (partition, operation),
+        ).fetchone()
+        if registered is None:
+            raise NotFoundError("operation is not registered in this partition")
+        revision = _stored_int(registered["revision"], "stored operation revision", minimum=1)
+        policy_json = registered["policy_json"]
+        policy_hash = registered["policy_hash"]
+        if (
+            type(policy_json) is not str
+            or type(policy_hash) is not str
+            or _snapshot_policy_failures(policy_json, policy_hash)
+        ):
+            raise StateError(
+                "the operation's own policy fails its binding; quarantine suspends members only"
+            )
+        rows = self._promoted_function_rows(connection, partition=partition, operation=operation)
+        claimants: dict[str, int] = {}
+        for row in rows:
+            digest = str(row["input_hash"])
+            claimants[digest] = claimants.get(digest, 0) + 1
+        members: list[QuarantineMember] = []
+        for row in rows:
+            artifact_id = str(row["id"])
+            findings = self._snapshot_member(
+                connection, row, revision=revision, policy_hash=policy_hash, policy_json=policy_json
+            )
+            reasons = [
+                f"{channel}: {failure.removeprefix(f'{artifact_id}: ')}"
+                for channel, failure in (
+                    ("abi", findings.abi_failure),
+                    ("report", findings.report_failure),
+                    ("receipt", findings.receipt_failure),
+                    ("projection", findings.projection_failure),
+                )
+                if failure is not None
+            ]
+            digest = str(row["input_hash"])
+            if claimants[digest] > 1:
+                reasons.append(
+                    f"ambiguity: input digest {digest} has {claimants[digest]} promoted members"
+                )
+            if reasons:
+                members.append(QuarantineMember(artifact_id=artifact_id, reasons=tuple(reasons)))
+        members.sort(key=lambda member: member.artifact_id)
+        values = [partition, operation, str(revision)]
+        for member in members:
+            values.extend((member.artifact_id, str(len(member.reasons)), *member.reasons))
+        return QuarantinePlan(
+            partition=partition,
+            operation=operation,
+            operation_revision=revision,
+            members=tuple(members),
+            plan_digest=_digest_strings("cement-quarantine-plan-v1", values),
+        )
+
+    @staticmethod
+    def _quarantine_applied(
+        connection: sqlite3.Connection,
+        *,
+        partition: str,
+        operation: str,
+        plan_digest: str,
+    ) -> tuple[str, ...] | None:
+        """The ids an earlier quarantine under ``plan_digest`` suspended, if its record is whole.
+
+        The event is the receipt: a tag alone can be written by ``suspend_artifact``. The tagged
+        set must be nonempty, still suspended and equal to the event's count + full-id hash.
+        """
+
+        records = [
+            parse_json(str(row["payload_json"])).value
+            for row in connection.execute(
+                """
+                SELECT payload_json FROM events
+                WHERE partition = ? AND kind = 'function.quarantined' AND subject_id = ?
+                ORDER BY sequence
+                """,
+                (partition, f"{partition}/{operation}"),
+            )
+        ]
+        matching = [
+            record
+            for record in records
+            if type(record) is dict and record.get("plan_digest") == plan_digest
+        ]
+        if len(matching) != 1:
+            return None
+        rows = connection.execute(
+            """
+            SELECT id, status FROM artifacts
+            WHERE partition = ? AND operation = ? AND status_reason = ?
+            """,
+            (partition, operation, f"quarantined {plan_digest}"),
+        ).fetchall()
+        if not rows or any(row["status"] != "suspended" for row in rows):
+            return None
+        ids = tuple(sorted(str(row["id"]) for row in rows))
+        count, _, ids_hash = _id_list_projection(ids)
+        if count != matching[0].get("count") or ids_hash != matching[0].get("artifact_ids_hash"):
+            return None
+        return ids
 
     def operations(self, partition: str) -> list[dict[str, JSONValue]]:
         partition = _name(partition, "partition")

@@ -82,6 +82,21 @@ answering, because the switch pins what the person chose. `challenge` is an expl
 records a counterexample and suspends the member that it contradicts. A pinned version stops
 answering when a challenge, a revocation, or a suspension reaches one of its members.
 
+### Containment
+
+`resolve` reports a failed verification and never writes. A person contains damaged members with two
+calls. `quarantine_plan` (`function quarantine-plan`) is a read. It lists each live promoted member that
+has a member-local finding: its artifact ABI, its bound report, its scope and live receipt, its
+projection, or an input digest that another live member also claims. It refuses when the operation's own policy fails
+its binding, because that fault belongs to the operation. `quarantine` (`function quarantine`) takes the
+`plan_digest` from that read and an actor. In one write transaction it derives the plan again and compares
+the digests before any write. An equal plan suspends exactly its members and writes one
+`function.quarantined` event with the actor, the digest, the count and the hash of every id. A plan that
+changed raises a conflict (status 4) and writes nothing. A later call with the same digest returns
+`already_applied` and writes nothing, but only when that event exists and the members it suspended
+still match its count and hash. Suspension publishes no replacement version, so `follow` stays failed until a promotion,
+and a pinned version that contains a suspended member stops answering.
+
 ### Projection
 
 A projection program (`cement-projection-v1` or `cement-projection-v2`) is a closed, line-oriented

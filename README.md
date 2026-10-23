@@ -185,6 +185,16 @@ with the proposals that the learning pass confirmed for it. The command reads th
 switch pins, or else the newest version. `--receipt-id` reads any version, and `--json` prints the same
 listing as JSON. An operation that has no promoted version exits 3.
 
+When verification fails because promoted members are damaged, or because two members claim one input,
+contain them in two steps.
+`function quarantine-plan OPERATION` writes nothing. It lists each promoted member with a
+member-local finding and its reasons, and it prints a `plan_digest`. An empty list means that no member
+needs containment, not that verification passes. `function quarantine OPERATION --plan-digest DIGEST
+--actor NAME` suspends exactly the members of that plan and writes one `function.quarantined` event.
+If the plan changed after you read it, the command writes nothing and exits 4. A second run with the
+same digest reports `already_applied` and writes nothing. Suspension contains the members but
+publishes no replacement, so `follow` stays failed until you promote a new version.
+
 Verify the set and export it. Then answer inputs where no ledger exists:
 
 ```bash

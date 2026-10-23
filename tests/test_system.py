@@ -17230,6 +17230,7 @@ class PreservedInvariantCensusTests(unittest.TestCase):
             "examples.receipt_json[json]",
             "examples.reviewer",
         ],
+        "quarantine": ["events.payload_json[json]"],
     }
     EVENT_PAYLOAD_KEYS = {
         "artifact.challenged": ("example_id", "receipt_hash", "reviewer", "suspended"),
@@ -17258,6 +17259,7 @@ class PreservedInvariantCensusTests(unittest.TestCase):
         "function.switched": (
             "function_hash", "mode", "previous_function_hash", "previous_mode", "receipt_id", "set_by",
         ),
+        "function.quarantined": ("actor", "artifact_ids", "artifact_ids_hash", "count", "plan_digest"),
         "operation.registered": ("policy_hash", "registered_by"),
         "operation.revised": ("policy_hash", "previous_revision", "revised_by"),
         "projection.set": ("previous_program_hash", "program_hash", "retired_artifact_ids", "set_by"),
@@ -17343,6 +17345,14 @@ class PreservedInvariantCensusTests(unittest.TestCase):
             system.verify_drafts(p, op, verified_by="base")
             return system.inspect_function_promotion(p, op).function_hash
 
+        def quarantine_setup(system):
+            database = str(system.store.path)
+            _out_of_band(
+                database,
+                ("UPDATE artifacts SET artifact_json = '{}' WHERE id = ?", (_promoted_ids(database)[0],)),
+            )
+            return system.quarantine_plan(p, op).plan_digest
+
         return (
             ("register_operation", "registered_by", lambda s: None,
              lambda s, c, i: s.register_operation(p, "other", registered_by=i)),
@@ -17373,6 +17383,8 @@ class PreservedInvariantCensusTests(unittest.TestCase):
              lambda s, c, i: s.set_projection(p, "plan", c, actor=i)),
             ("supersede_examples", "reviewer", lambda s: [e["id"] for e in s.examples(p, op)],
              lambda s, c, i: s.supersede_examples(p, op, example_ids=c, output={"y": 9}, reviewer=i)),
+            ("quarantine", "actor", quarantine_setup,
+             lambda s, c, i: s.quarantine(p, op, plan_digest=c, actor=i)),
         )
 
     @staticmethod
@@ -17684,6 +17696,71 @@ class BindingOwnerCensusTests(unittest.TestCase):
         )
 
 
+def _promoted_ledger(
+    database: str, partition: str, operation: str, members: int, *, mode: str = "follow"
+) -> System:
+    """A ledger whose `members` inputs `{"x": i}` → `{"y": i}` are promoted as one function."""
+
+    system = System(database)
+    system.register_operation(partition, operation, policy=CompilePolicy(2, 1, 0))
+    for value in range(members):
+        for reviewer in ("alice", "bob"):
+            proposal = system.submit_proposal(
+                partition,
+                operation,
+                {"x": value},
+                candidate=Candidate(output={"y": value}, provenance={}),
+                source_id=f"{value}-{reviewer}",
+            )
+            system.review(partition, proposal, reviewer=reviewer, decision="accept")
+    system.compile(partition, operation)
+    system.verify_drafts(partition, operation, verified_by="verifier")
+    manifest = system.inspect_function_promotion(partition, operation)
+    promotion = system.promote_function(
+        partition, operation, expected_function_hash=manifest.function_hash, promoted_by="release"
+    )
+    if mode == "pinned":
+        system.set_switch(
+            partition, operation, mode="pinned", actor="person", function_hash=promotion.function_hash
+        )
+    else:
+        system.set_switch(partition, operation, mode=mode, actor="person")
+    return system
+
+
+def _out_of_band(database: str, *statements: tuple[str, tuple[object, ...]]) -> None:
+    """Trigger-preserving, committed SQL from another connection; each statement changes rows."""
+
+    connection = sqlite3.connect(database, isolation_level=None)
+    try:
+        triggers = connection.execute(
+            "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' ORDER BY rowid"
+        ).fetchall()
+        connection.execute("BEGIN IMMEDIATE")
+        for name, _ in triggers:
+            connection.execute(f'DROP TRIGGER "{name}"')
+        for sql, parameters in statements:
+            assert connection.execute(sql, parameters).rowcount >= 1, sql
+        for _, sql in triggers:
+            connection.execute(sql)
+        connection.execute("COMMIT")
+    finally:
+        connection.close()
+
+
+def _promoted_ids(database: str) -> list[str]:
+    connection = sqlite3.connect(database)
+    try:
+        return [
+            row[0]
+            for row in connection.execute(
+                "SELECT id FROM artifacts WHERE status = 'promoted' ORDER BY input_hash"
+            )
+        ]
+    finally:
+        connection.close()
+
+
 class ServingCacheTests(unittest.TestCase):
     """p35: `serving` reuses a verification while the ledger is unchanged (`.agent/decisions/p35-contract.md`).
 
@@ -17714,37 +17791,7 @@ class ServingCacheTests(unittest.TestCase):
     def _ledger(self, members: int = 3, *, mode: str = "follow") -> tuple[System, str]:
         self.ledgers += 1
         database = str(self.directory / f"ledger-{self.ledgers}.db")
-        system = System(database)
-        system.register_operation(self.PARTITION, self.OPERATION, policy=CompilePolicy(2, 1, 0))
-        for value in range(members):
-            for reviewer in ("alice", "bob"):
-                proposal = system.submit_proposal(
-                    self.PARTITION,
-                    self.OPERATION,
-                    {"x": value},
-                    candidate=Candidate(output={"y": value}, provenance={}),
-                    source_id=f"{value}-{reviewer}",
-                )
-                system.review(self.PARTITION, proposal, reviewer=reviewer, decision="accept")
-        system.compile(self.PARTITION, self.OPERATION)
-        system.verify_drafts(self.PARTITION, self.OPERATION, verified_by="verifier")
-        manifest = system.inspect_function_promotion(self.PARTITION, self.OPERATION)
-        promotion = system.promote_function(
-            self.PARTITION,
-            self.OPERATION,
-            expected_function_hash=manifest.function_hash,
-            promoted_by="release",
-        )
-        if mode == "pinned":
-            system.set_switch(
-                self.PARTITION,
-                self.OPERATION,
-                mode="pinned",
-                actor="person",
-                function_hash=promotion.function_hash,
-            )
-        else:
-            system.set_switch(self.PARTITION, self.OPERATION, mode=mode, actor="person")
+        system = _promoted_ledger(database, self.PARTITION, self.OPERATION, members, mode=mode)
         self.calls.clear()
         return system, database
 
@@ -17755,29 +17802,8 @@ class ServingCacheTests(unittest.TestCase):
     def _corrupt(database: str, position: int) -> None:
         """Trigger-preserving, committed, out-of-band SQL: the promoted member at `position`."""
 
-        connection = sqlite3.connect(database, isolation_level=None)
-        try:
-            triggers = connection.execute(
-                "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' ORDER BY rowid"
-            ).fetchall()
-            connection.execute("BEGIN IMMEDIATE")
-            for name, _ in triggers:
-                connection.execute(f'DROP TRIGGER "{name}"')
-            ids = [
-                row[0]
-                for row in connection.execute(
-                    "SELECT id FROM artifacts WHERE status = 'promoted' ORDER BY input_hash"
-                )
-            ]
-            cursor = connection.execute(
-                "UPDATE artifacts SET artifact_json = '{}' WHERE id = ?", (ids[position],)
-            )
-            assert cursor.rowcount == 1
-            for _, sql in triggers:
-                connection.execute(sql)
-            connection.execute("COMMIT")
-        finally:
-            connection.close()
+        ids = _promoted_ids(database)
+        _out_of_band(database, ("UPDATE artifacts SET artifact_json = '{}' WHERE id = ?", (ids[position],)))
 
     def test_a_warm_call_verifies_once_and_a_second_system_shares_it(self) -> None:
         _, database = self._ledger()
@@ -18115,6 +18141,263 @@ class ServingCacheTests(unittest.TestCase):
         self.assertEqual(os.read(reader, 16), b"ok")
         os.close(reader)
         self.assertEqual(status, 0)
+
+
+class QuarantineTests(unittest.TestCase):
+    """p36: `quarantine_plan` shows member-local findings; `quarantine` applies exactly that plan.
+
+    Contract `.agent/decisions/p36-contract.md` (revision 2). Corruption = committed,
+    trigger-preserving SQL from another connection.
+    """
+
+    PARTITION = "tenant-p36"
+    OPERATION = "echo"
+
+    def setUp(self) -> None:
+        directory = tempfile.TemporaryDirectory(prefix="cement-p36-")
+        self.addCleanup(directory.cleanup)
+        self.database = str(pathlib.Path(directory.name) / "ledger.db")
+
+    def _ledger(self, members: int = 3) -> System:
+        return _promoted_ledger(self.database, self.PARTITION, self.OPERATION, members)
+
+    def _state(self) -> tuple[object, ...]:
+        connection = sqlite3.connect(self.database)
+        try:
+            return (
+                connection.execute(
+                    "SELECT id, status, status_reason FROM artifacts ORDER BY id"
+                ).fetchall(),
+                connection.execute("SELECT count(*) FROM events").fetchone()[0],
+            )
+        finally:
+            connection.close()
+
+    def _quarantine_events(self) -> list[dict]:
+        connection = sqlite3.connect(self.database)
+        try:
+            return [
+                json.loads(row[0])
+                for row in connection.execute(
+                    "SELECT payload_json FROM events WHERE kind = 'function.quarantined'"
+                )
+            ]
+        finally:
+            connection.close()
+
+    def test_a_healthy_set_has_an_empty_plan_and_quarantine_writes_nothing(self) -> None:
+        system = self._ledger()
+        plan = system.quarantine_plan(self.PARTITION, self.OPERATION)
+        self.assertEqual(plan.members, ())
+        self.assertEqual(plan.operation_revision, 1)
+        before = self._state()
+        result = system.quarantine(
+            self.PARTITION, self.OPERATION, plan_digest=plan.plan_digest, actor="person"
+        )
+        self.assertEqual(result.quarantined, ())
+        self.assertFalse(result.already_applied)
+        self.assertEqual(self._state(), before)
+        # An ordinary miss is no finding: the served function still answers it as absent.
+        miss = system.resolve(self.PARTITION, self.OPERATION, {"x": 99})
+        self.assertTrue(miss.verification.passed)
+        self.assertFalse(miss.match.matched)
+
+    def test_the_plan_names_each_faulty_member_with_its_channel_and_nothing_else(self) -> None:
+        system = self._ledger()
+        first, middle, last = _promoted_ids(self.database)
+        _out_of_band(
+            self.database,
+            (
+                "UPDATE test_reports SET build_hash = ? WHERE id = "
+                "(SELECT verified_report_id FROM artifacts WHERE id = ?)",
+                ("0" * 64, first),
+            ),
+            ("UPDATE artifacts SET artifact_json = '{}' WHERE id = ?", (last,)),
+        )
+        plan = system.quarantine_plan(self.PARTITION, self.OPERATION)
+        reasons = {member.artifact_id: member.reasons for member in plan.members}
+        self.assertEqual(set(reasons), {first, last})
+        self.assertNotIn(middle, reasons)
+        self.assertIn("report: report build_hash binding mismatch", reasons[first])
+        self.assertTrue(any(reason.startswith("abi: ") for reason in reasons[last]))
+        self.assertTrue(any(reason.startswith("projection: ") for reason in reasons[last]))
+        self.assertEqual([member.artifact_id for member in plan.members], sorted(reasons))
+
+    def test_ambiguity_names_every_claimant(self) -> None:
+        system = self._ledger(members=4)
+        ids = _promoted_ids(self.database)
+        connection = sqlite3.connect(self.database)
+        try:
+            shared = connection.execute(
+                "SELECT input_hash FROM artifacts WHERE id = ?", (ids[0],)
+            ).fetchone()[0]
+        finally:
+            connection.close()
+        # A UNIQUE index forbids two claimants in one revision; corruption spreads them over three.
+        _out_of_band(
+            self.database,
+            *[
+                (
+                    "UPDATE artifacts SET input_hash = ?, operation_revision = ? WHERE id = ?",
+                    (shared, 10 + index, artifact_id),
+                )
+                for index, artifact_id in enumerate(ids[1:])
+            ],
+        )
+        plan = system.quarantine_plan(self.PARTITION, self.OPERATION)
+        expected = f"ambiguity: input digest {shared} has 4 promoted members"
+        self.assertEqual(sorted(member.artifact_id for member in plan.members), sorted(ids))
+        for member in plan.members:
+            self.assertIn(expected, member.reasons)
+
+    def test_a_function_receipt_fault_alone_leaves_the_plan_empty(self) -> None:
+        system = self._ledger()
+        _out_of_band(self.database, ("UPDATE function_receipts SET function_hash = ?", ("0" * 64,)))
+        self.assertFalse(system.verify_function(self.PARTITION, self.OPERATION).passed)
+        self.assertEqual(system.quarantine_plan(self.PARTITION, self.OPERATION).members, ())
+
+    def test_an_operation_policy_fault_refuses_the_plan(self) -> None:
+        system = self._ledger()
+        _out_of_band(self.database, ("UPDATE operations SET policy_hash = ?", ("0" * 64,)))
+        with self.assertRaisesRegex(StateError, "operation's own policy fails its binding"):
+            system.quarantine_plan(self.PARTITION, self.OPERATION)
+        with self.assertRaisesRegex(StateError, "operation's own policy fails its binding"):
+            system.quarantine(self.PARTITION, self.OPERATION, plan_digest="0" * 64, actor="person")
+
+    def test_quarantine_suspends_exactly_the_plan_with_one_bounded_event(self) -> None:
+        system = self._ledger()
+        first, middle, last = _promoted_ids(self.database)
+        _out_of_band(self.database, ("UPDATE artifacts SET artifact_json = '{}' WHERE id IN (?, ?)", (first, last)))
+        plan = system.quarantine_plan(self.PARTITION, self.OPERATION)
+        result = system.quarantine(
+            self.PARTITION, self.OPERATION, plan_digest=plan.plan_digest, actor="person"
+        )
+        self.assertEqual(result.quarantined, tuple(sorted((first, last))))
+        self.assertFalse(result.already_applied)
+        rows = {row[0]: row[1:] for row in self._state()[0]}
+        tag = f"quarantined {plan.plan_digest}"
+        self.assertEqual(rows[first], ("suspended", tag))
+        self.assertEqual(rows[last], ("suspended", tag))
+        self.assertEqual(rows[middle][0], "promoted")
+        (event,) = self._quarantine_events()
+        self.assertEqual(
+            set(event), {"actor", "artifact_ids", "artifact_ids_hash", "count", "plan_digest"}
+        )
+        self.assertEqual(event["count"], 2)
+        self.assertEqual(event["artifact_ids"], sorted((first, last)))
+        self.assertEqual(event["artifact_ids_hash"], _id_list_hash([first, last]))
+        self.assertEqual(event["plan_digest"], plan.plan_digest)
+        # Containment publishes no replacement: `follow` stays failed until a new promotion.
+        self.assertFalse(system.resolve(self.PARTITION, self.OPERATION, {"x": 1}).verification.passed)
+
+    def test_a_rerun_is_already_applied_and_writes_nothing(self) -> None:
+        system = self._ledger()
+        first = _promoted_ids(self.database)[0]
+        _out_of_band(self.database, ("UPDATE artifacts SET artifact_json = '{}' WHERE id = ?", (first,)))
+        plan = system.quarantine_plan(self.PARTITION, self.OPERATION)
+        system.quarantine(self.PARTITION, self.OPERATION, plan_digest=plan.plan_digest, actor="a")
+        before = self._state()
+        again = system.quarantine(self.PARTITION, self.OPERATION, plan_digest=plan.plan_digest, actor="b")
+        self.assertTrue(again.already_applied)
+        self.assertEqual(again.quarantined, (first,))
+        self.assertEqual(self._state(), before)
+
+    def test_a_forged_tag_or_a_partial_tagged_set_is_no_application(self) -> None:
+        for case in ("forged", "partial"):
+            with self.subTest(case=case):
+                pathlib.Path(self.database).unlink(missing_ok=True)
+                system = self._ledger()
+                first, middle, _ = _promoted_ids(self.database)
+                _out_of_band(
+                    self.database,
+                    ("UPDATE artifacts SET artifact_json = '{}' WHERE id IN (?, ?)", (first, middle)),
+                )
+                plan = system.quarantine_plan(self.PARTITION, self.OPERATION)
+                tag = f"quarantined {plan.plan_digest}"
+                if case == "forged":
+                    system.suspend_artifact(self.PARTITION, first, suspended_by="x", reason=tag)
+                else:
+                    system.quarantine(
+                        self.PARTITION, self.OPERATION, plan_digest=plan.plan_digest, actor="a"
+                    )
+                    _out_of_band(
+                        self.database,
+                        ("UPDATE artifacts SET status_reason = 'other' WHERE id = ?", (middle,)),
+                    )
+                before = self._state()
+                with self.assertRaises(ConflictError):
+                    system.quarantine(
+                        self.PARTITION, self.OPERATION, plan_digest=plan.plan_digest, actor="b"
+                    )
+                self.assertEqual(self._state(), before)
+
+    def test_a_changed_plan_conflicts_with_zero_writes_and_an_unrelated_commit_applies(self) -> None:
+        system = self._ledger()
+        first, middle, _ = _promoted_ids(self.database)
+        _out_of_band(self.database, ("UPDATE artifacts SET artifact_json = '{}' WHERE id = ?", (first,)))
+        plan = system.quarantine_plan(self.PARTITION, self.OPERATION)
+        system.set_switch(self.PARTITION, self.OPERATION, mode="follow", actor="other")
+        _out_of_band(self.database, ("UPDATE artifacts SET artifact_json = '{}' WHERE id = ?", (middle,)))
+        before = self._state()
+        with self.assertRaisesRegex(ConflictError, "quarantine plan changed"):
+            system.quarantine(self.PARTITION, self.OPERATION, plan_digest=plan.plan_digest, actor="a")
+        self.assertEqual(self._state(), before)
+        fresh = system.quarantine_plan(self.PARTITION, self.OPERATION)
+        system.set_switch(self.PARTITION, self.OPERATION, mode="follow", actor="unrelated")
+        applied = system.quarantine(
+            self.PARTITION, self.OPERATION, plan_digest=fresh.plan_digest, actor="a"
+        )
+        self.assertEqual(applied.quarantined, tuple(sorted((first, middle))))
+
+    def test_a_failing_event_rolls_every_suspension_back(self) -> None:
+        system = self._ledger()
+        first = _promoted_ids(self.database)[0]
+        _out_of_band(self.database, ("UPDATE artifacts SET artifact_json = '{}' WHERE id = ?", (first,)))
+        plan = system.quarantine_plan(self.PARTITION, self.OPERATION)
+        before = self._state()
+        event = system_module._event
+
+        def failing(connection, **kwargs):
+            if kwargs["kind"] == "function.quarantined":
+                raise sqlite3.OperationalError("planted event failure")
+            return event(connection, **kwargs)
+
+        with mock.patch.object(system_module, "_event", failing), self.assertRaises(StateError):
+            system.quarantine(self.PARTITION, self.OPERATION, plan_digest=plan.plan_digest, actor="a")
+        self.assertEqual(self._state(), before)
+
+    def test_the_cli_shows_and_applies_a_plan(self) -> None:
+        import contextlib
+        import io
+
+        from cement_runtime import cli as cement_cli
+
+        self._ledger()
+        first = _promoted_ids(self.database)[0]
+        _out_of_band(self.database, ("UPDATE artifacts SET artifact_json = '{}' WHERE id = ?", (first,)))
+        base = ["--db", self.database, "--partition", self.PARTITION, "function"]
+
+        def run(*argv: str) -> tuple[int, dict]:
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(io.StringIO()):
+                status = cement_cli.main([*base, *argv])
+            return status, json.loads(stdout.getvalue() or "{}")
+
+        status, plan = run("quarantine-plan", self.OPERATION)
+        self.assertEqual(status, 0)
+        self.assertEqual([member["artifact_id"] for member in plan["members"]], [first])
+        status, applied = run(
+            "quarantine", self.OPERATION, "--plan-digest", plan["plan_digest"], "--actor", "person"
+        )
+        self.assertEqual((status, applied["quarantined"], applied["already_applied"]), (0, [first], False))
+        status, again = run(
+            "quarantine", self.OPERATION, "--plan-digest", plan["plan_digest"], "--actor", "person"
+        )
+        self.assertEqual((status, again["already_applied"]), (0, True))
+        status, _ = run("quarantine", self.OPERATION, "--plan-digest", "0" * 64, "--actor", "person")
+        self.assertEqual(status, 4)
+        status, _ = run("quarantine-plan", "missing")
+        self.assertEqual(status, 3)
 
 
 if __name__ == "__main__":
