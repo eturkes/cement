@@ -21,6 +21,18 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p130 close (MAINTAIN queue run 3, tier `docs`: a gate step wrapping an existing audit; owner-approved gate change) — target = the commit landing this section
+
+Check set = the row's acceptance clauses A1-A4, fixed before the diff was reread.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | step `articles` after `register` | pass | `.agent/gate` full + `--omit-d28` branches; the fast gate stays static checks + modules + spec-lint. |
+| A2 | firing | pass | seed commit 4fddc2d (this tree + S17's `cached` sentence in `docs/architecture.md`), CI run 40028039097: both legs `articles 1` (`docs/architecture.md:345 the cached`), every other step 0 (full leg unittest 0 in 1488.1 s, D28 included), gate rc 1; branch `ci/p130-seed` deleted. |
+| A3 | `ops.md` Gate + `spec.md` Artifacts list the step | pass | both lists; `human-facing.md` + the `gate-checks.md` S17 bullet name it. |
+| A4 | full gate green | pass | the CI gate in this commit's body. |
+| P1 | the step's first catch | pass | it flagged this unit's own README rewrite (`the workflow`, `the definite-reference`), reworded before the seed; the README step list also gained the three steps it omitted (`zizmor`, ShellCheck, the report anchor check). |
+
 ## p88 close (MAINTAIN queue run 3, tier `docs`: a milestone plan; the build = row p136) — target = the commit landing this section
 
 Check set W1-W8 fixed before the review; consultant-1 reviewed revision 1 (`93ff847`, Open WebUI 0.12.3 from the installed wheel); MAIN re-derived the decisive claims and ruled each row; revision 2 = the plan this commit lands.

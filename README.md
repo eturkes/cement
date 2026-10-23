@@ -617,10 +617,12 @@ uv sync
 .agent/gate
 ```
 
-`.agent/gate` runs every check in order: format, lint, and type check (`ruff`, `mypy`), the dependency
-audit (`uv audit`), the secret scan (`gitleaks`), the skip census, the prose register audit, the test
-suite, the package build, and the spec check. It prints each step's exit status and time, and it exits
-0 only when every step passes. CI runs the same command.
+`.agent/gate` runs every check in order. First come format, lint, and type check (`ruff`, `mypy`).
+Then come the dependency audit (`uv audit`), the secret scan (`gitleaks`), a CI workflow scan
+(`zizmor`), a shell script check (`ShellCheck`), and the skip census. The prose register audit, an
+audit of definite references, and the report anchor check follow. The test suite, the package build,
+and the spec check run last. The command prints each step's exit status and time, and it
+exits 0 only when every step passes. CI runs the same command.
 
 The runtime has no package dependencies. The development tools come from `uv sync`, and `uv_build`
 produces the wheel and the source distribution.
