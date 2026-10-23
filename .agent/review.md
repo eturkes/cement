@@ -21,6 +21,14 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p126 close (MAINTAIN queue run 3, owner-approved re-scope; tier `data`) — target = the commit landing this section
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | re-scoped acceptance: each mirror graded against its target | pass | `.agent/pins`: `open-webui mirror python` = `PYTHON` vs the Kimi target line (the jail stand-in; `Decisions`: the Open WebUI target runs Cement's supported Python, not the stock image's 3.11), `nucllei jail stand-in python` = the stand-in vs `FROM python:3.N` in nucllei's `sandbox/Dockerfile` at `v20261020-01` (`dockerfile_python`, `gh api`); both 3.12 = 3.12, `HELD` empty, 28 pins rc 0. |
+| A2 | the rows fire | pass | `PYTHON = "3.13"` → rc 1 `3.13 3.12 BEHIND`; the stand-in image at `python:3.13-slim` → rc 1 on the split leg, the floor and the jail row; files restored (`cmp`). |
+| A3 | records | pass | `pins.md` (mirrors graded against their targets), `gate-checks.md` `.agent/pins` bullet (new seeds; the HOLD-GONE seed left with the hold). |
+
 ## p132 close (MAINTAIN queue run 3, owner ruling: "Choose the more correct one, even if it takes more work now") — target = the commit landing this section
 
 | id | lens | verdict | basis (MAIN-verified) |

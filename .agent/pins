@@ -28,10 +28,7 @@ PROVIDER = "examples/command_source/pyproject.toml"
 CONSTRAINTS = "examples/command_source/build-constraints.txt"
 OWUI_LOCK = "examples/open_webui/local-requirements.txt"
 # pin name -> the open queue row that holds it below latest.
-HELD = {
-    "open-webui mirror python": "p126",
-    "nucllei jail stand-in python": "p126",
-}
+HELD: dict[str, str] = {}
 
 
 class SourceError(Exception):
@@ -72,6 +69,13 @@ def gh_release(repo: str) -> str:
 
 def gh_tag(repo: str) -> str:
     return run("gh", "api", f"repos/{repo}/tags?per_page=1", "--jq", ".[0].name").strip()
+
+
+def dockerfile_python(repo: str, path: str, ref: str) -> str:
+    """The `FROM python:3.N` line a target's own Dockerfile builds on at `ref`."""
+
+    text = run("gh", "api", f"repos/{repo}/contents/{path}?ref={ref}", "-H", "Accept: application/vnd.github.raw")
+    return one(r"^FROM python:(3\.\d+)", text, f"{repo}:{path}@{ref}")
 
 
 def newest_cpython_line() -> str:
@@ -180,14 +184,17 @@ def pins() -> list[tuple[str, str, object, str]]:
     webui = one(r'^OPEN_WEBUI = "open-webui==([0-9.]+)"$', local, "local.py")
     rows.append(("open-webui target", webui, lambda: pypi("open-webui"), "PyPI open-webui"))
     mirror = one(r'^PYTHON = "(3\.\d+)"$', local, "local.py")
-    rows.append(("open-webui mirror python", mirror, newest_cpython_line, "uv python list --only-downloads"))
+    # The Open WebUI target runs Cement's supported line, the Kimi target's (`Decisions`; p126).
+    rows.append(("open-webui mirror python", mirror, lambda: jail, "the Kimi target line (nucllei jail stand-in)"))
     rows.append(("open-webui lock transitive", "locked",
                  lambda: compile_drift(OWUI_LOCK, f"open-webui=={webui}", mirror), f"uv pip compile ({OWUI_LOCK})"))
     auditor = one(r'^PIP_AUDIT = "pip-audit==([0-9.]+)"$', read(".agent/owui-audit"), ".agent/owui-audit")
     rows.append(("pip-audit (owui-audit)", auditor, lambda: pypi("pip-audit"), "PyPI pip-audit"))
     nucllei = one(r"nucllei-sandbox (v\d{8}-\d\d)", read(".claude/rules/nucllei.md"), "nucllei.md")
     rows.append(("nucllei target", nucllei, lambda: gh_tag("technoplasm/nucllei"), "GitHub technoplasm/nucllei tags"))
-    rows.append(("nucllei jail stand-in python", jail, newest_cpython_line, "uv python list --only-downloads"))
+    rows.append(("nucllei jail stand-in python", jail,
+                 lambda: dockerfile_python("technoplasm/nucllei", "sandbox/Dockerfile", nucllei),
+                 f"technoplasm/nucllei sandbox/Dockerfile @ {nucllei}"))
     return rows
 
 
