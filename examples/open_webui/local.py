@@ -42,6 +42,9 @@ OPERATIONS = (
 )
 CHAT_MODEL = "cement-chat"
 LEARNING_MODEL = "cement-learning"
+ADMIN = "admin@localhost"
+# Open WebUI 0.12.3 without a login gives its admin this password (`routers/auths.py` signin).
+NO_LOGIN_PASSWORD = "admin"  # noqa: S105 — Open WebUI's public default, read only to replace it
 
 
 def _write(text: str) -> None:
@@ -57,8 +60,19 @@ def _paths(directory: pathlib.Path) -> dict[str, pathlib.Path]:
         "data": directory / "data",
         "ledger": directory / "data" / "cement" / "ledger.db",
         "secret": directory / "secret",
+        "password": directory / "admin-password",
         "log": directory / "open-webui.log",
     }
+
+
+def _kept_token(path: pathlib.Path) -> str:
+    """A random token written once with mode 0600, then read back on every later run."""
+
+    if not path.is_file():
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(secrets.token_hex(32))
+    return path.read_text(encoding="utf-8")
 
 
 def plan(model: str, ledger: pathlib.Path) -> list[tuple[str, str, dict[str, Any]]]:
@@ -168,13 +182,41 @@ class _Client:
         return payload
 
 
-def provision(client: _Client, model: str, ledger: pathlib.Path) -> None:
+def _sign_in(client: _Client, password: str) -> str:
+    """The admin's token: the kept password, else the first signup, else a no-login instance's
+    admin, whose password becomes the kept one."""
+
+    credentials = {"email": ADMIN, "password": password}
+
+    def token(path: str, body: dict[str, str]) -> str | None:
+        status, payload = client.call("POST", path, body)
+        return str(payload["token"]) if status == 200 else None
+
+    found = token("/api/v1/auths/signin", credentials) or token(
+        "/api/v1/auths/signup", credentials | {"name": "Admin"}
+    )
+    if found is None:
+        client.token = token("/api/v1/auths/signin", credentials | {"password": NO_LOGIN_PASSWORD})
+        if client.token is not None:
+            client.ok(
+                "POST",
+                "/api/v1/auths/update/password",
+                {"password": NO_LOGIN_PASSWORD, "new_password": password},
+            )
+            found = token("/api/v1/auths/signin", credentials)
+    if found is None:
+        raise SystemExit(
+            f"local: {ADMIN} does not sign in with the kept password;"
+            " start a new instance with `serve --fresh`"
+        )
+    return found
+
+
+def provision(client: _Client, model: str, paths: dict[str, pathlib.Path]) -> None:
     """Create or update every object of `plan`, so a restart picks up regenerated paste-ins."""
 
-    client.token = client.ok(
-        "POST", "/api/v1/auths/signin", {"email": "admin@localhost", "password": "admin"}
-    )["token"]
-    for kind, identifier, form in plan(model, ledger):
+    client.token = _sign_in(client, _kept_token(paths["password"]))
+    for kind, identifier, form in plan(model, paths["ledger"]):
         if kind in ("tool", "function"):
             root = f"/api/v1/{kind}s"
             body = {
@@ -201,16 +243,18 @@ def provision(client: _Client, model: str, ledger: pathlib.Path) -> None:
             client.ok("POST", path, form)
 
 
-def _environment(paths: dict[str, pathlib.Path], base_url: str, key: str) -> dict[str, str]:
-    if not paths["secret"].is_file():
-        descriptor = os.open(paths["secret"], os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            handle.write(secrets.token_hex(32))
+def _environment(
+    paths: dict[str, pathlib.Path], base_url: str, key: str, port: int
+) -> dict[str, str]:
     return os.environ | {
         "DATA_DIR": str(paths["data"]),
-        "WEBUI_SECRET_KEY": paths["secret"].read_text(encoding="utf-8"),
-        # One local administrator, no login page.
-        "WEBUI_AUTH": "False",
+        "WEBUI_SECRET_KEY": _kept_token(paths["secret"]),
+        # Without a login, every caller gets an admin token, and an admin token runs code
+        # (`tools/create` executes the pasted source). The launcher's admin is the one account.
+        "WEBUI_AUTH": "True",
+        "ENABLE_SIGNUP": "False",
+        # Open WebUI's default `*` lets any web page read its responses, the token included.
+        "CORS_ALLOW_ORIGIN": f"http://127.0.0.1:{port};http://localhost:{port}",
         # The launcher's flags win over settings saved by an earlier run.
         "ENABLE_PERSISTENT_CONFIG": "False",
         "OPENAI_API_BASE_URL": base_url,
@@ -225,11 +269,13 @@ def _environment(paths: dict[str, pathlib.Path], base_url: str, key: str) -> dic
     }
 
 
-def _banner(url: str, model: str, ledger: pathlib.Path) -> str:
+def _banner(url: str, model: str, paths: dict[str, pathlib.Path]) -> str:
     documents = sorted(path.name for path in DOCUMENTS.glob("*.txt"))
+    ledger = paths["ledger"]
     return "\n".join(
         [
-            f"Open WebUI with Cement: {url} (no login)",
+            f"Open WebUI with Cement: {url}",
+            f"  Sign in as {ADMIN} with the password in {paths['password']}.",
             f"  Users chat with 'Cement chat ({model})'.",
             f"  The administrator uses 'Cement learning ({model})'.",
             "",
@@ -306,7 +352,7 @@ def serve(directory: pathlib.Path, base_url: str, model: str, port: int, fresh: 
     with paths["log"].open("ab") as log:
         server = subprocess.Popen(  # noqa: S603 — the venv's own entry point, fixed arguments
             [str(paths["server"]), "serve", "--host", "127.0.0.1", "--port", str(port)],
-            env=_environment(paths, base_url, key),
+            env=_environment(paths, base_url, key, port),
             stdout=log,
             stderr=subprocess.STDOUT,
             start_new_session=True,
@@ -318,8 +364,8 @@ def serve(directory: pathlib.Path, base_url: str, model: str, port: int, fresh: 
             if server.poll() is not None or time.monotonic() > deadline:
                 raise SystemExit(f"local: Open WebUI did not start; read {paths['log']}")
             time.sleep(1)
-        provision(client, model, paths["ledger"])
-        _write(_banner(url, model, paths["ledger"]))
+        provision(client, model, paths)
+        _write(_banner(url, model, paths))
         server.wait()
     except KeyboardInterrupt:
         pass
@@ -329,7 +375,7 @@ def serve(directory: pathlib.Path, base_url: str, model: str, port: int, fresh: 
 
 
 def reprovision(directory: pathlib.Path, model: str, port: int) -> int:
-    provision(_Client(f"http://127.0.0.1:{port}"), model, _paths(directory)["ledger"])
+    provision(_Client(f"http://127.0.0.1:{port}"), model, _paths(directory))
     _write("Pasted every Cement part into the running instance again.")
     return 0
 

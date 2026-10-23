@@ -137,12 +137,16 @@ Choose a change and confirm it. The ledger records your Open WebUI user id as th
 
 ## Try it locally
 
-`local.py` starts Open WebUI 0.12.3 on Python 3.11, the Python of the official image. It installs
-no Cement package beside Open WebUI, and it pastes in every part through the Open WebUI API. Use
-any OpenAI-compatible endpoint for the model. You do not need an OpenAI API account: a local
-proxy that signs in with your ChatGPT subscription and serves an OpenAI-compatible endpoint also
-works. The instance has no login and listens on `127.0.0.1` only. Use it for tests on your own
-computer, not as a shared server.
+`local.py` starts Open WebUI 0.12.3 on Python 3.11, the Python of the official image. It installs no
+Cement package beside Open WebUI, and it pastes in every part through the Open WebUI API. Use any
+OpenAI-compatible endpoint for the model. You do not need an OpenAI API account: a local proxy that
+signs in with your ChatGPT subscription and serves an OpenAI-compatible endpoint also works. The
+instance listens on `127.0.0.1` only and accepts calls from its own pages only. Sign in as
+`admin@localhost`. `local.py` writes its password to `.open-webui/admin-password` with mode 0600. A
+login is necessary: Open WebUI without a login gives an administrator token to each caller, and a
+web page that you open can be a caller. An administrator token can run code on your computer. If an
+earlier `local.py` started the instance without a login, the next start replaces the old password
+`admin`. Use the instance for tests on your own computer, not as a shared server.
 
 1. Install Open WebUI into `.open-webui/` once:
 
@@ -159,9 +163,9 @@ computer, not as a shared server.
      --base-url <endpoint>/v1 --model <model id>
    ```
 
-   The command prints the address and the steps of the walkthrough. It creates the users' chat
-   model `Cement chat` and the learning model `Cement learning`. Add `--fresh` to start again
-   with an empty instance and ledger. Press `Ctrl-C` to stop.
+   The command prints the address, a sign-in line and the steps of the walkthrough. It
+   creates the users' chat model `Cement chat` and the learning model `Cement learning`. Add
+   `--fresh` to start again with an empty instance and ledger. Press `Ctrl-C` to stop.
 
 3. Follow the printed steps. Set up `extraction_plan` with the button. Paste two forms of one
    layout from `examples/hospital_ocr/documents/` into new chats with `Cement chat`, and ask which
