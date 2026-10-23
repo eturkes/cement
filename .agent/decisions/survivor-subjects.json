@@ -1,3 +1,18 @@
 {
-  "tests.test_cli.ParserShapeTests.test_the_live_grammar_digest_covers_help_choices_and_type": ["cli.py:_parser"]
+  "tests.test_cli.ParserShapeTests.test_the_live_grammar_digest_covers_help_choices_and_type": [
+    "cli.py:_parser"
+  ],
+  "tests.test_function.FunctionTests.test_the_real_item_bound_accepts_one_million_and_rejects_one_more": [
+    "json_value.py:_validate",
+    "json_value.py:canonicalize",
+    "json_value.py:parse_json"
+  ],
+  "tests.test_json_value.CanonicalJSONTests.test_parser_rejects_ambiguous_or_unbounded_values": [
+    "json_value.py:parse_json"
+  ],
+  "tests.test_system.SystemTests.test_function_report_public_shape_is_exact_frozen_slotted_and_exported": [
+    "models.py:FunctionReport",
+    "models.py:OperationNowReport",
+    "models.py:FunctionAnchorReport"
+  ]
 }

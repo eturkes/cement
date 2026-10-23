@@ -17,3 +17,7 @@ Subject `cli.py:_parser`. Tally: 77 survivors = 75 out-of-scope (`contract-open`
 |---|---|---|
 | `cli.py:102` `ReplaceComparisonOperator_Eq_GtE` #1 | equivalent | `for name in ("register", "revise")`: `"register" >= "revise"` is False and `"revise" >= "revise"` True, the same truth table as `==` over the only two values. |
 | `cli.py:102` `ReplaceComparisonOperator_Eq_Is` #1 | equivalent | both operands are the same interned literal `"revise"` in CPython, so `is` agrees with `==` over the loop's two values. |
+
+## p113 — `p91-mutate.txt` (ABI pin `test_function_report_public_shape_is_exact_frozen_slotted_and_exported` @ 3ef05d3 + `test_parser_rejects_ambiguous_or_unbounded_values` @ 8bef2a0)
+
+Subjects: the report dataclasses (`models.py` `FunctionReport`, `OperationNowReport`, `FunctionAnchorReport`) and `json_value.py` `parse_json`. Tally: 84 survivors, all out of scope → `contract-open` by construction: `store.py` `Store.__init__` 35, `_validate_ledger` 10, `Store._connect` 10, `Store._initialize` 7, `_schema_objects` 5 and `system.py` `System.__init__` 17 — the ledger the pin's fixture opens. The subject module `models.py` holds no survivor (the record: 27 killed of 27); the parser pin's section holds none.
