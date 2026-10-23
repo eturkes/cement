@@ -21,6 +21,21 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p88 close (MAINTAIN queue run 3, tier `docs`: a milestone plan; the build = row p136) — target = the commit landing this section
+
+Check set W1-W8 fixed before the review; consultant-1 reviewed revision 1 (`93ff847`, Open WebUI 0.12.3 from the installed wheel); MAIN re-derived the decisive claims and ruled each row; revision 2 = the plan this commit lands.
+
+| id | lens | consultant-1 | MAIN ruling + basis |
+|---|---|---|---|
+| W1 | premises | defect | accepted: Q2 rewritten (the outlet runs before delivery; `_pairs` returns miss/record pairs, hits need `_tool_calls`); Q5 rewritten (`--receipt-id`; reconstruction uncached; p35's cache keys the whole ledger). |
+| W2 | S1 outlet timing | defect | accepted after MAIN read `open_webui/utils/middleware.py`: the non-streaming handler awaits `outlet_filter_handler(ctx)` before `return response` → S1 = enqueue a descriptor, a bounded worker does the model + Cement work; duplicate `/api/chat/completed` admission named. |
+| W3 | S2 cost + captured version | defect | accepted: a ledger commit invalidates p35's cache by design (its contract C2/C4), so telemetry goes to a separate store (T6); `agreed` from the captured hash; no cost claim before `resolve → record → resolve` is measured. |
+| W4 | S3 counts + inspection | gap | accepted: retained original input + `observations`; group by distinct hash; cutoff, empty window, order, dropped/failed counts; learning-tool reads. |
+| W5 | S5 discrimination | gap | accepted: one frozen primary completion replayed at rate 0/1 (two fresh chats differ); mixed + all-agree + all-disagree controls; call counts; duplicate delivery, blocked, failed and version-move cases. |
+| W6 | docs map | gap | accepted: supported scope instead of blanket absence; oracle + proof-of-request caveats; telemetry-store classification; p87 E3 named as a future integration. |
+| W7 | Intent + Decisions | gap | accepted: S4 states that drift never gates, switches or challenges; prototype + nucllei waiting rulings stay scoped as written. |
+| W8 | owner decisions | gap | accepted: T6-T9 added; tier `kernel` for selection, identity, isolation + verdict. |
+
 ## p89 close (MAINTAIN queue run 3, tier `kernel`: public API typing; the runtime dicts unchanged, re-checked by the p32 differential) — target = the commit landing this section
 
 Check set = the row's three acceptance clauses A1-A3 + the code diff lenses C1-C3, fixed before the diff was reread.
