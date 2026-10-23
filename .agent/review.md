@@ -21,6 +21,23 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p87 close (MAINTAIN queue run 3, tier `docs`: a milestone plan; the build = row p135, tier `kernel`) — target = the commit landing this section
+
+Check set V1-V10 fixed before MAIN's review pass (seeded for consultant-1, who declined it: trust-gate reviews route to MAIN under the user's global instructions, so MAIN ran it).
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| V1 | premises hold at HEAD | pass after edits | 15 actor-bearing writes (`_text(…, maximum=256)` sites in `system.py`); triggers + FKs read from `store.py` → P8 added (`examples.proposal_id` FK; `projection_programs` shared across partitions; five child tables reach their partition through a parent). |
+| V2 | E1 unforgeable by the chat model | defect → fixed | write-time checks alone are bypassable where the model can write the ledger (nucllei `/workspace/.cement`) → P7 + the stored attestation re-verified on serving, `allowed-signers` on a read-only mount; HMAC dropped (the verifier would hold the minting key inside the jail); `previous` binds the prior switch row, and the rollback left when rows can be deleted is published. |
+| V3 | authorization stays outside Cement | pass | the minting side decides who gets a signature; `allowed-signers` = deployment configuration; Cement applies no role logic (M3.1 kept). |
+| V4 | E2 names every plaintext copy | pass after edits | file list = ledger, `-journal` (+ `-wal`/`-shm`), the export's temporary file, bundles, backups, swap; SQLite temp files stay in memory (`temp_store = MEMORY`). |
+| V5 | E3 rows exact | defect → fixed | a shared `projection_programs` row goes only when no other partition names it; child tables reach the grant through their parent; prune age vs learning cadence stated; backups named. |
+| V6 | E4 + E5 key, verifier, process-free | pass | signer = the publisher's SSH key (D6); verifier = in-process SSHSIG + RFC 8032 Ed25519 (stdlib `hashlib` SHA-512 + integers; feasibility from RFC 8032 §6's reference code, not probed here), so the eval audit-hook claim holds; a library verifier added. |
+| V7 | threat-model + README bullets complete | pass after edits | added `## Untrusted` reviewer-label bullet, `## Enforced controls` switch bullet, three README `Deployment boundary` sentences. |
+| V8 | Intent + Decisions conflicts | pass | the switch stays the one human gate (E1 strengthens it); stdlib-only + embeddings kept (E2 declines a cipher dependency, D4); schema v4 = D5. |
+| V9 | missing property or risk | pass after edits | key removal = fail-closed, clock skew (nonce stops replay), rollback residual, backups. |
+| V10 | gates fail on the unbuilt tree + catch the classic defect | pass after edits | raw-SQL switch row + copied older row → `off`; shared program kept on erase; collision-pair partition. |
+
 ## p37 close (MAINTAIN queue run 3, tier `data`: `System.submit_proposal` re-grades every field the relay sends; the example is caller code) — target = the commit landing this section
 
 Check set = the row's acceptance clauses A1-A4 + the code diff lenses C1-C3, fixed before the diff was reread.
