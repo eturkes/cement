@@ -1,0 +1,92 @@
+#!/usr/bin/env python3
+"""owui-audit — OSV audit of the Open WebUI regimen's hash-pinned lock (p131).
+
+`examples/open_webui/local-requirements.txt` installs the owner-ruled `open-webui` target with every
+package hash-pinned, while the gate's `audit` step reads `uv.lock` alone. This runs pip-audit
+(pinned below; `.agent/pins` grades the pin) over the lock without pip (`--disable-pip`, hashes
+required) and compares each finding with `.agent/decisions/owui-audit-holds.json`: `<package> <id>`
+→ `{version, row}` (one advisory id can name several packages). A finding passes only while its hold names the same package + version and
+its row is open in `.agent/deferred.md`; a hold the audit no longer reports is stale.
+
+Usage: uv run python .agent/owui-audit [--lock PATH] [--emit-holds ROW]
+rc 0 = every finding held by an open row; 1 = an unheld finding, a hold for another version, a hold
+whose row is not open, or a stale hold; 2 = the auditor failed (network, a changed output shape).
+`--emit-holds ROW` writes every current finding as a hold on ROW (review the diff before committing).
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import pathlib
+import re
+import subprocess
+import sys
+import tempfile
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+PIP_AUDIT = "pip-audit==2.10.1"
+LOCK = ROOT / "examples/open_webui/local-requirements.txt"
+HOLDS = ROOT / ".agent/decisions/owui-audit-holds.json"
+
+
+def findings(lock: pathlib.Path) -> dict[str, str]:
+    """`<package> <vulnerability id>` → the locked version."""
+
+    with tempfile.TemporaryDirectory(prefix="cement-owui-audit-") as directory:
+        report = pathlib.Path(directory) / "audit.json"
+        run = subprocess.run(  # noqa: S603 — fixed argv
+            ["uvx", "-q", PIP_AUDIT, "-r", str(lock), "--require-hashes", "--disable-pip",
+             "--progress-spinner", "off", "--format", "json", "-o", str(report)],
+            cwd=directory, capture_output=True, text=True, check=False,
+        )
+        try:
+            dependencies = json.loads(report.read_text(encoding="utf-8"))["dependencies"]
+        except (OSError, ValueError, KeyError) as error:
+            raise SystemExit(f"owui-audit: no report (rc {run.returncode}): {error}\n{run.stderr[-2000:]}") from None
+    if run.returncode not in (0, 1) or not dependencies:
+        raise SystemExit(f"owui-audit: pip-audit rc {run.returncode}, {len(dependencies)} packages\n{run.stderr[-2000:]}")
+    return {f"{dependency['name']} {vuln['id']}": dependency["version"]
+            for dependency in dependencies for vuln in dependency.get("vulns", [])}
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--lock", type=pathlib.Path, default=LOCK)
+    parser.add_argument("--emit-holds")
+    args = parser.parse_args()
+    try:
+        found = findings(args.lock)
+    except SystemExit as error:
+        print(error, file=sys.stderr)
+        return 2
+    if args.emit_holds:
+        HOLDS.write_text(json.dumps({key: {"version": version, "row": args.emit_holds}
+                                     for key, version in sorted(found.items())},
+                                    indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        print(f"owui-audit: wrote {len(found)} holds on {args.emit_holds}")
+        return 0
+    holds = json.loads(HOLDS.read_text(encoding="utf-8"))
+    open_rows = set(re.findall(r"^- `(p\d+)` ", (ROOT / ".agent/deferred.md").read_text(encoding="utf-8"), re.M))
+    problems = []
+    for key, version in sorted(found.items()):
+        hold = holds.get(key)
+        if hold is None:
+            problems.append(f"UNHELD {key} {version}")
+        elif hold["version"] != version:
+            problems.append(f"MOVED {key} {version} (held for {hold['version']})")
+        elif hold["row"] not in open_rows:
+            problems.append(f"HOLD-GONE {key} {version} ({hold['row']} not open)")
+    problems += [f"STALE {key} {hold['version']} (no longer reported)"
+                 for key, hold in sorted(holds.items()) if key not in found]
+    packages = sorted({key.split(" ", 1)[0] for key in found})
+    print(f"owui-audit: {len(found)} findings in {len(packages)} packages ({PIP_AUDIT}); "
+          f"{len(holds)} holds on {sorted({hold['row'] for hold in holds.values()})}")
+    for problem in problems:
+        print(f"  {problem}")
+    print(f"owui-audit: {'FAIL' if problems else 'PASS'} ({len(problems)} problems)")
+    return 1 if problems else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

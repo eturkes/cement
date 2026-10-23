@@ -21,6 +21,18 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p131 close (MAINTAIN queue run 3, tier `data`: dependency instruments; the vulnerability triage = MAIN) — target = the commit landing this section
+
+Check set = the row's acceptance clauses A1-A4 + a security lens S1, fixed before the diff was reread.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | `.agent/pins` lock row | pass | `open-webui lock transitive` = a fresh compile of the lock's header requirement (`open-webui==0.12.3`, Python 3.12) vs the lock's pins (`compile_drift`, shared with p34's constraints row); it found `jiter 0.17.0 -> 0.18.0` → the lock refreshed by its header command + `--upgrade` (an existing output file otherwise keeps its pins); fired by lowering `jiter` again → rc 1; shipped → 28 pins, rc 0. |
+| A2 | committed OSV audit | pass | `.agent/owui-audit` = `pip-audit==2.10.1` (latest; its own `.agent/pins` row) `--require-hashes --disable-pip` over the lock; findings keyed `<package> <id>` (one advisory can name two packages; pip-audit repeats 30 of its 155 entries) against `owui-audit-holds.json`; rc 1 on `jinja2==2.10` (6 UNHELD) and on the holding row dropped (125 HOLD-GONE); rc 0 on the shipped lock with every finding held. |
+| A3 | seeds recorded | pass | `.claude/rules/gate-checks.md` `.agent/pins` bullet (lock row + audit seeds). |
+| A4 | `pins.md` names both | pass | the Open WebUI target bullet: refresh command, audit command, holds, `--emit-holds`. |
+| S1 | the findings themselves | find → row `p137` (held) | 125 advisories in 15 packages, every one an EXACT pin in `open-webui==0.12.3`'s own `requires_dist` (checked against PyPI metadata), and 0.12.3 = the latest release + the owner-ruled target mirroring production ⇒ no in-repo fix; the production instance carries the same set — reported to the owner at the run's close. |
+
 ## p130 close (MAINTAIN queue run 3, tier `docs`: a gate step wrapping an existing audit; owner-approved gate change) — target = the commit landing this section
 
 Check set = the row's acceptance clauses A1-A4, fixed before the diff was reread.

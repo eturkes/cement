@@ -1,0 +1,502 @@
+{
+  "accelerate PYSEC-2026-3804": {
+    "row": "p137",
+    "version": "1.13.0"
+  },
+  "aiohttp CVE-2026-111063": {
+    "row": "p137",
+    "version": "3.14.3"
+  },
+  "aiohttp CVE-2026-111064": {
+    "row": "p137",
+    "version": "3.14.3"
+  },
+  "aiohttp CVE-2026-111065": {
+    "row": "p137",
+    "version": "3.14.3"
+  },
+  "aiohttp CVE-2026-111066": {
+    "row": "p137",
+    "version": "3.14.3"
+  },
+  "aiohttp CVE-2026-111748": {
+    "row": "p137",
+    "version": "3.14.3"
+  },
+  "aiohttp CVE-2026-111749": {
+    "row": "p137",
+    "version": "3.14.3"
+  },
+  "aiohttp CVE-2026-111750": {
+    "row": "p137",
+    "version": "3.14.3"
+  },
+  "aiohttp GHSA-2g87-pp6c-29x5": {
+    "row": "p137",
+    "version": "3.14.3"
+  },
+  "anthropic PYSEC-2026-2114": {
+    "row": "p137",
+    "version": "0.86.0"
+  },
+  "anthropic PYSEC-2026-2115": {
+    "row": "p137",
+    "version": "0.86.0"
+  },
+  "black CVE-2026-114134": {
+    "row": "p137",
+    "version": "26.5.1"
+  },
+  "brotli GHSA-9v8h-qqgm-4m35": {
+    "row": "p137",
+    "version": "1.2.0"
+  },
+  "brotli PYSEC-2026-4322": {
+    "row": "p137",
+    "version": "1.2.0"
+  },
+  "brotlicffi PYSEC-2026-4323": {
+    "row": "p137",
+    "version": "1.2.0.1"
+  },
+  "chromadb PYSEC-2026-311": {
+    "row": "p137",
+    "version": "1.5.9"
+  },
+  "chromadb PYSEC-2026-3813": {
+    "row": "p137",
+    "version": "1.5.9"
+  },
+  "chromadb PYSEC-2026-3814": {
+    "row": "p137",
+    "version": "1.5.9"
+  },
+  "chromadb PYSEC-2026-3815": {
+    "row": "p137",
+    "version": "1.5.9"
+  },
+  "cryptography GHSA-537c-gmf6-5ccf": {
+    "row": "p137",
+    "version": "48.0.0"
+  },
+  "cryptography PYSEC-2026-3552": {
+    "row": "p137",
+    "version": "48.0.0"
+  },
+  "cryptography PYSEC-2026-3553": {
+    "row": "p137",
+    "version": "48.0.0"
+  },
+  "cryptography PYSEC-2026-3554": {
+    "row": "p137",
+    "version": "48.0.0"
+  },
+  "mcp CVE-2026-59951": {
+    "row": "p137",
+    "version": "1.27.2"
+  },
+  "mcp PYSEC-2026-3483": {
+    "row": "p137",
+    "version": "1.27.2"
+  },
+  "pillow CVE-2026-112390": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-112391": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-112392": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-112393": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-112395": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-112396": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-112397": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-112399": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-112400": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-112401": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-112402": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-112404": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-112405": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-112406": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-112891": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-112892": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-112893": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-112894": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-112895": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-112896": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-112897": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-112899": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-112900": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-112901": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-96636": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-96637": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-96638": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-96639": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-96640": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-96641": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-96642": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-96643": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-96644": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-96778": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow GHSA-78g4-xqwv-q3g8": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pyarrow PYSEC-2026-113": {
+    "row": "p137",
+    "version": "20.0.0"
+  },
+  "pyjwt GHSA-pxh4-856f-4h89": {
+    "row": "p137",
+    "version": "2.13.0"
+  },
+  "pyjwt PYSEC-2026-4140": {
+    "row": "p137",
+    "version": "2.13.0"
+  },
+  "pyjwt PYSEC-2026-4141": {
+    "row": "p137",
+    "version": "2.13.0"
+  },
+  "pyjwt PYSEC-2026-4142": {
+    "row": "p137",
+    "version": "2.13.0"
+  },
+  "pyjwt PYSEC-2026-4143": {
+    "row": "p137",
+    "version": "2.13.0"
+  },
+  "pyjwt PYSEC-2026-4144": {
+    "row": "p137",
+    "version": "2.13.0"
+  },
+  "pyjwt PYSEC-2026-4145": {
+    "row": "p137",
+    "version": "2.13.0"
+  },
+  "pyjwt PYSEC-2026-4146": {
+    "row": "p137",
+    "version": "2.13.0"
+  },
+  "pyjwt PYSEC-2026-4147": {
+    "row": "p137",
+    "version": "2.13.0"
+  },
+  "pyjwt PYSEC-2026-4148": {
+    "row": "p137",
+    "version": "2.13.0"
+  },
+  "pyjwt PYSEC-2026-4149": {
+    "row": "p137",
+    "version": "2.13.0"
+  },
+  "pyjwt PYSEC-2026-4150": {
+    "row": "p137",
+    "version": "2.13.0"
+  },
+  "pyjwt PYSEC-2026-4151": {
+    "row": "p137",
+    "version": "2.13.0"
+  },
+  "pyjwt PYSEC-2026-4152": {
+    "row": "p137",
+    "version": "2.13.0"
+  },
+  "pyjwt PYSEC-2026-4183": {
+    "row": "p137",
+    "version": "2.13.0"
+  },
+  "pypdf CVE-2026-113786": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf CVE-2026-113789": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf CVE-2026-113790": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf CVE-2026-113791": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf CVE-2026-113792": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf CVE-2026-113793": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf CVE-2026-113794": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf CVE-2026-113795": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf CVE-2026-115572": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf CVE-2026-115580": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf CVE-2026-115585": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf CVE-2026-57204": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3004": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3006": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3007": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3009": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3010": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3011": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3012": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3016": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3018": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3019": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3020": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3021": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3022": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3023": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3025": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3026": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3610": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3611": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3612": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3613": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3655": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3656": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3910": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3911": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3912": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-3913": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-4153": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-4154": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-4155": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-4156": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-4157": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-4158": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-4159": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "pypdf PYSEC-2026-4160": {
+    "row": "p137",
+    "version": "6.7.5"
+  },
+  "sentence-transformers PYSEC-2026-4164": {
+    "row": "p137",
+    "version": "5.5.1"
+  },
+  "transformers PYSEC-2026-3929": {
+    "row": "p137",
+    "version": "5.5.4"
+  },
+  "transformers PYSEC-2026-4174": {
+    "row": "p137",
+    "version": "5.5.4"
+  }
+}

@@ -26,6 +26,7 @@ import urllib.request
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 PROVIDER = "examples/command_source/pyproject.toml"
 CONSTRAINTS = "examples/command_source/build-constraints.txt"
+OWUI_LOCK = "examples/open_webui/local-requirements.txt"
 # pin name -> the open queue row that holds it below latest.
 HELD = {
     "open-webui mirror python": "p126",
@@ -105,16 +106,16 @@ def lock_status() -> str:
     return "; ".join(updates) if updates else "locked"
 
 
-def constraints_status(backend: str, python: str) -> str:
-    """Drift of the provider's hashed build constraints against a fresh compile of their header."""
+def compile_drift(path: str, requirement: str, python: str) -> str:
+    """Drift of a hash-pinned lock against a fresh compile of its own header requirement."""
 
-    pinned = dict(re.findall(r"^([a-z0-9-]+)==(\S+) \\$", read(CONSTRAINTS), re.M))
+    pinned = dict(re.findall(r"^([a-z0-9-]+)==(\S+) \\$", read(path), re.M))
     argv = ["uv", "pip", "compile", "--python-version", python, "--universal", "--no-header",
             "--no-annotate", "-"]
-    result = subprocess.run(argv, input=f"{backend}\n", capture_output=True, text=True, check=False,  # noqa: S603 fixed argv
+    result = subprocess.run(argv, input=f"{requirement}\n", capture_output=True, text=True, check=False,  # noqa: S603 fixed argv
                             cwd=ROOT)
     if result.returncode != 0:
-        raise SourceError(f"uv pip compile {backend}: rc {result.returncode} {result.stderr.strip()[:200]}")
+        raise SourceError(f"uv pip compile {requirement}: rc {result.returncode} {result.stderr.strip()[:200]}")
     fresh = dict(re.findall(r"^([a-z0-9-]+)==(\S+)$", result.stdout, re.M))
     drift = [f"{name} {pinned.get(name)} -> {version}" for name, version in sorted(fresh.items())
              if pinned.get(name) != version]
@@ -138,7 +139,7 @@ def pins() -> list[tuple[str, str, object, str]]:
     rows.append(("command-source hatchling", backend.split("==")[1], lambda: pypi("hatchling"),
                  "PyPI hatchling"))
     rows.append(("command-source build constraints", "locked",
-                 lambda: constraints_status(backend, provider_floor), f"uv pip compile ({CONSTRAINTS})"))
+                 lambda: compile_drift(CONSTRAINTS, backend, provider_floor), f"uv pip compile ({CONSTRAINTS})"))
     for tool in sorted((ROOT / ".agent").iterdir()):
         text = tool.read_text(encoding="utf-8") if tool.is_file() else ""
         if tool.name == "fetch-tool" or "\nfetch_tool " not in text:
@@ -180,6 +181,10 @@ def pins() -> list[tuple[str, str, object, str]]:
     rows.append(("open-webui target", webui, lambda: pypi("open-webui"), "PyPI open-webui"))
     mirror = one(r'^PYTHON = "(3\.\d+)"$', local, "local.py")
     rows.append(("open-webui mirror python", mirror, newest_cpython_line, "uv python list --only-downloads"))
+    rows.append(("open-webui lock transitive", "locked",
+                 lambda: compile_drift(OWUI_LOCK, f"open-webui=={webui}", mirror), f"uv pip compile ({OWUI_LOCK})"))
+    auditor = one(r'^PIP_AUDIT = "pip-audit==([0-9.]+)"$', read(".agent/owui-audit"), ".agent/owui-audit")
+    rows.append(("pip-audit (owui-audit)", auditor, lambda: pypi("pip-audit"), "PyPI pip-audit"))
     nucllei = one(r"nucllei-sandbox (v\d{8}-\d\d)", read(".claude/rules/nucllei.md"), "nucllei.md")
     rows.append(("nucllei target", nucllei, lambda: gh_tag("technoplasm/nucllei"), "GitHub technoplasm/nucllei tags"))
     rows.append(("nucllei jail stand-in python", jail, newest_cpython_line, "uv python list --only-downloads"))
