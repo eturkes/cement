@@ -10,6 +10,7 @@ Fill one test per commit. Replace the seeded `self.skipTest` with the real probe
 from __future__ import annotations
 
 import pathlib
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -198,8 +199,16 @@ class ResolveBatteryTests(unittest.TestCase):
             ),
         )
         self.assertTrue(FunctionResolution.__dataclass_params__.frozen)
-        self.assertFalse(FunctionResolution.__dataclass_params__.kw_only)
-        self.assertTrue(FunctionResolution.__dataclass_params__.slots)
+        # `_DataclassParams` records kw_only + slots from Python 3.12; the field and
+        # `__slots__` pins below hold their effect on 3.11 too.
+        if sys.version_info >= (3, 12):
+            self.assertFalse(FunctionResolution.__dataclass_params__.kw_only)
+            self.assertTrue(FunctionResolution.__dataclass_params__.slots)
+        self.assertEqual(
+            tuple(field.kw_only for field in dataclasses.fields(FunctionResolution)),
+            (False, False, False),
+        )
+        self.assertEqual(FunctionResolution.__slots__, ("verification", "match", "switch"))
         self.assertFalse(hasattr(resolution, "__dict__"))
         with self.assertRaises(dataclasses.FrozenInstanceError):
             resolution.match = None

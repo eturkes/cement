@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# ci-gate <unit> — the full gate as CI's parallel fan-out (`.claude/rules/ops.md` Template
+# rulings (5)): push HEAD to `ci/<unit>`, watch the Gate run of exactly that commit, print each
+# leg + D28's replay line, delete the branch once green.
+# rc 0 = every leg green, branch deleted; 1 = a leg red (branch kept: fix, amend, rerun);
+# 2 = usage, a tracked change outside HEAD, or no run for the pushed commit.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+[ $# -eq 1 ] || { echo "usage: .agent/ci-gate <unit>" >&2; exit 2; }
+branch="ci/$1"
+# CI grades the pushed commit alone, so a tracked edit outside it would go ungraded.
+[ -z "$(git status --porcelain --untracked-files=no)" ] || { echo "ci-gate: commit first: tracked changes outside HEAD" >&2; exit 2; }
+sha=$(git rev-parse HEAD)
+git push -f -q origin "HEAD:refs/heads/$branch"
+run=
+for _ in $(seq 60); do
+  run=$(gh run list --branch "$branch" --commit "$sha" --workflow gate.yml --event push --limit 1 \
+    --json databaseId --jq '.[0].databaseId // empty')
+  [ -n "$run" ] && break
+  sleep 5
+done
+[ -n "$run" ] || { echo "ci-gate: no Gate run for $sha on $branch within 300 s" >&2; exit 2; }
+echo "ci-gate: $branch commit $sha tree $(git rev-parse 'HEAD^{tree}') run $run"
+rc=0
+gh run watch "$run" --exit-status --interval 30 > /dev/null || rc=1
+gh run view "$run" --json jobs --jq '.jobs[] | "\(.conclusion)\t\(.name)"'
+d28=$(gh run view "$run" --log 2> /dev/null | grep -o -m 1 'D28: [0-9]* revisions.*' || true)
+echo "${d28:-D28 line: absent}"
+if [ "$rc" -eq 0 ]; then
+  git push -q origin --delete "$branch"
+  echo "ci-gate: green, $branch deleted"
+else
+  echo "ci-gate: red, $branch kept"
+fi
+exit "$rc"

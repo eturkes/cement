@@ -21,6 +21,29 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## `CLAUDE.md` refresh agents@897faa7 → agents@b78f436 + offload move + CI gate + 3.11 leg (MAINTAIN, ad-hoc) — target = the diff this commit lands, base `a1a08de`
+
+Template delta = Git `ci/*` pushes, NEW `CI gate`, `CLAUDE.local.md` tier. Owner request = offload/nixbox law out of `.claude/rules/` into `CLAUDE.local.md`; owner picks at the session's question = CI gate installed + the 3.11 leg fixed now, p119 superseded by the CI gate. `reviewer-1`, 10 lenses fixed before it read the diff, primary tree read-only (target sha256 `4990af7f…` over its run; MAIN's fixes after it). Teammate verdicts re-derived here.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| L1 | template fidelity | pass | `cmp` rc 0 vs agents@b78f436: `CLAUDE.md`, 6 roles, `.agent/spec-lint` (100755); HEAD's copy = agents@897faa7 ⇒ no local law in the replaced lines. |
+| L2 | obligation coverage | pass | Git `ci/*` → `ops.md` Commits; `CI gate` → Template rulings (5) + `gate.yml` `ci/**` + `.agent/ci-gate` + the 3.11 repair (green-`main` precondition); `CLAUDE.local.md` tier → `.gitignore:21` + the move. |
+| L3 | owner request | pass | `rg -n 'offload\|nixbox' .claude/` rc 1 (HEAD: 3 lines); every moved fact in `CLAUDE.local.md`, the portable remainder in `ops.md` / `history-gates.md` / `gate-checks.md`; nixbox's 3.13 build re-measured (`main, Jun 11 2026, 04:03:13`). |
+| L4 | old forms | pass | `I handle remote`, `nothing machine-specific.` → 0 live hits (HEAD controls 1 each); `drives remote` → the new Commits clause; `offload` / `nixbox` → `.agent/decisions/*` + `.agent/archive/` alone. |
+| L5 | spec preservation | pass | `Artifacts` Gate line alone; unit/`p<nn>` token stream sha256 equal, headers equal; spec-lint rc 0. |
+| L6 | check strength | pass | 3.12+ assertions unchanged, b02 adds field `kw_only` + `__slots__` pins; both modules OK on 3.11.17 / 3.12.14 / 3.13.14 / 3.14.8; 3.11 credit + survivor rulings `.agent/decisions/py311-mutate.txt`; skip census 3 members; `seeds --list` 20 groups. |
+| L7 | `.agent/ci-gate` | pass | `bash -n` + `shellcheck` rc 0; no arg / tracked change outside HEAD → rc 2; verdict source `gh run watch 39801982661 --exit-status` → rc 1; reviewer's remote-free harness: green → rc 0 + delete, red → rc 1 kept, no run → rc 2. |
+| L8 | queue soundness | finding F1 (minor), fixed | p119 row + status byte-verbatim; grader PASS. |
+| L9 | law consistency | finding F2 (minor), fixed | `sys.platform` + `sys.version` key; no host or clone component (`tests/test_migration_battery.py` `_d28_content_key`). |
+| L10 | claim soundness | findings F1-F3 (minor), fixed | run 39801982661 = `a1a08de`, 3.11 leg red alone; mutation tallies match the log. |
+
+- F1 p119's `Closed:` asserted four green legs before the first CI run existed → it names the closing commit's body as the carrier of the observed run.
+- F2 `history-gates.md` + `ops.md` said another host or clone replays cold, while the key holds neither (a copied store hits — the CI cache relies on it) → a clone without the store, or a different interpreter build.
+- F3 `CLAUDE.local.md` stated this controller's uv as 0.13.1 (now 0.13.5) → the `sys.version` strings D28 keys on, both re-measured.
+- Re-review (MAIN, each fix against its own acceptance): each of the four finding anchors `rg -Fc` → 0 in its file (positive control: the new `Closed:` line = 1); grader PASS, spec-lint rc 0, acceptance rc 1.
+- Survivor rulings (3.11 credit, subject `Store._connect`): reviewer-1 = 10 contract-open + 2 equivalent; MAIN reran S2 (siblings b05 + b06 read arguments `FAILED (failures=2)`) and S6 (3.11 module OK; neither `Connection.setconfig` nor `SQLITE_DBCONFIG_DEFENSIVE` exists).
+
 ## p120 close (MAINTAIN queue row, tier `docs`: skill text + its replay) — target = the commit that lands this section
 
 MAIN alone; check set = the row's acceptance + the standing pin-repair approval.

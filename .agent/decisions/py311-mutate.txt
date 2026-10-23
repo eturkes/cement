@@ -1,0 +1,165 @@
+# `.agent/mutate` credit — the 3.11 repair's preservation pins (3.11 expectations of tests.test_read_capability_battery.ReadCapabilityBatteryTests.{test_b06_setconfig_calls_are_exact, test_b06_authorizer_is_last_then_begin_runs} + tests.test_resolve_battery.ResolveBatteryTests.test_b02); command per pin: uv run python .agent/mutate <test id> --rev impl/py311 --workers 6 under UV_PYTHON=3.11 (CPython 3.11.15) on the offload pool (impl/py311 = 6bf2646 = a1a08de + the two test files, tagged archive/py311-credit; line numbers at 6bf2646). Survivors inside the pins' subject function Store._connect ruled by reviewer-1 (non-author), re-derived by MAIN: store.py:654 Mul_Div #3 (`*` → `/`, private call grammar) contract-open; :662 NumberReplacer #20/#21 + :669 #22/#23 (timeout 11.0/9.0) contract-open, killed by siblings test_b05_busy_timeout_readback_is_ten_thousand + test_b06_read_connect_arguments_are_exact (:662) and test_b06_read_connect_arguments_are_exact + test_b15_write_connect_and_begin_are_exact (:669), each FAILED (failures=2) on 3.11; :680 AddNot #30 equivalent on 3.11 (neither Connection.setconfig nor SQLITE_DBCONFIG_DEFENSIVE exists, so both branches make no call; module OK). Every other survivor lies outside Store._connect = contract-open by construction (.claude/rules/assurance.md Survivor scope).
+=== tests.test_read_capability_battery.ReadCapabilityBatteryTests.test_b06_setconfig_calls_are_exact
+mutate: tests.test_read_capability_battery.ReadCapabilityBatteryTests.test_b06_setconfig_calls_are_exact @ 6bf2646c1d13, baseline 0.3s (ran 1), timeout 10.0s, workers 6
+  scope src/cement_runtime/store.py: 118 executed lines
+mutate: killed 105, survived 74, incompetent 0, invalid 30, no-test 0, error 0 (of 209 in-scope mutants)
+  module src/cement_runtime/store.py: 209 mutants (killed 105, survived 74, invalid 30)
+  SURVIVED src/cement_runtime/store.py:444 core/NumberReplacer #8
+  SURVIVED src/cement_runtime/store.py:444 core/NumberReplacer #9
+  SURVIVED src/cement_runtime/store.py:444 core/NumberReplacer #10
+  SURVIVED src/cement_runtime/store.py:444 core/NumberReplacer #11
+  SURVIVED src/cement_runtime/store.py:444 core/NumberReplacer #13
+  SURVIVED src/cement_runtime/store.py:526 core/AddNot #3
+  SURVIVED src/cement_runtime/store.py:528 core/ReplaceComparisonOperator_Eq_Is #0
+  SURVIVED src/cement_runtime/store.py:528 core/ReplaceComparisonOperator_Eq_Lt #0
+  SURVIVED src/cement_runtime/store.py:528 core/ReplaceComparisonOperator_Eq_LtE #0
+  SURVIVED src/cement_runtime/store.py:535 core/ReplaceComparisonOperator_Eq_GtE #1
+  SURVIVED src/cement_runtime/store.py:535 core/ReplaceComparisonOperator_Eq_Is #1
+  SURVIVED src/cement_runtime/store.py:535 core/ReplaceComparisonOperator_Eq_LtE #1
+  SURVIVED src/cement_runtime/store.py:544 core/ReplaceBinaryOperator_Mul_Div #0
+  SURVIVED src/cement_runtime/store.py:569 core/NumberReplacer #15
+  SURVIVED src/cement_runtime/store.py:569 core/ReplaceComparisonOperator_NotEq_Gt #0
+  SURVIVED src/cement_runtime/store.py:569 core/ReplaceComparisonOperator_NotEq_Is #0
+  SURVIVED src/cement_runtime/store.py:569 core/ReplaceComparisonOperator_NotEq_Lt #0
+  SURVIVED src/cement_runtime/store.py:580 core/NumberReplacer #17
+  SURVIVED src/cement_runtime/store.py:580 core/ReplaceComparisonOperator_NotEq_Gt #1
+  SURVIVED src/cement_runtime/store.py:580 core/ReplaceComparisonOperator_NotEq_Is #1
+  SURVIVED src/cement_runtime/store.py:580 core/ReplaceComparisonOperator_NotEq_Lt #1
+  SURVIVED src/cement_runtime/store.py:580 core/ReplaceOrWithAnd #2
+  SURVIVED src/cement_runtime/store.py:582 core/ReplaceComparisonOperator_NotEq_Is #2
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_Add #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_BitAnd #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_BitXor #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_Div #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_FloorDiv #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_LShift #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_Mod #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_Mul #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_Pow #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_RShift #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_Sub #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_Mul_Div #2
+  SURVIVED src/cement_runtime/store.py:603 core/ReplaceComparisonOperator_IsNot_NotEq #0
+  SURVIVED src/cement_runtime/store.py:605 core/ReplaceComparisonOperator_Lt_Eq #0
+  SURVIVED src/cement_runtime/store.py:605 core/ReplaceComparisonOperator_Lt_Is #0
+  SURVIVED src/cement_runtime/store.py:605 core/ReplaceComparisonOperator_Lt_LtE #0
+  SURVIVED src/cement_runtime/store.py:619 core/ReplaceComparisonOperator_Eq_Gt #3
+  SURVIVED src/cement_runtime/store.py:619 core/ReplaceComparisonOperator_Eq_GtE #3
+  SURVIVED src/cement_runtime/store.py:619 core/ReplaceComparisonOperator_Eq_Is #3
+  SURVIVED src/cement_runtime/store.py:623 core/ReplaceUnaryOperator_Delete_Not #1
+  SURVIVED src/cement_runtime/store.py:633 core/NumberReplacer #18
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_Add #5
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_Add #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_BitAnd #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_BitXor #5
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_BitXor #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_FloorDiv #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_LShift #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_Mod #5
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_Mod #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_Mul #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_Pow #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_RShift #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_Sub #6
+  SURVIVED src/cement_runtime/store.py:654 core/ReplaceBinaryOperator_Mul_Div #3
+  SURVIVED src/cement_runtime/store.py:662 core/NumberReplacer #20
+  SURVIVED src/cement_runtime/store.py:662 core/NumberReplacer #21
+  SURVIVED src/cement_runtime/store.py:669 core/NumberReplacer #22
+  SURVIVED src/cement_runtime/store.py:669 core/NumberReplacer #23
+  SURVIVED src/cement_runtime/store.py:680 core/AddNot #30
+  SURVIVED src/cement_runtime/store.py:697 core/NumberReplacer #25
+  SURVIVED src/cement_runtime/store.py:700 core/ReplaceComparisonOperator_Eq_GtE #4
+  SURVIVED src/cement_runtime/store.py:700 core/ReplaceComparisonOperator_Eq_LtE #4
+  SURVIVED src/cement_runtime/store.py:704 core/NumberReplacer #31
+  SURVIVED src/cement_runtime/store.py:704 core/ReplaceComparisonOperator_NotEq_Gt #3
+  SURVIVED src/cement_runtime/store.py:704 core/ReplaceComparisonOperator_NotEq_Lt #3
+  SURVIVED src/cement_runtime/store.py:704 core/ReplaceOrWithAnd #4
+  SURVIVED src/cement_runtime/store.py:743 core/ReplaceUnaryOperator_Delete_Not #6
+  SURVIVED src/cement_runtime/store.py:744 core/AddNot #38
+  SURVIVED src/cement_runtime/store.py:762 core/AddNot #40
+  SURVIVED src/cement_runtime/store.py:762 core/ReplaceComparisonOperator_IsNot_Is #4
+rc=0
+=== tests.test_read_capability_battery.ReadCapabilityBatteryTests.test_b06_authorizer_is_last_then_begin_runs
+mutate: tests.test_read_capability_battery.ReadCapabilityBatteryTests.test_b06_authorizer_is_last_then_begin_runs @ 6bf2646c1d13, baseline 0.2s (ran 1), timeout 10.0s, workers 6
+  scope src/cement_runtime/store.py: 118 executed lines
+mutate: killed 107, survived 72, incompetent 0, invalid 30, no-test 0, error 0 (of 209 in-scope mutants)
+  module src/cement_runtime/store.py: 209 mutants (killed 107, survived 72, invalid 30)
+  SURVIVED src/cement_runtime/store.py:444 core/NumberReplacer #8
+  SURVIVED src/cement_runtime/store.py:444 core/NumberReplacer #9
+  SURVIVED src/cement_runtime/store.py:444 core/NumberReplacer #10
+  SURVIVED src/cement_runtime/store.py:444 core/NumberReplacer #11
+  SURVIVED src/cement_runtime/store.py:444 core/NumberReplacer #13
+  SURVIVED src/cement_runtime/store.py:526 core/AddNot #3
+  SURVIVED src/cement_runtime/store.py:528 core/ReplaceComparisonOperator_Eq_Is #0
+  SURVIVED src/cement_runtime/store.py:528 core/ReplaceComparisonOperator_Eq_Lt #0
+  SURVIVED src/cement_runtime/store.py:528 core/ReplaceComparisonOperator_Eq_LtE #0
+  SURVIVED src/cement_runtime/store.py:535 core/ReplaceComparisonOperator_Eq_GtE #1
+  SURVIVED src/cement_runtime/store.py:535 core/ReplaceComparisonOperator_Eq_Is #1
+  SURVIVED src/cement_runtime/store.py:535 core/ReplaceComparisonOperator_Eq_LtE #1
+  SURVIVED src/cement_runtime/store.py:544 core/ReplaceBinaryOperator_Mul_Div #0
+  SURVIVED src/cement_runtime/store.py:569 core/NumberReplacer #15
+  SURVIVED src/cement_runtime/store.py:569 core/ReplaceComparisonOperator_NotEq_Gt #0
+  SURVIVED src/cement_runtime/store.py:569 core/ReplaceComparisonOperator_NotEq_Is #0
+  SURVIVED src/cement_runtime/store.py:569 core/ReplaceComparisonOperator_NotEq_Lt #0
+  SURVIVED src/cement_runtime/store.py:580 core/NumberReplacer #17
+  SURVIVED src/cement_runtime/store.py:580 core/ReplaceComparisonOperator_NotEq_Gt #1
+  SURVIVED src/cement_runtime/store.py:580 core/ReplaceComparisonOperator_NotEq_Is #1
+  SURVIVED src/cement_runtime/store.py:580 core/ReplaceComparisonOperator_NotEq_Lt #1
+  SURVIVED src/cement_runtime/store.py:580 core/ReplaceOrWithAnd #2
+  SURVIVED src/cement_runtime/store.py:582 core/ReplaceComparisonOperator_NotEq_Is #2
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_Add #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_BitAnd #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_BitXor #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_Div #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_FloorDiv #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_LShift #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_Mod #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_Mul #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_Pow #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_RShift #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_BitOr_Sub #4
+  SURVIVED src/cement_runtime/store.py:595 core/ReplaceBinaryOperator_Mul_Div #2
+  SURVIVED src/cement_runtime/store.py:603 core/ReplaceComparisonOperator_IsNot_NotEq #0
+  SURVIVED src/cement_runtime/store.py:605 core/ReplaceComparisonOperator_Lt_Eq #0
+  SURVIVED src/cement_runtime/store.py:605 core/ReplaceComparisonOperator_Lt_Is #0
+  SURVIVED src/cement_runtime/store.py:605 core/ReplaceComparisonOperator_Lt_LtE #0
+  SURVIVED src/cement_runtime/store.py:619 core/ReplaceComparisonOperator_Eq_Gt #3
+  SURVIVED src/cement_runtime/store.py:619 core/ReplaceComparisonOperator_Eq_GtE #3
+  SURVIVED src/cement_runtime/store.py:619 core/ReplaceComparisonOperator_Eq_Is #3
+  SURVIVED src/cement_runtime/store.py:623 core/ReplaceUnaryOperator_Delete_Not #1
+  SURVIVED src/cement_runtime/store.py:633 core/NumberReplacer #18
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_Add #5
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_Add #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_BitAnd #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_BitXor #5
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_BitXor #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_FloorDiv #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_LShift #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_Mod #5
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_Mod #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_Mul #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_Pow #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_RShift #6
+  SURVIVED src/cement_runtime/store.py:633 core/ReplaceBinaryOperator_BitOr_Sub #6
+  SURVIVED src/cement_runtime/store.py:654 core/ReplaceBinaryOperator_Mul_Div #3
+  SURVIVED src/cement_runtime/store.py:662 core/NumberReplacer #20
+  SURVIVED src/cement_runtime/store.py:662 core/NumberReplacer #21
+  SURVIVED src/cement_runtime/store.py:669 core/NumberReplacer #22
+  SURVIVED src/cement_runtime/store.py:669 core/NumberReplacer #23
+  SURVIVED src/cement_runtime/store.py:680 core/AddNot #30
+  SURVIVED src/cement_runtime/store.py:697 core/NumberReplacer #25
+  SURVIVED src/cement_runtime/store.py:700 core/ReplaceComparisonOperator_Eq_GtE #4
+  SURVIVED src/cement_runtime/store.py:700 core/ReplaceComparisonOperator_Eq_LtE #4
+  SURVIVED src/cement_runtime/store.py:704 core/NumberReplacer #31
+  SURVIVED src/cement_runtime/store.py:704 core/ReplaceComparisonOperator_NotEq_Gt #3
+  SURVIVED src/cement_runtime/store.py:704 core/ReplaceComparisonOperator_NotEq_Lt #3
+  SURVIVED src/cement_runtime/store.py:704 core/ReplaceOrWithAnd #4
+  SURVIVED src/cement_runtime/store.py:762 core/AddNot #40
+  SURVIVED src/cement_runtime/store.py:762 core/ReplaceComparisonOperator_IsNot_Is #4
+rc=0
+=== tests.test_resolve_battery.ResolveBatteryTests.test_b02
+mutate: tests.test_resolve_battery.ResolveBatteryTests.test_b02 @ 6bf2646c1d13, baseline 0.2s (ran 1), timeout 10.0s, workers 6
+  scope src/cement_runtime/models.py: 0 executed lines + 15 read definition lines
+mutate: killed 3, survived 0, incompetent 0, invalid 0, no-test 0, error 0 (of 3 in-scope mutants)
+  module src/cement_runtime/models.py: 3 mutants (killed 3)
+rc=0

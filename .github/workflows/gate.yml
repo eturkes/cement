@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - main
+      # The CI gate's fan-out branches (`.agent/ci-gate`, `.claude/rules/ops.md` Template rulings (5)).
+      - "ci/**"
   schedule:
     - cron: "17 6 * * 1"
   workflow_dispatch:

@@ -8,10 +8,9 @@ Every recorded recipe has an S01–S18 group, with a result per constituent case
 rc 0 = every selected expectation matched and every worktree restored; 1 = a
 verdict differs; 2 = setup/restoration failure. --self-test repeats the selected
 set after neutralizing skip-census: exactly S12's four red seeds must change.
-CPU-heavy (suites, D28 replays, a mutation run) ⇒ run the whole runner in one
-offload slot: `offload run -- uv run python .agent/seeds …` (nixbox first, else a
-local heavy slot); it acquires no slot itself, since `heavy` is absent on the pool
-host and a nested `heavy` waits on a second local slot. Network is required by uv
+CPU-heavy (suites, D28 replays, a mutation run) ⇒ run the whole runner as one
+scheduled job; it schedules nothing itself (machine commands → `CLAUDE.local.md`).
+Network is required by uv
 audit and an uncached gitleaks download. A private mirror keeps test commits, worktrees,
 and D28 cache writes out of the calling repository. Existing GREEN D28 records
 are copied as a cache only; D28 itself validates their content keys.

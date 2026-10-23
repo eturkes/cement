@@ -8,6 +8,7 @@ import json
 import pathlib
 import sqlite3
 import subprocess
+import sys
 import tempfile
 import typing
 import unittest
@@ -18,6 +19,10 @@ from cement_runtime import cli as cement_cli
 from cement_runtime import store as store_module
 from cement_runtime.errors import IntegrityError, StateError
 from tests.test_read_capability_census import _sql_values
+
+# `Connection.setconfig` + `sqlite3.SQLITE_DBCONFIG_DEFENSIVE` arrived in Python 3.12; on 3.11
+# `_connect` sets no DBCONFIG flag (pyproject admits 3.11, CI's split leg runs it).
+SETCONFIG_PYTHON = sys.version_info >= (3, 12)
 
 
 class ReadCapabilityBatteryTests(unittest.TestCase):
@@ -281,7 +286,9 @@ class ReadCapabilityBatteryTests(unittest.TestCase):
             [event[1:] for event in events if event[:1] == ("setconfig",)],
             [
                 (sqlite3.SQLITE_DBCONFIG_DEFENSIVE, True),
-            ],
+            ]
+            if SETCONFIG_PYTHON
+            else [],
         )
 
     def test_b06_authorizer_is_last_then_begin_runs(self):
@@ -297,7 +304,7 @@ class ReadCapabilityBatteryTests(unittest.TestCase):
                 "execute",
                 "execute",
                 "execute",
-                "setconfig",
+                *(["setconfig"] if SETCONFIG_PYTHON else []),
                 "set_authorizer",
                 "execute",
             ],
