@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Literal, cast
+from typing import Literal, NotRequired, TypedDict, cast
 
 from .errors import ValidationError
 from .function import FunctionDocument, FunctionMatch
 from .json_value import JSONValue
+from .projection import ProgramDocument
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,7 +35,7 @@ class CompilePolicy:
         if not 0 <= self.min_span_seconds <= 10 * 365 * 24 * 60 * 60:
             raise ValidationError("min_span_seconds must be between zero and ten years")
 
-    def as_json(self) -> dict[str, JSONValue]:
+    def as_json(self) -> PolicyRecord:
         return {
             "min_confirmations": self.min_confirmations,
             "min_reviewers": self.min_reviewers,
@@ -423,3 +424,187 @@ class Promotion:
     artifact_id: str
     replaced_artifact_ids: tuple[str, ...]
     promoted_at_us: int
+
+
+# Inspection records (p89): the dicts the read and write methods return, typed per field. Runtime
+# values stay plain dicts, so their JSON is unchanged; a stored JSON document stays `JSONValue`.
+
+
+class PolicyRecord(TypedDict):
+    min_confirmations: int
+    min_reviewers: int
+    min_span_seconds: int
+
+
+class OperationRecord(TypedDict):
+    created_at_us: int
+    name: str
+    policy: JSONValue
+    policy_hash: str
+    revision: int
+    updated_at_us: int
+
+
+class ProposalRecord(TypedDict):
+    created_at_us: int
+    final_output: JSONValue
+    id: str
+    input: JSONValue
+    operation: str
+    operation_revision: int
+    proposed_output: JSONValue
+    provenance: JSONValue
+    review_note: str | None
+    reviewed_at_us: int | None
+    reviewer: str | None
+    sequence: int
+    status: str
+
+
+class RevocationRecord(TypedDict):
+    at_us: int
+    by: str
+    reason: str
+
+
+class ExampleRecord(TypedDict):
+    confirmed_at_us: int
+    id: str
+    input: JSONValue
+    input_hash: str
+    operation_revision: int
+    origin: str
+    output: JSONValue
+    output_hash: str
+    receipt_hash: str
+    reviewer: str
+    sequence: int
+    source_id: str | None
+    superseded_by: str | None
+    supersedes_example_id: str | None
+    revocation: RevocationRecord | None
+
+
+class ArtifactSummaryRecord(TypedDict):
+    artifact_hash: str
+    build_hash: str
+    created_at_us: int
+    evidence_snapshot_hash: str
+    id: str
+    input_hash: str
+    operation_revision: int
+    promoted_at_us: int | None
+    promotion_hash: str | None
+    reviewer_count: int
+    sequence: int
+    scope_hash: str
+    span_seconds: int
+    status: str
+    status_reason: str | None
+    support: int
+    verified_report_id: str | None
+
+
+class ArtifactRecord(ArtifactSummaryRecord):
+    document: JSONValue
+    evidence_ids: list[str]
+
+
+class ReportTestRecord(TypedDict):
+    detail: str
+    example_id: str | None
+    key: str
+    passed: bool
+
+
+class ReportSummaryRecord(TypedDict):
+    artifact_id: str
+    build_hash: str
+    created_at_us: int
+    id: str
+    passed: bool
+    sequence: int
+    scope_hash: str
+    test_count: int
+    test_set_hash: str
+
+
+class ReportRecord(ReportSummaryRecord):
+    artifact_hash: str
+    details: JSONValue
+    evidence_snapshot_hash: str
+    policy_hash: str
+    tests: list[ReportTestRecord]
+
+
+class EventRecord(TypedDict):
+    created_at_us: int
+    kind: str
+    payload: JSONValue
+    sequence: int
+    subject_id: str
+    subject_type: str
+
+
+class ProjectionRecord(TypedDict):
+    operation_revision: int
+    program: JSONValue
+    program_hash: str
+
+
+class ProjectionChange(TypedDict):
+    changed: bool
+    program_hash: str
+    retired: list[str]
+
+
+class ProjectionKeyRecord(TypedDict):
+    key_hash: str
+    support: int
+    outputs: int
+
+
+class ProjectionReportRecord(TypedDict):
+    program_hash: str
+    projected: int
+    unprojected: list[str]
+    keys: list[ProjectionKeyRecord]
+    merged_outputs: list[str]
+    unwitnessed_layouts: list[str]
+
+
+class ProjectionPreviewKey(ProjectionKeyRecord):
+    pending: int
+    ready: bool
+
+
+class ProjectionPreviewItem(TypedDict):
+    kind: Literal["example", "proposal"]
+    id: str
+    key_hash: str | None
+    reason: str | None
+
+
+class ProjectionPreview(TypedDict):
+    program_hash: str
+    projected: int
+    unprojected: list[str]
+    keys: list[ProjectionPreviewKey]
+    merged_outputs: list[str]
+    unwitnessed_layouts: list[str]
+    items: list[ProjectionPreviewItem]
+
+
+class LearningCasesRecord(TypedDict):
+    partition: str
+    operation: str
+    operation_revision: int
+    grouped_by: Literal["candidate", "exact", "build-current"]
+    program_hash: str | None
+    cases: list[JSONValue]
+    unprojected: dict[str, JSONValue]
+    stale_pending_proposal_ids: list[JSONValue]
+    unsourced_pending: list[JSONValue]
+    work: dict[str, JSONValue]
+    nothing_to_learn: bool
+    program: NotRequired[ProgramDocument]

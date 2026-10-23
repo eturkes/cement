@@ -21,6 +21,19 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p89 close (MAINTAIN queue run 3, tier `kernel`: public API typing; the runtime dicts unchanged, re-checked by the p32 differential) — target = the commit landing this section
+
+Check set = the row's three acceptance clauses A1-A3 + the code diff lenses C1-C3, fixed before the diff was reread.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | each dict-returning public method returns a TypedDict or a dataclass | pass | 16 functions retyped (13 `System` methods, `learning.cases`, `projection.draft_program`, `CompilePolicy.as_json`); `test_no_public_function_returns_an_untyped_dict` walks every public function of every `src/cement_runtime` module (`JSONValue` unions exempt: a JSON document, not a record) — red at the parent with 16 offenders. |
+| A2 | mypy `--strict` over a committed caller fixture: zero Any-typed field reads | pass | `tests/typed_records_caller.py` binds all 175 field reads to their declared types under `--strict --disallow-any-expr` → `Success`; at the parent the same fixture → 172 errors; `MYPYPATH` = the tree's own `src` (D28 replays check their own revision). |
+| A3 | the CLI's JSON byte-identical | pass | `p32-differential.py --base ebbfe76`: every behavior + CLI probe identical; the one differing record = `S01.29.public-signatures` (the two return annotations this row changes). Runtime values stay plain dicts. |
+| C1 | correctness of reshaped builders | pass | `artifact` builds its summary before parsing the document (stored-field errors keep their order); `test_projection` keeps the key insertion order (`{**entry, "pending", "ready"}`, `items` last); `set_projection` returns `str` ids (stored ids already strings). |
+| C2 | public surface | pass | `Publication.projection` → `ProjectionChange | None`; record names importable from `cement_runtime.models` / `.projection`, none added to `__all__` (R3 freezes it); README `## Library API` names them; casts the typing made redundant removed (`cli.py`, `learning.py`). |
+| C3 | generated copies + censuses | pass | paste-ins + `ext/bin/cement` regenerated; fast gate over every module but D28 + `test_source` → 1421 tests OK; article audit 437 grounded words (the S17 record updated). |
+
 ## p90 close (MAINTAIN queue run 3, tier `docs`: metadata + links; PyPI's own renderer = the live spot-check) — target = the commit landing this section
 
 Check set = the row's three acceptance clauses A1-A3 + a prose lens P1, fixed before the diff was reread.

@@ -58,6 +58,8 @@ from .json_value import (
     parse_json,
 )
 from .models import (
+    ArtifactRecord,
+    ArtifactSummaryRecord,
     Candidate,
     CandidateRequest,
     CompilePolicy,
@@ -65,6 +67,8 @@ from .models import (
     CompileScope,
     DraftEntry,
     DraftVerification,
+    EventRecord,
+    ExampleRecord,
     FunctionAnchorReport,
     FunctionCheck,
     FunctionDiff,
@@ -80,15 +84,26 @@ from .models import (
     FunctionVerification,
     FunctionVersion,
     FunctionVersionPage,
+    LearningCasesRecord,
     OperationArtifact,
     OperationArtifactStatus,
     OperationNowReport,
+    OperationRecord,
     PendingProposalGap,
+    ProjectionChange,
+    ProjectionPreview,
+    ProjectionPreviewItem,
+    ProjectionPreviewKey,
+    ProjectionRecord,
+    ProjectionReportRecord,
     Promotion,
+    ProposalRecord,
     ProposalView,
     QuarantineMember,
     QuarantinePlan,
     QuarantineResult,
+    ReportRecord,
+    ReportSummaryRecord,
     ReviewResult,
     StaleRevisionAnomaly,
     SwitchState,
@@ -1772,7 +1787,7 @@ class System:
                 created_at_us=_stored_int(row["created_at_us"], "stored proposal created_at_us"),
             )
 
-    def proposal(self, partition: str, proposal_id: str) -> dict[str, JSONValue]:
+    def proposal(self, partition: str, proposal_id: str) -> ProposalRecord:
         """Inspect pending or historical proposal state and bound provenance."""
 
         partition = _name(partition, "partition")
@@ -1794,7 +1809,7 @@ class System:
         status: str = "pending",
         after_sequence: int = 0,
         limit: int = 100,
-    ) -> list[dict[str, JSONValue]]:
+    ) -> list[ProposalRecord]:
         """Monotonic proposal-state feed ordered by audit transition sequence."""
 
         partition = _name(partition, "partition")
@@ -1821,7 +1836,7 @@ class System:
             )
             return [self._proposal_record(binding) for binding in bindings.rows]
 
-    def _proposal_record(self, binding: _ProposalBinding) -> dict[str, JSONValue]:
+    def _proposal_record(self, binding: _ProposalBinding) -> ProposalRecord:
         row = binding.row
         self._validate_proposal_shape(row)
         input_json, proposed, provenance = self._proposal_content(binding)
@@ -4075,7 +4090,7 @@ class System:
         operation: str,
         revision: int,
         program: ProjectionProgram,
-    ) -> dict[str, JSONValue]:
+    ) -> ProjectionReportRecord:
         """V2-V4 evidence for one program over the revision's active examples (read-only)."""
 
         rows = connection.execute(
@@ -4091,7 +4106,7 @@ class System:
         ).fetchall()
         outputs: dict[str, set[str]] = {}
         support: dict[str, int] = {}
-        unprojected: list[JSONValue] = []
+        unprojected: list[str] = []
         witnessed: set[tuple[str, tuple[tuple[str, str], ...]]] = set()
         for row in rows:
             key_text = self._case_key_text(program, str(row["input_json"]), str(row["input_hash"]))
@@ -4111,7 +4126,7 @@ class System:
             )
             outputs.setdefault(key.digest, set()).add(str(row["output_hash"]))
             support[key.digest] = support.get(key.digest, 0) + 1
-        unwitnessed: list[JSONValue] = [
+        unwitnessed = [
             layout.name
             for layout in program.layouts
             if (layout.title, layout.entries) not in witnessed
@@ -4124,15 +4139,11 @@ class System:
                 {"key_hash": digest, "support": support[digest], "outputs": len(outputs[digest])}
                 for digest in sorted(support)
             ],
-            "merged_outputs": cast(
-                list[JSONValue], sorted(d for d, o in outputs.items() if len(o) > 1)
-            ),
+            "merged_outputs": sorted(d for d, o in outputs.items() if len(o) > 1),
             "unwitnessed_layouts": unwitnessed,
         }
 
-    def test_projection(
-        self, partition: str, operation: str, program: object
-    ) -> dict[str, JSONValue]:
+    def test_projection(self, partition: str, operation: str, program: object) -> ProjectionPreview:
         """Preview a program over the current revision; writes nothing.
 
         Besides the V2-V4 evidence ``set_projection`` grades (active examples alone), the preview
@@ -4159,10 +4170,10 @@ class System:
                 revision=revision,
                 program=parsed,
             )
-            items: list[JSONValue] = []
+            items: list[ProjectionPreviewItem] = []
             pending: dict[str, int] = {}
             key_texts: dict[str, str] = {}
-            sources = (
+            sources: tuple[tuple[Literal["example", "proposal"], str], ...] = (
                 (
                     "example",
                     """
@@ -4202,10 +4213,10 @@ class System:
                         pending[key_hash] = pending.get(key_hash, 0) + 1
                     elif projected.key is not None:
                         key_texts[projected.key.digest] = projected.key.text
-            keys = cast(list[dict[str, JSONValue]], report["keys"])
-            for entry in keys:
-                digest = str(entry["key_hash"])
-                entry["pending"] = pending.pop(digest, 0)
+            keys: list[ProjectionPreviewKey] = []
+            for entry in report["keys"]:
+                digest = entry["key_hash"]
+                count = pending.pop(digest, 0)
                 # Ready = compile's own per-key gates (support, outputs, reviewers, span) pass.
                 assessment = self._assess_examples(
                     self._active_evidence(
@@ -4220,15 +4231,13 @@ class System:
                     policy,
                     projected=True,
                 )
-                entry["ready"] = not (
-                    assessment["policy_failures"] or assessment["integrity_failures"]
-                )
+                ready = not (assessment["policy_failures"] or assessment["integrity_failures"])
+                keys.append({**entry, "pending": count, "ready": ready})
             keys.extend(
                 {"key_hash": digest, "support": 0, "outputs": 0, "pending": count, "ready": False}
                 for digest, count in sorted(pending.items())
             )
-            report["items"] = items
-            return report
+            return {**report, "keys": keys, "items": items}
 
     @staticmethod
     def _submission_revision_in(
@@ -4242,7 +4251,7 @@ class System:
             raise NotFoundError("operation is not registered in this partition")
         return _stored_int(row["revision"], "operation revision", minimum=1)
 
-    def projection(self, partition: str, operation: str) -> dict[str, JSONValue] | None:
+    def projection(self, partition: str, operation: str) -> ProjectionRecord | None:
         """The program new builds of the current revision use, or ``None`` (exact mode)."""
 
         partition = _name(partition, "partition")
@@ -4262,7 +4271,7 @@ class System:
 
     def set_projection(
         self, partition: str, operation: str, program: object, *, actor: str
-    ) -> dict[str, JSONValue]:
+    ) -> ProjectionChange:
         """Set the projection program new builds use; verify it in the same write transaction.
 
         Refused (nothing written) unless: the program validates (V1); every layout is witnessed
@@ -4348,7 +4357,11 @@ class System:
                 },
                 now_us=now,
             )
-            return {"changed": True, "program_hash": parsed.program_hash, "retired": stale}
+            return {
+                "changed": True,
+                "program_hash": parsed.program_hash,
+                "retired": [str(artifact_id) for artifact_id in stale],
+            }
 
     # -- switch + versions ----------------------------------------------------
 
@@ -6034,7 +6047,7 @@ class System:
 
     def learning_cases(
         self, partition: str, operation: str, *, program: object = None
-    ) -> dict[str, JSONValue]:
+    ) -> LearningCasesRecord:
         """What the learning pass has to do for one operation; writes nothing.
 
         Groups the current revision's pending proposals and active examples by case key: under
@@ -6716,7 +6729,7 @@ class System:
             return None
         return ids
 
-    def operations(self, partition: str) -> list[dict[str, JSONValue]]:
+    def operations(self, partition: str) -> list[OperationRecord]:
         partition = _name(partition, "partition")
         with self.store.transaction() as connection:
             rows = connection.execute(
@@ -6752,7 +6765,7 @@ class System:
         include_revoked: bool = False,
         after_sequence: int = 0,
         limit: int = 1_000,
-    ) -> list[dict[str, JSONValue]]:
+    ) -> list[ExampleRecord]:
         partition = _name(partition, "partition")
         operation = _name(operation, "operation")
         if type(include_revoked) is not bool:
@@ -6826,7 +6839,7 @@ class System:
         *,
         after_sequence: int = 0,
         limit: int = 1_000,
-    ) -> list[dict[str, JSONValue]]:
+    ) -> list[ArtifactSummaryRecord]:
         partition = _name(partition, "partition")
         operation = _name(operation, "operation")
         _bounded_int(
@@ -6847,7 +6860,7 @@ class System:
             ).fetchall()
             return [self._artifact_summary(row) for row in rows]
 
-    def artifact(self, partition: str, artifact_id: str) -> dict[str, JSONValue]:
+    def artifact(self, partition: str, artifact_id: str) -> ArtifactRecord:
         partition = _name(partition, "partition")
         artifact_id = _entity_id(artifact_id, "artifact_id")
         with self.store.transaction() as connection:
@@ -6860,11 +6873,10 @@ class System:
             self._artifact_from_row(row)
             if row["status"] == "promoted":
                 self._validate_promoted(connection, row)
+            # The summary's stored-field checks run before the document parse, as they always did.
             summary = self._artifact_summary(row)
-            summary["document"] = parse_json(
-                str(row["artifact_json"]), max_bytes=ARTIFACT_MAX_BYTES
-            ).value
-            summary["evidence_ids"] = [
+            document = parse_json(str(row["artifact_json"]), max_bytes=ARTIFACT_MAX_BYTES).value
+            evidence_ids = [
                 str(item["example_id"])
                 for item in connection.execute(
                     """
@@ -6874,7 +6886,7 @@ class System:
                     (artifact_id,),
                 ).fetchall()
             ]
-            return summary
+            return {**summary, "document": document, "evidence_ids": evidence_ids}
 
     def report(
         self,
@@ -6883,7 +6895,7 @@ class System:
         *,
         after_test_key: str = "",
         test_limit: int = 1_000,
-    ) -> dict[str, JSONValue]:
+    ) -> ReportRecord:
         """Inspect immutable verification bindings and a stable test page."""
 
         partition = _name(partition, "partition")
@@ -6946,7 +6958,7 @@ class System:
         artifact_id: str | None = None,
         after_sequence: int = 0,
         limit: int = 100,
-    ) -> list[dict[str, JSONValue]]:
+    ) -> list[ReportSummaryRecord]:
         """Monotonic immutable verification-report feed."""
 
         partition = _name(partition, "partition")
@@ -6976,7 +6988,7 @@ class System:
                     limit,
                 ),
             ).fetchall()
-            result: list[dict[str, JSONValue]] = []
+            result: list[ReportSummaryRecord] = []
             for row in rows:
                 self._validate_report(connection, row, verify_test_set=True)
                 result.append(
@@ -7008,7 +7020,7 @@ class System:
         *,
         after: int = 0,
         limit: int = 1_000,
-    ) -> list[dict[str, JSONValue]]:
+    ) -> list[EventRecord]:
         """Read events carrying an exact partition binding."""
 
         partition = _name(partition, "partition")
@@ -7040,7 +7052,7 @@ class System:
             ]
 
     @staticmethod
-    def _artifact_summary(row: sqlite3.Row) -> dict[str, JSONValue]:
+    def _artifact_summary(row: sqlite3.Row) -> ArtifactSummaryRecord:
         return {
             "artifact_hash": str(row["artifact_hash"]),
             "build_hash": str(row["build_hash"]),

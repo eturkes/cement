@@ -14,7 +14,13 @@ from typing import Any, Literal, cast
 
 from .errors import CementError, ValidationError
 from .json_value import JSONValue, canonicalize
-from .models import CompileResult, DraftVerification, FunctionSetPromotion
+from .models import (
+    CompileResult,
+    DraftVerification,
+    FunctionSetPromotion,
+    LearningCasesRecord,
+    ProjectionChange,
+)
 from .projection import draft_program
 from .system import System
 
@@ -46,7 +52,7 @@ class Publication:
     published: bool
     reason: Literal["failed", "empty", "same"] | None
     layouts: tuple[str, ...] = ()
-    projection: dict[str, JSONValue] | None = None
+    projection: ProjectionChange | None = None
     compiled: CompileResult | None = None
     drafts: DraftVerification | None = None
     function_hash: str | None = None
@@ -98,7 +104,7 @@ def raw_inputs(system: System, partition: str, operation: str, *, pending: bool)
         ]
         if len(page) < _PAGE:
             break
-        after = cast(int, page[-1]["sequence"])
+        after = page[-1]["sequence"]
     after = 0
     while pending:
         rows = system.proposals(partition, status="pending", after_sequence=after, limit=_PAGE)
@@ -109,13 +115,13 @@ def raw_inputs(system: System, partition: str, operation: str, *, pending: bool)
         ]
         if len(rows) < _PAGE:
             break
-        after = cast(int, rows[-1]["sequence"])
+        after = rows[-1]["sequence"]
     return found
 
 
 def cases(
     system: System, partition: str, operation: str, *, projectable: bool = False
-) -> dict[str, JSONValue]:
+) -> LearningCasesRecord:
     """``System.learning_cases``; when projectable, grouped by a program derived from the raw
     inputs (one layout per form structure), which rides along as ``program``."""
 

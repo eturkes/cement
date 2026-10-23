@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import string
 from dataclasses import dataclass
-from typing import Literal, cast
+from typing import Literal, TypedDict, cast
 
 from .errors import ValidationError
 from .json_value import CanonicalJSON, JSONValue, canonicalize
@@ -272,7 +272,22 @@ def project(program: ProjectionProgram, value: JSONValue) -> Projection:
 
 # Outside `__all__` on purpose: the two learning surfaces (CLI `learn cases --projectable`, the Open
 # WebUI learning tool) share it, while the projection contract API stays the seven pinned names.
-def draft_program(inputs: list[JSONValue]) -> dict[str, JSONValue]:
+class LayoutDocument(TypedDict):
+    name: str
+    title: str
+    entries: list[dict[str, str]]
+
+
+class ProgramDocument(TypedDict):
+    """The program document `draft_program` derives (p89: typed per field)."""
+
+    abi: str
+    text: str
+    keep: list[str]
+    layouts: list[LayoutDocument]
+
+
+def draft_program(inputs: list[JSONValue]) -> ProgramDocument:
     """One layout per distinct title + structure of the raw inputs, as a v1 program unless some
     input reads differently under v2's separators (a U+FF1A label): then a v2 program (p97).
 
@@ -306,7 +321,7 @@ def draft_program(inputs: list[JSONValue]) -> dict[str, JSONValue]:
         if any(_structure(t, v2)[0] != structure(t) for t in texts)
         else PROJECTION_ABI
     )
-    layouts: dict[tuple[str, tuple[tuple[str, str], ...]], dict[str, JSONValue]] = {}
+    layouts: dict[tuple[str, tuple[tuple[str, str], ...]], LayoutDocument] = {}
     for text in texts:
         parsed = _structure(text, _SEPARATORS[abi])[0]
         if parsed is None or parsed in layouts:

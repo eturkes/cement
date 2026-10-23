@@ -448,6 +448,14 @@ and `publish` do what `learn merge` and `learn publish` do, and they return a `M
 it starts raises `MergeInterruptedError`, which holds the error and the writes that returned.
 The write that raised can also have committed, so read the cases again before you retry.
 
+A method that returns a record gives a typed dictionary, and a type checker sees each field with
+its own type. `cement_runtime.models` defines the records, for example `ProposalRecord`
+(`proposal`, `proposals`), `ExampleRecord`, `ArtifactRecord`, `ReportRecord`, `EventRecord`,
+`ProjectionPreview` and `LearningCasesRecord`. `cement_runtime.projection` defines
+`ProgramDocument`, which `draft_program` returns. At run time each record is a plain `dict`, so
+the CLI prints the same JSON. A field that holds stored JSON, such as an input or an output, has
+the type `JSONValue`.
+
 ### Explicit proposal submission
 
 `System.submit_proposal` and `System.propose` write one pending proposal directly. Use them when you

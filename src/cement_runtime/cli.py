@@ -31,7 +31,7 @@ from .json_value import (
     canonicalize,
     parse_json,
 )
-from .models import Candidate, CompilePolicy
+from .models import Candidate, CompilePolicy, ExampleRecord
 from .system import PROVENANCE_MAX_BYTES, SOURCE_ID_MAX_BYTES, System, _name, _text
 
 
@@ -705,13 +705,13 @@ def _function_listing(
     members = {
         member.input_hash: member.artifact_id for member in (anchor.members if anchor else ())
     }
-    examples: dict[str, dict[str, Any]] = {}
+    examples: dict[str, ExampleRecord] = {}
     after = 0
     while page := system.examples(
         partition, operation, include_revoked=True, after_sequence=after, limit=1000
     ):
         examples.update((str(row["id"]), row) for row in page)
-        after = int(cast(int, page[-1]["sequence"]))
+        after = page[-1]["sequence"]
     proposal_of: dict[str, str] = {}
     after = 0
     while events := system.events(partition, after=after, limit=1000):
@@ -719,30 +719,29 @@ def _function_listing(
             if event["kind"] in ("proposal.accepted", "proposal.corrected"):
                 payload = cast(dict[str, Any], event["payload"])
                 proposal_of[str(payload["example_id"])] = str(event["subject_id"])
-        after = int(cast(int, events[-1]["sequence"]))
+        after = events[-1]["sequence"]
     cases: list[dict[str, Any]] = []
     for entry in cast(list[dict[str, Any]], reconstruction.document.value["entries"]):
         artifact_id = members.get(str(entry["input_hash"]))
         behind: list[dict[str, Any]] = []
         unproposed: list[dict[str, Any]] = []
         if artifact_id is not None:
-            for example_id in cast(
-                list[str], system.artifact(partition, artifact_id)["evidence_ids"]
-            ):
+            for example_id in system.artifact(partition, artifact_id)["evidence_ids"]:
                 # A superseding example carries no proposal; the one it replaced may.
                 source, seen = example_id, {example_id}
                 while source not in proposal_of:
-                    replaced = examples.get(source, {}).get("supersedes_example_id")
+                    known = examples.get(source)
+                    replaced = None if known is None else known["supersedes_example_id"]
                     if replaced is None or replaced in seen:
                         break
                     source = str(replaced)
                     seen.add(source)
                 proposal_id = proposal_of.get(source)
                 if proposal_id is None:
-                    row = examples.get(example_id, {})
+                    row = examples.get(example_id)
                     unproposed.append(
-                        {"example_id": example_id, "origin": row.get("origin")}
-                        | {"sequence": row.get("sequence", 0)}
+                        {"example_id": example_id, "origin": None if row is None else row["origin"]}
+                        | {"sequence": 0 if row is None else row["sequence"]}
                     )
                     continue
                 proposal = system.proposal(partition, proposal_id)
