@@ -21,6 +21,15 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p35 close (MAINTAIN queue run 3, tier `kernel`) — target = `d155dca` (implementation) + the commit landing this section (bench)
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| C1 | observation soundness | redesigned before code | consultant-1 (paired controls, SQLite 3.53.1 + 3.40.1): closing a second raw descriptor dropped this process's locks (a cross-process COMMIT landed under a held snapshot) → token = observer `PRAGMA data_version`; scope ruled by the owner (writes through SQLite). |
+| C2 | implementation | finding → fixed | consultant-1's audit: the observer read `journal_mode` before `data_version` refreshed its pager → one-call WAL miss; order swapped, one-call regression pinned (old order → `database is locked`); re-audit accepted. |
+| C3 | isolation | pass | deep copy per hit; caller mutation never reaches a later call (test). |
+| C4 | C8 bench | pass | `.agent/decisions/p35-resolve-bench.json` at `d155dca` (nixbox, load 8-10): warm/cold 0.032 at 1,000 and 0.034 at 50,000 (≤ 0.10). |
+
 ## p36 close (MAINTAIN queue run 3, tier `kernel`) — target = the commit landing this section
 
 Check set = consultant-1's contract rows K1-K6 (before code) + MAIN's implementation lenses M1-M3.

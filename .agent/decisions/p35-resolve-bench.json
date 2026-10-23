@@ -1,0 +1,125 @@
+{
+  "kind": "p35-resolve-bench",
+  "points": {
+    "n1": {
+      "entries": 1,
+      "fixture_build_seconds": 0.57,
+      "load_1min_after": 8.12890625,
+      "load_1min_before": 8.12890625,
+      "median_cold_ms": 9.475418,
+      "median_other_ms": 2.224967,
+      "median_peak_rss_kib": 28568.0,
+      "median_warm_ms": 2.304765,
+      "provenance": {
+        "commit": "d155dca2c4beb69619ead7c86159d344a7cfd5eb",
+        "host_cpu": "Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz",
+        "platform": "Linux-6.18.57-x86_64-with-glibc2.42",
+        "python_version": "3.14.6",
+        "repeats": 3,
+        "source_dirty": false,
+        "sqlite_version": "3.53.1"
+      },
+      "samples": [
+        {
+          "cold_ms": 8.996253,
+          "other_ms": 2.0636,
+          "peak_rss_kib": 28568,
+          "warm_ms": 2.14238
+        },
+        {
+          "cold_ms": 9.844111,
+          "other_ms": 2.464419,
+          "peak_rss_kib": 28528,
+          "warm_ms": 2.45559
+        },
+        {
+          "cold_ms": 9.475418,
+          "other_ms": 2.224967,
+          "peak_rss_kib": 28632,
+          "warm_ms": 2.304765
+        }
+      ],
+      "warm_over_cold": 0.243236
+    },
+    "n1000": {
+      "entries": 1000,
+      "fixture_build_seconds": 31.898,
+      "load_1min_after": 9.90576171875,
+      "load_1min_before": 8.12890625,
+      "median_cold_ms": 2199.757246,
+      "median_other_ms": 68.785964,
+      "median_peak_rss_kib": 50080.0,
+      "median_warm_ms": 70.967813,
+      "provenance": {
+        "commit": "d155dca2c4beb69619ead7c86159d344a7cfd5eb",
+        "host_cpu": "Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz",
+        "platform": "Linux-6.18.57-x86_64-with-glibc2.42",
+        "python_version": "3.14.6",
+        "repeats": 3,
+        "source_dirty": false,
+        "sqlite_version": "3.53.1"
+      },
+      "samples": [
+        {
+          "cold_ms": 2237.549882,
+          "other_ms": 68.785964,
+          "peak_rss_kib": 50016,
+          "warm_ms": 70.967813
+        },
+        {
+          "cold_ms": 2190.066512,
+          "other_ms": 70.076456,
+          "peak_rss_kib": 50172,
+          "warm_ms": 71.609992
+        },
+        {
+          "cold_ms": 2199.757246,
+          "other_ms": 66.386737,
+          "peak_rss_kib": 50080,
+          "warm_ms": 70.465302
+        }
+      ],
+      "warm_over_cold": 0.032262
+    },
+    "n50000": {
+      "entries": 50000,
+      "fixture_build_seconds": 1206.741,
+      "load_1min_after": 9.28173828125,
+      "load_1min_before": 9.90576171875,
+      "median_cold_ms": 145702.38599,
+      "median_other_ms": 4508.290675,
+      "median_peak_rss_kib": 1032636.0,
+      "median_warm_ms": 4896.178618,
+      "provenance": {
+        "commit": "d155dca2c4beb69619ead7c86159d344a7cfd5eb",
+        "host_cpu": "Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz",
+        "platform": "Linux-6.18.57-x86_64-with-glibc2.42",
+        "python_version": "3.14.6",
+        "repeats": 3,
+        "source_dirty": false,
+        "sqlite_version": "3.53.1"
+      },
+      "samples": [
+        {
+          "cold_ms": 148748.152188,
+          "other_ms": 4846.012495,
+          "peak_rss_kib": 1032172,
+          "warm_ms": 7774.975205
+        },
+        {
+          "cold_ms": 142610.856387,
+          "other_ms": 4508.290675,
+          "peak_rss_kib": 1032788,
+          "warm_ms": 4298.114132
+        },
+        {
+          "cold_ms": 145702.38599,
+          "other_ms": 4261.327831,
+          "peak_rss_kib": 1032636,
+          "warm_ms": 4896.178618
+        }
+      ],
+      "warm_over_cold": 0.033604
+    }
+  }
+}
