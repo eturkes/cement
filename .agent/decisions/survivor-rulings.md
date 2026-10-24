@@ -156,3 +156,7 @@ Campaign: `uv run python .agent/decisions/p93-campaign.py` = `.agent/mutate <pin
 | `set_projection` `_text(actor, "actor", maximum=256)` → 255 / 257 | missing-test → added | the actor byte bound had no adjacent pair here: `test_p93_set_projection_bounds_its_actor_at_256_utf8_bytes` (two-byte characters, as p18). |
 | `serving` `state.mode == "follow"` → `<=` | equivalent | `off` returns above; over `follow` and `pinned`, `"pinned" > "follow"`. |
 | `_projection_uniform_check` AddNot on `program.program_hash if program else ''` | missing-test → added | no test read the passing detail: `test_p93_the_uniform_check_names_the_program_every_member_projects_with`. |
+
+## p99 — `p17-mutate.txt` (`test_function_promote_rejects_stale_hash_after_qualifying_change` @ 4d9ff42)
+
+Subject: `system.py` `System.promote_function`. Tally: 1170 survivors — 1164 out of scope → `contract-open` by construction (`system.py` outside `promote_function`, `cli.py`, `json_value.py`, `artifacts.py`: the compile + verify + inspect path the pin's fixture runs); 6 in scope: 4 killed by the modules naming the subject, 2 survived (`promoted_by = _text(…, maximum=256)` → 257 / 255, `NumberReplacer #354`, `#355`); replayed against HEAD with the full suite minus D28 → both killed (p18's `test_function_promote_actor_bounds_are_adjacent_byte_pairs`, the adjacent byte pair). No residue.
