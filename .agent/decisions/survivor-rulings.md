@@ -111,3 +111,13 @@ Subjects: `cli.py` `_run` (the export branch + the ledger gate the pins run). Ta
 
 Subjects: `system.py` `System.verify_drafts` + `_text`. Tally: 1026 survivors — 1020 out of scope → `contract-open` by construction (`system.py` 511 outside the subjects, `cli.py` 203, `json_value.py` 106: the ledger + CLI the pin drives); 6 in scope: 2 killed by the modules naming a subject, 4 survived; replayed against HEAD with the full suite minus D28 (`--at HEAD --full`) → 1 killed, 3 left, ruled: `_text` `maximum: int = 512` → 511 / 513 (`NumberReplacer #20`, `#21`) and its keyword-only `*` → `/` (`Mul_Div #3`) = equivalent, as in `## p114` (no call reads the default; every call passes keywords).
 
+## p106 — `p18-mutate.txt` (`test_function_promote_actor_bounds_are_adjacent_byte_pairs` @ 9d6cdf3)
+
+Subjects: `system.py` `System.promote_function` + `_text`. Tally: 1260 survivors — 1224 out of scope → `contract-open` by construction (`system.py` 620 outside the subjects, `cli.py` 210, `json_value.py` 118); 36 in scope: 29 killed, 7 survived; replayed against HEAD with the full suite minus D28 → 1 killed, 6 left (one `ambiguous`: its text repeats inside `promote_function`, mapped by hand below), ruled:
+
+| survivor (`9d6cdf3`) | ruling | basis |
+|---|---|---|
+| `_text` `:171` `NumberReplacer #20`, `#21`, `Mul_Div #3` | equivalent | as in `## p114`. |
+| `:5010` `entry.public.disposition == "candidate"` → `<=` (`Eq_LtE #48`) | equivalent | `disposition` is `Literal["retained", "candidate"]` and `"retained" > "candidate"`, so `==` and `<=` agree. |
+| `:5019` `{replaced ids} | set(locked.dropped)` → `^` (`BitOr_BitXor #57`) | equivalent | the two sets are disjoint by the plan's construction: a member a candidate replaces keeps its case key in the new set, so it is never `dropped`; union = symmetric difference. |
+| `:5068` `if changed != 1` → `<` (`NotEq_Lt #123`; `ambiguous` at HEAD) | equivalent | `changed` = the `rowcount` of an `UPDATE … WHERE id = ?` on the primary key, so 0 or 1, where `!= 1` and `< 1` agree. |
