@@ -579,5 +579,86 @@ class ProjectionLifecycleBatteryII(_ProjectionCase):
                 call()
 
 
+class ProjectionEventBoundTests(_ProjectionCase):
+    """p138: list payloads stay inside `_event`'s 262,144-byte bound, whatever the ledger holds."""
+
+    def test_p138_set_projection_retires_ten_thousand_stale_artifacts(self) -> None:
+        # An `art_<32 hex>` id costs 39 canonical bytes, so the full list passed the event bound
+        # at about 6,717 stale artifacts and the projection could no longer change.
+        import cement_runtime.system as system_module
+
+        for text in self.texts:
+            self._confirm(text, {"plan": text.splitlines()[0]})
+            self._confirm(text, {"plan": text.splitlines()[0]})
+        self.system.compile(P, OP)
+        with self.system.store.transaction(write=True) as connection:
+            columns = [str(row[1]) for row in connection.execute("PRAGMA table_info(artifacts)")][2:]
+            (built,) = connection.execute("SELECT COUNT(*) FROM artifacts WHERE status = 'draft'").fetchone()
+            # Stale drafts beside the real ones: copies of one draft row under fresh ids.
+            connection.execute(
+                f"""
+                WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?)
+                INSERT INTO artifacts(id, {", ".join(columns)})
+                SELECT printf('art_%032x', i), {", ".join(columns)}
+                FROM n, (SELECT * FROM artifacts WHERE status = 'draft' ORDER BY sequence LIMIT 1)
+                """,
+                (10_000 - int(built),),
+            )
+        change = self.system.set_projection(P, OP, _program(self.texts), actor="learning-pass")
+        retired = sorted(change["retired"])
+        self.assertEqual(len(retired), 10_000)
+        (event,) = [event for event in self.system.events(P) if event["kind"] == "projection.set"]
+        payload = event["payload"]
+        self.assertEqual(
+            {key: payload[key] for key in ("retired_artifact_count", "retired_artifact_ids", "retired_artifact_ids_hash")},
+            {
+                "retired_artifact_count": 10_000,
+                "retired_artifact_ids": retired[:100],
+                "retired_artifact_ids_hash": system_module._id_list_hash(retired),
+            },
+        )
+
+    def test_p138_a_failing_structural_probe_counts_into_one_failure(self) -> None:
+        # `_run_verification` appended one "structural edit" failure per example, so a case's
+        # failure list grew with its evidence until the report passed its own byte bound.
+        import collections
+
+        import cement_runtime.system as system_module
+
+        for text in self.texts:
+            self._confirm(text, {"plan": text.splitlines()[0]})
+        program = _program(self.texts)
+        self.system.set_projection(P, OP, program, actor="learning-pass")
+        self.system.compile(P, OP)
+        parsed = parse_program(program)
+        support = collections.Counter(project(parsed, {"document": text}).key.digest for text in self.texts)  # type: ignore[union-attr]
+        real = system_module.project
+
+        def without_last(text: str) -> str:
+            lines = text.split("\n")
+            last = max(index for index, line in enumerate(lines) if ":" in line)
+            return "\n".join(lines[:last] + lines[last + 1 :])
+
+        shortened = {without_last(text): text for text in self.texts}
+
+        def lenient(program: object, raw: object) -> object:
+            # L18's defective interpreter: a document missing its last field reads as the full one.
+            if type(raw) is dict and raw.get("document") in shortened:
+                raw = {**raw, "document": shortened[raw["document"]]}
+            return real(program, raw)  # type: ignore[arg-type]
+
+        with unittest.mock.patch.object(system_module, "project", lenient):
+            result = self.system.verify_drafts(P, OP, verified_by="learning-pass")
+        self.assertFalse(result.passed)
+        self.assertTrue(result.entries)
+        for entry in result.entries:
+            with self.subTest(case=entry.input_hash[:12]):
+                self.assertGreaterEqual(support[entry.input_hash], 2)
+                self.assertEqual(
+                    [failure for failure in entry.report.failures if "structural" in failure],
+                    [f"{support[entry.input_hash]} structural-edit probes kept the projected key"],
+                )
+
+
 if __name__ == "__main__":
     unittest.main()

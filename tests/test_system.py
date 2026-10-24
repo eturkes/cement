@@ -17262,7 +17262,10 @@ class PreservedInvariantCensusTests(unittest.TestCase):
         "function.quarantined": ("actor", "artifact_ids", "artifact_ids_hash", "count", "plan_digest"),
         "operation.registered": ("policy_hash", "registered_by"),
         "operation.revised": ("policy_hash", "previous_revision", "revised_by"),
-        "projection.set": ("previous_program_hash", "program_hash", "retired_artifact_ids", "set_by"),
+        "projection.set": (
+            "previous_program_hash", "program_hash", "retired_artifact_count", "retired_artifact_ids",
+            "retired_artifact_ids_hash", "set_by",
+        ),
         "proposal.accepted": ("contradicted_artifact_ids", "example_id", "receipt_hash", "reviewer"),
         "proposal.corrected": ("contradicted_artifact_ids", "example_id", "receipt_hash", "reviewer"),
         "proposal.created": (),

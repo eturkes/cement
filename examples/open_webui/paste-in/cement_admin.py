@@ -20,8 +20,8 @@ from pydantic import BaseModel, Field
 # The embedded source keeps its own line breaks; one of its pragma comments runs past 100
 # columns inside the string, where ruff reads no pragma.
 # ruff: noqa: E501
-_CEMENT_PACKAGE = "_cement_runtime_e052509566f29fea"
-_CEMENT_DIGEST = "e052509566f29fea5b2d4e69e8fb5bc20134edbd12e7c38883794023cc9f0ea7"
+_CEMENT_PACKAGE = "_cement_runtime_d8ae0da2d7c37909"
+_CEMENT_DIGEST = "d8ae0da2d7c379096e684589d22802df198134486ecfcd26216807bb0d75d8d5"
 _CEMENT_SOURCES = {
     "__init__": r'''
 """Cement public API."""
@@ -7326,7 +7326,7 @@ class System:
                 """,
                 (_new_id("proj"), partition, operation, revision, parsed.program_hash, actor, now),
             )
-            stale: list[JSONValue] = [
+            stale = [
                 str(row["id"])
                 for row in connection.execute(
                     """
@@ -7345,6 +7345,9 @@ class System:
                 """,
                 [(artifact_id,) for artifact_id in stale],
             )
+            # Projected as `function.promoted` projects its lists: the full list would pass the
+            # event bound at about 6,717 stale artifacts and block every later program change.
+            retired_count, retired_preview, retired_hash = _id_list_projection(stale)
             _event(
                 connection,
                 partition=partition,
@@ -7354,16 +7357,14 @@ class System:
                 payload={
                     "previous_program_hash": None if current is None else current.program_hash,
                     "program_hash": parsed.program_hash,
-                    "retired_artifact_ids": stale,
+                    "retired_artifact_count": retired_count,
+                    "retired_artifact_ids": retired_preview,
+                    "retired_artifact_ids_hash": retired_hash,
                     "set_by": actor,
                 },
                 now_us=now,
             )
-            return {
-                "changed": True,
-                "program_hash": parsed.program_hash,
-                "retired": [str(artifact_id) for artifact_id in stale],
-            }
+            return {"changed": True, "program_hash": parsed.program_hash, "retired": stale}
 
     # -- switch + versions ----------------------------------------------------
 
@@ -8189,6 +8190,7 @@ class System:
         input_json = parse_json(str(row["input_json"]))
         expected_output = str(row["output_json"])
         replay_failures = 0
+        structure_failures = 0
         for example in self._active_evidence(
             connection,
             partition=partition,
@@ -8220,7 +8222,7 @@ class System:
                     "a structural edit leaves the case",
                 )
                 if not probe_ok:
-                    failures.append("a structural edit kept the projected key")
+                    structure_failures += 1
             execution = execute(
                 artifact,
                 partition=partition,
@@ -8242,6 +8244,9 @@ class System:
             )
             if not ok:
                 replay_failures += 1
+        # Counted, never one failure per example: the report's list stays bounded by its evidence.
+        if structure_failures:
+            failures.append(f"{structure_failures} structural-edit probes kept the projected key")
         if replay_failures:
             failures.append(f"{replay_failures} exact fixture replay tests failed")
 
