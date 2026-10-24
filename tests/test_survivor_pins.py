@@ -544,5 +544,62 @@ class EvaluatePins(unittest.TestCase):
         self.assertEqual(evaluate(bundle, input_json=canonicalize({"n": 7})).output, {"m": 7})
 
 
+class JSONBoundaryPins(unittest.TestCase):
+    """p108: `json_value.py` `_validate`, `canonicalize` + `parse_json` survivors (p29 record)."""
+
+    def test_p108_canonicalize_refuses_classes_forging_equality_by_its_own_rules(self) -> None:
+        # `type(value) is bool/str/int/float/list/dict` → `==` and `type(key) is not str` → `!=`:
+        # a forged class then reaches `json.dumps` or a comparison, so `_validate`'s message is lost.
+        from cement_runtime.json_value import canonicalize
+
+        class Forged(metaclass=ForgedEquality):
+            pass
+
+        for value, message in (
+            (Forged(), "value of type 'Forged' is not JSON"),
+            ({Forged(): 1}, "JSON object keys must be strings"),
+        ):
+            with self.subTest(message=message), self.assertRaises(ValidationError) as raised:
+                canonicalize(value)
+            self.assertEqual(str(raised.exception), message)
+
+    def test_p108_the_integer_range_is_an_adjacent_pair_at_both_ends(self) -> None:
+        # `MIN_INTEGER <= value <= MAX_INTEGER` → `MIN_INTEGER is not value <= MAX_INTEGER`
+        # admitted every integer below the range; only the upper end had a pair.
+        from cement_runtime.json_value import canonicalize
+
+        low, high = -(2**63), 2**63 - 1
+        self.assertEqual([canonicalize(low).value, canonicalize(high).value], [low, high])
+        for outside in (low - 1, high + 1):
+            with self.subTest(outside=outside), self.assertRaises(ValidationError) as raised:
+                canonicalize(outside)
+            self.assertEqual(str(raised.exception), "JSON integer is outside the signed 64-bit range")
+
+    def test_p108_json_limits_are_adjacent_pairs_of_exact_ints(self) -> None:
+        # `canonicalize` + `parse_json` limit guards: each bound ±1, `<` → `<=` / `==`, `or` →
+        # `and` (one bad limit alone) and `type(limit) is not int` → `!=` (a forged class). A bad
+        # limit is the caller's error whatever the input, so it is refused beside an invalid one:
+        # `parse_json` ends in `canonicalize`, whose same guard otherwise masks its own.
+        from cement_runtime.json_value import canonicalize, parse_json
+
+        class ForgedInt(metaclass=ForgedEquality):
+            pass
+
+        message = "JSON limits must be non-negative and max_bytes positive"
+        for name, accept, refuse in (
+            ("canonicalize", lambda **limits: canonicalize(1, **limits),
+             lambda **limits: canonicalize(object(), **limits)),
+            ("parse_json", lambda **limits: parse_json("1", **limits),
+             lambda **limits: parse_json("{", **limits)),
+        ):
+            for limit, floor in (("max_bytes", 1), ("max_depth", 0), ("max_items", 0)):
+                with self.subTest(function=name, limit=limit):
+                    self.assertEqual(accept(**{limit: floor}).text, "1")
+                    for bad in (floor - 1, 1.5, ForgedInt()):
+                        with self.assertRaises(ValueError) as raised:
+                            refuse(**{limit: bad})
+                        self.assertEqual(str(raised.exception), message)
+
+
 if __name__ == "__main__":
     unittest.main()
