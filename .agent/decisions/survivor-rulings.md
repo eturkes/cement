@@ -82,3 +82,17 @@ Subjects: `cli.py` `_parser`. Tally: 1188 survivors — 858 out of scope → `co
 |---|---|---|
 | `:182` `:252` `:257` `:264` `:279` `:282` `:286` `:291` `add_parser(…, allow_abbrev=False)` → `True` (`ReplaceFalseWithTrue #2`-`#9`) | equivalent | `_parser()` ends with `_no_abbreviation`, which sets `allow_abbrev = False` on every node (p49); a per-node argument is overridden by that walk, so neither value reaches a parse. |
 | `:102` `if name == "revise"` → `>=` (`Eq_GtE #1`) | equivalent | `name` ranges over the literal pair `("register", "revise")`, and `"register" < "revise"`, so `==` and `>=` agree on both. |
+
+## p101 — `p22-mutate.txt` (`OfflineBundleTests.test_bundle_identity_follows_its_ids_and_clock_alone` @ bad1d30)
+
+Subjects: `function.py` `build_function` + `_normalize`, `system.py` `_function_entry_seal`. Tally: 1513 survivors — 1462 out of scope → `contract-open` by construction (the promoted-ledger fixture); 51 in scope: 33 killed by the modules naming a subject at the record's revision; the 18 survivors replayed against HEAD → 1 killed by later tests (`--at HEAD`), then 2 more by the full suite minus D28 (`--at HEAD --full`: the input + output digest-mismatch `!=` → `<`/`>` mutants), 15 distinct left, ruled:
+
+| survivor (`bad1d30`) | ruling | basis |
+|---|---|---|
+| `:123` `v2_keys | {"projection", "projection_hash"}` → `^` (`BitOr_BitXor #0`) | equivalent | the two key sets are disjoint, so union = symmetric difference. |
+| `:131` + `:249` `root["abi"] == FUNCTION_ABI` → `>=` (`Eq_GtE #1`, `#2`) | equivalent | `:127` admits only `cement-function-v3` + `-v2`, and `-v2 < -v3`, so `==` and `>=` agree. |
+| `:234` `len(set(h)) != len(h)` → `<` (`NotEq_Lt #5`) | equivalent | a set never outgrows its sequence. |
+| `:339` `"function_hash": "0" * 64` → 63 / 65 (`NumberReplacer #20`, `#21`) | equivalent | a placeholder: `_document` overwrites `function_hash` with the normalized content digest. |
+| `:119` `type(value) is dict` → `==`; `:127` `type(root["abi"]) is not str` → `!=`; `:151` `type(operation_revision) is not int` → `!=`; `:158` `type(raw_entries) is not list` → `!=`; `:315` `type(entry) is not FunctionEntry` → `!=` (`#0`, `#3`, `#4`, `#5`, `#8`) | missing-test → added | `validate_function` + `build_function` are public and take caller objects; equality can be forged through a metaclass, identity cannot. `tests/test_survivor_pins.py` `test_p101_bundle_type_checks_refuse_classes_forging_equality` is red on each of the five mutants. |
+| `:132` `projection is not None or projection_hash is not None` → `and` (`ReplaceOrWithAnd #4`) | missing-test → added | a bundle with one half set must still enter the projected branch and refuse the missing half; `test_p101_a_half_set_projection_is_refused_as_invalid` (hash alone, program alone) red on the mutant. |
+| `:138` `program.program_hash != projection_hash` → `>`, `<`, `is` (`#1` ×3) | missing-test → added | a mismatch below and above the program's hash must both refuse; `test_p101_a_projection_hash_mismatch_is_refused_in_both_orders` (`0…0`, `f…f`) red on all three. |

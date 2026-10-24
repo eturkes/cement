@@ -16,6 +16,19 @@ from cement_runtime import System, cli
 from cement_runtime.errors import ValidationError
 
 
+class ForgedEquality(type):
+    """A metaclass whose classes claim equality with every class: `type(x) == T` holds for its
+    instances, `type(x) is T` never does — the gap each `is` → `==` survivor ruling pins."""
+
+    def __eq__(cls, other: object) -> bool:
+        return True
+
+    def __ne__(cls, other: object) -> bool:
+        return False
+
+    __hash__ = type.__hash__
+
+
 class SurvivorPinTests(unittest.TestCase):
     def test_p105_the_cli_prints_non_ascii_json_as_raw_utf8(self) -> None:
         # p105: `cli.py` `_emit` `ensure_ascii=False` → `True` survived every module, because each
@@ -43,15 +56,6 @@ class SurvivorPinTests(unittest.TestCase):
     def test_p104_a_class_forging_equality_is_no_candidate(self) -> None:
         # p104: `type(candidate) is not Candidate` → `!=` survived every module. Identity cannot be
         # forged; equality can, through the class's metaclass, so only `is not` refuses this object.
-        class ForgedEquality(type):
-            def __eq__(cls, other: object) -> bool:
-                return True
-
-            def __ne__(cls, other: object) -> bool:
-                return False
-
-            __hash__ = type.__hash__
-
         class LooksLikeACandidate(metaclass=ForgedEquality):
             output = {"answer": 1}
             provenance: dict[str, object] = {}
@@ -84,15 +88,6 @@ class SurvivorPinTests(unittest.TestCase):
     def test_p114_text_refuses_a_class_forging_equality_with_str(self) -> None:
         # p114: `_text`'s `type(value) is not str` → `!=` survived; equality with `str` can be
         # forged through a metaclass, identity cannot.
-        class ForgedEquality(type):
-            def __eq__(cls, other: object) -> bool:
-                return True
-
-            def __ne__(cls, other: object) -> bool:
-                return False
-
-            __hash__ = type.__hash__
-
         class LooksLikeText(metaclass=ForgedEquality):
             def encode(self, encoding: str) -> bytes:
                 return b"actor"
@@ -126,6 +121,89 @@ class SurvivorPinTests(unittest.TestCase):
                         with self.assertRaises(ValidationError) as raised:
                             write()
                         self.assertEqual(str(raised.exception), "canonical JSON exceeds 262144 bytes")
+
+    def test_p101_bundle_type_checks_refuse_classes_forging_equality(self) -> None:
+        # p101: `validate_function` + `build_function` take caller objects, and each `type(x) is T`
+        # → `==` survived (`function.py` `_normalize` document, abi, operation revision, entries;
+        # `build_function` entries). Forged equality passes `==`; identity refuses.
+        from copy import deepcopy
+
+        from cement_runtime import FUNCTION_ABI, build_function, validate_function
+        from tests.test_function import _build, _entry
+
+        class Forged(metaclass=ForgedEquality):
+            pass
+
+        class ForgedAbi(metaclass=ForgedEquality):
+            # Equal to the v3 ABI alone, so `_normalize` keeps v3's key set and reaches the check.
+            def __eq__(self, other: object) -> bool:
+                return other == FUNCTION_ABI
+
+            def __hash__(self) -> int:
+                return hash(FUNCTION_ABI)
+
+        bundle = _build((_entry({"x": 1}, {"answer": 1}, label="p101"),))
+        cases = {
+            "document": (lambda: Forged(), "invalid function: expected keys"),
+            "abi": (lambda: {**deepcopy(bundle.value), "abi": ForgedAbi()}, "unsupported function ABI"),
+            "operation_revision": (
+                lambda: {**deepcopy(bundle.value), "scope": {**bundle.value["scope"], "operation_revision": Forged()}},
+                "function operation revision must be a positive signed 64-bit integer",
+            ),
+            "entries": (lambda: {**deepcopy(bundle.value), "entries": Forged()}, "function entries must be an array"),
+        }
+        for name, (document, message) in cases.items():
+            with self.subTest(field=name), self.assertRaises(ValidationError) as raised:
+                validate_function(document())
+            self.assertTrue(str(raised.exception).startswith(message), str(raised.exception))
+        with self.assertRaises(ValidationError) as raised:
+            build_function(
+                partition="tenant-a", operation="echo", operation_revision=1,
+                policy_hash="0" * 64, entries=[Forged()],
+            )
+        self.assertEqual(str(raised.exception), "function entries must be FunctionEntry values")
+
+    def test_p101_a_half_set_projection_is_refused_as_invalid(self) -> None:
+        # p101: `projection is not None or projection_hash is not None` → `and` survived: with one
+        # of the two set, the projected branch must still run and refuse the missing half.
+        from copy import deepcopy
+
+        from cement_runtime import validate_function
+        from cement_runtime.projection import draft_program, parse_program
+        from tests.test_function import _build, _entry, _rehash
+
+        program = parse_program(draft_program([{"doc": "Intake\nName: Ada"}]))
+        bundle = _build((_entry({"x": 1}, {"answer": 1}, label="p101-half"),))
+        for name, projection, projection_hash in (
+            ("hash alone", None, program.program_hash),
+            ("program alone", program.canonical.value, None),
+        ):
+            document = deepcopy(bundle.value)
+            document["projection"], document["projection_hash"] = projection, projection_hash
+            _rehash(document)
+            with self.subTest(case=name), self.assertRaises(ValidationError):
+                validate_function(document)
+
+    def test_p101_a_projection_hash_mismatch_is_refused_in_both_orders(self) -> None:
+        # p101: `program_hash != projection_hash` → `<`, `>` and `is` survived; a mismatch below
+        # and above the program's hash must both refuse.
+        from copy import deepcopy
+
+        from cement_runtime import IntegrityError, validate_function
+        from cement_runtime.projection import draft_program, parse_program
+        from tests.test_function import _build, _entry, _rehash
+
+        program = parse_program(draft_program([{"doc": "Intake\nName: Ada"}]))
+        bundle = _build((_entry({"x": 1}, {"answer": 1}, label="p101-order"),))
+        for wrong in ("0" * 64, "f" * 64):
+            document = deepcopy(bundle.value)
+            document["projection"], document["projection_hash"] = program.canonical.value, wrong
+            _rehash(document)
+            with self.subTest(projection_hash=wrong[:4]), self.assertRaises(IntegrityError) as raised:
+                validate_function(document)
+            self.assertEqual(
+                str(raised.exception), "function projection does not hash to its projection_hash"
+            )
 
 
 if __name__ == "__main__":
