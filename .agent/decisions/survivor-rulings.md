@@ -73,3 +73,12 @@ Subjects: `system.py` `_text` (invalid-identity pin), `_event` (payload-keys pin
 | `:171` `_text` keyword-only `*` → `/` (`Mul_Div #3`) | equivalent | every call passes `maximum` + `allow_empty` by keyword. |
 | `:172` `type(value) is not str` → `!=` (`IsNot_NotEq #2`) | missing-test → added | equality with `str` can be forged through a metaclass, identity cannot; `tests/test_survivor_pins.py` `test_p114_text_refuses_a_class_forging_equality_with_str` red on the mutant. |
 | `:388` `_event` `max_bytes=262_144` → 262,143 / 262,145 (`NumberReplacer #44`, `#45`) | missing-test → added | the cap is reachable (`set_projection` writes an unbounded id list, row p138); `test_p114_the_event_payload_cap_is_an_adjacent_pair` (262,144 accepted, 262,145 refused) red on both mutants. |
+
+## p100 — `p21-mutate.txt` (the four `function show` / `receipts` parser pins @ 55d6942)
+
+Subjects: `cli.py` `_parser`. Tally: 1188 survivors — 858 out of scope → `contract-open` by construction; 330 in scope (84 distinct): 122 killed by the modules naming the subject at the record's revision; the 208 survivors replayed against HEAD (`--at HEAD`, re-anchored by line text) → 172 rows killed by later tests (the grammar SHAPE digest, p53, covers each node's `required`, `default`, `nargs`, `allow_abbrev`, help, choices and type), 36 rows = 9 distinct surviving the full suite minus D28 too (`--at HEAD --full` → `survived-at 36`), ruled:
+
+| survivor (`55d6942`) | ruling | basis |
+|---|---|---|
+| `:182` `:252` `:257` `:264` `:279` `:282` `:286` `:291` `add_parser(…, allow_abbrev=False)` → `True` (`ReplaceFalseWithTrue #2`-`#9`) | equivalent | `_parser()` ends with `_no_abbreviation`, which sets `allow_abbrev = False` on every node (p49); a per-node argument is overridden by that walk, so neither value reaches a parse. |
+| `:102` `if name == "revise"` → `>=` (`Eq_GtE #1`) | equivalent | `name` ranges over the literal pair `("register", "revise")`, and `"register" < "revise"`, so `==` and `>=` agree on both. |

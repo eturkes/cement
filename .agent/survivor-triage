@@ -18,6 +18,9 @@ suite instead: each mutant's changed line block (at the record's revision) is re
 source by exact text (inside the subject's span where the text repeats), then REV's modules naming a
 subject run on it — `killed-at` (a later test covers it), `survived-at` (the residue to rule),
 `superseded` (REV no longer holds the code), `ambiguous` (the text is not unique in the span).
+`--full` (with `--at`) replays against every test module but D28's and `tests/test_source.py` (it
+times subprocesses, so load would read as kills): the row's "full suite minus D28" — a module that
+exercises the subject through public API without naming it kills there.
 Prints one line per in-scope survivor + a tally; `--out` writes every verdict as JSON lines. A mutant
 already replayed in this run against the same module set (sections of one record share most
 mutants) takes that verdict (`note` = `memo`) instead of a second replay.
@@ -157,6 +160,13 @@ def _replay(tree: pathlib.Path, rows: list[dict[str, object]], modules: list[str
                                    capture_output=True, check=True)
 
 
+def _suite(revision: str) -> list[str]:
+    listed = _git("ls-tree", "--name-only", f"{revision}:tests").split()
+    excluded = {"test_migration_battery.py", "test_source.py"}
+    return sorted(f"tests.{name[:-3]}" for name in listed
+                  if name.startswith("test_") and name.endswith(".py") and name not in excluded)
+
+
 def _hunk(original: str, mutated: str) -> tuple[list[str], list[str]] | None:
     import difflib
 
@@ -177,7 +187,9 @@ def _at(args: argparse.Namespace, subjects: dict[str, list[str]],
     target = _git("rev-parse", "--verify", f"{args.at}^{{commit}}").strip()
     rows = [json.loads(line) for line in args.from_file.read_text(encoding="utf-8").splitlines()
             if line.strip()]
-    rows = [row for row in rows if row.get("verdict") == "survived"]
+    # A `--from` file may itself be an `--at` output: replay what survived there.
+    rows = [row for row in rows
+            if row.get("verdict_at", row.get("verdict")) in ("survived", "survived-at")]
     sources: dict[tuple[str, str], str] = {}
 
     def source(revision: str, module: str) -> str:
@@ -208,7 +220,7 @@ def _at(args: argparse.Namespace, subjects: dict[str, list[str]],
             row["verdict_at"] = "ambiguous"
             continue
         mutated = "".join(here[:starts[0]] + new + here[starts[0] + len(old):])
-        modules = tuple(_killers(target, subjects[pin]))
+        modules = tuple(_suite(target) if args.full else _killers(target, subjects[pin]))
         jobs.setdefault((module, mutated, modules), []).append(row)
     keys = list(jobs)
     with tempfile.TemporaryDirectory(prefix="cement-triage-at-") as directory:
@@ -273,6 +285,7 @@ def main() -> int:
     parser.add_argument("--out", type=pathlib.Path)
     parser.add_argument("--at")
     parser.add_argument("--from", dest="from_file", type=pathlib.Path)
+    parser.add_argument("--full", action="store_true")
     args = parser.parse_args()
     if (args.at is None) != (args.from_file is None):
         parser.error("--at and --from go together")
