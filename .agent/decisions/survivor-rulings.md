@@ -50,3 +50,15 @@ Subjects: `system.py` `System.verify_function` + `System._promoted_function_rows
 ## p110 — `p41-mutate.txt` (`test_verify_drafts_holds_the_write_lock_while_a_blocking_clock_runs` + `test_promote_function_rolls_back_when_its_clock_reenters_the_ledger` @ ab478e4)
 
 Subjects: `system.py` `System.verify_drafts` (first pin) + `System.promote_function` (second). Tally: 1689 survivors — 1681 out of scope → `contract-open` by construction (`system.py` 990 outside the subjects, `json_value.py` 224, `models.py` 160, `store.py` 159, `function.py` 76); 8 in scope: 4 killed at the record's revision (`promote_function:4994` `ReplaceTrueWithFalse #49`, `:5002` `NotEq_Gt #121`, `NotEq_Is #112`, `NotEq_Lt #121`), 4 survived there (`verify_drafts:4411` `NumberReplacer #326`/`#327`, `promote_function:4993` `NumberReplacer #354`/`#355`) and are killed at HEAD f368cc1 by the suite's later tests (`survivor-triage --at HEAD --from …p41.jsonl` → `4 distinct replays; killed-at 4`). No ruling owed.
+
+## p115 — `p48-mutate.txt` (the three `ProposalBindingAdapterTests` selection pins @ 9af7827)
+
+Subjects: `system.py` `_proposal_bindings`. Tally: 888 survivors — 877 out of scope → `contract-open` by construction (the ledger + proposal fixture); 11 in scope: 2 killed by the modules naming the subject, 9 rows = 5 distinct mutants surviving at the record's revision and at HEAD f368cc1 (`survivor-triage --at HEAD` → `survived-at 9`), ruled:
+
+| survivor (`9af7827`) | ruling | basis |
+|---|---|---|
+| `:512` `type(selection) is _ProposalIds` → `==` (`Is_Eq #0`) | equivalent | the selection classes are private dataclasses with no custom metaclass, built only inside `system.py`; class equality = identity for them. |
+| `:527` `is _ProposalFeed` → `==` (`Is_Eq #1`) | equivalent | as above. |
+| `:542` `is _PendingProposals` → `==` (`Is_Eq #2`) | equivalent | as above. |
+| `:515` `len(set(v)) != len(v)` → `<` (`NotEq_Lt #3`) | equivalent | a set never holds more members than the sequence it came from, so `!=` and `<` agree. |
+| `:515` `len(set(v)) != len(v)` → `is not` (`NotEq_IsNot #3`) | missing-test → added | CPython caches small ints only (to 256), so the identity form refuses every distinct selection longer than that; the helper's contract (an id set, duplicates refused) admits it. `tests/test_survivor_pins.py` `test_p115_a_long_distinct_id_selection_is_no_duplicate` (300 distinct ids) is green on the tree and red on the mutant (`IntegrityError: … duplicate identifiers`). |

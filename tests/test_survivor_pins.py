@@ -66,6 +66,21 @@ class SurvivorPinTests(unittest.TestCase):
             self.assertEqual(str(raised.exception), "candidate must be a Candidate")
             self.assertEqual(system.events("tenant-a")[-1]["kind"], "operation.registered")
 
+    def test_p115_a_long_distinct_id_selection_is_no_duplicate(self) -> None:
+        # p115: `len(set(ids)) != len(ids)` → `is not` survived. CPython caches small ints alone
+        # (to 256), so the identity form refuses every distinct selection longer than that.
+        from cement_runtime import system as system_module
+
+        with tempfile.TemporaryDirectory(prefix="cement-p115-") as directory:
+            system = System(str(pathlib.Path(directory) / "ledger.db"))
+            system.register_operation("tenant-a", "echo")
+            ids = tuple(f"prop_{index:032x}" for index in range(300))
+            with system.store.transaction() as connection:
+                bound = system_module._proposal_bindings(
+                    connection, partition="tenant-a", selection=system_module._ProposalIds(ids)
+                )
+        self.assertEqual((bound.total, bound.rows), (0, ()))
+
 
 if __name__ == "__main__":
     unittest.main()
