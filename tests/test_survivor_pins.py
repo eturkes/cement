@@ -205,6 +205,21 @@ class SurvivorPinTests(unittest.TestCase):
                 str(raised.exception), "function projection does not hash to its projection_hash"
             )
 
+    def test_p111_register_grades_its_actor_before_creating_a_ledger(self) -> None:
+        # p111: the CLI pre-check `_text(args.actor, "registered_by", maximum=256)` ±1 survived;
+        # 256 bytes register, and 257 are refused before `System(create=True)` makes a file (p51).
+        with tempfile.TemporaryDirectory(prefix="cement-p111-") as directory:
+            for size, status in ((256, 0), (257, 2)):
+                database = pathlib.Path(directory) / f"ledger-{size}.db"
+                stdout, stderr = io.StringIO(), io.StringIO()
+                with self.subTest(size=size), contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                    result = cli.main([
+                        "--db", str(database), "--partition", "tenant-a",
+                        "operation", "register", "echo", "--actor", "a" * size,
+                    ])
+                    self.assertEqual(result, status, stderr.getvalue())
+                    self.assertEqual(database.exists(), status == 0)
+
 
 if __name__ == "__main__":
     unittest.main()
