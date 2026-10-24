@@ -21,6 +21,29 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## MAINTAIN queue run 3 close — target = the commit landing this section
+
+Check set (the body's `Met when`), fixed before the run's record was reread: R1 every queue row closed by its acceptance in its own commit, blocked on the owner with what it owes, waiting on its trigger, or routed; R2 the queue + ledger grader; R3 the standing censuses + audits; R4 the full gate on a clean tree at the closing commit. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | 37 rows open at the run's base `dbe9db0`; closed this run, each in its own commit with its `Closed:` line (43): p32 p33 p34 p35 p36 p37 p87 p88 p89 p90 p93 p99-p102 p104-p116 p122-p134 p138 p139 (born + closed: p130-p134, p138, p139); waiting on a trigger: p52 (a map row about to become a durable claim), p137 (an Open WebUI release that moves its exact pins); routed to IMPLEMENT (owner, the route commit after this one): p135, p136; owed by the owner: none. |
+| R2 | acceptance | pass | `uv run python .agent/decisions/m3-deferred-validate.py` → `VERDICT: PASS`. |
+| R3 | integrity | pass | `p03-stored-int-census.py` (UNGUARDED 0), `p10-scratch-census.py` (unmarked 0), `p76-anchor-census.py` (failures 0), `p94-sha-census.py` (unreachable 0), `p73-review-coverage.py` rc 0; tripwires `RESULT: PASS`; `m3-report-validate.py --all` 5 graded, 0 failed; `.agent/pins` rc 0 (28 pins); `.agent/owui-audit` rc 1 → two pillow 12.3.0 advisories published after p131 (CVE-2026-112398, CVE-2026-114501; pillow is one of the 15 packages `open-webui==0.12.3` pins exactly) held on p137 under the owner's track-only ruling → rc 0, 127 findings. |
+| R4 | acceptance | see the final message | the closing gate runs on the closing commit (a commit cannot carry its own gate result). |
+
+p138 pass (tier `kernel`: a ledger event's shape; owner-approved re-pin) — target = `24e1e07` (`runtime+tests+queue (MAINTAIN p138)`); check set = the row's acceptance A1-A4 + correctness lenses C1-C3, fixed before the diff was reread:
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | the payload projects the list | pass | `retired_artifact_count` + `retired_artifact_ids` (first 100 sorted) + `retired_artifact_ids_hash` via `_id_list_projection`, the names `function.promoted` uses (the row wrote `retired_count`). |
+| A2 | 10,000 stale artifacts | pass | `test_p138_set_projection_retires_ten_thousand_stale_artifacts` red at the parent (`canonical JSON exceeds 262144 bytes`), green at the commit. |
+| A3 | census + docs follow | pass | `EVENT_PAYLOAD_KEYS["projection.set"]` (static + runtime halves); no shipped doc names payload keys. |
+| A4 | other list payloads checked | pass | `replaced_artifact_ids` ≤ 1 (`one_promoted_exact_scope`); `contradicted_artifact_ids` ≤ 1 exact + one per distinct promoted projected key; `failures`: one structural-probe message per example → one counted message (pinned, red at the parent), the rest fixed-size. |
+| C1 | each hunk with its enclosing function | pass | `stale` became `list[str]`: `executemany`, `_id_list_projection` (sorts a copy) and the return read it, none mutates it; `structure_failures` counts inside the evidence loop, its message precedes the replay message as the per-example ones did. |
+| C2 | callers + consumers | pass | no reader of `projection.set`'s payload outside the census (`rg retired_artifact_ids`: `function.promoted` + receipt fields alone); `ProjectionChange.retired` still lists every id; the embedded copies regenerated. |
+| C3 | classic pitfalls | pass | the event write stays inside the write transaction, so a refusal still rolls everything back; L18 still fails the defective interpreter (`passed` False). |
+
 ## p133 close (MAINTAIN queue run 3, owner-approved gate change; tier `data`) — target = the commit landing this section
 
 | id | lens | verdict | basis (MAIN-verified) |

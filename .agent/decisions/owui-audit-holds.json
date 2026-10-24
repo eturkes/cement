@@ -127,6 +127,10 @@
     "row": "p137",
     "version": "12.3.0"
   },
+  "pillow CVE-2026-112398": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
   "pillow CVE-2026-112399": {
     "row": "p137",
     "version": "12.3.0"
@@ -192,6 +196,10 @@
     "version": "12.3.0"
   },
   "pillow CVE-2026-112901": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow CVE-2026-114501": {
     "row": "p137",
     "version": "12.3.0"
   },
