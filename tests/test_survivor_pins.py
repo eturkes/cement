@@ -81,6 +81,52 @@ class SurvivorPinTests(unittest.TestCase):
                 )
         self.assertEqual((bound.total, bound.rows), (0, ()))
 
+    def test_p114_text_refuses_a_class_forging_equality_with_str(self) -> None:
+        # p114: `_text`'s `type(value) is not str` → `!=` survived; equality with `str` can be
+        # forged through a metaclass, identity cannot.
+        class ForgedEquality(type):
+            def __eq__(cls, other: object) -> bool:
+                return True
+
+            def __ne__(cls, other: object) -> bool:
+                return False
+
+            __hash__ = type.__hash__
+
+        class LooksLikeText(metaclass=ForgedEquality):
+            def encode(self, encoding: str) -> bytes:
+                return b"actor"
+
+            def __iter__(self):  # noqa: ANN204 — the shape `_text` iterates
+                return iter("actor")
+
+        with tempfile.TemporaryDirectory(prefix="cement-p114-") as directory:
+            system = System(str(pathlib.Path(directory) / "ledger.db"))
+            with self.assertRaises(ValidationError) as raised:
+                system.register_operation("tenant-a", "echo", registered_by=LooksLikeText())  # type: ignore[arg-type]
+        self.assertEqual(str(raised.exception), "registered_by must be non-empty text")
+
+    def test_p114_the_event_payload_cap_is_an_adjacent_pair(self) -> None:
+        # p114: `_event`'s `max_bytes=262_144` ±1 survived; `set_projection` reaches the cap (p138).
+        from cement_runtime import system as system_module
+
+        frame = len('{"p":""}')
+        with tempfile.TemporaryDirectory(prefix="cement-p114-") as directory:
+            store = system_module.Store(str(pathlib.Path(directory) / "ledger.db"))
+            for size, accepted in ((262_144, True), (262_145, False)):
+                with self.subTest(size=size), store.transaction(write=True) as connection:
+                    write = lambda: system_module._event(  # noqa: E731 — one call, two outcomes
+                        connection, partition="tenant-a", kind="operation.registered",
+                        subject_type="operation", subject_id="tenant-a/echo@1",
+                        payload={"p": "x" * (size - frame)}, now_us=1,
+                    )
+                    if accepted:
+                        self.assertGreater(write(), 0)
+                    else:
+                        with self.assertRaises(ValidationError) as raised:
+                            write()
+                        self.assertEqual(str(raised.exception), "canonical JSON exceeds 262144 bytes")
+
 
 if __name__ == "__main__":
     unittest.main()

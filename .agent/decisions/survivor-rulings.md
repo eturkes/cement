@@ -62,3 +62,14 @@ Subjects: `system.py` `_proposal_bindings`. Tally: 888 survivors — 877 out of 
 | `:542` `is _PendingProposals` → `==` (`Is_Eq #2`) | equivalent | as above. |
 | `:515` `len(set(v)) != len(v)` → `<` (`NotEq_Lt #3`) | equivalent | a set never holds more members than the sequence it came from, so `!=` and `<` agree. |
 | `:515` `len(set(v)) != len(v)` → `is not` (`NotEq_IsNot #3`) | missing-test → added | CPython caches small ints only (to 256), so the identity form refuses every distinct selection longer than that; the helper's contract (an id set, duplicates refused) admits it. `tests/test_survivor_pins.py` `test_p115_a_long_distinct_id_selection_is_no_duplicate` (300 distinct ids) is green on the tree and red on the mutant (`IntegrityError: … duplicate identifiers`). |
+
+## p114 — `p42-mutate.txt` (the three `PreservedInvariantCensusTests` pins @ 059dab8)
+
+Subjects: `system.py` `_text` (invalid-identity pin), `_event` (payload-keys pin), both (identity-writer census). Tally: 3950 survivors — 3928 out of scope → `contract-open` by construction (the writers' bodies + fixtures the censuses drive); 22 in scope: 10 killed by the modules naming a subject, 12 rows = 6 distinct mutants surviving at the record's revision and at HEAD f368cc1 (`--at HEAD` → `survived-at 12`), ruled:
+
+| survivor (`059dab8`) | ruling | basis |
+|---|---|---|
+| `:171` `_text` `maximum: int = 512` → 511 / 513 (`NumberReplacer #20`, `#21`) | equivalent | every `_text` call passes `maximum` explicitly (AST census: 23 calls at the record's revision, 25 at HEAD, none reads the default). |
+| `:171` `_text` keyword-only `*` → `/` (`Mul_Div #3`) | equivalent | every call passes `maximum` + `allow_empty` by keyword. |
+| `:172` `type(value) is not str` → `!=` (`IsNot_NotEq #2`) | missing-test → added | equality with `str` can be forged through a metaclass, identity cannot; `tests/test_survivor_pins.py` `test_p114_text_refuses_a_class_forging_equality_with_str` red on the mutant. |
+| `:388` `_event` `max_bytes=262_144` → 262,143 / 262,145 (`NumberReplacer #44`, `#45`) | missing-test → added | the cap is reachable (`set_projection` writes an unbounded id list, row p138); `test_p114_the_event_payload_cap_is_an_adjacent_pair` (262,144 accepted, 262,145 refused) red on both mutants. |
