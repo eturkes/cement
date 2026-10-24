@@ -13,6 +13,11 @@ scope. Per survivor, at the section's revision:
                 module that names a subject (D28's module excluded) → covered elsewhere
   survived      in scope and no such module kills it → needs a ruling (equivalent | contract-open
                 | missing-test)
+`--at REV --from FILE` replays the survivors FILE (an earlier `--out`) marks `survived` against REV's
+suite instead: each mutant's changed line block (at the record's revision) is re-anchored in REV's
+source by exact text (inside the subject's span where the text repeats), then REV's modules naming a
+subject run on it — `killed-at` (a later test covers it), `survived-at` (the residue to rule),
+`superseded` (REV no longer holds the code), `ambiguous` (the text is not unique in the span).
 Prints one line per in-scope survivor + a tally; `--out` writes every verdict as JSON lines. A mutant
 already replayed in this run against the same module set (sections of one record share most
 mutants) takes that verdict (`note` = `memo`) instead of a second replay.
@@ -152,13 +157,125 @@ def _replay(tree: pathlib.Path, rows: list[dict[str, object]], modules: list[str
                                    capture_output=True, check=True)
 
 
+def _hunk(original: str, mutated: str) -> tuple[list[str], list[str]] | None:
+    import difflib
+
+    before, after = original.splitlines(keepends=True), mutated.splitlines(keepends=True)
+    changes = [op for op in difflib.SequenceMatcher(a=before, b=after, autojunk=False).get_opcodes()
+               if op[0] != "equal"]
+    if len(changes) != 1:
+        return None
+    _, i1, i2, j1, j2 = changes[0]
+    return before[i1:i2], after[j1:j2]
+
+
+def _at(args: argparse.Namespace, subjects: dict[str, list[str]],
+        revisions: dict[str, str]) -> int:
+    import cosmic_ray.plugins
+    from cosmic_ray.mutating import mutate_code
+
+    target = _git("rev-parse", "--verify", f"{args.at}^{{commit}}").strip()
+    rows = [json.loads(line) for line in args.from_file.read_text(encoding="utf-8").splitlines()
+            if line.strip()]
+    rows = [row for row in rows if row.get("verdict") == "survived"]
+    sources: dict[tuple[str, str], str] = {}
+
+    def source(revision: str, module: str) -> str:
+        if (revision, module) not in sources:
+            sources[(revision, module)] = _git("show", f"{revision}:{_path(module)}")
+        return sources[(revision, module)]
+
+    jobs: dict[tuple[object, ...], list[dict[str, object]]] = {}
+    for row in rows:
+        module, pin = str(row["module"]), str(row["pin"])
+        original = source(revisions[pin], module)
+        operator = cosmic_ray.plugins.get_operator(str(row["operator"]))()
+        hunk = _hunk(original, mutate_code(original, operator, int(row["occurrence"])) or original)
+        here = source(target, module).splitlines(keepends=True)
+        if hunk is None:
+            row["verdict_at"] = "ambiguous"
+            continue
+        old, new = hunk
+        starts = [index for index in range(len(here) - len(old) + 1) if here[index:index + len(old)] == old]
+        if len(starts) > 1:
+            spans = [span for span in _functions("".join(here)) if span[2] == row["function"]]
+            starts = [start for start in starts
+                      if any(first <= start + 1 <= last for first, last, _ in spans)]
+        if not starts:
+            row["verdict_at"] = "superseded"
+            continue
+        if len(starts) > 1:
+            row["verdict_at"] = "ambiguous"
+            continue
+        mutated = "".join(here[:starts[0]] + new + here[starts[0] + len(old):])
+        modules = tuple(_killers(target, subjects[pin]))
+        jobs.setdefault((module, mutated, modules), []).append(row)
+    keys = list(jobs)
+    with tempfile.TemporaryDirectory(prefix="cement-triage-at-") as directory:
+        trees = [pathlib.Path(directory) / f"tree-{index}" for index in range(args.workers)]
+        try:
+            for tree in trees:
+                _git("worktree", "add", "--detach", str(tree), target)
+
+            def run(tree: pathlib.Path, share: list[tuple[object, ...]]) -> None:
+                for module, mutated, modules in share:
+                    path = tree / _path(str(module))
+                    original = path.read_text(encoding="utf-8")
+                    path.write_text(str(mutated), encoding="utf-8")
+                    embedded = _embedded(str(module))
+                    try:
+                        if embedded and not _regenerate(tree):
+                            verdict = "killed-at"
+                        else:
+                            result = subprocess.run(
+                                [sys.executable, "-m", "unittest", *modules], cwd=tree,
+                                env=_environment(tree), capture_output=True, text=True,
+                                timeout=args.timeout)
+                            verdict = "killed-at" if result.returncode != 0 else "survived-at"
+                    except subprocess.TimeoutExpired:
+                        verdict = "killed-at"
+                    finally:
+                        path.write_text(original, encoding="utf-8")
+                        if embedded:
+                            shipped = [name for name in GENERATED if (tree / name).exists()]
+                            if shipped:
+                                subprocess.run(["git", "-C", str(tree), "checkout", "--", *shipped],
+                                               capture_output=True, check=True)
+                    for row in jobs[(module, mutated, modules)]:
+                        row["verdict_at"] = verdict
+
+            shares = [keys[index::args.workers] for index in range(args.workers)]
+            with concurrent.futures.ThreadPoolExecutor(args.workers) as pool:
+                list(pool.map(lambda pair: run(*pair), zip(trees, shares, strict=True)))
+        finally:
+            for tree in trees:
+                subprocess.run(["git", "worktree", "remove", "--force", str(tree)], cwd=ROOT,
+                               capture_output=True)
+    for row in rows:
+        print(f"  {row['verdict_at']:<12} {row['module']}:{row['line']} {row['function']} "
+              f"{row['operator']} #{row['occurrence']}")
+    tally: dict[str, int] = {}
+    for row in rows:
+        tally[str(row["verdict_at"])] = tally.get(str(row["verdict_at"]), 0) + 1
+    print(f"survivor-triage --at {target[:12]}: {len(keys)} distinct replays; "
+          + ", ".join(f"{key} {value}" for key, value in sorted(tally.items())))
+    if args.out is not None:
+        args.out.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in rows),
+                            encoding="utf-8")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("record", type=pathlib.Path)
     parser.add_argument("--workers", type=int, default=2)
     parser.add_argument("--timeout", type=float, default=900.0)
     parser.add_argument("--out", type=pathlib.Path)
+    parser.add_argument("--at")
+    parser.add_argument("--from", dest="from_file", type=pathlib.Path)
     args = parser.parse_args()
+    if (args.at is None) != (args.from_file is None):
+        parser.error("--at and --from go together")
     subjects = json.loads(SUBJECTS.read_text(encoding="utf-8"))
     sections: list[tuple[str, str, list[dict[str, object]]]] = []
     for line in args.record.read_text(encoding="utf-8").splitlines():
@@ -170,6 +287,10 @@ def main() -> int:
     if not sections:
         print(f"survivor-triage: no section in {args.record}", file=sys.stderr)
         return 2
+    if args.at is not None:
+        revisions = {test_id: _git("rev-parse", "--verify", f"{short}^{{commit}}").strip()
+                     for test_id, short, _ in sections}
+        return _at(args, subjects, revisions)
     verdicts: list[dict[str, object]] = []
     memo: dict[tuple[object, ...], dict[str, object]] = {}
     for test_id, short, rows in sections:
