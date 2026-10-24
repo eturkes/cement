@@ -143,4 +143,6 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.12 under `uv`.
 
 ## Phase
 
-MAINTAIN — whole product
+IMPLEMENT — deployment trust (p135) + shadow sampling and drift telemetry (p136)
+> - `p135` `pri=4` — Build the deployment-trust milestone that p87 planned (`.agent/decisions/p87-milestone.md`: E1 attested actors with the attestation re-verified on serving, E2 encryption-at-rest obligations, E3 retention prune + partition erase on schema v4, E4 registry recipe, E5 SSHSIG + pure-Python Ed25519 bundle verification inside `function eval`). Several sessions of work with a schema cut and seven owner decisions (D1-D7) ⇒ an IMPLEMENT-sized milestone (`CLAUDE.md` `Session flow` Routing). Accept: D1-D7 ruled and recorded in `.agent/spec.md` `Decisions`; the plan's numbered gates 1-3 pass from committed state.
+> - `p136` `pri=4` — Build the shadow-sampling + drift-telemetry milestone that p88 planned (`.agent/decisions/p88-milestone.md`: S1 an off-path sampler in the Open WebUI filter outlet with a bounded worker, S2 `record_shadow` into a separate telemetry store with the agreement derived from the captured version, S3 `drift` + `observations` + CLI + learning-tool reads, S4 passive, S5 the frozen-completion probe). Several sessions of work across the runtime, a new store and the Open WebUI example, with nine owner decisions (T1-T9) ⇒ an IMPLEMENT-sized milestone (`CLAUDE.md` `Session flow` Routing). Accept: T1-T9 ruled and recorded in `.agent/spec.md` `Decisions`; the plan's numbered gates 1-3 pass from committed state.
