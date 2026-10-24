@@ -214,6 +214,25 @@ class SurvivorPinTests(unittest.TestCase):
                 str(raised.exception), "function projection does not hash to its projection_hash"
             )
 
+    def test_p109_a_digest_field_refuses_a_class_forging_equality(self) -> None:
+        # p109: `_digest`'s `type(value) is not str` → `!=` survived; `validate_function` reads
+        # every entry digest from a caller document.
+        from copy import deepcopy
+
+        from cement_runtime import validate_function
+        from tests.test_function import _build, _entry
+
+        class Forged(metaclass=ForgedEquality):
+            pass
+
+        document = deepcopy(_build((_entry({"x": 1}, {"answer": 1}, label="p109"),)).value)
+        document["entries"][0]["artifact_hash"] = Forged()
+        with self.assertRaises(ValidationError) as raised:
+            validate_function(document)
+        self.assertEqual(
+            str(raised.exception), "function entry 0 artifact_hash must be a SHA-256 hex digest"
+        )
+
     def test_p111_register_grades_its_actor_before_creating_a_ledger(self) -> None:
         # p111: the CLI pre-check `_text(args.actor, "registered_by", maximum=256)` ±1 survived;
         # 256 bytes register, and 257 are refused before `System(create=True)` makes a file (p51).
@@ -599,6 +618,70 @@ class JSONBoundaryPins(unittest.TestCase):
                         with self.assertRaises(ValueError) as raised:
                             refuse(**{limit: bad})
                         self.assertEqual(str(raised.exception), message)
+
+
+class SnapshotScopePins(unittest.TestCase):
+    """p109: live-set snapshot survivors (p28 record): `_snapshot_scope_failures` + `_snapshot_policy_failures`."""
+
+    def ledger(self, revisions: int = 1) -> tuple[System, str]:
+        from cement_runtime import Candidate, CompilePolicy
+
+        directory = tempfile.TemporaryDirectory(prefix="cement-p109-")
+        self.addCleanup(directory.cleanup)
+        database = str(pathlib.Path(directory.name) / "ledger.db")
+        system = System(database)
+        system.register_operation("tenant_a", "op", policy=CompilePolicy(2, 1, 0))
+        for _ in range(revisions - 1):
+            system.revise_operation("tenant_a", "op", policy=CompilePolicy(2, 1, 0), revised_by="operator")
+        for _ in range(2):
+            proposal = system.submit_proposal(
+                "tenant_a", "op", {"doc": 1}, candidate=Candidate(output={"f": 1}, provenance={})
+            )
+            system.review("tenant_a", proposal, reviewer="learning-pass", decision="accept")
+        system.compile("tenant_a", "op")
+        system.verify_drafts("tenant_a", "op", verified_by="learning-pass")
+        manifest = system.inspect_function_promotion("tenant_a", "op")
+        system.promote_function(
+            "tenant_a", "op", expected_function_hash=manifest.function_hash, promoted_by="learning-pass"
+        )
+        return system, database
+
+    def failures(self, system: System, column: str, value: str, database: str) -> str:
+        import sqlite3
+
+        with contextlib.closing(sqlite3.connect(database)) as raw, raw:
+            raw.execute(f"UPDATE operations SET {column} = ? WHERE partition = 'tenant_a' AND name = 'op'", (value,))
+        result = system.verify_function("tenant_a", "op")
+        self.assertFalse(result.passed)
+        return " | ".join(check.detail for check in result.checks if not check.passed)
+
+    def test_p109_a_set_past_revision_256_verifies(self) -> None:
+        # `stored_revision != revision` → `is not` agrees only inside CPython's small-int cache:
+        # past it, two reads of one revision are distinct objects and the set would fail.
+        system, _ = self.ledger(revisions=257)
+        result = system.verify_function("tenant_a", "op")
+        self.assertTrue(result.passed, [check.detail for check in result.checks if not check.passed])
+        self.assertEqual(result.document.value["scope"]["operation_revision"], 257)  # type: ignore[index, union-attr]
+
+    def test_p109_a_member_policy_mismatch_fails_in_both_orders(self) -> None:
+        # `row["policy_hash"] != policy_hash` + `row["policy_json"] != policy_json` → `>`: the
+        # battery forged one order each (a lower hash, a higher JSON); here each meets both.
+        from cement_runtime import CompilePolicy
+        from cement_runtime.json_value import canonicalize
+
+        for column, forged, message in (
+            ("policy_hash", "0" * 64, "policy hash does not match current operation"),
+            ("policy_hash", "f" * 64, "policy hash does not match current operation"),
+            ("policy_json", canonicalize(CompilePolicy(3, 1, 0).as_json()).text,
+             "policy JSON does not match current operation"),
+            ("policy_json", canonicalize(CompilePolicy(10, 1, 0).as_json()).text,
+             "policy JSON does not match current operation"),
+        ):
+            with self.subTest(column=column, forged=forged[:24]):
+                system, database = self.ledger()
+                detail = self.failures(system, column, forged, database)
+                self.assertIn(message, detail)
+                self.assertIn("operation policy digest does not match policy_hash", detail)
 
 
 if __name__ == "__main__":

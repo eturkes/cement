@@ -22,7 +22,10 @@ purged before each run; per mutant a probe proves the interpreter resolves the m
 to the clone's file and that file holds `new`; the selected suite decides (rc != 0 or timeout =
 killed); the original bytes are restored in `finally` and their sha256 compared, and each clone
 ends with `git diff --quiet`. A pristine CONTROL run per clone (full worker count, run first)
-must pass with exactly `ran` tests, or nothing is replayed.
+must pass with exactly `ran` tests, or nothing is replayed. The embedded copies (Open WebUI
+paste-ins, nucllei `ext/bin/cement`) are regenerated from the clone's sources before its control
+and after each mutant, then checked out again: a mutant in an embedded module otherwise reds
+W1/N7 (a phantom kill), and a umask-0077 checkout (mode 0700) reads as stale to N7.
 
 Usage: uv run python .agent/replay-mutants <catalogue.jsonl> [--workers N] [--only ID …]
 rc 0 = control green, every row applied or superseded, every clone restored, and the verdicts
@@ -64,6 +67,31 @@ def _environment(tree: pathlib.Path) -> dict[str, str]:
     environment = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
     environment["PYTHONPATH"] = os.pathsep.join([str(tree), str(tree / "src")])
     return environment
+
+
+GENERATORS = ("examples/open_webui/generate.py", "examples/nucllei/generate.py")
+GENERATED = ("examples/open_webui/paste-in", "examples/nucllei/ext/bin/cement")
+
+
+def _regenerate(tree: pathlib.Path) -> bool:
+    # A base older than a generator ships no such copy; regenerate what this clone carries.
+    return all(
+        subprocess.run([sys.executable, generator], cwd=tree, env=_environment(tree),
+                       capture_output=True).returncode == 0
+        for generator in GENERATORS if (tree / generator).is_file()
+    )
+
+
+def _restore_generated(tree: pathlib.Path) -> None:
+    present = [name for name in GENERATED if (tree / name).exists()]
+    if present:
+        subprocess.run(["git", "checkout", "--", *present], cwd=tree, capture_output=True, check=True)
+
+
+def _control(tree: pathlib.Path, argv: list[str]) -> tuple[int | None, int, str]:
+    if not _regenerate(tree):
+        return 1, 0, "regenerating the embedded copies failed"
+    return _suite(tree, argv, None)
 
 
 def _purge(tree: pathlib.Path) -> None:
@@ -144,11 +172,15 @@ def _replay(tree: pathlib.Path, row: dict[str, object], argv: list[str],
             if probe.returncode != 0:
                 record["verdict"] = "not-loaded"
                 return record
+        if not _regenerate(tree):
+            record["verdict"] = "regenerate-failed"
+            return record
         rc, _ran, tail = _suite(tree, argv, timeout)
         record["verdict"] = "killed" if rc != 0 else "survived"
         record["tail"] = tail.strip().splitlines()[-1] if tail.strip() else ""
     finally:
         path.write_bytes(original)
+        _restore_generated(tree)
         record["restored"] = hashlib.sha256(path.read_bytes()).hexdigest() == digest
         record["seconds"] = round(time.monotonic() - started, 1)
     return record
@@ -185,7 +217,7 @@ def main() -> int:
                 _git("worktree", "add", "--detach", str(tree), base)
             started = time.monotonic()
             with concurrent.futures.ThreadPoolExecutor(workers) as pool:
-                controls = list(pool.map(lambda tree: _suite(tree, argv, None), trees))
+                controls = list(pool.map(lambda tree: _control(tree, argv), trees))
             control_seconds = time.monotonic() - started
             want = header.get("ran")
             for index, (rc, ran, tail) in enumerate(controls):
