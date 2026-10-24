@@ -98,15 +98,11 @@ def _killers(revision: str, subjects: list[str]) -> list[str]:
 
 
 # Generated copies embed these sources; a mutant left un-regenerated reds their freshness tests
-# (W1, N7) whatever it does, a phantom kill. Regenerated, those modules judge the mutant's code.
+# (W1, N7) whatever it does, a phantom kill, and a umask-0077 checkout leaves `ext/bin/cement` at
+# 0700, which N7 reads as stale before any mutant. Every tree regenerates after checkout and around
+# each mutant (≈ 0.2 s); regenerated, those modules judge the mutant's code.
 GENERATORS = ("examples/open_webui/generate.py", "examples/nucllei/generate.py")
 GENERATED = ("examples/open_webui/paste-in", "examples/nucllei/ext/bin/cement")
-
-
-def _embedded(module: str) -> bool:
-    if "/" not in module:
-        return module.removesuffix(".py") not in {"cli", "__main__"}
-    return module.startswith("examples/open_webui/cement_") or module == "examples/nucllei/cement_nucllei.py"
 
 
 def _regenerate(tree: pathlib.Path) -> bool:
@@ -116,6 +112,13 @@ def _regenerate(tree: pathlib.Path) -> bool:
                           capture_output=True, text=True).returncode != 0:
             return False
     return True
+
+
+def _restore_generated(tree: pathlib.Path) -> None:
+    shipped = [name for name in GENERATED if (tree / name).exists()]
+    if shipped:
+        subprocess.run(["git", "-C", str(tree), "checkout", "--", *shipped], capture_output=True, check=True)
+        _regenerate(tree)  # the checkout re-applies the umask to `ext/bin/cement`
 
 
 def _replay(tree: pathlib.Path, rows: list[dict[str, object]], modules: list[str],
@@ -137,9 +140,8 @@ def _replay(tree: pathlib.Path, rows: list[dict[str, object]], modules: list[str
             row["verdict"] = "unbuildable"
             continue
         path.write_text(mutated, encoding="utf-8")
-        embedded = _embedded(str(row["module"]))
         try:
-            if embedded and not _regenerate(tree):
+            if not _regenerate(tree):
                 # The gate's freshness tests run the generators, so a mutant they refuse is detected.
                 row["verdict"] = "killed"
                 row["note"] = "generator refused"
@@ -153,11 +155,7 @@ def _replay(tree: pathlib.Path, rows: list[dict[str, object]], modules: list[str
             row["note"] = "timeout"
         finally:
             path.write_text(original, encoding="utf-8")
-            if embedded:
-                shipped = [name for name in GENERATED if (tree / name).exists()]
-                if shipped:
-                    subprocess.run(["git", "-C", str(tree), "checkout", "--", *shipped],
-                                   capture_output=True, check=True)
+            _restore_generated(tree)
 
 
 def _suite(revision: str) -> list[str]:
@@ -239,15 +237,15 @@ def _at(args: argparse.Namespace, subjects: dict[str, list[str]],
         try:
             for tree in trees:
                 _git("worktree", "add", "--detach", str(tree), target)
+                _regenerate(tree)
 
             def run(tree: pathlib.Path, share: list[tuple[object, ...]]) -> None:
                 for module, mutated, modules in share:
                     path = tree / _path(str(module))
                     original = path.read_text(encoding="utf-8")
                     path.write_text(str(mutated), encoding="utf-8")
-                    embedded = _embedded(str(module))
                     try:
-                        if embedded and not _regenerate(tree):
+                        if not _regenerate(tree):
                             verdict = "killed-at"
                         else:
                             result = subprocess.run(
@@ -259,11 +257,7 @@ def _at(args: argparse.Namespace, subjects: dict[str, list[str]],
                         verdict = "killed-at"
                     finally:
                         path.write_text(original, encoding="utf-8")
-                        if embedded:
-                            shipped = [name for name in GENERATED if (tree / name).exists()]
-                            if shipped:
-                                subprocess.run(["git", "-C", str(tree), "checkout", "--", *shipped],
-                                               capture_output=True, check=True)
+                        _restore_generated(tree)
                     for row in jobs[(module, mutated, modules)]:
                         row["verdict_at"] = verdict
 
@@ -352,6 +346,7 @@ def main() -> int:
                 try:
                     for tree in trees:
                         _git("worktree", "add", "--detach", str(tree), revision)
+                        _regenerate(tree)
                     baseline = subprocess.run([sys.executable, "-m", "unittest", *modules],
                                               cwd=trees[0], env=_environment(trees[0]),
                                               capture_output=True, text=True)

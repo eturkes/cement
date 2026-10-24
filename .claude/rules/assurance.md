@@ -43,7 +43,7 @@ paths:
 - A survivor count is meaningless without its VERDICT MODULE LIST — print the modules on the control line and quote them beside every count. A dead branch and a surviving mutant are one fact seen twice: an unforced enforcement line gets deleted, an unforced GRANT splits by reachability.
 - An author-run sweep certifies only the families its author had in mind; treat it as a floor and give the campaign its own catalogue. Re-anchor after a fix through a `difflib` line MAP over a byte-exact pre-fix copy; three outcomes are distinct — killed, survived, superseded (`old` absent ⇒ the fix deleted that code).
 - The sweep patches `src/` in place ⇒ `git status` is contaminated for its whole run; commit by explicit pathspec, and after a kill run `git status --porcelain src/` + `git checkout -- src/`.
-- A replay that mutates an embedded source (`src/cement_runtime` minus `cli` + `__main__`, the Open WebUI + nucllei example sources) regenerates the generated copies before its modules run: a stale paste-in or `ext/bin/cement` reds W1/N7 for every mutant, a phantom kill that hides a survivor (`.agent/survivor-triage` regenerates + restores per mutant).
+- A replay that mutates an embedded source (`src/cement_runtime` minus `cli` + `__main__`, the Open WebUI + nucllei example sources) regenerates the generated copies before its modules run: a stale paste-in or `ext/bin/cement` reds W1/N7 for every mutant, a phantom kill that hides a survivor; a umask-0077 checkout leaves `ext/bin/cement` at 0700, which N7 reads as stale before any mutant, so every replay tree regenerates after checkout and around each mutant, whatever module it mutates (`.agent/survivor-triage`, `.agent/replay-mutants`, `.agent/kill-check`).
 
 ## Fixtures and bounds
 

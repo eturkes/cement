@@ -76,9 +76,7 @@ def main() -> int:
                 result = subprocess.run([sys.executable, "-m", "unittest", args.test_id], cwd=tree,  # noqa: S603
                                         env=TRIAGE["_environment"](tree), capture_output=True, text=True)
                 path.write_text(before)
-                subprocess.run(["git", "-C", str(tree), "checkout", "--",  # noqa: S603, S607
-                                *[name for name in TRIAGE["GENERATED"] if (tree / name).exists()]],
-                               capture_output=True)
+                TRIAGE["_restore_generated"](tree)
                 if result.returncode == 0:
                     alive.append((module, line, op, occ, "".join(new).strip()[:90]))
         finally:

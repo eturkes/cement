@@ -17,7 +17,7 @@ Subject `cli.py:_parser`. Tally: 77 survivors = 75 out-of-scope (`contract-open`
 | survivor | ruling | basis |
 |---|---|---|
 | `cli.py:102` `ReplaceComparisonOperator_Eq_GtE` #1 | equivalent | `for name in ("register", "revise")`: `"register" >= "revise"` is False and `"revise" >= "revise"` True, the same truth table as `==` over the only two values. |
-| `cli.py:102` `ReplaceComparisonOperator_Eq_Is` #1 | equivalent | both operands are the same interned literal `"revise"` in CPython, so `is` agrees with `==` over the loop's two values. |
+| `cli.py:102` `ReplaceComparisonOperator_Eq_Is` #1 | killed at HEAD (equivalent ruling reversed, p139) | `if name is "revise"` compiles with a SyntaxWarning (`"is" with 'str' literal`) that the CLI subprocess tests see, so the full suite minus D28 at HEAD kills it: `tests.test_cli.CLITests.test_an_interrupt_exits_130_with_a_json_error_and_no_traceback` errors, `tests.test_hospital_ocr_example.ShippedCommandRoundTripTests.test_shipped_cli_exports_the_bundle_and_answers_both_verdicts` + `.test_the_eval_child_opens_no_database_file` fail. The interned literals do agree by identity; the warning is the observable difference. |
 
 ## p113 — `p91-mutate.txt` (ABI pin `test_function_report_public_shape_is_exact_frozen_slotted_and_exported` @ 3ef05d3 + `test_parser_rejects_ambiguous_or_unbounded_values` @ 8bef2a0)
 
