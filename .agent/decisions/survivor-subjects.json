@@ -78,6 +78,66 @@
   "tests.test_json_value.CanonicalJSONTests.test_parser_rejects_ambiguous_or_unbounded_values": [
     "json_value.py:parse_json"
   ],
+  "tests.test_open_webui_example.CaptureBindingBattery.test_e3_a_malformed_peer_never_drops_a_valid_pair": [
+    "examples/open_webui/cement_filter.py:Filter._pairs",
+    "examples/open_webui/cement_filter.py:Filter._retain",
+    "examples/open_webui/cement_filter.py:Filter.outlet"
+  ],
+  "tests.test_open_webui_example.CaptureBindingBattery.test_e3_a_record_without_its_output_writes_nothing": [
+    "examples/open_webui/cement_filter.py:Filter._pairs",
+    "examples/open_webui/cement_filter.py:Filter._retain",
+    "examples/open_webui/cement_filter.py:Filter.outlet"
+  ],
+  "tests.test_open_webui_example.CaptureBindingBattery.test_e4_a_retention_or_notification_failure_never_reaches_open_webui": [
+    "examples/open_webui/cement_filter.py:Filter._pairs",
+    "examples/open_webui/cement_filter.py:Filter._retain",
+    "examples/open_webui/cement_filter.py:Filter.outlet"
+  ],
+  "tests.test_open_webui_example.CaptureBindingBattery.test_e4_without_a_current_message_id_nothing_is_retained": [
+    "examples/open_webui/cement_filter.py:Filter._pairs",
+    "examples/open_webui/cement_filter.py:Filter._retain",
+    "examples/open_webui/cement_filter.py:Filter.outlet"
+  ],
+  "tests.test_open_webui_example.CaptureBindingBattery.test_x6_each_pair_binds_its_own_source_id_and_provenance": [
+    "examples/open_webui/cement_filter.py:Filter._pairs",
+    "examples/open_webui/cement_filter.py:Filter._retain",
+    "examples/open_webui/cement_filter.py:Filter.outlet"
+  ],
+  "tests.test_open_webui_example.CaptureBindingBattery.test_x6_the_full_reply_is_retained_whenever_the_provenance_fits": [
+    "examples/open_webui/cement_filter.py:Filter._pairs",
+    "examples/open_webui/cement_filter.py:Filter._retain",
+    "examples/open_webui/cement_filter.py:Filter.outlet"
+  ],
+  "tests.test_projection_lifecycle_battery.ProjectionLifecycleBattery.test_l18_verification_fails_an_interpreter_that_ignores_a_missing_last_structural_line": [
+    "projection.py:project",
+    "projection.py:_structure"
+  ],
+  "tests.test_projection_lifecycle_battery.ProjectionLifecycleBattery.test_l2_a_program_no_example_satisfies_is_refused": [
+    "system.py:System.set_projection"
+  ],
+  "tests.test_projection_lifecycle_battery.ProjectionLifecycleBattery.test_l2_each_refusal_writes_nothing": [
+    "system.py:System.set_projection"
+  ],
+  "tests.test_projection_lifecycle_battery.ProjectionLifecycleBattery.test_l3_a_program_change_retires_stale_builds_and_keeps_promoted_ones": [
+    "system.py:System.set_projection"
+  ],
+  "tests.test_projection_lifecycle_battery.ProjectionLifecycleBattery.test_l5_the_bundle_answers_raw_input_ledger_free_like_resolve": [
+    "projection.py:project",
+    "function.py:evaluate"
+  ],
+  "tests.test_projection_lifecycle_battery.ProjectionLifecycleBattery.test_l8_an_identical_program_is_a_no_op_and_a_b_a_rebuilds": [
+    "system.py:System.set_projection"
+  ],
+  "tests.test_projection_lifecycle_battery.ProjectionLifecycleBattery.test_v1_an_invalid_program_is_refused_before_any_write": [
+    "system.py:System.set_projection",
+    "projection.py:parse_program"
+  ],
+  "tests.test_projection_lifecycle_battery.ProjectionLifecycleBatteryII.test_l20_a_full_memo_never_repeats_a_projection_inside_one_verification": [
+    "system.py:System._case_key_text"
+  ],
+  "tests.test_projection_lifecycle_battery.ProjectionLifecycleBatteryII.test_l7_a_fabricated_mixed_set_fails_projection_uniform_alone_of_its_cause": [
+    "system.py:System._projection_uniform_check"
+  ],
   "tests.test_proposal_binding_battery.ProposalBindingAdapterTests.test_duplicate_identifier_selection_is_rejected": [
     "system.py:_proposal_bindings"
   ],
@@ -90,6 +150,21 @@
   "tests.test_submission.SubmissionTests.test_a_non_mapping_provenance_is_refused_never_normalized": [
     "system.py:System._canonical_candidate",
     "system.py:System.submit_proposal"
+  ],
+  "tests.test_switch_battery.SwitchBattery.test_w10_one_read_snapshot_serves_switch_version_and_checks": [
+    "system.py:System.serving"
+  ],
+  "tests.test_switch_battery.SwitchBattery.test_w1_off_reads_the_switch_and_operation_rows_alone": [
+    "system.py:System.serving",
+    "system.py:System._switch_state"
+  ],
+  "tests.test_switch_battery.SwitchBattery.test_w5_a_revision_never_unpins_but_a_suspension_does": [
+    "system.py:System._pin_checks",
+    "system.py:System._verify_pinned_snapshot"
+  ],
+  "tests.test_switch_battery.SwitchBattery.test_w5c_after_a_reset_suspending_a_retired_member_fails_the_pin": [
+    "system.py:System._pin_checks",
+    "system.py:System._verify_pinned_snapshot"
   ],
   "tests.test_system.PreservedInvariantCensusTests.test_an_invalid_identity_reaches_no_clock_read_and_no_id_allocation": [
     "system.py:_text"

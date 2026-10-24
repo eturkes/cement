@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+"""kill-check — replay a triage residue against one test id: which survivors does a new pin kill?
+
+Usage: uv run python .agent/kill-check RECORD RESIDUE TEST_ID [--function QUALNAME ...]
+  RECORD  = a `.agent/decisions/<rec>-mutate.txt` credit-run record
+  RESIDUE = `.agent/survivor-triage RECORD --at HEAD [--full] --out FILE`'s rows (rerunnable from the record)
+Rebuilds each distinct `survived-at` / `ambiguous` row (optionally only those in the named functions)
+with cosmic-ray at its section's revision, re-anchors it onto HEAD with `.agent/survivor-triage`'s
+hunk matcher, writes it into a detached HEAD worktree carrying the primary tree's `tests/*.py`
+(the uncommitted pins), regenerates the embedded copies, runs TEST_ID and restores. Prints
+`killed/total` and one `ALIVE` line per mutant TEST_ID leaves alive or cannot place (`anchor N` =
+its text matches N places inside its function → apply it by hand). rc 0 = the run completed.
+"""
+
+import argparse
+import json
+import pathlib
+import runpy
+import shutil
+import subprocess
+import sys
+import tempfile
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+TRIAGE = runpy.run_path(str(ROOT / ".agent/survivor-triage"), run_name="triage")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("record", type=pathlib.Path)
+    parser.add_argument("rows", type=pathlib.Path)
+    parser.add_argument("test_id")
+    parser.add_argument("--function", action="append", default=[])
+    args = parser.parse_args()
+    import cosmic_ray.plugins
+    from cosmic_ray.mutating import mutate_code
+
+    sections = {}
+    for line in args.record.read_text().splitlines():
+        head = TRIAGE["SECTION"].match(line)
+        if head:
+            sections[head.group(1)] = TRIAGE["_git"]("rev-parse", "--verify", f"{head.group(2)}^{{commit}}").strip()
+    rows = [json.loads(line) for line in args.rows.read_text().splitlines() if line.strip()]
+    rows = [row for row in rows if row.get("verdict_at") in ("survived-at", "ambiguous")
+            and (not args.function or row["function"] in args.function)]
+    seen = {}
+    for row in rows:
+        seen.setdefault((row["module"], row["line"], row["operator"], row["occurrence"], sections[row["pin"]]), row)
+    alive = []
+    with tempfile.TemporaryDirectory(prefix="cement-kill-check-") as directory:
+        tree = pathlib.Path(directory) / "tree"
+        TRIAGE["_git"]("worktree", "add", "--detach", str(tree), "HEAD")
+        for test in (ROOT / "tests").glob("*.py"):
+            shutil.copyfile(test, tree / "tests" / test.name)
+        try:
+            for (module, line, op, occ, revision), row in sorted(seen.items()):
+                original = TRIAGE["_git"]("show", f"{revision}:{TRIAGE['_path'](module)}")
+                mutated = mutate_code(original, cosmic_ray.plugins.get_operator(op)(), occ) or original
+                hunk = TRIAGE["_hunk"](original, mutated)
+                path = tree / TRIAGE["_path"](module)
+                here = path.read_text().splitlines(keepends=True)
+                if hunk is None:
+                    alive.append((module, line, op, occ, "no hunk"))
+                    continue
+                old, new = hunk
+                starts = [i for i in range(len(here) - len(old) + 1) if here[i:i + len(old)] == old]
+                if len(starts) > 1:
+                    spans = [s for s in TRIAGE["_functions"]("".join(here)) if s[2] == row["function"]]
+                    starts = [s for s in starts if any(a <= s + 1 <= b for a, b, _ in spans)]
+                if len(starts) != 1:
+                    alive.append((module, line, op, occ, f"anchor {len(starts)}"))
+                    continue
+                before = "".join(here)
+                path.write_text("".join(here[:starts[0]] + new + here[starts[0] + len(old):]))
+                TRIAGE["_regenerate"](tree)
+                result = subprocess.run([sys.executable, "-m", "unittest", args.test_id], cwd=tree,  # noqa: S603
+                                        env=TRIAGE["_environment"](tree), capture_output=True, text=True)
+                path.write_text(before)
+                subprocess.run(["git", "-C", str(tree), "checkout", "--",  # noqa: S603, S607
+                                *[name for name in TRIAGE["GENERATED"] if (tree / name).exists()]],
+                               capture_output=True)
+                if result.returncode == 0:
+                    alive.append((module, line, op, occ, "".join(new).strip()[:90]))
+        finally:
+            subprocess.run(["git", "worktree", "remove", "--force", str(tree)], cwd=ROOT, capture_output=True)  # noqa: S603, S607
+    print(f"{len(seen) - len(alive)}/{len(seen)} killed by {args.test_id}")
+    for item in alive:
+        print("  ALIVE", item)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

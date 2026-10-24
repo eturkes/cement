@@ -15,7 +15,15 @@ rewrites module files in place. Bytecode stays off (`PYTHONDONTWRITEBYTECODE=1`,
 a same-second, same-size edit never runs stale code (`.claude/rules/assurance.md`). Work splits
 across `--workers` clones by a stable hash of (module, operator, occurrence).
 
+`--subject PATH:QUALNAME` (repeatable; PATH repo-relative, e.g.
+`src/cement_runtime/system.py:System.set_switch`, `examples/open_webui/cement_filter.py:Filter._pairs`)
+narrows the scope to the traced lines inside those definitions (spans read at `--rev`) and admits a
+file outside `src/cement_runtime` (p93): under the survivor-scope rule (`.claude/rules/assurance.md`)
+a survivor outside the pin's subject is contract-open by construction, so a subject-scoped run
+enumerates exactly the survivors that need a ruling.
+
 Usage: uv run python .agent/mutate <test id> [--rev REV] [--workers N] [--timeout SECONDS]
+                                   [--subject PATH:QUALNAME ...]
   test id = a dotted unittest id, e.g. tests.test_function.FunctionTests.test_x
 Prints scope + the tally killed, survived (each survivor: file:line operator occurrence),
 incompetent, invalid, no-test, error, then the same tally per module; rc 0 when the run completes, 2 when the baseline is red or
@@ -34,18 +42,25 @@ import subprocess
 import sys
 import tempfile
 import time
+import warnings
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 TRACER = r"""
 import json, pathlib, sys, threading, unittest
 src = str(pathlib.Path("src/cement_runtime").resolve()) + "/"
+# Subject files outside the package (`--subject`), keyed by their repo-relative path.
+extra = {str(pathlib.Path(path).resolve()): path for path in json.loads(sys.argv[2])}
 lines = {}
 def tracer(frame, event, arg):
     name = frame.f_code.co_filename
-    if not name.startswith(src):
+    if name.startswith(src):
+        key = name[len(src):]
+    elif name in extra:
+        key = extra[name]
+    else:
         return None
     if event in ("call", "line"):
-        lines.setdefault(name[len(src):], set()).add(frame.f_lineno)
+        lines.setdefault(key, set()).add(frame.f_lineno)
     return tracer
 import ast, dataclasses, inspect, textwrap, typing
 read = {}
@@ -105,6 +120,44 @@ def _git(*args: str, cwd: pathlib.Path = ROOT) -> str:
     return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True).stdout
 
 
+def _display(module: str) -> str:
+    # `src/cement_runtime` modules are keyed by file name; a `--subject` file elsewhere by its path.
+    return module if "/" in module else f"src/cement_runtime/{module}"
+
+
+def _spans(revision: str, subjects: list[str]) -> dict[str, set[int]]:
+    import ast
+
+    wanted: dict[str, set[str]] = {}
+    for subject in subjects:
+        path, _, name = subject.partition(":")
+        if not path.endswith(".py") or not name:
+            raise SystemExit(f"mutate: --subject wants PATH:QUALNAME, got {subject!r}")
+        wanted.setdefault(path, set()).add(name)
+    spans: dict[str, set[int]] = {}
+    for path, names in wanted.items():
+        found: set[str] = set()
+
+        def walk(node: ast.AST, prefix: str, path: str = path, names: set[str] = names,
+                 found: set[str] = found) -> None:
+            for child in ast.iter_child_nodes(node):
+                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                    name = f"{prefix}{child.name}"
+                    if name in names:
+                        found.add(name)
+                        start = min([child.lineno, *(item.lineno for item in child.decorator_list)])
+                        key = path.removeprefix("src/cement_runtime/")
+                        spans.setdefault(key, set()).update(range(start, (child.end_lineno or start) + 1))
+                    walk(child, f"{name}.")
+                else:
+                    walk(child, prefix)
+
+        walk(ast.parse(_git("show", f"{revision}:{path}")), "")
+        if found != names:
+            raise SystemExit(f"mutate: no definition {sorted(names - found)} in {path} at {revision[:12]}")
+    return spans
+
+
 def _environment(tree: pathlib.Path) -> dict[str, str]:
     environment = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
     environment["PYTHONPATH"] = os.pathsep.join([str(tree), str(tree / "src")])
@@ -132,7 +185,7 @@ def _run_shard(tree: pathlib.Path, config: str, executed: dict[str, set[int]], i
     with use_db(str(session), WorkDB.Mode.open) as db:
         for item in list(db.pending_work_items):
             mutation = item.mutations[0]
-            module = pathlib.Path(mutation.module_path).name
+            module = str(mutation.module_path).removeprefix("src/cement_runtime/")
             spec = (module, mutation.operator_name, mutation.occurrence)
             keep = (mutation.start_pos[0] in executed.get(module, set())
                     and _shard(spec, workers) == index)
@@ -151,7 +204,10 @@ def _run_shard(tree: pathlib.Path, config: str, executed: dict[str, set[int]], i
                     # cosmic-ray 8.7's exception replacer raises on some `except` shapes (parso
                     # `PythonNode` without `.value`); a mutant it cannot build is incompetent too.
                     mutated = mutate_code(source, operator, mutation.occurrence)
-                    compile(mutated or "", str(path), "exec")
+                    with warnings.catch_warnings():
+                        # `is` against a literal: a valid mutant whose warning is noise here.
+                        warnings.simplefilter("ignore", SyntaxWarning)
+                        compile(mutated or "", str(path), "exec")
                 except Exception:  # noqa: BLE001 — any failure to build the mutant = incompetent
                     keep = False
                     invalid.append({"module": module, "line": mutation.start_pos[0],
@@ -169,7 +225,7 @@ def _run_shard(tree: pathlib.Path, config: str, executed: dict[str, set[int]], i
                 continue
             mutation = item.mutations[0]
             rows.append({
-                "module": pathlib.Path(mutation.module_path).name,
+                "module": str(mutation.module_path).removeprefix("src/cement_runtime/"),
                 "line": mutation.start_pos[0],
                 "operator": mutation.operator_name,
                 "occurrence": mutation.occurrence,
@@ -185,15 +241,20 @@ def main() -> int:
     parser.add_argument("--rev", default="HEAD")
     parser.add_argument("--workers", type=int, default=2)
     parser.add_argument("--timeout", type=float)
+    parser.add_argument("--subject", action="append", default=[])
     args = parser.parse_args()
     revision = _git("rev-parse", "--verify", f"{args.rev}^{{commit}}").strip()
+    subject = _spans(revision, args.subject) if args.subject else None
+    outside = sorted({item.partition(":")[0] for item in args.subject
+                      if not item.startswith("src/cement_runtime/")})
     with tempfile.TemporaryDirectory(prefix="cement-mutate-") as directory:
         trees = [pathlib.Path(directory) / f"tree-{index}" for index in range(args.workers)]
         try:
             for tree in trees:
                 _git("worktree", "add", "--detach", str(tree), revision)
             started = time.monotonic()
-            traced = subprocess.run([sys.executable, "-c", TRACER, args.test_id], cwd=trees[0],
+            traced = subprocess.run([sys.executable, "-c", TRACER, args.test_id, json.dumps(outside)],
+                                    cwd=trees[0],
                                     env=_environment(trees[0]), capture_output=True, text=True)
             baseline = time.monotonic() - started
             try:
@@ -209,7 +270,10 @@ def main() -> int:
             ran = {name: set(lines) for name, lines in report["lines"].items()}
             read = {name: set(lines) for name, lines in report["read"].items()}
             executed = {name: ran.get(name, set()) | read.get(name, set()) for name in {*ran, *read}}
-            modules = sorted(f"src/cement_runtime/{name}" for name in executed)
+            if subject is not None:
+                executed = {name: lines & subject[name] for name, lines in executed.items()
+                            if lines & subject.get(name, set())}
+            modules = sorted(_display(name) for name in executed)
             timeout = args.timeout or max(10.0, baseline * 4)
             config = "\n".join([
                 "[cosmic-ray]",
@@ -223,9 +287,12 @@ def main() -> int:
             ])
             print(f"mutate: {args.test_id} @ {revision[:12]}, baseline {baseline:.1f}s "
                   f"(ran {report['ran']}), timeout {timeout:.1f}s, workers {args.workers}")
+            if subject is not None:
+                print(f"  subject {', '.join(args.subject)}")
             for name in sorted(executed):
-                extra = len(read.get(name, set()) - ran.get(name, set()))
-                print(f"  scope src/cement_runtime/{name}: {len(ran.get(name, set()))} executed lines"
+                kept = executed[name]
+                extra = len((read.get(name, set()) - ran.get(name, set())) & kept)
+                print(f"  scope {_display(name)}: {len(ran.get(name, set()) & kept)} executed lines"
                       + (f" + {extra} read definition lines" if extra else ""))
             with concurrent.futures.ThreadPoolExecutor(args.workers) as pool:
                 shards = list(pool.map(
@@ -255,9 +322,9 @@ def main() -> int:
         verdicts = [str(row["test"]) if row["worker"] == "normal" else str(row["worker"])
                     for row in rows if row["module"] == module]
         counts = ", ".join(f"{key} {verdicts.count(key)}" for key in tally if verdicts.count(key))
-        print(f"  module src/cement_runtime/{module}: {len(verdicts)} mutants ({counts})")
+        print(f"  module {_display(str(module))}: {len(verdicts)} mutants ({counts})")
     for row in survivors:
-        print(f"  SURVIVED src/cement_runtime/{row['module']}:{row['line']} "
+        print(f"  SURVIVED {_display(str(row['module']))}:{row['line']} "
               f"{row['operator']} #{row['occurrence']}")
     return 0
 
