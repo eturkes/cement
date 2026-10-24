@@ -42,3 +42,7 @@ Subjects: `cli.py` `_emit` + `main` (the stdout channel both pins name). Tally: 
 |---|---|---|
 | `cli.py:409` `_emit` `ReplaceBinaryOperator_Mul_Div #3` | equivalent | cosmic-ray rewrites the keyword-only `*` of `def _emit(value, *, stream=None)` into `/`: `stream` becomes positional-or-keyword, and every call site passes `stream=` by keyword, so no call behaves differently. |
 | `cli.py:414` `_emit` `ReplaceFalseWithTrue #10` (`ensure_ascii=False` → `True`) | missing-test → added | the CLI prints non-ASCII JSON as raw UTF-8 (the implementation and every byte-comparing CLI test use `ensure_ascii=False`), but each such test prints ASCII alone; `tests/test_survivor_pins.py` `test_p105_the_cli_prints_non_ascii_json_as_raw_utf8` (a `proposal show` of a Japanese input + output) is green on the tree and red on the mutant (`'"患者": "山田"' not found`). |
+
+## p116 — `p30-mutate.txt` (`test_function_verification_enumerates_members_inside_its_read_transaction` @ 90b405a)
+
+Subjects: `system.py` `System.verify_function` + `System._promoted_function_rows`. Tally (`.agent/survivor-triage`, regenerated embeds): 1218 survivors — 1216 out of scope → `contract-open` by construction (`system.py` 830 outside the subjects, `json_value.py` 118, `models.py` 80, `store.py` 79, `function.py` 73: the promotion fixture the pin builds); 2 in scope, both killed by the modules naming a subject (`verify_function:2972` `ReplaceUnaryOperator_Delete_Not #22`, `:2975` `ReplaceFalseWithTrue #14`). No ruling owed.
