@@ -34,6 +34,7 @@ if [ "${1:-}" = "--omit-d28" ]; then
   step reports uv run python .agent/decisions/m3-report-validate.py --all
   step unittest uv run python .agent/suite --omit-d28 "${durations[@]}"
   step build uv build
+  step wheels .agent/decisions/p34-two-wheel-smoke.sh
 elif [ $# -eq 0 ]; then
   step audit uv audit --locked --preview-features audit-command
   step secrets .agent/gitleaks
@@ -45,6 +46,7 @@ elif [ $# -eq 0 ]; then
   step reports uv run python .agent/decisions/m3-report-validate.py --all
   step unittest uv run python -m unittest discover -s tests -t . "${durations[@]}"
   step build uv build
+  step wheels .agent/decisions/p34-two-wheel-smoke.sh
 else
   step unittest uv run python -m unittest "${durations[@]}" "$@"
 fi

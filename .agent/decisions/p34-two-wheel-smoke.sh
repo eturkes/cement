@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# p34 two-wheel smoke: build `cement-runtime` + `cement-command-source` from the committed tree
-# (each sdist, then its wheel from that sdist), install both offline into a fresh venv outside
-# the repository, and run the provider end to end.
-# Usage: .agent/decisions/p34-two-wheel-smoke.sh [TREE-ISH]  (default HEAD; an uncommitted state =
-# `git add` + `git write-tree`). rc 0 = every check passed; 1 = a check failed.
+# p34 two-wheel smoke (gate step `wheels`, p133): build `cement-runtime` + `cement-command-source`
+# (each sdist, then its wheel from that sdist), install both offline into a fresh venv outside the
+# repository, and run the provider end to end.
+# Usage: .agent/decisions/p34-two-wheel-smoke.sh [TREE-ISH]  (default: the working tree's tracked +
+# untracked-unignored files, as the gate sees them; a TREE-ISH = that committed tree).
+# rc 0 = every check passed; 1 = a check failed; other = a build or install step failed.
 set -euo pipefail
 
 root=$(git -C "$(dirname "$0")" rev-parse --show-toplevel)
@@ -19,7 +20,14 @@ check() {  # check <label> <actual> <expected>
     fi
 }
 
-git -C "$root" archive "${1:-HEAD}" | tar -x -C "$work" --one-top-level=tree
+mkdir "$work/tree"
+if [[ $# -gt 0 ]]; then
+    git -C "$root" archive "$1" | tar -x -C "$work/tree"
+else
+    # A tracked file deleted in the working tree is absent from the copy, as it is from a commit.
+    (cd "$root" && git ls-files -z -co --exclude-standard | while IFS= read -r -d '' path; do
+        [[ -e "$path" ]] && printf '%s\0' "$path"; done | tar --null -T - -c) | tar -x -C "$work/tree"
+fi
 uv build -q --out-dir "$work/dist" "$work/tree"
 uv build -q --out-dir "$work/dist" --build-constraints "$work/tree/examples/command_source/build-constraints.txt" \
     --require-hashes "$work/tree/examples/command_source"

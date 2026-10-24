@@ -21,6 +21,14 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p133 close (MAINTAIN queue run 3, owner-approved gate change; tier `data`) — target = the commit landing this section
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | the smoke runs inside the gate | pass | step `wheels` after `build` in the full + `--omit-d28` branches; the smoke's default = the working tree's tracked + untracked-unignored files (a tree-ish argument keeps the committed form), so a local gate tests what it sees. |
+| A2 | firing recorded | pass | hash seed e6083cb → CI run 40040610060: both legs `wheels 2` (`Hash mismatch`), every other step 0; prefix seed 98384a8 → run 40040543110: `wheels 1` + `unittest 1`; both seed branches deleted. Recorded in `gate-checks.md` (the `.agent/gate` bullet). |
+| A3 | records | pass | `ops.md` Gate list, `spec.md` Artifacts, README `## Development` (the install check named). |
+
 ## p134 close (MAINTAIN queue run 3, tier `kernel`: a public write's contract; owner-approved re-pins) — target = the commit landing this section
 
 Check set = the row's acceptance clauses A1-A4 + lenses C1-C3, fixed before the diff was reread.
