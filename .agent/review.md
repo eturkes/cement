@@ -21,6 +21,20 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p134 close (MAINTAIN queue run 3, tier `kernel`: a public write's contract; owner-approved re-pins) — target = the commit landing this section
+
+Check set = the row's acceptance clauses A1-A4 + lenses C1-C3, fixed before the diff was reread.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | `submit_proposal(…, expected_revision=)` refuses another revision with zero writes (adjacent pair) | pass | `_bounded_int(1, 2**63 - 1)` before any I/O, then `_persist_proposal(expected_revision=…)` compares under the write lock (`StateError`, the propose path's message); `tests/test_expected_revision.py`: equal → written, after a revise → refused with 1 proposal still, the new revision → written; 0, -1, `True`, 1.0, "1", 2**63 → `ValidationError` + 2**63 - 1 passes validation. |
+| A2 | CLI envelope `operation_revision` routed | pass | `_SUBMISSION_KEYS` gains it, `_REVISION_WIRE_BYTES` (19) enters the derived cap, `max_items` = fields + one per key; equal → exit 0, revised → exit 4 `conflict`, `true` → exit 2; help names it. |
+| A3 | the relay passes it; the README window sentence goes | pass | `Outbox.relay` → `expected_revision=intent["operation_revision"]`, a `StateError` with the refusal text → `stale` (any other `StateError` re-raised); the pre-check and its window paragraph removed. |
+| A4 | tests red at the parent | pass | the commit body's red-first run. |
+| C1 | re-pins keep their strength (owner-approved) | pass | D16 (five-key framing 69, cap formula + AST names, exact-cap success with the revision padded to its 19-byte width, cap + 1 refused), D17 + X13 (+5 members, at-bound + over-bound pairs), D19 (kwargs set + `expected_revision` None), D32 (StateError named beside `expected_revision`, the revision prose re-targeted), P01 + the ABI pin (signature + hints), V20 (maximal frame with a 19-digit revision), X11 (framing, keys, cap), X15 (the spy forwards the keyword), the grammar SHAPE digest (help text). |
+| C2 | behavior elsewhere | pass | `p32-differential.py --base 811f583` → SAME 2712; paste-ins + `ext/bin/cement` regenerated. |
+| C3 | prose | pass | README (five keys, the table row, the source-id paragraph), `docs/architecture.md`, the outbox README; register + article audits rc 0. |
+
 ## p126 close (MAINTAIN queue run 3, owner-approved re-scope; tier `data`) — target = the commit landing this section
 
 | id | lens | verdict | basis (MAIN-verified) |

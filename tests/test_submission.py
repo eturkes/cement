@@ -862,6 +862,7 @@ class SubmissionTests(unittest.TestCase):
                     ("input_value", inspect.Parameter.POSITIONAL_OR_KEYWORD, True),
                     ("candidate", inspect.Parameter.KEYWORD_ONLY, True),
                     ("source_id", inspect.Parameter.KEYWORD_ONLY, False),
+                    ("expected_revision", inspect.Parameter.KEYWORD_ONLY, False),  # p134
                 ),
                 {
                     "partition": str,
@@ -869,6 +870,7 @@ class SubmissionTests(unittest.TestCase):
                     "input_value": object,
                     "candidate": Candidate,
                     "source_id": str | None,
+                    "expected_revision": int | None,
                     "return": str,
                 },
             ),

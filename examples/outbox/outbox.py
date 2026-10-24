@@ -17,7 +17,7 @@ from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-from cement_runtime import Candidate, ConflictError, System
+from cement_runtime import Candidate, ConflictError, StateError, System
 from cement_runtime.json_value import JSONValue, canonicalize
 
 SCHEMA = """
@@ -30,8 +30,10 @@ CREATE TABLE IF NOT EXISTS intents (
     attempts INTEGER NOT NULL DEFAULT 0
 ) STRICT
 """
-# `System.submit_proposal`'s refusal of a repeated `source_id`; the stored id travels in the text.
+# `System.submit_proposal`'s refusals the relay acts on: a repeated `source_id` (the stored id
+# travels in the text) and a revision other than the intent's (`expected_revision`).
 RECORDED = re.compile(r"source observation already recorded as proposal (prop_[0-9a-f]{32})")
+REVISED = "operation revision changed before proposal submission"
 
 
 class IntentConflictError(Exception):
@@ -137,21 +139,6 @@ class Outbox:
                 connection.execute(
                     "UPDATE intents SET attempts = attempts + 1 WHERE id = ?", (intent_id,)
                 )
-            current = next(
-                (
-                    row["revision"]
-                    for row in system.operations(intent["partition"])
-                    if row["name"] == intent["operation"]
-                ),
-                None,
-            )
-            # `submit_proposal` binds whatever revision is current under Cement's write lock and
-            # takes no expected revision, so a revise between this check and the submission
-            # still binds the intent to the new revision.
-            if current is not None and current != intent["operation_revision"]:
-                self._acknowledge(intent_id, "stale", None)
-                deliveries.append(Delivery(intent_id, "stale", None, replayed=False))
-                continue
             candidate = Candidate(
                 output=intent["candidate"]["output"],
                 provenance={
@@ -168,7 +155,15 @@ class Outbox:
                     intent["input"],
                     candidate=candidate,
                     source_id=f"outbox:{intent_id}" if keyed else None,
+                    expected_revision=intent["operation_revision"],
                 )
+            except StateError as error:
+                if str(error) != REVISED:
+                    raise
+                # Cement compared the revision under its write lock, so nothing was written.
+                self._acknowledge(intent_id, "stale", None)
+                deliveries.append(Delivery(intent_id, "stale", None, replayed=False))
+                continue
             except ConflictError as error:
                 match = RECORDED.fullmatch(str(error))
                 if match is None:

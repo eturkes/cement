@@ -141,8 +141,8 @@ those checks pass, it calls the configured candidate source one time, outside ev
 the call holds.
 
 `cement proposal submit OPERATION --submission VALUE` calls `System.submit_proposal`. The leaf never
-runs a candidate source. `--submission` carries `input`, `output`, an optional `provenance` and an
-optional `source_id` in one JSON object, because separate flags cannot carry three maximum-size fields
+runs a candidate source. `--submission` carries `input`, `output`, an optional `provenance`, an
+optional `source_id` and an optional `operation_revision` (the expected revision) in one JSON object, because separate flags cannot carry three maximum-size fields
 through one argument list. Without a source id, the command inherits the method's non-idempotency: two
 identical submissions write two proposals.
 

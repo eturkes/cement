@@ -1715,7 +1715,7 @@ class ObligationBatteryTests(unittest.TestCase):
     def test_d16_the_aggregate_cap_is_2_default_max_bytes_provenance_max_by(
         self,
     ) -> None:
-        """D16. Four-key framing plus exported input/output/provenance/source-id wire limits derive the cap.
+        """D16. Five-key framing plus exported input/output/provenance/source-id/revision wire limits derive the cap (p134).
 
         No copied limit; maximal escaped source id fits beside maximal other fields.
         Exact-cap success and cap+1 rejection bind byte, text and inline transports with zero failed writes."""
@@ -1723,16 +1723,20 @@ class ObligationBatteryTests(unittest.TestCase):
         _leaf_parser(self, cement_cli._parser(), ("proposal", "submit"))
         cap = cement_cli.SUBMISSION_MAX_BYTES
         provenance_max = system_module.PROVENANCE_MAX_BYTES
-        framing_bytes = b'{"input":,"output":,"provenance":,"source_id":}'
+        framing_bytes = b'{"input":,"output":,"provenance":,"source_id":,"operation_revision":}'
         framing = len(framing_bytes)
-        self.assertEqual(framing, 47)
+        self.assertEqual(framing, 69)
         self.assertEqual(cement_cli._SUBMISSION_FRAMING, framing)
         self.assertEqual(
             cap,
-            2 * DEFAULT_MAX_BYTES + provenance_max + 3 * system_module.SOURCE_ID_MAX_BYTES + 2 + framing,
+            2 * DEFAULT_MAX_BYTES + provenance_max + 3 * system_module.SOURCE_ID_MAX_BYTES + 2
+            + len(str(2**63 - 1)) + framing,
         )
         self.assertEqual(system_module.SOURCE_ID_MAX_BYTES, 512)
-        self.assertEqual(tuple(cement_cli._SUBMISSION_KEYS), ("input", "output", "provenance", "source_id"))
+        self.assertEqual(
+            tuple(cement_cli._SUBMISSION_KEYS),
+            ("input", "output", "provenance", "source_id", "operation_revision"),
+        )
 
         cli_tree = ast.parse(
             (ROOT / "src/cement_runtime/cli.py").read_text(encoding="utf-8")
@@ -1794,7 +1798,13 @@ class ObligationBatteryTests(unittest.TestCase):
         }
         self.assertEqual(
             cap_names,
-            {"DEFAULT_MAX_BYTES", "PROVENANCE_MAX_BYTES", "_SOURCE_ID_WIRE_BYTES", "_SUBMISSION_FRAMING"},
+            {
+                "DEFAULT_MAX_BYTES",
+                "PROVENANCE_MAX_BYTES",
+                "_SOURCE_ID_WIRE_BYTES",
+                "_REVISION_WIRE_BYTES",
+                "_SUBMISSION_FRAMING",
+            },
         )
         self.assertFalse(
             any(
@@ -1826,6 +1836,11 @@ class ObligationBatteryTests(unittest.TestCase):
             + maximal_provenance
             + ',"source_id":'
             + json.dumps("😀" * (system_module.SOURCE_ID_MAX_BYTES // 4))
+            # The revision's full 19-byte width, padded with JSON whitespace so that it still
+            # names the current revision (1) and the exact-cap submission succeeds.
+            + ',"operation_revision":'
+            + " " * (len(str(2**63 - 1)) - 1)
+            + "1"
             + "}"
         )
         self.assertEqual(len(at_cap.encode("utf-8")), cap)
@@ -1872,7 +1887,7 @@ class ObligationBatteryTests(unittest.TestCase):
     def test_d17_validation_order_is_strict_parse_json_under_the_aggregate(
         self,
     ) -> None:
-        """D17. Strict parse uses aggregate bytes, field depth+1 and three field-item bounds+4 envelope members.
+        """D17. Strict parse uses aggregate bytes, field depth+1 and three field-item bounds+5 envelope members.
 
         Type, unknown keys and missing keys precede submission; duplicate keys fail inside parsing.
         Adjacent depth/item pairs pin application of the derived bounds."""
@@ -1907,7 +1922,7 @@ class ObligationBatteryTests(unittest.TestCase):
             {
                 "max_bytes": cement_cli.SUBMISSION_MAX_BYTES,
                 "max_depth": DEFAULT_MAX_DEPTH + 1,
-                "max_items": 3 * DEFAULT_MAX_ITEMS + 4,
+                "max_items": 3 * DEFAULT_MAX_ITEMS + 5,
             },
         )
 
@@ -1962,7 +1977,7 @@ class ObligationBatteryTests(unittest.TestCase):
             + hundred_thousand
             + ',"provenance":'
             + hundred_thousand
-            + ',"source_id":"observation"}'
+            + ',"source_id":"observation","operation_revision":1}'
         )
         over_items = at_items.replace('"input":[', '"input":[0,', 1)
         fake.reset_mock()
@@ -2131,8 +2146,9 @@ class ObligationBatteryTests(unittest.TestCase):
         fake.submit_proposal.assert_called_once()
         call = fake.submit_proposal.call_args
         self.assertEqual(call.args, (PARTITION, OPERATION, {"input": 12}))
-        self.assertEqual(set(call.kwargs), {"candidate", "source_id"})
+        self.assertEqual(set(call.kwargs), {"candidate", "source_id", "expected_revision"})
         self.assertIsNone(call.kwargs["source_id"])
+        self.assertIsNone(call.kwargs["expected_revision"])  # p134: absent key → None
         candidate = call.kwargs["candidate"]
         self.assertIs(type(candidate), Candidate)
         self.assertEqual(candidate.output, {"output": 34})

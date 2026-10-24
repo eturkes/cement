@@ -1604,6 +1604,7 @@ class System:
         *,
         candidate: Candidate,
         source_id: str | None = None,
+        expected_revision: int | None = None,
     ) -> str:
         """Submit a candidate that the caller generated, as a pending proposal.
 
@@ -1617,15 +1618,23 @@ class System:
         Without a ``source_id``, Cement gives no idempotency: two calls with
         identical content write two proposals and return two identifiers.
 
+        ``expected_revision`` names the operation revision the caller generated
+        the candidate for. When the revision under the write lock differs, the
+        call raises ``StateError`` and writes nothing, so a revision change
+        between generation and submission cannot bind the candidate to the new
+        revision.
+
         Return the identifier of the new proposal.
 
-        The call opens one transaction and binds whatever operation revision is
-        current under that write lock. It captures no earlier revision, so a
-        concurrent revision change cannot make it fail.
+        The call opens one transaction and binds the operation revision that is
+        current under that write lock. Without ``expected_revision`` it captures
+        no earlier revision, so a concurrent revision change cannot make it fail.
 
         Raise ``ValidationError`` for a rejected partition, operation, input
-        value, candidate, or ``source_id``. Raise ``NotFoundError`` when the
-        partition holds no such operation.
+        value, candidate, ``source_id``, or ``expected_revision``. Raise
+        ``NotFoundError`` when the partition holds no such operation. Raise
+        ``StateError`` when the current revision differs from
+        ``expected_revision``.
 
         A failure before the commit writes nothing. If the commit itself
         succeeds and then fails, the call raises and returns no identifier while
@@ -1637,12 +1646,16 @@ class System:
         operation = _name(operation, "operation")
         if source_id is not None:
             source_id = _text(source_id, "source_id", maximum=SOURCE_ID_MAX_BYTES)
+        if expected_revision is not None:
+            expected_revision = _bounded_int(
+                expected_revision, "expected_revision", minimum=1, maximum=2**63 - 1
+            )
         input_json = canonicalize(input_value)
         proposed, provenance = self._canonical_candidate(candidate)
         return self._persist_proposal(
             partition=partition,
             operation=operation,
-            expected_revision=None,
+            expected_revision=expected_revision,
             source_id=source_id,
             input_json=input_json,
             proposed=proposed,

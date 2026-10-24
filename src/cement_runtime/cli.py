@@ -137,7 +137,10 @@ def _parser() -> argparse.ArgumentParser:
     proposal_submit.add_argument(
         "--submission",
         required=True,
-        help="JSON object {input, output, provenance?, source_id?}; '-' reads stdin",
+        help=(
+            "JSON object {input, output, provenance?, source_id?, operation_revision?};"
+            " '-' reads stdin"
+        ),
     )
     proposal_show = proposal_commands.add_parser("show")
     proposal_show.add_argument("proposal_id")
@@ -422,7 +425,7 @@ def _input(value: str) -> JSONValue:
     return parse_json(source).value
 
 
-_SUBMISSION_KEYS = ("input", "output", "provenance", "source_id")
+_SUBMISSION_KEYS = ("input", "output", "provenance", "source_id", "operation_revision")
 _SUBMISSION_REQUIRED = ("input", "output")
 # `{` and `}`, one `,` between each adjacent pair, and `"<key>":` per key. The
 # transport bound must admit every submission the library accepts, so it is
@@ -434,8 +437,14 @@ _SUBMISSION_FRAMING = (
 # A source id holds at most SOURCE_ID_MAX_BYTES UTF-8 bytes; JSON text spells each byte in at
 # most 3 (a 4-byte scalar as a 12-byte surrogate-pair escape), inside two quotes.
 _SOURCE_ID_WIRE_BYTES = 3 * SOURCE_ID_MAX_BYTES + 2
+# An expected revision is a positive signed-64-bit integer: at most its decimal digits (p134).
+_REVISION_WIRE_BYTES = len(str(2**63 - 1))
 SUBMISSION_MAX_BYTES = (
-    2 * DEFAULT_MAX_BYTES + PROVENANCE_MAX_BYTES + _SOURCE_ID_WIRE_BYTES + _SUBMISSION_FRAMING
+    2 * DEFAULT_MAX_BYTES
+    + PROVENANCE_MAX_BYTES
+    + _SOURCE_ID_WIRE_BYTES
+    + _REVISION_WIRE_BYTES
+    + _SUBMISSION_FRAMING
 )
 
 
@@ -483,9 +492,9 @@ def _submission(value: str) -> dict[str, JSONValue]:
     parsed = parse_json(
         source,
         max_bytes=SUBMISSION_MAX_BYTES,
-        # The envelope nests each field one level deeper and adds four members.
+        # The envelope nests each field one level deeper and adds one member per key.
         max_depth=DEFAULT_MAX_DEPTH + 1,
-        max_items=3 * DEFAULT_MAX_ITEMS + 4,
+        max_items=3 * DEFAULT_MAX_ITEMS + len(_SUBMISSION_KEYS),
     ).value
     if type(parsed) is not dict:
         raise ValidationError("submission must be a JSON object")
@@ -934,6 +943,7 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
                         provenance=cast(Any, envelope.get("provenance", {})),
                     ),
                     source_id=cast(Any, envelope.get("source_id")),
+                    expected_revision=cast(Any, envelope.get("operation_revision")),
                 )
             }
         if args.proposal_command == "show":

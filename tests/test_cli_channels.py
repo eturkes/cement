@@ -80,7 +80,7 @@ RESOLVE_KEYS = {
 }
 PROVENANCE_MAX_BYTES = getattr(system_module, "PROVENANCE_MAX_BYTES", 65_536)
 SOURCE_ID_MAX_BYTES = system_module.SOURCE_ID_MAX_BYTES
-SUBMISSION_FRAMING = len(b'{"input":,"output":,"provenance":,"source_id":}')
+SUBMISSION_FRAMING = len(b'{"input":,"output":,"provenance":,"source_id":,"operation_revision":}')
 SUBMISSION_MAX_BYTES = cement_cli.SUBMISSION_MAX_BYTES
 
 
@@ -1085,7 +1085,7 @@ class CliChannelTests(unittest.TestCase):
     def test_v20_the_aggregate_cap_accepts_2162722_bytes_and_rejects_216272(self) -> None:
         """V20 [D16]. The live aggregate cap accepts its exact boundary and rejects one byte more.
 
-        All four envelope fields fill their wire bounds; X11 independently pins the derivation."""
+        All five envelope fields fill their wire bounds (p134 adds the revision); X11 pins the derivation."""
         input_json = '"' + "i" * (DEFAULT_MAX_BYTES - 2) + '"'
         provenance_json = (
             '{"p":"' + "p" * (PROVENANCE_MAX_BYTES - len(b'{"p":""}')) + '"}'
@@ -1102,6 +1102,8 @@ class CliChannelTests(unittest.TestCase):
                 + provenance_json
                 + ',"source_id":'
                 + json.dumps("😀" * (SOURCE_ID_MAX_BYTES // 4))
+                + ',"operation_revision":'
+                + str(2**63 - 1)
                 + "}"
             ).encode("utf-8")
 
@@ -1933,7 +1935,7 @@ class CliChannelTests(unittest.TestCase):
         self.assertLessEqual(stream.requests[0], SUBMISSION_MAX_BYTES + 1)
 
     def test_x11_the_aggregate_transport_cap_is_derived_from_one_exported_p(self) -> None:
-        """X11 [D16]. Derive the four-key transport bound from exported field limits and exact framing.
+        """X11 [D16]. Derive the five-key transport bound from exported field limits and exact framing.
 
         Source-id wire bound includes worst-case JSON escapes and two quotes. Pin the arithmetic,
         keys, AST references and zero provenance-limit copies independently."""
@@ -1945,13 +1947,14 @@ class CliChannelTests(unittest.TestCase):
         keys = tuple(cement_cli._SUBMISSION_KEYS)
         framing = 2 + sum(len(json.dumps(key)) + 1 for key in keys) + len(keys) - 1
         self.assertEqual(provenance_limit, 65_536)
-        self.assertEqual(framing, 47)
+        self.assertEqual(framing, 69)
         self.assertEqual(framing, SUBMISSION_FRAMING)
-        self.assertEqual(keys, ("input", "output", "provenance", "source_id"))
+        self.assertEqual(keys, ("input", "output", "provenance", "source_id", "operation_revision"))
         self.assertEqual(cement_cli._SUBMISSION_FRAMING, framing)
         self.assertEqual(
             cement_cli.SUBMISSION_MAX_BYTES,
-            2 * DEFAULT_MAX_BYTES + provenance_limit + 3 * SOURCE_ID_MAX_BYTES + 2 + framing,
+            2 * DEFAULT_MAX_BYTES + provenance_limit + 3 * SOURCE_ID_MAX_BYTES + 2
+            + len(str(2**63 - 1)) + framing,
         )
         self.assertEqual(SOURCE_ID_MAX_BYTES, 512)
         self.assertEqual(cement_cli._SOURCE_ID_WIRE_BYTES, len(json.dumps("😀" * (SOURCE_ID_MAX_BYTES // 4)).encode("utf-8")))
@@ -1988,7 +1991,13 @@ class CliChannelTests(unittest.TestCase):
             node.id for node in ast.walk(cap_assignment) if isinstance(node, ast.Name)
         }
         self.assertTrue(
-            {"DEFAULT_MAX_BYTES", "PROVENANCE_MAX_BYTES", "_SOURCE_ID_WIRE_BYTES", "_SUBMISSION_FRAMING"}
+            {
+                "DEFAULT_MAX_BYTES",
+                "PROVENANCE_MAX_BYTES",
+                "_SOURCE_ID_WIRE_BYTES",
+                "_REVISION_WIRE_BYTES",
+                "_SUBMISSION_FRAMING",
+            }
             <= cap_names
         )
         system_uses = {
@@ -2035,11 +2044,11 @@ class CliChannelTests(unittest.TestCase):
         self.assertEqual(system.submit_proposal.call_count, 0)
 
     def test_x13_aggregate_depth_and_item_maxima_are_adjacent_accept_reject(self) -> None:
-        """X13 [D17]. Pin adjacent aggregate depth/item boundaries with all four envelope members.
+        """X13 [D17]. Pin adjacent aggregate depth/item boundaries with all five envelope members.
 
-        Field limits remain DEFAULT_MAX_DEPTH/DEFAULT_MAX_ITEMS; the envelope adds one depth and four items."""
+        Field limits remain DEFAULT_MAX_DEPTH/DEFAULT_MAX_ITEMS; the envelope adds one depth and five items."""
         max_depth = DEFAULT_MAX_DEPTH + 1
-        max_items = 3 * DEFAULT_MAX_ITEMS + 4
+        max_items = 3 * DEFAULT_MAX_ITEMS + 5
         depth_at = (
             '{"input":'
             + "[" * DEFAULT_MAX_DEPTH
@@ -2065,12 +2074,12 @@ class CliChannelTests(unittest.TestCase):
                 + field_array
                 + ',"provenance":{"p":'
                 + provenance
-                + '} ,"source_id":"observation"}'
+                + '} ,"source_id":"observation","operation_revision":1}'
             )
 
         item_at = item_frame(DEFAULT_MAX_ITEMS - 1)
         item_over = item_frame(DEFAULT_MAX_ITEMS)
-        self.assertEqual((max_depth, max_items), (65, 300_004))
+        self.assertEqual((max_depth, max_items), (65, 300_005))
         cases = (
             ("depth-at", depth_at, 1, 0, None),
             (
@@ -2162,6 +2171,7 @@ class CliChannelTests(unittest.TestCase):
             *,
             candidate: Candidate,
             source_id: str | None = None,
+            expected_revision: int | None = None,
         ) -> str:
             captured.append(candidate)
             return submit(
@@ -2171,6 +2181,7 @@ class CliChannelTests(unittest.TestCase):
                 input_value,
                 candidate=candidate,
                 source_id=source_id,
+                expected_revision=expected_revision,
             )
 
         sources = (

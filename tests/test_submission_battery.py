@@ -275,11 +275,13 @@ class SubmissionBatteryTests(unittest.TestCase):
 
         self.assertEqual(
             tuple(submit.parameters),
-            ("self", "partition", "operation", "input_value", "candidate", "source_id"),
+            ("self", "partition", "operation", "input_value", "candidate", "source_id", "expected_revision"),
         )
         self.assertIs(submit.parameters["candidate"].default, inspect.Parameter.empty)
         self.assertIsNone(submit.parameters["source_id"].default)
         self.assertIs(submit.parameters["source_id"].kind, inspect.Parameter.KEYWORD_ONLY)
+        self.assertIsNone(submit.parameters["expected_revision"].default)  # p134
+        self.assertIs(submit.parameters["expected_revision"].kind, inspect.Parameter.KEYWORD_ONLY)
         self.assertIs(
             submit.parameters["candidate"].kind,
             inspect.Parameter.KEYWORD_ONLY,
@@ -1746,13 +1748,16 @@ class SubmissionBatteryTests(unittest.TestCase):
                 self.assertIn("validationerror", docstring)
                 self.assertIn("notfounderror", docstring)
 
-        # V-D12 leaves the direct path no revision guard, so naming StateError on
-        # submit_proposal would publish an error that route cannot raise.
+        # V-D12 left the direct path no revision guard; p134 adds the caller's opt-in
+        # `expected_revision`, so StateError is named on submit_proposal beside it alone.
         self.assertIn("without a ``source_id``", submit)
         self.assertIn("conflicterror", submit)
         self.assertIn("stateerror", propose)
-        self.assertNotIn("stateerror", submit)
-        self.assertIn("binds whatever operation revision is current", submit)
+        self.assertIn(
+            "raise ``stateerror`` when the current revision differs from ``expected_revision``", submit
+        )
+        self.assertIn("binds the operation revision that is current", submit)
+        self.assertIn("without ``expected_revision`` it captures no earlier revision", submit)
         self.assertIn("never invokes the configured candidate source", submit)
         self.assertNotIn("operation revision changes", submit)
         self.assertIn("source runs outside every transaction", propose)

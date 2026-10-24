@@ -291,9 +291,11 @@ refuses an argument list above 131,071 bytes, and only one flag can read standar
 also visible to observers on the same host, because it enters the argument list of the process.
 Prefer `-` for a candidate you must protect.
 
-The object takes four keys. `input` and `output` are required. `provenance` is optional and defaults to
+The object takes five keys. `input` and `output` are required. `provenance` is optional and defaults to
 an empty object. `source_id` is optional: it names the observation, and Cement refuses a second
-proposal with the same source id (exit 4). Any other key is an error, and the message names every offending key. A repeated key is
+proposal with the same source id (exit 4). `operation_revision` is optional: it names the revision
+that the candidate was made for, and Cement refuses the proposal when the current revision differs
+(exit 4). Any other key is an error, and the message names every offending key. A repeated key is
 also an error, so the command never silently keeps one of two values.
 
 Success prints one key, `proposal_id`, at status 0. The command echoes no part of the candidate.
@@ -434,7 +436,7 @@ refusal writes nothing:
 
 | Purpose | Methods |
 |---|---|
-| Retain answers | `submit_proposal`, `propose` (pending proposals; optional `source_id`, a repeat raises `ConflictError`) |
+| Retain answers | `submit_proposal`, `propose` (pending proposals; optional `source_id`, a repeat raises `ConflictError`; optional `expected_revision`, another current revision raises `StateError`) |
 | Review | `review` (`ReviewResult`), `supersede_examples`, `revoke_example`, `challenge`, `suspend_artifact` |
 | Projection | `test_projection` (preview, writes nothing), `set_projection` (V1-V4 or `ValidationError`), `projection` (the stored program or `None`) |
 | Learning pass | `learning_cases` (cases by key + unfinished work, read-only) |
@@ -508,7 +510,10 @@ A proposal can carry a source id that names the observation it came from, for ex
 deployment, the chat, the user message and the digest of the input. Pass it as
 `submit_proposal(..., source_id=...)`, or as the `source_id` key of the `--submission` object.
 Cement refuses a second proposal with the same source id for the same partition and operation
-(`ConflictError`, exit 4), so a repeated delivery adds no second proposal.
+(`ConflictError`, exit 4), so a repeated delivery adds no second proposal. A caller that generated
+the candidate for one operation revision passes `submit_proposal(..., expected_revision=...)` or the
+`operation_revision` key. When an `operation revise` lands first, Cement refuses the proposal
+(`StateError`, exit 4) and writes nothing.
 
 ### Reviewing a proposal
 

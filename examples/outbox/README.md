@@ -16,9 +16,9 @@ the caller's own database. Write each intent in the same transaction as the stat
 - `Outbox.relay` delivers each pending intent through `System.submit_proposal`, in ID order. Then
   it marks the intent as delivered. The provenance of each proposal names its intent and the
   source revision.
-- When the current operation revision differs from the intent revision, the relay marks the intent
-  as stale and submits nothing. `submit_proposal` takes no expected revision. Thus a revision
-  change after this check and before `submit_proposal` binds the proposal to the new revision.
+- The relay passes the intent revision as `expected_revision`. When the current operation revision
+  differs, Cement refuses the proposal with `StateError` under its write lock and writes nothing,
+  and the relay marks the intent as stale.
 
 ## Delivery is at least once
 
