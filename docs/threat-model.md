@@ -70,7 +70,7 @@
   it. After the rename, the write flushes the destination's directory, so a completed export survives a
   power loss. If that flush fails, the command reports a failure while the destination already holds
   the new bundle. A final target race remains possible.
-- Function receipt and membership rows are database-immutable. Historical receipt reconstruction
+- Function receipt and membership rows are database-immutable outside a partition erasure. Historical receipt reconstruction
   survives member supersession, operation-revision retirement, and evidence revocation. An audit of a
   past promotion therefore does not depend on current artifact status.
 - The optional command candidate source (`examples/command_source/`) bypasses the shell, applies
@@ -79,6 +79,11 @@
   mechanism is lifecycle containment for the trusted adapter, not a hostile-code sandbox. The outer
   watchdog covers unexpected supervisor exit for the shared process group. A cgroup/container is
   necessary to contain detached descendants across simultaneous supervisor/watchdog failure or OOM.
+- `retention prune` and `partition erase` delete rows in one transaction each. Each write connection
+  runs SQLite `secure_delete`, so deleted bytes leave the ledger file. Backups, snapshots, disk
+  blocks of a rollback journal, and the `-wal` file of a ledger that an operator switched to
+  WAL mode are outside that control. An erasure keeps one record with an unkeyed digest of the
+  partition name, which is not a secret.
 - Proposed output is visible only through the review API. Accepted output can differ, and the final
   edited value is the fixture.
 - Evidence conflicts block compilation. Evidence snapshots and policy/artifact digests block stale
@@ -102,7 +107,9 @@
 - Make every permission decision in your own service. Cement records the actor name that you supply.
 - Put every mutable answer dependency into the input, including identity, permissions, locale, policy
   revision, and external-state revision. Exclude behavior with hidden context from compilation.
-- Minimize, redact, encrypt, expire, and back up evidence according to its data classification. The
+- Minimize, redact, encrypt, expire, and back up evidence according to its data classification. Run
+  `retention prune` on a schedule, and run `partition erase` when a tenant leaves. Set a backup
+  retention period too, because backups keep erased rows. The
   ledger is plaintext and a blind copy of a live SQLite database is unsafe. An exported bundle is
   plaintext too. It carries the exact inputs, the exact outputs, and the governance digests, so it
   creates a second data-classification, retention, and disclosure surface outside the ledger.

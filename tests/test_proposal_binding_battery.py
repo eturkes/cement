@@ -2552,7 +2552,10 @@ class ProposalBindingBatteryTests(unittest.TestCase):
                       if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "SCHEMA" for target in node.targets))
         schema_bytes = schema.encode("utf-8")
 
-        self.assertEqual(store_module.SCHEMA_VERSION, 3)
+        # p135-e3 re-scope: v3 = the closed state at 331a3b4 (the last v3 revision); v4 is live.
+        last_v3 = ast.parse(_git_source("331a3b4", "src/cement_runtime/store.py"))
+        self.assertEqual(next(ast.literal_eval(node.value) for node in last_v3.body
+                              if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "SCHEMA_VERSION" for target in node.targets)), 3)
         self.assertEqual(len(schema_bytes), 14_580)
         self.assertEqual(hashlib.sha256(schema_bytes).hexdigest(), expected)
         self.assertEqual(store_module.SCHEMA_FINGERPRINT, hashlib.sha256(store_module.SCHEMA.encode("utf-8")).hexdigest())
@@ -2746,10 +2749,11 @@ class ProposalBindingBatteryTests(unittest.TestCase):
 
     def test_b35_y11_statement_cardinality_one_statement_per_2(self) -> None:
         """B35. Exact review statement counts; one binding read and one matching decision event, no request writes."""
+        # p135-e3: every write connection adds `PRAGMA secure_delete = ON` to its setup (+1 record).
         expected = {
-            "accept": (12, 7, 0),
-            "correct": (12, 7, 0),
-            "reject": (10, 5, 0),
+            "accept": (13, 7, 0),
+            "correct": (13, 7, 0),
+            "reject": (11, 5, 0),
         }
         real_reader = system_module._proposal_bindings
         real_writer = system_module._event

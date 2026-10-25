@@ -38,7 +38,16 @@ from .signature import (
     SIGNATURE_MAX_BYTES,
     verify_signature,
 )
-from .system import PROVENANCE_MAX_BYTES, SOURCE_ID_MAX_BYTES, System, _name, _text
+from .system import (
+    _MAX_AGE_SECONDS,
+    PROVENANCE_MAX_BYTES,
+    SOURCE_ID_MAX_BYTES,
+    System,
+    _name,
+    _text,
+)
+
+_MAX_AGE_DAYS = _MAX_AGE_SECONDS // 86_400
 
 
 class _UsageError(Exception):
@@ -391,6 +400,30 @@ def _parser() -> argparse.ArgumentParser:
     )
     learn_publish.add_argument("--actor", default=learning.REVIEWER)
 
+    retention = commands.add_parser(
+        "retention", help="delete old retained answers that no example uses"
+    )
+    retention_commands = retention.add_subparsers(dest="retention_command", required=True)
+    retention_prune = retention_commands.add_parser(
+        "prune", help="delete the partition's unused proposals that are older than an age"
+    )
+    retention_prune.add_argument(
+        "--older-than",
+        type=int,
+        required=True,
+        metavar="DAYS",
+        help="age in days; an unused proposal created before it is deleted",
+    )
+    retention_prune.add_argument("--actor", required=True)
+    partition = commands.add_parser("partition", help="erase every row of one partition")
+    partition_commands = partition.add_subparsers(dest="partition_command", required=True)
+    partition_erase = partition_commands.add_parser(
+        "erase", help="delete every row of the partition and keep one erasure record"
+    )
+    partition_erase.add_argument("--actor", required=True)
+    partition_erase.add_argument(
+        "--confirm", required=True, help="repeat the --partition value to confirm the erasure"
+    )
     events = commands.add_parser("events", help="read append-only audit projections")
     events.add_argument("--after", type=int, default=0)
     events.add_argument("--limit", type=int, default=1_000)
@@ -1295,6 +1328,19 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
             args.operation,
             program=None if args.program is None else _input(args.program),
         )
+    if args.command == "retention":
+        if not 0 <= args.older_than <= _MAX_AGE_DAYS:
+            raise _UsageError(
+                f"--older-than must be a whole number of days from 0 to {_MAX_AGE_DAYS}"
+            )
+        return system.prune_proposals(
+            args.partition, older_than_seconds=args.older_than * 86_400, actor=args.actor
+        )
+    if args.command == "partition":
+        # After the existing-only open (an absent ledger exits 5, p51), before any write.
+        if args.confirm != args.partition:
+            raise _UsageError("--confirm must repeat the --partition value")
+        return system.erase_partition(args.partition, actor=args.actor)
     if args.command == "events":
         return system.events(args.partition, after=args.after, limit=args.limit)
     raise AssertionError("argparse accepted an unknown command")

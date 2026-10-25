@@ -869,7 +869,7 @@ class ReadCapabilityBatteryTests(unittest.TestCase):
         )
         self.assertEqual([name for name, _ in write_sites].count("_persist_proposal"), 1)
         expected_read_sites = {'test_projection', 'examples', 'function_report', 'serving', 'artifact', 'proposals', 'function_versions', 'diff_versions', 'reports', '_submission_revision', 'verify_function', 'inspect_function_promotion', 'proposal', 'events', 'latest_function_receipt', 'learning_cases', 'report', 'reconstruct_function_receipt', 'operations', 'switch', 'get_proposal', 'projection', 'artifacts', 'function_receipts', 'quarantine_plan'}
-        expected_write_sites = ['register_operation', 'revise_operation', '_persist_proposal', 'review', 'compile', 'set_projection', 'set_switch', 'verify_drafts', 'verify', 'promote_function', 'promote', 'challenge', 'challenge', 'supersede_examples', 'revoke_example', 'suspend_artifact', 'quarantine']
+        expected_write_sites = ['register_operation', 'revise_operation', '_persist_proposal', 'review', 'compile', 'set_projection', 'set_switch', 'verify_drafts', 'verify', 'promote_function', 'promote', 'challenge', 'challenge', 'supersede_examples', 'revoke_example', 'suspend_artifact', 'quarantine', 'prune_proposals', 'erase_partition']
         expected_helpers = {'_validate_live_promoted', '_contradicted', '_program_by_hash', '_verify_pinned_snapshot', '_function_report_member', '_validate_report', '_run_verification', '_operation_report_artifact', '_active_reviewer_count', '_reconstruct_function_receipt', '_active_evidence', '_submission_revision_in', '_verify_function_snapshot', '_pin_checks', '_project_current_build', '_validate_promoted', '_live_build', '_projection_report', '_current_build_projections', '_function_promotion_entry', '_persisted_function_receipt_check', '_function_promotion_plan', '_build_projections', '_draft_verification_plan', '_learning_case_groups', '_learning_case_list', '_learning_work', '_projection_uniform_check', '_promotion_candidates', '_promotion_retained', '_report_artifact_statuses', '_report_compile_scopes', '_report_function_anchor', '_report_stale_anomalies', '_snapshot_member', '_quarantine_plan'}
         self.assertEqual(len(read_sites), len(expected_read_sites))
         self.assertEqual(len(write_sites), len(expected_write_sites))
@@ -903,8 +903,9 @@ class ReadCapabilityBatteryTests(unittest.TestCase):
             validate.assert_not_called()
 
     def test_b22_schema_version_is_two(self):
-        """B22: the live schema is v3."""
-        self.assertEqual(store_module.SCHEMA_VERSION, 3)
+        """B22: the schema was v3 through its last v3 revision."""
+        # p135-e3 re-scope: the v3 claim reads the last v3 revision (331a3b4); v4 is live.
+        self.assertIn("\nSCHEMA_VERSION = 3\n", subprocess.check_output(("git", "-C", str(pathlib.Path(__file__).resolve().parents[1]), "show", "331a3b4:src/cement_runtime/store.py"), text=True))
 
     def test_b22_schema_ddl_matches_entry_digest(self):
         """B22: M3.2a closing DDL equals its entry digest; the live fingerprint binds live DDL."""

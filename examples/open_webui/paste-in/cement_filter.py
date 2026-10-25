@@ -20,8 +20,8 @@ from pydantic import BaseModel, Field
 # The embedded source keeps its own line breaks; one of its pragma comments runs past 100
 # columns inside the string, where ruff reads no pragma.
 # ruff: noqa: E501
-_CEMENT_PACKAGE = "_cement_runtime_bce4799778e3c2ac"
-_CEMENT_DIGEST = "bce4799778e3c2aca56c9cb00ab7a738cea258d928c42605c562242a5caf0b44"
+_CEMENT_PACKAGE = "_cement_runtime_ac1daa51a266ac34"
+_CEMENT_DIGEST = "ac1daa51a266ac344d965bf7f8f032bc5438cb00fe0a110c646ffedaea734f4b"
 _CEMENT_SOURCES = {
     "__init__": r'''
 """Cement public API."""
@@ -1493,6 +1493,27 @@ class QuarantineResult:
 
 
 @dataclass(frozen=True, slots=True)
+class PruneResult:
+    """What one ``prune_proposals`` call deleted: proposals created before ``cutoff_us`` that no
+    example referenced. ``proposal_ids`` holds the first 100 sorted ids; the hash binds them all."""
+
+    cutoff_us: int
+    count: int
+    proposal_ids: tuple[str, ...]
+    proposal_ids_hash: str
+
+
+@dataclass(frozen=True, slots=True)
+class ErasureResult:
+    """One ``erase_partition``: its tombstone id, the partition digest it records, and the rows it
+    deleted per table."""
+
+    erasure_id: str
+    partition_hash: str
+    counts: dict[str, int]
+
+
+@dataclass(frozen=True, slots=True)
 class PendingProposalGap:
     proposal_id: str
     operation_revision: int
@@ -2630,7 +2651,7 @@ from pathlib import Path
 
 from .errors import CementError, IntegrityError, StateError, ValidationError
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 MIN_SQLITE = (3, 37, 0)  # STRICT tables
 
 SCHEMA = r"""
@@ -2861,6 +2882,21 @@ CREATE TABLE IF NOT EXISTS events (
     created_at_us INTEGER NOT NULL
 ) STRICT;
 
+-- One row exists only inside a `partition erase` transaction; it opens the delete guards
+-- below for that partition alone.
+CREATE TABLE IF NOT EXISTS erasure_grants (
+    partition TEXT PRIMARY KEY
+) STRICT;
+
+CREATE TABLE IF NOT EXISTS erasures (
+    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL UNIQUE,
+    partition_hash TEXT NOT NULL,
+    counts_json TEXT NOT NULL,
+    erased_by TEXT NOT NULL,
+    erased_at_us INTEGER NOT NULL
+) STRICT;
+
 CREATE INDEX IF NOT EXISTS proposals_scope
     ON proposals(partition, operation, status, status_sequence);
 CREATE UNIQUE INDEX IF NOT EXISTS proposals_source
@@ -2896,7 +2932,12 @@ BEFORE UPDATE ON examples BEGIN
     SELECT RAISE(ABORT, 'examples are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS examples_no_delete
-BEFORE DELETE ON examples BEGIN
+BEFORE DELETE ON examples
+WHEN NOT EXISTS (
+    SELECT 1 FROM erasure_grants WHERE partition =
+        OLD.partition
+)
+BEGIN
     SELECT RAISE(ABORT, 'examples are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS revocations_no_update
@@ -2904,7 +2945,12 @@ BEFORE UPDATE ON example_revocations BEGIN
     SELECT RAISE(ABORT, 'revocations are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS revocations_no_delete
-BEFORE DELETE ON example_revocations BEGIN
+BEFORE DELETE ON example_revocations
+WHEN NOT EXISTS (
+    SELECT 1 FROM erasure_grants WHERE partition =
+        (SELECT partition FROM examples WHERE id = OLD.example_id)
+)
+BEGIN
     SELECT RAISE(ABORT, 'revocations are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS artifact_evidence_no_update
@@ -2940,7 +2986,12 @@ ON artifacts BEGIN
     SELECT RAISE(ABORT, 'artifact build fields are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS artifact_evidence_no_delete
-BEFORE DELETE ON artifact_evidence BEGIN
+BEFORE DELETE ON artifact_evidence
+WHEN NOT EXISTS (
+    SELECT 1 FROM erasure_grants WHERE partition =
+        (SELECT partition FROM artifacts WHERE id = OLD.artifact_id)
+)
+BEGIN
     SELECT RAISE(ABORT, 'artifact evidence edges are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS test_reports_no_update
@@ -2948,7 +2999,12 @@ BEFORE UPDATE ON test_reports BEGIN
     SELECT RAISE(ABORT, 'test reports are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS test_reports_no_delete
-BEFORE DELETE ON test_reports BEGIN
+BEFORE DELETE ON test_reports
+WHEN NOT EXISTS (
+    SELECT 1 FROM erasure_grants WHERE partition =
+        (SELECT partition FROM artifacts WHERE id = OLD.artifact_id)
+)
+BEGIN
     SELECT RAISE(ABORT, 'test reports are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS artifact_tests_no_update
@@ -2962,7 +3018,13 @@ BEGIN
     SELECT RAISE(ABORT, 'artifact test set is sealed');
 END;
 CREATE TRIGGER IF NOT EXISTS artifact_tests_no_delete
-BEFORE DELETE ON artifact_tests BEGIN
+BEFORE DELETE ON artifact_tests
+WHEN NOT EXISTS (
+    SELECT 1 FROM erasure_grants WHERE partition =
+        (SELECT a.partition FROM test_reports AS r
+            JOIN artifacts AS a ON a.id = r.artifact_id WHERE r.id = OLD.report_id)
+)
+BEGIN
     SELECT RAISE(ABORT, 'artifact tests are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS function_memberships_sealed_insert
@@ -2976,7 +3038,12 @@ BEFORE UPDATE ON function_memberships BEGIN
     SELECT RAISE(ABORT, 'function memberships are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS function_memberships_no_delete
-BEFORE DELETE ON function_memberships BEGIN
+BEFORE DELETE ON function_memberships
+WHEN NOT EXISTS (
+    SELECT 1 FROM erasure_grants WHERE partition =
+        (SELECT partition FROM function_receipts WHERE id = OLD.receipt_id)
+)
+BEGIN
     SELECT RAISE(ABORT, 'function memberships are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS function_receipts_no_update
@@ -2984,7 +3051,12 @@ BEFORE UPDATE ON function_receipts BEGIN
     SELECT RAISE(ABORT, 'function receipts are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS function_receipts_no_delete
-BEFORE DELETE ON function_receipts BEGIN
+BEFORE DELETE ON function_receipts
+WHEN NOT EXISTS (
+    SELECT 1 FROM erasure_grants WHERE partition =
+        OLD.partition
+)
+BEGIN
     SELECT RAISE(ABORT, 'function receipts are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS projection_programs_no_update
@@ -2992,7 +3064,14 @@ BEFORE UPDATE ON projection_programs BEGIN
     SELECT RAISE(ABORT, 'projection programs are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS projection_programs_no_delete
-BEFORE DELETE ON projection_programs BEGIN
+BEFORE DELETE ON projection_programs
+WHEN NOT (
+    EXISTS (SELECT 1 FROM erasure_grants)
+    AND NOT EXISTS (SELECT 1 FROM projection_settings WHERE program_hash = OLD.program_hash)
+    AND NOT EXISTS (SELECT 1 FROM artifacts WHERE projection_hash = OLD.program_hash)
+    AND NOT EXISTS (SELECT 1 FROM function_receipts WHERE projection_hash = OLD.program_hash)
+)
+BEGIN
     SELECT RAISE(ABORT, 'projection programs are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS projection_settings_no_update
@@ -3000,7 +3079,12 @@ BEFORE UPDATE ON projection_settings BEGIN
     SELECT RAISE(ABORT, 'projection settings are append-only');
 END;
 CREATE TRIGGER IF NOT EXISTS projection_settings_no_delete
-BEFORE DELETE ON projection_settings BEGIN
+BEFORE DELETE ON projection_settings
+WHEN NOT EXISTS (
+    SELECT 1 FROM erasure_grants WHERE partition =
+        OLD.partition
+)
+BEGIN
     SELECT RAISE(ABORT, 'projection settings are append-only');
 END;
 CREATE TRIGGER IF NOT EXISTS switch_settings_no_update
@@ -3008,7 +3092,12 @@ BEFORE UPDATE ON switch_settings BEGIN
     SELECT RAISE(ABORT, 'switch settings are append-only');
 END;
 CREATE TRIGGER IF NOT EXISTS switch_settings_no_delete
-BEFORE DELETE ON switch_settings BEGIN
+BEFORE DELETE ON switch_settings
+WHEN NOT EXISTS (
+    SELECT 1 FROM erasure_grants WHERE partition =
+        OLD.partition
+)
+BEGIN
     SELECT RAISE(ABORT, 'switch settings are append-only');
 END;
 CREATE TRIGGER IF NOT EXISTS switch_settings_pin_scope
@@ -3025,8 +3114,21 @@ BEFORE UPDATE ON events BEGIN
     SELECT RAISE(ABORT, 'events are append-only');
 END;
 CREATE TRIGGER IF NOT EXISTS events_no_delete
-BEFORE DELETE ON events BEGIN
+BEFORE DELETE ON events
+WHEN NOT EXISTS (
+    SELECT 1 FROM erasure_grants WHERE partition =
+        OLD.partition
+)
+BEGIN
     SELECT RAISE(ABORT, 'events are append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS erasures_no_update
+BEFORE UPDATE ON erasures BEGIN
+    SELECT RAISE(ABORT, 'erasure records are immutable');
+END;
+CREATE TRIGGER IF NOT EXISTS erasures_no_delete
+BEFORE DELETE ON erasures BEGIN
+    SELECT RAISE(ABORT, 'erasure records are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS schema_metadata_no_update
 BEFORE UPDATE ON schema_metadata BEGIN
@@ -3296,6 +3398,11 @@ class Store:
             if read_only:
                 # Last: the setup pragmas above are writes the allowlist denies.
                 connection.set_authorizer(_read_authorizer)
+            else:
+                # Every write zeroes the space it frees, so a pruned or erased row leaves no copy
+                # in the file; switched on at erase time alone, copies that earlier page moves and
+                # updates had left behind survived the erase.
+                connection.execute("PRAGMA secure_delete = ON")
         except Exception:
             connection.close()
             raise
@@ -3444,6 +3551,7 @@ from .models import (
     CompileScope,
     DraftEntry,
     DraftVerification,
+    ErasureResult,
     EventRecord,
     ExampleRecord,
     FunctionAnchorReport,
@@ -3476,6 +3584,7 @@ from .models import (
     Promotion,
     ProposalRecord,
     ProposalView,
+    PruneResult,
     QuarantineMember,
     QuarantinePlan,
     QuarantineResult,
@@ -3780,6 +3889,73 @@ def _stored_int(
     if type(value) is not int or not minimum <= value <= maximum:
         raise IntegrityError(f"{label} is invalid")
     return value
+
+
+# Whether any table that carries `partition` directly holds a row of it; `erase_partition`
+# reaches the other tables through these.
+_PARTITION_PRESENT = """
+    SELECT 1 FROM operations WHERE partition = :p
+    UNION ALL SELECT 1 FROM proposals WHERE partition = :p
+    UNION ALL SELECT 1 FROM examples WHERE partition = :p
+    UNION ALL SELECT 1 FROM artifacts WHERE partition = :p
+    UNION ALL SELECT 1 FROM function_receipts WHERE partition = :p
+    UNION ALL SELECT 1 FROM projection_settings WHERE partition = :p
+    UNION ALL SELECT 1 FROM switch_settings WHERE partition = :p
+    UNION ALL SELECT 1 FROM events WHERE partition = :p
+    LIMIT 1
+"""
+
+# Child-first, so each guard trigger still finds its row's partition through the parent and every
+# foreign key holds at each statement's end.
+_ERASE_STEPS = (
+    (
+        "artifact_tests",
+        """
+        DELETE FROM artifact_tests WHERE report_id IN (
+            SELECT r.id FROM test_reports AS r JOIN artifacts AS a ON a.id = r.artifact_id
+            WHERE a.partition = ?)
+        """,
+    ),
+    (
+        "function_memberships",
+        """
+        DELETE FROM function_memberships WHERE receipt_id IN (
+            SELECT id FROM function_receipts WHERE partition = ?)
+        """,
+    ),
+    (
+        "test_reports",
+        """
+        DELETE FROM test_reports WHERE artifact_id IN (
+            SELECT id FROM artifacts WHERE partition = ?)
+        """,
+    ),
+    (
+        "artifact_evidence",
+        """
+        DELETE FROM artifact_evidence WHERE artifact_id IN (
+            SELECT id FROM artifacts WHERE partition = ?)
+        """,
+    ),
+    (
+        "example_revocations",
+        """
+        DELETE FROM example_revocations WHERE example_id IN (
+            SELECT id FROM examples WHERE partition = ?)
+        """,
+    ),
+    ("switch_settings", "DELETE FROM switch_settings WHERE partition = ?"),
+    ("function_receipts", "DELETE FROM function_receipts WHERE partition = ?"),
+    ("projection_settings", "DELETE FROM projection_settings WHERE partition = ?"),
+    ("artifacts", "DELETE FROM artifacts WHERE partition = ?"),
+    ("examples", "DELETE FROM examples WHERE partition = ?"),
+    ("proposals", "DELETE FROM proposals WHERE partition = ?"),
+    ("events", "DELETE FROM events WHERE partition = ?"),
+    ("operations", "DELETE FROM operations WHERE partition = ?"),
+)
+
+# The largest age whose cutoff in microseconds still fits a signed 64-bit SQLite integer.
+_MAX_AGE_SECONDS = (2**63 - 1) // 1_000_000
 
 
 def _event(
@@ -10408,6 +10584,138 @@ class System:
                     }
                 )
             return result
+
+    # -- retention (p135-e3) ---------------------------------------------------
+
+    def prune_proposals(
+        self, partition: str, *, older_than_seconds: int, actor: str
+    ) -> PruneResult:
+        """Delete the partition's proposals that no example references and that are older than
+        ``older_than_seconds``.
+
+        A proposal created before ``cutoff_us`` (now minus the age) is deleted; one created exactly
+        at the cutoff stays. Pending and rejected proposals qualify; an accepted or corrected one is
+        the evidence of its example and stays. One write transaction (every write connection runs
+        SQLite ``secure_delete``, so the deleted bytes leave the database file) and one
+        ``retention.pruned`` event; nothing to prune writes nothing. A pruned pending proposal stops
+        counting toward recurrence, and its source id can be retained again.
+        """
+
+        partition = _name(partition, "partition")
+        if type(older_than_seconds) is not int or not 0 <= older_than_seconds <= _MAX_AGE_SECONDS:
+            raise ValidationError(
+                f"older_than_seconds must be an integer from 0 to {_MAX_AGE_SECONDS}"
+            )
+        actor = _text(actor, "actor", maximum=256)
+        with self.store.transaction(write=True) as connection:
+            now = self._now()
+            cutoff = now - older_than_seconds * 1_000_000
+            ids = [
+                str(row["id"])
+                for row in connection.execute(
+                    """
+                    SELECT p.id FROM proposals AS p
+                    WHERE p.partition = ? AND p.created_at_us < ?
+                      AND NOT EXISTS (SELECT 1 FROM examples AS e WHERE e.proposal_id = p.id)
+                    """,
+                    (partition, cutoff),
+                )
+            ]
+            count, preview, ids_hash = _id_list_projection(ids)
+            if ids:
+                deleted = connection.executemany(
+                    "DELETE FROM proposals WHERE id = ?", [(ident,) for ident in ids]
+                ).rowcount
+                if deleted != count:
+                    raise IntegrityError("prune deleted an unexpected proposal row count")
+                _event(
+                    connection,
+                    partition=partition,
+                    kind="retention.pruned",
+                    subject_type="partition",
+                    subject_id=partition,
+                    payload={
+                        "actor": actor,
+                        "count": count,
+                        "cutoff_us": cutoff,
+                        "proposal_ids": cast(list[JSONValue], preview),
+                        "proposal_ids_hash": ids_hash,
+                    },
+                    now_us=now,
+                )
+            return PruneResult(
+                cutoff_us=cutoff,
+                count=count,
+                proposal_ids=tuple(preview),
+                proposal_ids_hash=ids_hash,
+            )
+
+    def erase_partition(self, partition: str, *, actor: str) -> ErasureResult:
+        """Delete every row of ``partition`` in one transaction and keep one content-free tombstone.
+
+        The delete guards open for this partition alone while the transaction holds its
+        ``erasure_grants`` row; rows go child-first, and a projection program goes only when no
+        remaining row names it. SQLite ``secure_delete``, on for every write connection, overwrites
+        the deleted bytes in the database file; copies outside it (backups, the rollback journal's
+        freed disk blocks) are the deployment's to expire. A partition with no rows raises
+        ``NotFoundError`` and writes nothing.
+        """
+
+        partition = _name(partition, "partition")
+        actor = _text(actor, "actor", maximum=256)
+        with self.store.transaction(write=True) as connection:
+            present = connection.execute(_PARTITION_PRESENT, {"p": partition}).fetchone()
+            if present is None:
+                raise NotFoundError("the partition has no rows")
+            programs = sorted(
+                str(row[0])
+                for row in connection.execute(
+                    """
+                    SELECT program_hash FROM projection_settings WHERE partition = ?
+                    UNION SELECT projection_hash FROM artifacts
+                        WHERE partition = ? AND projection_hash IS NOT NULL
+                    UNION SELECT projection_hash FROM function_receipts
+                        WHERE partition = ? AND projection_hash IS NOT NULL
+                    """,
+                    (partition, partition, partition),
+                )
+            )
+            connection.execute("INSERT INTO erasure_grants(partition) VALUES (?)", (partition,))
+            counts = {
+                table: connection.execute(statement, (partition,)).rowcount
+                for table, statement in _ERASE_STEPS
+            }
+            counts["projection_programs"] = sum(
+                connection.execute(
+                    """
+                    DELETE FROM projection_programs WHERE program_hash = ?
+                      AND NOT EXISTS (SELECT 1 FROM projection_settings WHERE program_hash = ?)
+                      AND NOT EXISTS (SELECT 1 FROM artifacts WHERE projection_hash = ?)
+                      AND NOT EXISTS (SELECT 1 FROM function_receipts WHERE projection_hash = ?)
+                    """,
+                    (program, program, program, program),
+                ).rowcount
+                for program in programs
+            )
+            connection.execute("DELETE FROM erasure_grants WHERE partition = ?", (partition,))
+            erasure_id = _new_id("er")
+            partition_hash = _digest_strings("cement-partition-v1", (partition,))
+            connection.execute(
+                """
+                INSERT INTO erasures(id, partition_hash, counts_json, erased_by, erased_at_us)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    erasure_id,
+                    partition_hash,
+                    canonicalize(cast(dict[str, JSONValue], counts)).text,
+                    actor,
+                    self._now(),
+                ),
+            )
+            return ErasureResult(
+                erasure_id=erasure_id, partition_hash=partition_hash, counts=dict(counts)
+            )
 
     def events(
         self,

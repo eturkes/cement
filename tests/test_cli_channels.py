@@ -1302,7 +1302,7 @@ class CliChannelTests(unittest.TestCase):
         claim.
         """
         before = self.table_counts()
-        self.assertEqual(len(before), 15)
+        self.assertEqual(len(before), 17)  # p135-e3: schema v4 adds erasure_grants + erasures
         source = json.dumps({"input": 1, "output": 2, "provenance": {}})
         run = self.run_cli(
             "proposal", "submit", "absent", "--submission", source
@@ -2708,7 +2708,8 @@ class CliChannelTests(unittest.TestCase):
             hashlib.sha256(current).hexdigest(),
             "2b2650144d4b384af4d8bfe67e1f9de0e186b609f3bb2632e2f81b53536770f7",
         )
-        self.assertEqual(SCHEMA_VERSION, 3)
+        # p135-e3 re-scope: the v3 claim reads the last v3 revision (331a3b4); v4 is live.
+        self.assertIn("\nSCHEMA_VERSION = 3\n", subprocess.check_output(("git", "-C", str(ROOT), "show", "331a3b4:src/cement_runtime/store.py"), text=True))
 
     def test_x25_one_successful_cli_submission_preserves_the_direct_library(self) -> None:
         """X25 [D26] one successful CLI submission preserves the direct library three-row footprint over all tables
@@ -2727,7 +2728,7 @@ class CliChannelTests(unittest.TestCase):
         """
         self.register()
         before = self.table_counts()
-        self.assertEqual(len(before), 15)
+        self.assertEqual(len(before), 17)  # p135-e3: schema v4 adds erasure_grants + erasures
         source = json.dumps(
             {"input": {"value": 1}, "output": {"value": 2}, "provenance": {}}
         )

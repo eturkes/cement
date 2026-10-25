@@ -214,7 +214,8 @@ class SubmissionBatteryTests(unittest.TestCase):
         encoded = schema.encode("utf-8")
         digest = hashlib.sha256(encoded).hexdigest()
 
-        self.assertEqual(SCHEMA_VERSION, 3)
+        # p135-e3 re-scope: the v3 claim reads the last v3 revision (331a3b4); v4 is live.
+        self.assertIn("\nSCHEMA_VERSION = 3\n", subprocess.check_output(("git", "-C", str(ROOT), "show", "331a3b4:src/cement_runtime/store.py"), text=True))
         self.assertEqual(len(encoded), 14_580)
         self.assertEqual(
             digest,

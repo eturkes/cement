@@ -83,15 +83,32 @@ class _Ledger(unittest.TestCase):
 
 class SchemaIdentityBattery(_Ledger):
     def test_s1_version_three_and_the_fingerprint_bind_the_schema_text(self) -> None:
-        self.assertEqual(SCHEMA_VERSION, 3)
+        # p135-e3 re-scope: v3 = the package at 331a3b4 (the last v3 revision); v4 is live and
+        # pinned by `tests/test_retention_battery.py`.
+        archive = subprocess.run(
+            ["git", "-C", str(ROOT), "archive", "331a3b4", "src"], check=True, capture_output=True
+        ).stdout
+        package = self.root / "v3"
+        with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
+            tar.extractall(package, filter="data")
+        probe = (
+            "import hashlib, json, sqlite3, sys; sys.path.insert(0, sys.argv[1]);"
+            " from cement_runtime import System; from cement_runtime import store; System(sys.argv[2]);"
+            " c = sqlite3.connect(sys.argv[2]);"
+            " print(json.dumps([store.SCHEMA_VERSION, store.SCHEMA_FINGERPRINT,"
+            " hashlib.sha256(store.SCHEMA.encode('utf-8')).hexdigest(),"
+            " c.execute('PRAGMA user_version').fetchone()[0],"
+            " c.execute('SELECT key, value FROM schema_metadata').fetchall()]))"
+        )
+        version, fingerprint, digest, user_version, metadata = json.loads(subprocess.run(
+            [sys.executable, "-I", "-c", probe, str(package / "src"), self.db],
+            check=True, capture_output=True, text=True,
+            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+        ).stdout)
+        self.assertEqual((version, user_version), (3, 3))
+        self.assertEqual(fingerprint, digest)
+        self.assertEqual(metadata, [["schema-v3", fingerprint]])
         self.assertEqual(SCHEMA_FINGERPRINT, hashlib.sha256(SCHEMA.encode("utf-8")).hexdigest())
-        System(self.db)
-        with closing(sqlite3.connect(self.db)) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 3)
-            self.assertEqual(
-                connection.execute("SELECT key, value FROM schema_metadata").fetchall(),
-                [("schema-v3", SCHEMA_FINGERPRINT)],
-            )
 
     def test_s1_a_real_v2_ledger_refuses_to_open_naming_the_reset(self) -> None:
         archive = subprocess.run(
@@ -114,7 +131,7 @@ class SchemaIdentityBattery(_Ledger):
         before = pathlib.Path(self.db).read_bytes()
         for create in (True, False):
             with self.subTest(create=create), self.assertRaisesRegex(
-                IntegrityError, r"database schema 2 is unsupported; expected 3 .*start a new ledger"
+                IntegrityError, rf"database schema 2 is unsupported; expected {SCHEMA_VERSION} .*start a new ledger"
             ):
                 System(self.db, create=create)
         code, out, err = _run(self.db, "operation", "list")

@@ -5709,7 +5709,8 @@ class SystemTests(unittest.TestCase):
 
 
     def test_function_promotion_schema_v2_is_reference_only_and_immutable(self) -> None:
-        self.assertEqual(SCHEMA_VERSION, 3)
+        # p135-e3 re-scope: the v3 claim reads the last v3 revision (331a3b4); v4 is live.
+        self.assertIn("\nSCHEMA_VERSION = 3\n", subprocess.check_output(("git", "-C", str(pathlib.Path(__file__).resolve().parents[1]), "show", "331a3b4:src/cement_runtime/store.py"), text=True))
         self.register(confirmations=2, reviewers=1, span=0)
         _, promotion = self._promote_three_as_function("function-schema")
 
@@ -6483,7 +6484,7 @@ class SystemTests(unittest.TestCase):
             connection.close()
         with self.assertRaisesRegex(
             IntegrityError,
-            "database schema 1 is unsupported; expected 3",
+            f"database schema 1 is unsupported; expected {SCHEMA_VERSION}",
         ):
             System(legacy)
         connection = sqlite3.connect(legacy)
@@ -17231,6 +17232,8 @@ class PreservedInvariantCensusTests(unittest.TestCase):
             "examples.reviewer",
         ],
         "quarantine": ["events.payload_json[json]"],
+        "prune_proposals": ["events.payload_json[json]"],
+        "erase_partition": ["erasures.erased_by"],
     }
     EVENT_PAYLOAD_KEYS = {
         "artifact.challenged": ("example_id", "receipt_hash", "reviewer", "suspended"),
@@ -17270,6 +17273,7 @@ class PreservedInvariantCensusTests(unittest.TestCase):
         "proposal.corrected": ("contradicted_artifact_ids", "example_id", "receipt_hash", "reviewer"),
         "proposal.created": (),
         "proposal.rejected": ("reviewer",),
+        "retention.pruned": ("actor", "count", "cutoff_us", "proposal_ids", "proposal_ids_hash"),
     }
 
     def setUp(self) -> None:
@@ -17388,6 +17392,11 @@ class PreservedInvariantCensusTests(unittest.TestCase):
              lambda s, c, i: s.supersede_examples(p, op, example_ids=c, output={"y": 9}, reviewer=i)),
             ("quarantine", "actor", quarantine_setup,
              lambda s, c, i: s.quarantine(p, op, plan_digest=c, actor=i)),
+            ("prune_proposals", "actor",
+             lambda s: s.submit_proposal(p, op, {"x": 4}, candidate=Candidate(output={"y": 4}, provenance={})),
+             lambda s, c, i: s.prune_proposals(p, older_than_seconds=0, actor=i)),
+            ("erase_partition", "actor", lambda s: None,
+             lambda s, c, i: s.erase_partition(p, actor=i)),
         )
 
     @staticmethod
@@ -17417,16 +17426,23 @@ class PreservedInvariantCensusTests(unittest.TestCase):
             connection.close()
 
     def test_the_live_schema_is_frozen_at_v3(self) -> None:
-        # v3 shipped with the IMPLEMENT close: a schema byte change now needs a version bump in an
-        # owner-approved unit, which updates this frozen digest beside it.
-        payload = store_module.SCHEMA.encode("utf-8")
-        self.assertEqual(SCHEMA_VERSION, 3)
+        # v3 shipped with the IMPLEMENT close and stayed frozen through its last revision; the
+        # owner-approved v4 cut (p135-e3, D5) left it there. v4 freezes at its own phase close.
+        # p135-e3 re-scope: the v3 claim reads the last v3 revision (331a3b4); v4 is live.
+        closed = subprocess.check_output(("git", "-C", str(pathlib.Path(__file__).resolve().parents[1]), "show", "331a3b4:src/cement_runtime/store.py"), text=True)
+        self.assertIn("\nSCHEMA_VERSION = 3\n", closed)
+        payload = next(
+            ast.literal_eval(node.value)
+            for node in ast.parse(closed).body
+            if isinstance(node, ast.Assign)
+            and any(isinstance(target, ast.Name) and target.id == "SCHEMA" for target in node.targets)
+        ).encode("utf-8")
         self.assertEqual(len(payload), 15_997)
         self.assertEqual(
             hashlib.sha256(payload).hexdigest(),
             "298d84d468ea62b8fa77a7e1ab5f353155b119beccd22a17ac719d7ee2129106",
         )
-        self.assertEqual(store_module.SCHEMA_FINGERPRINT, hashlib.sha256(payload).hexdigest())
+        self.assertEqual(store_module.SCHEMA_FINGERPRINT, hashlib.sha256(store_module.SCHEMA.encode("utf-8")).hexdigest())
 
     def test_every_identity_writer_records_its_identity_where_it_did(self) -> None:
         census = {

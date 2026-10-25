@@ -496,7 +496,7 @@ class LifecycleRemovalBattery(unittest.TestCase):
             self.assertIsNotNone(before)
             self.assertEqual(tuple(before), ("generating", None, "old-process", 999))
             before_bytes = database.read_bytes()
-            with self.assertRaisesRegex(IntegrityError, r"^database schema 2 is unsupported; expected 3 \(no migration exists before 1\.0: start a new ledger\)$"):
+            with self.assertRaisesRegex(IntegrityError, r"^database schema 2 is unsupported; expected 4 \(no migration exists before 1\.0: start a new ledger\)$"):
                 reopened = System(database, clock_us=lambda: 200)
                 reopened.revise_operation("partition", "operation", policy=CompilePolicy(), revised_by="revision-actor")
             with contextlib.closing(sqlite3.connect(database)) as connection:

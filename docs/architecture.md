@@ -216,7 +216,7 @@ an example. A pinned version keeps answering
 across a revision until one of its members is revoked, suspended, or challenged. Callers reconcile prior effects, then work
 under the current revision.
 
-Confirmed receipt data and artifact evidence edges are immutable. Revocation is a separate tombstone;
+Confirmed receipt data and artifact evidence edges are immutable outside a partition erasure. Revocation is a separate tombstone;
 it suspends every non-retired dependent build. Artifact suspension and retirement are terminal, and no
 public surface replays a historical per-artifact promotion receipt.
 
@@ -282,7 +282,7 @@ Initialization adopts only a schema-empty SQLite database. It creates the schema
 SQLite integrity and foreign-key checks. It then validates the database metadata fingerprint plus
 the live tables, indexes, and triggers. Unrecognized non-empty databases reject without journal/schema
 mutation. Evidence edges, receipts, verification reports/tests, revocations, events, function
-receipts, and function memberships are database-immutable. Evidence replay
+receipts, and function memberships are database-immutable outside a partition erasure. Evidence replay
 and test recording stream rows in bounded batches. Monotonic sequences provide a proposal transition
 feed, an immutable verification-report feed, and insertion catalogs for examples/artifacts even if the
 wall clock rolls backward. The append-only event feed carries later revocation and artifact lifecycle
@@ -295,13 +295,22 @@ child set.
 Schema version 3 holds the function layer: the `function_receipts` and `function_memberships` tables,
 their indexes, and their triggers. A receipt is self-bound and stores the candidate and retired ID sets
 as counts and digests. A membership row names its receipt, its ordinal, its artifact, and its report.
-Triggers reject every update and delete on both tables. A further trigger rejects a membership insert
+Triggers reject every update on both tables, and every delete outside a partition erasure. A further trigger rejects a membership insert
 once the receipt row exists, so promotion must write the whole membership set before its receipt. A
 deferred composite foreign key binds each membership to its receipt and to exactly that receipt's
 `function_hash`. Version 3 also stores proposals with their scope and source id, and the supersession
 links between examples. The projection programs, the projection settings, and the switch settings are
 append-only.
-Initialization rejects a version-2 ledger and names the reset; this release ships no migration runner.
+Schema version 4 adds erasure. Each delete-refusing trigger of a partition's rows carries one
+clause: it allows a delete while an `erasure_grants` row names the row's partition, read from the
+row itself or from its parent row. `erase_partition` inserts that grant, deletes the partition's
+rows children first, so that each trigger still finds a parent row to read, and deletes its grant in
+the same transaction. A projection program goes only while a grant exists and no settings,
+artifact, or receipt row names it. The `erasures` table keeps one record per erasure, and its
+triggers reject every update and delete. Each write connection runs SQLite `secure_delete`, so
+any space that a write frees is overwritten from the ledger's creation.
+Initialization rejects a version-2 or version-3 ledger and names the reset; this release ships no
+migration runner.
 
 Set promotion emits one `function.promoted` event with bounded ID projections. The membership table
 stays authoritative for the exact member list. `latest_function_receipt` returns the current-revision

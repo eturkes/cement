@@ -51,7 +51,8 @@ correctness.
   the complete evidence snapshot, and the sealed verification test set. Its receipt binds all of
   those values; retirement and suspension are one-way states. Set promotion repeats one function hash,
   retires predecessors, activates candidates, and writes one immutable receipt plus ordered
-  memberships in the same transaction.
+  memberships in the same transaction. Only `partition erase` deletes them, with every other row of
+  the partition.
 - A new confirmation that contradicts a promoted case is a revision: the live set fails verification
   and answers nothing until a promotion replaces that case or the contradicting example is revoked
   or superseded. A challenge suspends the contradicted
@@ -428,6 +429,44 @@ equal to the old one (exit 2), an unknown example (exit 3), and a revoked or alr
 example (exit 4). `example revoke` withdraws an example that is wrong, and it also
 stops every version built on that example from answering.
 
+
+### Retention and erasure
+
+A retained answer stays in the ledger until you delete it. Two commands delete rows. Each one
+writes in one transaction, and each write overwrites any space that it frees, so deleted rows leave
+the ledger file.
+
+`retention prune` deletes the partition's proposals that are older than an age and that no example
+uses:
+
+```bash
+uv run cement --db demo.db --partition acme retention prune --older-than 90 --actor ops-lead
+```
+
+A pending or rejected proposal is old when Cement retained it more than `--older-than` days ago. An
+accepted or corrected proposal is the evidence of its example, so the command keeps it. Set an age
+longer than your interval between learning passes, because a pruned pending proposal no longer
+counts toward recurrence. A pruned proposal also frees its source id, so a later retention with that
+id writes a new proposal. The command returns `cutoff_us`, `count`, the first 100 deleted ids, and a
+hash of all of them, and it writes one `retention.pruned` event. When nothing is old enough, it writes
+nothing.
+
+`partition erase` deletes every row of one partition: its operations, proposals, examples, versions,
+switch settings, and events.
+
+```bash
+uv run cement --db demo.db --partition acme partition erase --actor ops-lead --confirm acme
+```
+
+`--confirm` must repeat the `--partition` value, or the command writes nothing and exits 2. The
+command keeps one erasure record: a digest of the partition name, the number of rows that it deleted
+from each table, the actor, and a timestamp. The digest is not a secret: a person who knows the
+partition name can compute it. A projection program that another partition also uses stays. A
+partition with no rows exits 3 and writes nothing. No command restores an erased partition.
+
+Copies outside the ledger file stay: backups, snapshots, and disk blocks that a rollback journal used. If an operator switched the ledger to WAL mode, its `-wal` file also keeps old pages until a
+checkpoint. Expire those copies through your backup retention and your storage encryption.
+
 ## Library API
 
 ```python
@@ -469,6 +508,7 @@ refusal writes nothing:
 | Build | `compile`, `verify_drafts`, `inspect_function_promotion`, `promote_function` (repeats the inspected hash or raises `ConflictError`) |
 | Versions + switch | `function_receipts`, `function_versions`, `diff_versions`, `set_switch` (`off`, `follow`, `pinned`), `switch`, `serving` |
 | Answer | `resolve`, `verify_function`, `function_report`, `reconstruct_function_receipt`; `evaluate` + `parse_function` answer from a bundle with no ledger |
+| Retention | `prune_proposals` (`PruneResult`), `erase_partition` (`ErasureResult` and one erasure record) |
 
 `cement_runtime.signature.verify_signature` checks an SSH signature over bundle bytes against an
 allowed signers file before you parse the bundle. It returns a `SignatureVerification` with the

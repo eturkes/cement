@@ -16,7 +16,7 @@ from pathlib import Path
 
 from .errors import CementError, IntegrityError, StateError, ValidationError
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 MIN_SQLITE = (3, 37, 0)  # STRICT tables
 
 SCHEMA = r"""
@@ -247,6 +247,21 @@ CREATE TABLE IF NOT EXISTS events (
     created_at_us INTEGER NOT NULL
 ) STRICT;
 
+-- One row exists only inside a `partition erase` transaction; it opens the delete guards
+-- below for that partition alone.
+CREATE TABLE IF NOT EXISTS erasure_grants (
+    partition TEXT PRIMARY KEY
+) STRICT;
+
+CREATE TABLE IF NOT EXISTS erasures (
+    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL UNIQUE,
+    partition_hash TEXT NOT NULL,
+    counts_json TEXT NOT NULL,
+    erased_by TEXT NOT NULL,
+    erased_at_us INTEGER NOT NULL
+) STRICT;
+
 CREATE INDEX IF NOT EXISTS proposals_scope
     ON proposals(partition, operation, status, status_sequence);
 CREATE UNIQUE INDEX IF NOT EXISTS proposals_source
@@ -282,7 +297,12 @@ BEFORE UPDATE ON examples BEGIN
     SELECT RAISE(ABORT, 'examples are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS examples_no_delete
-BEFORE DELETE ON examples BEGIN
+BEFORE DELETE ON examples
+WHEN NOT EXISTS (
+    SELECT 1 FROM erasure_grants WHERE partition =
+        OLD.partition
+)
+BEGIN
     SELECT RAISE(ABORT, 'examples are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS revocations_no_update
@@ -290,7 +310,12 @@ BEFORE UPDATE ON example_revocations BEGIN
     SELECT RAISE(ABORT, 'revocations are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS revocations_no_delete
-BEFORE DELETE ON example_revocations BEGIN
+BEFORE DELETE ON example_revocations
+WHEN NOT EXISTS (
+    SELECT 1 FROM erasure_grants WHERE partition =
+        (SELECT partition FROM examples WHERE id = OLD.example_id)
+)
+BEGIN
     SELECT RAISE(ABORT, 'revocations are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS artifact_evidence_no_update
@@ -326,7 +351,12 @@ ON artifacts BEGIN
     SELECT RAISE(ABORT, 'artifact build fields are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS artifact_evidence_no_delete
-BEFORE DELETE ON artifact_evidence BEGIN
+BEFORE DELETE ON artifact_evidence
+WHEN NOT EXISTS (
+    SELECT 1 FROM erasure_grants WHERE partition =
+        (SELECT partition FROM artifacts WHERE id = OLD.artifact_id)
+)
+BEGIN
     SELECT RAISE(ABORT, 'artifact evidence edges are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS test_reports_no_update
@@ -334,7 +364,12 @@ BEFORE UPDATE ON test_reports BEGIN
     SELECT RAISE(ABORT, 'test reports are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS test_reports_no_delete
-BEFORE DELETE ON test_reports BEGIN
+BEFORE DELETE ON test_reports
+WHEN NOT EXISTS (
+    SELECT 1 FROM erasure_grants WHERE partition =
+        (SELECT partition FROM artifacts WHERE id = OLD.artifact_id)
+)
+BEGIN
     SELECT RAISE(ABORT, 'test reports are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS artifact_tests_no_update
@@ -348,7 +383,13 @@ BEGIN
     SELECT RAISE(ABORT, 'artifact test set is sealed');
 END;
 CREATE TRIGGER IF NOT EXISTS artifact_tests_no_delete
-BEFORE DELETE ON artifact_tests BEGIN
+BEFORE DELETE ON artifact_tests
+WHEN NOT EXISTS (
+    SELECT 1 FROM erasure_grants WHERE partition =
+        (SELECT a.partition FROM test_reports AS r
+            JOIN artifacts AS a ON a.id = r.artifact_id WHERE r.id = OLD.report_id)
+)
+BEGIN
     SELECT RAISE(ABORT, 'artifact tests are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS function_memberships_sealed_insert
@@ -362,7 +403,12 @@ BEFORE UPDATE ON function_memberships BEGIN
     SELECT RAISE(ABORT, 'function memberships are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS function_memberships_no_delete
-BEFORE DELETE ON function_memberships BEGIN
+BEFORE DELETE ON function_memberships
+WHEN NOT EXISTS (
+    SELECT 1 FROM erasure_grants WHERE partition =
+        (SELECT partition FROM function_receipts WHERE id = OLD.receipt_id)
+)
+BEGIN
     SELECT RAISE(ABORT, 'function memberships are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS function_receipts_no_update
@@ -370,7 +416,12 @@ BEFORE UPDATE ON function_receipts BEGIN
     SELECT RAISE(ABORT, 'function receipts are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS function_receipts_no_delete
-BEFORE DELETE ON function_receipts BEGIN
+BEFORE DELETE ON function_receipts
+WHEN NOT EXISTS (
+    SELECT 1 FROM erasure_grants WHERE partition =
+        OLD.partition
+)
+BEGIN
     SELECT RAISE(ABORT, 'function receipts are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS projection_programs_no_update
@@ -378,7 +429,14 @@ BEFORE UPDATE ON projection_programs BEGIN
     SELECT RAISE(ABORT, 'projection programs are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS projection_programs_no_delete
-BEFORE DELETE ON projection_programs BEGIN
+BEFORE DELETE ON projection_programs
+WHEN NOT (
+    EXISTS (SELECT 1 FROM erasure_grants)
+    AND NOT EXISTS (SELECT 1 FROM projection_settings WHERE program_hash = OLD.program_hash)
+    AND NOT EXISTS (SELECT 1 FROM artifacts WHERE projection_hash = OLD.program_hash)
+    AND NOT EXISTS (SELECT 1 FROM function_receipts WHERE projection_hash = OLD.program_hash)
+)
+BEGIN
     SELECT RAISE(ABORT, 'projection programs are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS projection_settings_no_update
@@ -386,7 +444,12 @@ BEFORE UPDATE ON projection_settings BEGIN
     SELECT RAISE(ABORT, 'projection settings are append-only');
 END;
 CREATE TRIGGER IF NOT EXISTS projection_settings_no_delete
-BEFORE DELETE ON projection_settings BEGIN
+BEFORE DELETE ON projection_settings
+WHEN NOT EXISTS (
+    SELECT 1 FROM erasure_grants WHERE partition =
+        OLD.partition
+)
+BEGIN
     SELECT RAISE(ABORT, 'projection settings are append-only');
 END;
 CREATE TRIGGER IF NOT EXISTS switch_settings_no_update
@@ -394,7 +457,12 @@ BEFORE UPDATE ON switch_settings BEGIN
     SELECT RAISE(ABORT, 'switch settings are append-only');
 END;
 CREATE TRIGGER IF NOT EXISTS switch_settings_no_delete
-BEFORE DELETE ON switch_settings BEGIN
+BEFORE DELETE ON switch_settings
+WHEN NOT EXISTS (
+    SELECT 1 FROM erasure_grants WHERE partition =
+        OLD.partition
+)
+BEGIN
     SELECT RAISE(ABORT, 'switch settings are append-only');
 END;
 CREATE TRIGGER IF NOT EXISTS switch_settings_pin_scope
@@ -411,8 +479,21 @@ BEFORE UPDATE ON events BEGIN
     SELECT RAISE(ABORT, 'events are append-only');
 END;
 CREATE TRIGGER IF NOT EXISTS events_no_delete
-BEFORE DELETE ON events BEGIN
+BEFORE DELETE ON events
+WHEN NOT EXISTS (
+    SELECT 1 FROM erasure_grants WHERE partition =
+        OLD.partition
+)
+BEGIN
     SELECT RAISE(ABORT, 'events are append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS erasures_no_update
+BEFORE UPDATE ON erasures BEGIN
+    SELECT RAISE(ABORT, 'erasure records are immutable');
+END;
+CREATE TRIGGER IF NOT EXISTS erasures_no_delete
+BEFORE DELETE ON erasures BEGIN
+    SELECT RAISE(ABORT, 'erasure records are immutable');
 END;
 CREATE TRIGGER IF NOT EXISTS schema_metadata_no_update
 BEFORE UPDATE ON schema_metadata BEGIN
@@ -682,6 +763,11 @@ class Store:
             if read_only:
                 # Last: the setup pragmas above are writes the allowlist denies.
                 connection.set_authorizer(_read_authorizer)
+            else:
+                # Every write zeroes the space it frees, so a pruned or erased row leaves no copy
+                # in the file; switched on at erase time alone, copies that earlier page moves and
+                # updates had left behind survived the erase.
+                connection.execute("PRAGMA secure_delete = ON")
         except Exception:
             connection.close()
             raise

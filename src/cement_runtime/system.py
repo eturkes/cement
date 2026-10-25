@@ -67,6 +67,7 @@ from .models import (
     CompileScope,
     DraftEntry,
     DraftVerification,
+    ErasureResult,
     EventRecord,
     ExampleRecord,
     FunctionAnchorReport,
@@ -99,6 +100,7 @@ from .models import (
     Promotion,
     ProposalRecord,
     ProposalView,
+    PruneResult,
     QuarantineMember,
     QuarantinePlan,
     QuarantineResult,
@@ -403,6 +405,73 @@ def _stored_int(
     if type(value) is not int or not minimum <= value <= maximum:
         raise IntegrityError(f"{label} is invalid")
     return value
+
+
+# Whether any table that carries `partition` directly holds a row of it; `erase_partition`
+# reaches the other tables through these.
+_PARTITION_PRESENT = """
+    SELECT 1 FROM operations WHERE partition = :p
+    UNION ALL SELECT 1 FROM proposals WHERE partition = :p
+    UNION ALL SELECT 1 FROM examples WHERE partition = :p
+    UNION ALL SELECT 1 FROM artifacts WHERE partition = :p
+    UNION ALL SELECT 1 FROM function_receipts WHERE partition = :p
+    UNION ALL SELECT 1 FROM projection_settings WHERE partition = :p
+    UNION ALL SELECT 1 FROM switch_settings WHERE partition = :p
+    UNION ALL SELECT 1 FROM events WHERE partition = :p
+    LIMIT 1
+"""
+
+# Child-first, so each guard trigger still finds its row's partition through the parent and every
+# foreign key holds at each statement's end.
+_ERASE_STEPS = (
+    (
+        "artifact_tests",
+        """
+        DELETE FROM artifact_tests WHERE report_id IN (
+            SELECT r.id FROM test_reports AS r JOIN artifacts AS a ON a.id = r.artifact_id
+            WHERE a.partition = ?)
+        """,
+    ),
+    (
+        "function_memberships",
+        """
+        DELETE FROM function_memberships WHERE receipt_id IN (
+            SELECT id FROM function_receipts WHERE partition = ?)
+        """,
+    ),
+    (
+        "test_reports",
+        """
+        DELETE FROM test_reports WHERE artifact_id IN (
+            SELECT id FROM artifacts WHERE partition = ?)
+        """,
+    ),
+    (
+        "artifact_evidence",
+        """
+        DELETE FROM artifact_evidence WHERE artifact_id IN (
+            SELECT id FROM artifacts WHERE partition = ?)
+        """,
+    ),
+    (
+        "example_revocations",
+        """
+        DELETE FROM example_revocations WHERE example_id IN (
+            SELECT id FROM examples WHERE partition = ?)
+        """,
+    ),
+    ("switch_settings", "DELETE FROM switch_settings WHERE partition = ?"),
+    ("function_receipts", "DELETE FROM function_receipts WHERE partition = ?"),
+    ("projection_settings", "DELETE FROM projection_settings WHERE partition = ?"),
+    ("artifacts", "DELETE FROM artifacts WHERE partition = ?"),
+    ("examples", "DELETE FROM examples WHERE partition = ?"),
+    ("proposals", "DELETE FROM proposals WHERE partition = ?"),
+    ("events", "DELETE FROM events WHERE partition = ?"),
+    ("operations", "DELETE FROM operations WHERE partition = ?"),
+)
+
+# The largest age whose cutoff in microseconds still fits a signed 64-bit SQLite integer.
+_MAX_AGE_SECONDS = (2**63 - 1) // 1_000_000
 
 
 def _event(
@@ -7031,6 +7100,138 @@ class System:
                     }
                 )
             return result
+
+    # -- retention (p135-e3) ---------------------------------------------------
+
+    def prune_proposals(
+        self, partition: str, *, older_than_seconds: int, actor: str
+    ) -> PruneResult:
+        """Delete the partition's proposals that no example references and that are older than
+        ``older_than_seconds``.
+
+        A proposal created before ``cutoff_us`` (now minus the age) is deleted; one created exactly
+        at the cutoff stays. Pending and rejected proposals qualify; an accepted or corrected one is
+        the evidence of its example and stays. One write transaction (every write connection runs
+        SQLite ``secure_delete``, so the deleted bytes leave the database file) and one
+        ``retention.pruned`` event; nothing to prune writes nothing. A pruned pending proposal stops
+        counting toward recurrence, and its source id can be retained again.
+        """
+
+        partition = _name(partition, "partition")
+        if type(older_than_seconds) is not int or not 0 <= older_than_seconds <= _MAX_AGE_SECONDS:
+            raise ValidationError(
+                f"older_than_seconds must be an integer from 0 to {_MAX_AGE_SECONDS}"
+            )
+        actor = _text(actor, "actor", maximum=256)
+        with self.store.transaction(write=True) as connection:
+            now = self._now()
+            cutoff = now - older_than_seconds * 1_000_000
+            ids = [
+                str(row["id"])
+                for row in connection.execute(
+                    """
+                    SELECT p.id FROM proposals AS p
+                    WHERE p.partition = ? AND p.created_at_us < ?
+                      AND NOT EXISTS (SELECT 1 FROM examples AS e WHERE e.proposal_id = p.id)
+                    """,
+                    (partition, cutoff),
+                )
+            ]
+            count, preview, ids_hash = _id_list_projection(ids)
+            if ids:
+                deleted = connection.executemany(
+                    "DELETE FROM proposals WHERE id = ?", [(ident,) for ident in ids]
+                ).rowcount
+                if deleted != count:
+                    raise IntegrityError("prune deleted an unexpected proposal row count")
+                _event(
+                    connection,
+                    partition=partition,
+                    kind="retention.pruned",
+                    subject_type="partition",
+                    subject_id=partition,
+                    payload={
+                        "actor": actor,
+                        "count": count,
+                        "cutoff_us": cutoff,
+                        "proposal_ids": cast(list[JSONValue], preview),
+                        "proposal_ids_hash": ids_hash,
+                    },
+                    now_us=now,
+                )
+            return PruneResult(
+                cutoff_us=cutoff,
+                count=count,
+                proposal_ids=tuple(preview),
+                proposal_ids_hash=ids_hash,
+            )
+
+    def erase_partition(self, partition: str, *, actor: str) -> ErasureResult:
+        """Delete every row of ``partition`` in one transaction and keep one content-free tombstone.
+
+        The delete guards open for this partition alone while the transaction holds its
+        ``erasure_grants`` row; rows go child-first, and a projection program goes only when no
+        remaining row names it. SQLite ``secure_delete``, on for every write connection, overwrites
+        the deleted bytes in the database file; copies outside it (backups, the rollback journal's
+        freed disk blocks) are the deployment's to expire. A partition with no rows raises
+        ``NotFoundError`` and writes nothing.
+        """
+
+        partition = _name(partition, "partition")
+        actor = _text(actor, "actor", maximum=256)
+        with self.store.transaction(write=True) as connection:
+            present = connection.execute(_PARTITION_PRESENT, {"p": partition}).fetchone()
+            if present is None:
+                raise NotFoundError("the partition has no rows")
+            programs = sorted(
+                str(row[0])
+                for row in connection.execute(
+                    """
+                    SELECT program_hash FROM projection_settings WHERE partition = ?
+                    UNION SELECT projection_hash FROM artifacts
+                        WHERE partition = ? AND projection_hash IS NOT NULL
+                    UNION SELECT projection_hash FROM function_receipts
+                        WHERE partition = ? AND projection_hash IS NOT NULL
+                    """,
+                    (partition, partition, partition),
+                )
+            )
+            connection.execute("INSERT INTO erasure_grants(partition) VALUES (?)", (partition,))
+            counts = {
+                table: connection.execute(statement, (partition,)).rowcount
+                for table, statement in _ERASE_STEPS
+            }
+            counts["projection_programs"] = sum(
+                connection.execute(
+                    """
+                    DELETE FROM projection_programs WHERE program_hash = ?
+                      AND NOT EXISTS (SELECT 1 FROM projection_settings WHERE program_hash = ?)
+                      AND NOT EXISTS (SELECT 1 FROM artifacts WHERE projection_hash = ?)
+                      AND NOT EXISTS (SELECT 1 FROM function_receipts WHERE projection_hash = ?)
+                    """,
+                    (program, program, program, program),
+                ).rowcount
+                for program in programs
+            )
+            connection.execute("DELETE FROM erasure_grants WHERE partition = ?", (partition,))
+            erasure_id = _new_id("er")
+            partition_hash = _digest_strings("cement-partition-v1", (partition,))
+            connection.execute(
+                """
+                INSERT INTO erasures(id, partition_hash, counts_json, erased_by, erased_at_us)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    erasure_id,
+                    partition_hash,
+                    canonicalize(cast(dict[str, JSONValue], counts)).text,
+                    actor,
+                    self._now(),
+                ),
+            )
+            return ErasureResult(
+                erasure_id=erasure_id, partition_hash=partition_hash, counts=dict(counts)
+            )
 
     def events(
         self,

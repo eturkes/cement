@@ -2390,7 +2390,7 @@ class ObligationBatteryTests(unittest.TestCase):
                 )
 
         before = _table_counts(path)
-        self.assertEqual(len(before), 15)
+        self.assertEqual(len(before), 17)  # p135-e3: schema v4 adds erasure_grants + erasures
         status, stdout, stderr = _invoke(
             [
                 "--db",
@@ -2795,7 +2795,8 @@ class ObligationBatteryTests(unittest.TestCase):
             hashlib.sha256(current_store).digest(),
             hashlib.sha256(baseline_store).digest(),
         )
-        self.assertEqual(SCHEMA_VERSION, 3)
+        # p135-e3 re-scope: the v3 claim reads the last v3 revision (331a3b4); v4 is live.
+        self.assertIn("\nSCHEMA_VERSION = 3\n", subprocess.check_output(("git", "-C", str(pathlib.Path(__file__).resolve().parents[1]), "show", "331a3b4:src/cement_runtime/store.py"), text=True))
 
         _, ledger = _new_system(self)
         before = _table_counts(ledger)

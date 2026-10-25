@@ -238,6 +238,27 @@ class QuarantineResult:
 
 
 @dataclass(frozen=True, slots=True)
+class PruneResult:
+    """What one ``prune_proposals`` call deleted: proposals created before ``cutoff_us`` that no
+    example referenced. ``proposal_ids`` holds the first 100 sorted ids; the hash binds them all."""
+
+    cutoff_us: int
+    count: int
+    proposal_ids: tuple[str, ...]
+    proposal_ids_hash: str
+
+
+@dataclass(frozen=True, slots=True)
+class ErasureResult:
+    """One ``erase_partition``: its tombstone id, the partition digest it records, and the rows it
+    deleted per table."""
+
+    erasure_id: str
+    partition_hash: str
+    counts: dict[str, int]
+
+
+@dataclass(frozen=True, slots=True)
 class PendingProposalGap:
     proposal_id: str
     operation_revision: int

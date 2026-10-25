@@ -154,7 +154,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.12 under `uv`.
 
 ## Tasks
 
-- [ ] p135-e5 — bundle signatures: `cement_runtime.signature` (SSHSIG + allowed-signers + RFC 8032 verify) + `function eval --signature --allowed-signers`; D7 refusal.
+- [x] cd0d2cf p135-e5 — bundle signatures: `cement_runtime.signature` (SSHSIG + allowed-signers + RFC 8032 verify) + `function eval --signature --allowed-signers`; D7 refusal.
 - [ ] p135-e3 — schema v4 + `retention prune` + `partition erase` over the ledger.
 - [ ] p136-cmp — comparator IR + `set_comparator` (v4 table, amended in place) + `Read`/CLI views.
 - [ ] p136-store — telemetry store + admit / `record_shadow` (captured version, comparator, disagreement → proposal) + `drift` + `observations` + CLI; prune + erase cover it.
@@ -164,6 +164,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.12 under `uv`.
 - [ ] p135-docs — tier `docs`: E2 + E4 + threat model + README `Deployment boundary` per both plans; `resolve → record → resolve` cost measured.
   - Every unit: tier `kernel` unless named; contract `.agent/decisions/<unit>-contract.md` before code; red-first tests (parent + detached-worktree command in the commit body); its own `.agent/review.md` pass; human-facing docs for what it ships.
 - [ ] Phase close — closing-diff reviewers (one per lens) + MAINTAIN's security lens; `.agent/review.md` no open row; CI gate; p135 + p136 closed by acceptance; `Phase: MAINTAIN`.
+  - Also owed here: package 0.2.0 → 0.3.0 (the v4 cut) with `uv.lock`, the provider wheel's `cement-runtime` range + the two-wheel smoke, and v4's frozen schema digest — the lock change re-keys every D28 verdict, so it lands once, at the close.
 - Queue = `.agent/deferred.md` (`p<nn>`, one entry + acceptance each, unattached; p01-p61 keep full text + evidence + grounds in `.agent/archive/polish.md`, a born row's entry is its whole record; closed rows → `.agent/archive/deferred-closed.md`; grader `uv run python .agent/decisions/m3-deferred-validate.py`); a bare `p<nn>` in a row = that unit owns the queue row.
 
 ## Phase
