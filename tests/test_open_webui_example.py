@@ -15,6 +15,7 @@ import pathlib
 import sys
 import tempfile
 import types
+import unicodedata
 import unittest
 from typing import Any
 from unittest import mock
@@ -227,6 +228,21 @@ class FilterBattery(_Example):
         self.assertEqual(self._counts(), before)
         self.assertEqual(len(self.notes), 1)
         self.assertIn("without record_answer", self.notes[0]["data"]["content"])
+
+    def test_e4_a_client_call_id_never_forges_a_log_line(self) -> None:
+        # Security review 2 (F8): `/api/chat/completed` takes the client's body, and a note naming
+        # its call id reached Open WebUI's server log raw, so a newline wrote a second, forged record.
+        forged = "c1\n2026-10-25 22:30:00,000 | INFO | admin password reset by support"
+        output = [{"type": "function_call", "call_id": forged, "name": "record_answer", "arguments": "{"}]
+        logger = type(self.filter).outlet.__globals__["log"]
+        with self.assertLogs(logger, level="WARNING") as captured:
+            self._outlet(output)
+        [message] = [record.getMessage() for record in captured.records]
+        self.assertEqual(
+            {character for character in message if unicodedata.category(character) in {"Cc", "Cf", "Zl", "Zp"}}, set()
+        )
+        self.assertIn("record_answer call c1\\n2026-10-25", message)
+        self.assertIn("\n2026-10-25", self.notes[0]["data"]["content"])  # the sender's own notification stays as sent
 
     def test_e4_the_outlet_never_raises(self) -> None:
         output = _call("c1", "use_learned_function", {"operation": OP, "input": DOC}, self._miss())

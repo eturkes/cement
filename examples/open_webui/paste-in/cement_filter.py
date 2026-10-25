@@ -14,6 +14,7 @@ import importlib
 import json
 import logging
 import time
+import unicodedata
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -12756,6 +12757,18 @@ def _answer(text: str) -> Any:
     return parse_json(stripped, max_bytes=ANSWER_MAX_BYTES).value
 
 
+def _loggable(text: str) -> str:
+    """One log line: control, format and separator characters as escapes. A note names client
+    call ids (`/api/chat/completed` takes the client's body), and a raw newline forged a record."""
+
+    return "".join(
+        character.encode("unicode_escape").decode("ascii")
+        if unicodedata.category(character) in {"Cc", "Cf", "Zl", "Zp"}
+        else character
+        for character in text
+    )
+
+
 def _names(text: str) -> set[str]:
     return {name.strip() for name in text.replace("\n", ",").split(",") if name.strip()}
 
@@ -13280,7 +13293,7 @@ class Filter:
             log.exception("cement: retention failed")
             notes = ["Cement could not retain this answer; see the server log."]
         for note in notes:
-            log.warning("cement: %s", note)
+            log.warning("cement: %s", _loggable(note))
             if __event_emitter__ is not None:
                 try:
                     await __event_emitter__(
