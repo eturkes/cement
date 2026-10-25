@@ -13,7 +13,7 @@ from collections.abc import Iterator
 from dataclasses import asdict, dataclass, field, is_dataclass
 from typing import Any, Never, cast
 
-from . import learning
+from . import learning, shadow
 from .errors import (
     CementError,
     ConflictError,
@@ -32,6 +32,7 @@ from .json_value import (
     parse_json,
 )
 from .models import Candidate, CompilePolicy, ExampleRecord
+from .shadow import ShadowStore, shadow_path
 from .signature import (
     ALLOWED_SIGNERS_MAX_BYTES,
     FUNCTION_NAMESPACE,
@@ -114,6 +115,11 @@ def _parser() -> argparse.ArgumentParser:
         "--partition",
         default=os.environ.get("CEMENT_PARTITION"),
         help="explicit tenant/workflow isolation key",
+    )
+    parser.add_argument(
+        "--shadow",
+        default=os.environ.get("CEMENT_SHADOW"),
+        help="shadow observation file; the default is the ledger path plus .shadow",
     )
     commands = parser.add_subparsers(dest="command", required=True)
 
@@ -289,6 +295,23 @@ def _parser() -> argparse.ArgumentParser:
         help="repeat the digest that `function quarantine-plan` reports",
     )
     function_quarantine.add_argument("--actor", required=True)
+    function_drift = function_commands.add_parser(
+        "drift", help="count shadow answers that agreed or disagreed, per version"
+    )
+    function_drift.add_argument("operation")
+    function_drift.add_argument(
+        "--since-us", type=int, help="count observations at or after this microsecond time"
+    )
+    function_observations = function_commands.add_parser(
+        "observations", help="page the shadow observations of one operation"
+    )
+    function_observations.add_argument("operation")
+    function_observations.add_argument("--state", help="list only observations in this state")
+    function_observations.add_argument(
+        "--function-hash", help="list only observations of this version"
+    )
+    function_observations.add_argument("--after", type=int, default=0)
+    function_observations.add_argument("--limit", type=int, default=100)
     function_export = function_commands.add_parser("export")
     function_export.add_argument("operation")
     function_export.add_argument(
@@ -745,6 +768,24 @@ def _read_function_bundle(value: str) -> str:
     )
 
 
+def _shadow_file(args: argparse.Namespace) -> tuple[pathlib.Path, bool]:
+    """The shadow store path and whether the caller named it."""
+
+    if args.shadow:
+        return pathlib.Path(args.shadow), True
+    return shadow_path(args.db), False
+
+
+def _shadow_store(args: argparse.Namespace) -> ShadowStore | None:
+    """The shadow store for retention: a named one must exist; an absent default one is skipped
+    and never created."""
+
+    path, named = _shadow_file(args)
+    if not named and not path.exists():
+        return None
+    return ShadowStore(path, create=False)
+
+
 def _policy(args: argparse.Namespace) -> CompilePolicy:
     return CompilePolicy(
         min_confirmations=args.min_confirmations,
@@ -1019,6 +1060,22 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
     # Every other leaf needs an existing ledger, so a typo'd --db creates nothing and
     # exits 5 before any value is parsed (p50).
     system = System(args.db, create=creating)
+
+    if args.command == "function" and args.function_command in ("drift", "observations"):
+        # The ledger opened existing-only above (p51); the shadow file answers, and a
+        # missing one exits 3 and is never created.
+        store = ShadowStore(_shadow_file(args)[0], create=False)
+        if args.function_command == "drift":
+            return shadow.drift(store, args.partition, args.operation, since_us=args.since_us)
+        return shadow.observations(
+            store,
+            args.partition,
+            args.operation,
+            state=args.state,
+            function_hash=args.function_hash,
+            after_sequence=args.after,
+            limit=args.limit,
+        )
 
     if args.command == "operation":
         if args.operation_command == "list":
@@ -1395,14 +1452,37 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
             raise _UsageError(
                 f"--older-than must be a whole number of days from 0 to {_MAX_AGE_DAYS}"
             )
-        return system.prune_proposals(
+        _name(args.partition, "partition")
+        _text(args.actor, "actor", maximum=256)
+        kept = _shadow_store(args)
+        pruned = (
+            None
+            if kept is None
+            else kept.prune(args.partition, older_than_seconds=args.older_than * 86_400)
+        )
+        result = system.prune_proposals(
             args.partition, older_than_seconds=args.older_than * 86_400, actor=args.actor
         )
+        return {**asdict(result), "shadow": None if pruned is None else {"observations": pruned}}
     if args.command == "partition":
         # After the existing-only open (an absent ledger exits 5, p51), before any write.
         if args.confirm != args.partition:
             raise _UsageError("--confirm must repeat the --partition value")
-        return system.erase_partition(args.partition, actor=args.actor)
+        _name(args.partition, "partition")
+        _text(args.actor, "actor", maximum=256)
+        kept = _shadow_store(args)
+        # Two files, two transactions: the shadow store first, then the ledger; a rerun completes
+        # whichever side a failure left.
+        erased = None if kept is None else kept.erase(args.partition)
+        try:
+            ledger: dict[str, Any] = asdict(
+                system.erase_partition(args.partition, actor=args.actor)
+            )
+        except NotFoundError:
+            if erased is None or not any(erased.values()):
+                raise
+            ledger = {"erasure_id": None, "partition_hash": None, "counts": None}
+        return {**ledger, "shadow": erased}
     if args.command == "events":
         return system.events(args.partition, after=args.after, limit=args.limit)
     raise AssertionError("argparse accepted an unknown command")

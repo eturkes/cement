@@ -111,6 +111,7 @@ from .models import (
     ReportRecord,
     ReportSummaryRecord,
     ReviewResult,
+    ShadowCapture,
     StaleRevisionAnomaly,
     SwitchState,
     VerificationReport,
@@ -4645,6 +4646,73 @@ class System:
                 "comparator_hash": parsed.comparator_hash,
                 "operation_revision": revision,
             }
+
+    # -- shadow observations (p136-store) -----------------------------------------
+
+    def shadow_capture(
+        self, partition: str, operation: str, *, function_hash: str, input_value: object
+    ) -> ShadowCapture:
+        """The answer of the version ``function_hash`` names for one input, and the comparator in
+        force for its revision now: what a shadow observation will compare an LLM answer against.
+
+        The serving verification answers when it serves exactly that hash and passes; any other
+        version is rebuilt from its receipt (uncached). A hash that names no version of this
+        operation raises ``NotFoundError``; a version that misses the input raises
+        ``ValidationError``; a failed rebuild raises ``IntegrityError``. Writes nothing.
+        """
+
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        function_hash = _digest(function_hash, "function_hash")
+        input_json = canonicalize(input_value)
+        with self.store.transaction(write=False) as connection:
+            receipt = self._receipt_by_hash(
+                connection, partition=partition, operation=operation, function_hash=function_hash
+            )
+            if receipt is None:
+                raise NotFoundError("function_hash names no version of this operation")
+            receipt_id = str(receipt["id"])
+            revision = _stored_int(receipt["operation_revision"], "receipt revision", minimum=1)
+        # `serving` fails its expected-hash check unless it serves exactly this version, so a
+        # passing verification is the captured one.
+        _, served = self.serving(partition, operation, expected_function_hash=function_hash)
+        if served is not None and served.passed and served.document is not None:
+            document = served.document
+        else:
+            document = self.reconstruct_function_receipt(partition, receipt_id).document
+            if document.function_hash != function_hash:
+                raise IntegrityError("the receipt rebuilds a different function")
+        match = evaluate(document, input_json=input_json)
+        if not match.matched or match.artifact_hash is None:
+            raise ValidationError("the captured version does not answer this input")
+        return ShadowCapture(
+            receipt_id=receipt_id,
+            operation_revision=revision,
+            function_hash=function_hash,
+            output=match.output,
+            artifact_hash=match.artifact_hash,
+            comparator=self.comparator(partition, operation, operation_revision=revision),
+        )
+
+    def proposal_by_source(
+        self, partition: str, operation: str, source_id: str
+    ) -> ProposalRecord | None:
+        """The proposal that one source observation id names, in any status, or ``None``."""
+
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        source_id = _text(source_id, "source_id", maximum=SOURCE_ID_MAX_BYTES)
+        with self.store.transaction(write=False) as connection:
+            row = connection.execute(
+                "SELECT id FROM proposals WHERE partition = ? AND operation = ? AND source_id = ?",
+                (partition, operation, source_id),
+            ).fetchone()
+            if row is None:
+                return None
+            binding = _proposal_binding(connection, partition=partition, proposal_id=str(row["id"]))
+            if binding is None:
+                raise IntegrityError("proposal row vanished inside one snapshot")
+            return self._proposal_record(binding)
 
     def switch(self, partition: str, operation: str) -> SwitchState:
         """Read the operation's current switch (``off`` until a person sets one)."""

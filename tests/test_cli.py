@@ -5425,7 +5425,7 @@ class ParserShapeTests(unittest.TestCase):
     grammar or help change re-pins it.
     """
 
-    SHAPE = (287, "1a14d23d9e0d17ec")  # p136-cmp: `comparator set` + `comparator show`
+    SHAPE = (301, "c8c163d165b7e6ce")  # p136-store: `--shadow`, `function drift` + `function observations`
 
     @staticmethod
     def shape(parser: argparse.ArgumentParser) -> tuple[int, str]:

@@ -21,6 +21,35 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p136-store close (IMPLEMENT, unit; tier `kernel` + `data` payloads) — target = the commit landing this section
+
+Check set, fixed from `.agent/decisions/p136-store-contract.md` revision 2 + the `CLAUDE.md` diff lenses before the diff was reread: A1-A10 = S1-S10; N = consultant-2's eight rows, each re-derived; P = repaired pins; C1-C3 lenses. consultant-2 (`consultant`) attacked revision 1 before code; its N3 + consultant-1's L4 reshaped the design (capture at admission, a durable `prepared` row, recovery by an exact source lookup).
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | S1 store | pass | `tests.test_shadow.StoreIdentityTests`: a ledger file, a foreign DB, an extra table, a wrong version → `IntegrityError` with byte-identical files; mode 0600 under umask 022; `create=False` on a missing file → `NotFoundError`, nothing created; illegal transitions, capture edits and a CHECK-violating shape refused by SQLite. |
+| A2 | S2 admission | pass | The captured version decides in both directions (v1 vs v2 for one input), the served version answers without a rebuild and an older one rebuilds (spy 0 / 1); switch off still captures; foreign scope, an absent hash, a miss and a corrupt membership refuse with both files byte-identical; a repeated id returns the original id, counts, keeps the original input; four threads racing one id → one row + three duplicates; 505 / 506-byte id, empty, control character. |
+| A3 | S3 outcomes | pass | drop (new identity, repeat counted), cancel, fail → their states + notes; a second transition → `ConflictError`; ledger table counts unchanged. |
+| A4 | S4 record | pass | An agreement leaves the ledger file byte-identical and the serving cache warm (0 verifications on the next resolve); a disagreement → exactly proposals + 1 and events + 1, pending, exact bounded provenance, joins `learning_cases`, serving unchanged; >5 paths keep the first five + the count; 1 MiB / + 1 output, 256 / 257-byte model. |
+| A5 | S5 finish | pass | A failure planted after the ledger commit leaves `prepared`; the proposal is then rejected (reviewed before the retry); `finish_shadow` records that same proposal and no second one; a mismatching proposal under the source id → `ConflictError`, still `prepared`; a revision change → no proposal + the exact note; the comparator captured at admission decides after two later settings. |
+| A6 | S6 reads | pass | Drift across two hashes ordered by first sequence, `disagreements`, the inclusive `since_us` edge (200 keeps, 201 drops), an empty window with a lifetime duplicate; paging, the state filter, the pending cursor, limit bounds. |
+| A7 | S7 retention | pass | Prune as an adjacent pair (clock patched), a neighbour partition untouched; CLI erase runs the shadow file then the ledger, a rerun exits 3; an absent default store is skipped and never created; a named missing store exits 3. |
+| A8 | S8 never act | pass | Ledger deltas: agree 0, drop / cancel / fail 0, disagree = one proposal + one event; no path calls `challenge`, `set_switch`, `set_projection`, `set_comparator` (source read). |
+| A9 | S9 CLI | pass | `function drift` / `function observations` read the shadow file (ledger bytes unchanged), a missing store exits 3 uncreated, a ledger passed as `--shadow` exits 5; p51 holds (the ledger opens existing-only first). |
+| A10 | S10 docs | pass | README `### Shadow answers` + library row + erase wording; architecture `### Shadow observations`; threat model: the shadow answer as untrusted evidence, `Active shadow sampling` removed from `## Deliberately absent` (the Open WebUI half lands with p136-owui), monitor + minimize obligations. No cost claim yet: gate 3's measurement lands in the records commit that follows. Register + article audits rc 0; tripwires PASS (the retired token `request` avoided). |
+| N1 | store shape | accept | State CHECKs, immutable capture, live-schema comparison, existing-only open. |
+| N2 | identity | accept | Caller-derived source id with the 505-byte bound; cancellation is its own transition; one consumer per store (documented; the nucllei job holds a lock). |
+| N3 | recovery | accept | Durable `prepared`, exact all-status lookup + binding check, revision checked before submission (the ledger's own check stays a backstop), bounded provenance. |
+| N4 | learning effects | accept (sound) | Pinned: pending, joins `learning_cases`, serving unchanged. |
+| N5 | reads | accept | Filtered drift, lifetime duplicates apart, SQL `LIMIT`, a cursor for pending. |
+| N6 | retention + never act | accept | `proposal.created` named as the second ledger write; two-file erase reports per store, a rerun completes; quiescence documented. |
+| N7 | collateral | accept | typed records (runtime `System` import; `ShadowErasure`), B20 read sites, SHAPE, p51, both embeddings. |
+| N8 | seeds | accept | Fired (`.scratch/p136/store_seeds.py`, control OK first, source restored): conflict taken as success, pending-only lookup, captured comparator ignored, duplicate counter frozen, exclusive cutoff, revision check off, agreement written as prepared, provenance paths uncapped, cancel from any state → each reds its owner. Survivor: "served hash not checked" = equivalent (`serving`'s expected-hash check already fails a different version) → the redundant clause deleted, its reason in a comment. |
+| P | repaired pins | pass | Live re-pins: B20 + `shadow_capture` / `proposal_by_source`; `ParserShapeTests` SHAPE (287, 1a14d23d9e0d17ec) → (301, c8c163d165b7e6ce); the E3 battery's erase key set + `shadow`. |
+| C1 | correctness | pass, fixes | The ledger passed as a shadow store reported "schema 4 is unsupported" → names the foreign file; the shadow leaves skipped the ledger open and broke p51 → they open it existing-only first. |
+| C2 | cleanup | pass | One insert path (`_insert`) for admit + drop; one transition helper for cancel + fail. |
+| C3 | altitude | pass | Two small `System` reads carry the ledger knowledge; the store never writes the ledger except through `submit_proposal`. |
+
 ## p136-cmp close (IMPLEMENT, unit; tier `kernel`) — target = the commit landing this section
 
 Check set, fixed from `.agent/decisions/p136-cmp-contract.md` revision 2 + the `CLAUDE.md` diff lenses before the diff was reread: A1-A6 = M1-M6; L = consultant-1's six rows, each re-derived; P = repaired pins; C1-C3 lenses. consultant-1 (`consultant`, reused from E3) attacked revision 1 before code; consultant-2's store review (N3) independently found the comparator-time flip.

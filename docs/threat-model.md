@@ -28,6 +28,10 @@
   switch keeps a person's decision between learned versions and production: it starts `off`, `follow`
   is a standing choice to serve each new version, and `pinned` keeps one version.
 - Stored input/output content when rendered by another system.
+- A shadow answer. It is LLM output, kept as evidence, and a disagreement becomes a pending proposal
+  that the learning pass reviews like any other answer. Agreement is relative to one comparator and
+  one model, so it is no proof of correctness. An observation does not prove that a user in production
+  asked for that input: an integration supplies the input, and the capture proves only which version answers it.
 - Frequency by itself, reviewer labels without deployment authentication, and any inferred scope.
 - Exported bundle files, including the hash embedded in them, and their signature files. The parser
   validates every bundle and every signature as untrusted input. Only an independently obtained
@@ -110,7 +114,9 @@
 - Put every mutable answer dependency into the input, including identity, permissions, locale, policy
   revision, and external-state revision. Exclude behavior with hidden context from compilation.
 - Minimize, redact, encrypt, expire, and back up evidence according to its data classification. Run
-  `retention prune` on a schedule, and run `partition erase` when a tenant leaves. Set a backup
+  `retention prune` on a schedule, and run `partition erase` when a tenant leaves. The shadow file
+  holds plaintext inputs and answers too; both commands cover it. Stop shadow sampling for a partition
+  before you erase it, because the shadow file and the ledger are two transactions. Set a backup
   retention period too, because backups keep erased rows. The
   ledger is plaintext and a blind copy of a live SQLite database is unsafe. An exported bundle is
   plaintext too. It carries the exact inputs, the exact outputs, and the governance digests, so it
@@ -133,7 +139,8 @@
   any observer on the same host. An interactive shell can also record the value in its history file.
   Cement controls neither mechanism. The same applies to `cement resolve --input`.
 - Keep provider wrappers pure. A model call can repeat after a timeout.
-- Monitor promoted scopes. When policy or expected behavior changes, challenge them. Revise the
+- Monitor promoted scopes. `function drift` and `function observations` show how shadow answers
+  compare with each version. When policy or expected behavior changes, challenge them. Revise the
   operation instead of overwriting contradictory history.
 - Deploy command adapters on Linux. If crash-resilient process-tree containment is required, add an
   external cgroup/job/container boundary on every platform.
@@ -151,7 +158,6 @@ This local release excludes:
 - Arbitrary code sandboxing.
 - Generalized-rule synthesis. A projection maps inputs to exact keys; it never synthesizes a rule.
 - Domain schemas and oracles.
-- Active shadow sampling.
 - Quotas across principals.
 - Distributed consensus.
 

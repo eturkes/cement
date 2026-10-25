@@ -150,6 +150,21 @@ and a comparator that ignores every value of an example answer; those checks run
 and they prove applicability, not that the values a comparator keeps are enough. An equal comparator writes nothing. `comparator` reads the newest row of a
 revision. `partition erase` deletes those rows with every other row of the partition.
 
+### Shadow observations
+
+`cement_runtime.shadow` keeps shadow observations in a separate SQLite file, so an agreement never
+commits to the ledger and never makes the serving verification cold. `admit` captures, before any model
+call, the receipt, the revision, and the answer of the version that served the input, and the
+comparator then in force for that revision. A repeated observation id adds to a duplicate counter and
+writes no row. `record_shadow` decides agreement from that capture alone. A later promotion, revision,
+or comparator change does not change the verdict. A disagreement is first stored as `prepared` with
+everything a retry needs. `finish_shadow` then holds the shadow file's write lock, looks up the source
+id `shadow:<observation id>` in every proposal status, checks that a proposal it finds has the same
+input, answer, revision, and observation, or else submits one, and marks the row `disagreed`. A
+revision that is no longer current writes no proposal. Observations move `admitted` to `agreed`,
+`prepared`, `failed`, or `cancelled`, and `prepared` to `disagreed`; `dropped` marks a sample that was
+never admitted.
+
 ### Entry points
 
 `System.submit_proposal` and `System.propose` both write one proposal row and one

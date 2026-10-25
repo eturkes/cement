@@ -238,6 +238,19 @@ class QuarantineResult:
 
 
 @dataclass(frozen=True, slots=True)
+class ShadowCapture:
+    """What a shadow observation compares against: the version that served the hit (its receipt,
+    revision and answer) and the comparator in force for that revision when it was captured."""
+
+    receipt_id: str
+    operation_revision: int
+    function_hash: str
+    output: JSONValue
+    artifact_hash: str
+    comparator: ComparatorRecord | None
+
+
+@dataclass(frozen=True, slots=True)
 class PruneResult:
     """What one ``prune_proposals`` call deleted: proposals created before ``cutoff_us`` that no
     example referenced. ``proposal_ids`` holds the first 100 sorted ids; the hash binds them all."""

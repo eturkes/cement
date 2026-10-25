@@ -633,7 +633,7 @@ class RetentionCLITests(_Ledger):
         self.assertEqual(pathlib.Path(self.db).read_bytes(), before)
         code, out, _ = self.run_cli("partition", "erase", "--actor", "ops", "--confirm", "tenant_a")
         self.assertEqual(code, 0)
-        self.assertEqual(sorted(json.loads(out)), ["counts", "erasure_id", "partition_hash"])
+        self.assertEqual(sorted(json.loads(out)), ["counts", "erasure_id", "partition_hash", "shadow"])
         code, out, error = self.run_cli("partition", "erase", "--actor", "ops", "--confirm", "tenant_a")
         self.assertEqual((code, out, error["error"]), (3, "", "not_found"))
 

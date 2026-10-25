@@ -460,6 +460,42 @@ for example a tolerance that covers every dose. `function read` therefore lists 
 the cases of each version. The comparator is the current policy of the revision, not a part of a
 sealed version, so a later setting replaces it.
 
+### Shadow answers
+
+A shadow answer is the answer of the LLM to an input that a learned function already answered. An
+integration, for example the Open WebUI example, asks the LLM after it replies, and the user gets the
+function's answer. Cement records each pair in a separate shadow file beside the ledger, by default
+`<ledger>.shadow`:
+
+1. `cement_runtime.shadow.admit` starts an observation before the model call. It captures the answer of
+   the version that served the input and the comparator of that revision. A repeated observation id
+   writes nothing new and counts one duplicate.
+2. `record_shadow` compares the LLM answer with that answer, under that comparator. An
+   agreement writes the shadow file alone. A disagreement becomes one pending proposal for the learning
+   pass, with the source id `shadow:<observation id>`.
+3. `drop`, `cancel`, and `fail` record a sample that never reached the model, a shutdown, and a failed
+   model call. None of them writes the ledger.
+
+A disagreement does not change what Cement answers. The learning pass reviews the proposal like any
+other answer, and only a later publication or a switch changes the served version. Each disagreement
+commits to the ledger, so the next `resolve` repeats the full verification. If a write fails after the
+proposal committed, `finish_shadow` completes the observation and finds that proposal by its source id,
+so a retry never adds a second proposal.
+
+Read the observations with two commands. They read the shadow file and write nothing:
+
+```bash
+uv run cement --db demo.db --partition acme function drift support.reply
+uv run cement --db demo.db --partition acme function observations support.reply --state disagreed
+```
+
+`function drift` counts the observations of each version by state. `disagreements` adds the
+disagreements that wait for their proposal. `--since-us` keeps only the observations at or after that
+time. Agreement depends on the comparator and on one LLM, so it does not prove that an answer is
+correct, and an observation does not prove that a user in production asked for that input. The shadow file holds
+plaintext inputs and answers. Classify it with the ledger, and expire it with `retention prune` and
+`partition erase`, which also delete the shadow observations of the partition.
+
 ### Retention and erasure
 
 A retained answer stays in the ledger until you delete it. Two commands delete rows. Each one
@@ -482,7 +518,7 @@ hash of all of them, and it writes one `retention.pruned` event. When nothing is
 nothing.
 
 `partition erase` deletes every row of one partition: its operations, proposals, examples, versions,
-switch settings, and events.
+switch settings, comparators, and events, and its shadow observations.
 
 ```bash
 uv run cement --db demo.db --partition acme partition erase --actor ops-lead --confirm acme
@@ -539,6 +575,7 @@ refusal writes nothing:
 | Versions + switch | `function_receipts`, `function_versions`, `diff_versions`, `set_switch` (`off`, `follow`, `pinned`), `switch`, `serving` |
 | Answer | `resolve`, `verify_function`, `function_report`, `reconstruct_function_receipt`; `evaluate` + `parse_function` answer from a bundle with no ledger |
 | Retention | `prune_proposals` (`PruneResult`), `erase_partition` (`ErasureResult` and one erasure record) |
+| Comparators + shadow answers | `set_comparator`, `comparator`, `shadow_capture`, `proposal_by_source`; `cement_runtime.shadow` holds `ShadowStore`, `admit`, `record_shadow`, `finish_shadow`, `drop`, `cancel`, `fail`, `drift`, `observations`, and `pending` |
 
 `cement_runtime.signature.verify_signature` checks an SSH signature over bundle bytes against an
 allowed signers file before you parse the bundle. It returns a `SignatureVerification` with the
