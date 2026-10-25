@@ -12965,7 +12965,7 @@ class Filter:
 
         chat = importlib.import_module("open_webui.utils.chat")
         users = importlib.import_module("open_webui.models.users")
-        account = users.Users.get_user_by_id(user["id"])
+        account = await users.Users.get_user_by_id(user["id"])
         response = await chat.generate_chat_completion(
             request,
             {"model": self.valves.shadow_model, "messages": messages, "stream": False},

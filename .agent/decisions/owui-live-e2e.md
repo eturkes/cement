@@ -79,3 +79,37 @@ plain prose or a table, except turn 1 (the bare JSON plan).
 |---|---|---|---|---|---|
 | 9 | cement-chat | synthetic intake form B03 (Ravi Menon) | 14.7 | search_tools, use_learned_function | **true** |
 | L6 | cement-learning | "Run a Cement learning pass for extraction_plan." | 9.5 | learn_cases | — "Nothing to learn": 3 cases at support 2, nothing pending |
+
+## Shadow sampling (p136-owui gate 3)
+
+Instance = `local.py serve --base-url <forwarder>/v1 --model gpt-6-luna --fresh` with the `220fb55`
+paste-ins, Open WebUI 0.12.3 on CPython 3.12.15, a fresh v4 ledger. A scratch logging forwarder between
+Open WebUI and the endpoint recorded each model call's message roles, tool names + payload keys. The
+operation was registered + switched on through the CLI (actor `open-webui:cli-standin`; the action
+path lies outside this gate); the filter valve `shadow_model = gpt-6-luna` was set through the admin
+route `/api/v1/functions/id/cement_filter/valves/update`.
+
+| # | model | input | s | calls | result |
+|---|---|---|---|---|---|
+| 1, 2 | cement-chat | progress notes 01, 02 | 20.5, 19.1 | search_tools, use_learned_function (`off`), search_tools, record_answer | retained, 2 pending |
+| L | cement-learning | "Run a Cement learning pass for extraction_plan." | 26.5 | search_tools, learn_cases, call_tool, learn_cases, merge_case, publish_version, function_versions | `d35aa9c5…` published: 1 case at support 2, projection `PHYSICIAN PROGRESS NOTE` |
+| 3 | cement-chat | progress note 03 | 10.3 | search_tools, use_learned_function | **covered** → one observation `local:<chat>:<message>:<call>`, `agreed`, `gpt-6-luna`, `sha256:d796917429a709e9`, 5,358 ms, hash `d35aa9c5…`, differences `[]` |
+| D | cement-learning | "How do the shadow answers for extraction_plan compare with the learned function? Also show its comparator." | 7.4 | shadow_drift, show_comparator | "agreed once … disagreed zero times … Comparator: none is set." |
+| 4 | cement-chat | note a04 | 9.8 | search_tools, use_learned_function | covered → `agreed`, 4,323 ms |
+
+- Isolation (forwarder): each chat call carried `tools` = `search_tools`, `call_tool`; the shadow call
+  = `stream: false`, roles `developer`, `user` (Open WebUI rewrites `system` for this model), payload
+  keys `messages`, `model`, `stream` — no `tools`, no `tool_choice`. `request.state.metadata` brought no
+  tool into it.
+- Replay: `POST /api/chat/completed` with turn 3's chat + assistant message (W2) → `duplicates` 1, zero
+  model calls, still one observation.
+- Finding: the log held `RuntimeWarning: coroutine 'UsersTable.get_user_by_id' was never awaited` once,
+  after turn 3's shadow call. 0.12.3's `Users.get_user_by_id` is a coroutine function, so `_ask` handed
+  `generate_chat_completion` a coroutine as `user`; the call passed only because this path read no
+  user attribute (a base model, no system prompt, user-info headers off). A pipeline shadow model
+  (`payload['user']`), forwarded user-info headers or a system prompt applied with the user read
+  `user.id` / `.name` / `.email` / `.role` ⇒ an `AttributeError` → `failed`. Fix = `await`, pinned by
+  `tests/test_open_webui_shadow.py` `test_s5_the_real_shadow_call_awaits_the_account_and_sends_no_tools`
+  (real `_ask`, stub `open_webui` modules). Re-provisioned → note 03 in a new chat → `agreed`, 3,865 ms;
+  zero warnings after the re-provision (positive control: the same scan over the whole log finds the one
+  earlier warning).

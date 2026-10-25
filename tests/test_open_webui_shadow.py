@@ -1,7 +1,8 @@
 """p136-owui battery — shadow sampling in the Open WebUI filter (S5 = the frozen-completion probe).
 
 Contract: `.agent/decisions/p136-owui-contract.md`. Open WebUI stays stubbed as in
-`tests/test_open_webui_example.py`; the model boundary is the filter's own `_ask`, replaced per test.
+`tests/test_open_webui_example.py`; the model boundary is the filter's own `_ask`, replaced per test,
+except one test that drives it against stub `open_webui.utils.chat` + `open_webui.models.users` modules.
 """
 
 from __future__ import annotations
@@ -9,8 +10,11 @@ from __future__ import annotations
 import asyncio
 import copy
 import json
+import sys
+import types
 import unittest
 from typing import Any
+from unittest import mock
 
 from cement_runtime import shadow as sh
 from tests.test_open_webui_example import DOC, OP, P, PLAN, _call, _Example
@@ -201,6 +205,42 @@ class ShadowSamplingTests(_Example):
         asyncio.run(scenario())
         self.assertEqual(sorted(row["state"] for row in self.rows()), ["agreed", "dropped", "dropped"])
         self.assertEqual(self.filter.shadow_counts.get("dropped"), 2)
+
+    def test_s5_the_real_shadow_call_awaits_the_account_and_sends_no_tools(self) -> None:
+        # Open WebUI 0.12.3: `Users.get_user_by_id` is a coroutine function (live run, p136 gate 3).
+        self.publish(DOC)
+        body = self.body(1, DOC)
+        account, request = object(), object()
+        calls: list[tuple[Any, ...]] = []
+
+        async def get_user_by_id(user_id: str) -> object:
+            calls.append(("account", user_id))
+            return account
+
+        async def generate_chat_completion(request: Any, form: dict, *, user: Any, bypass_filter: bool = False) -> Any:
+            calls.append(("model", request, form, user, bypass_filter))
+            reply = {"choices": [{"message": {"content": json.dumps(OUTPUT)}}]}
+            return types.SimpleNamespace(body=json.dumps(reply).encode())
+
+        modules = {
+            "open_webui.utils.chat": types.SimpleNamespace(generate_chat_completion=generate_chat_completion),
+            "open_webui.models.users": types.SimpleNamespace(Users=types.SimpleNamespace(get_user_by_id=get_user_by_id)),
+        }
+
+        async def scenario() -> None:
+            await self.filter.outlet(body, __request__=request, __user__={"id": "u-1", "role": "user"})
+            await self.filter._queue.join()
+
+        with mock.patch.dict(sys.modules, modules):
+            asyncio.run(scenario())
+        [looked_up, (_, seen_request, form, user, bypass)] = calls
+        self.assertEqual(looked_up, ("account", "u-1"))
+        self.assertIs(seen_request, request)
+        self.assertIs(user, account)
+        self.assertIs(bypass, True)
+        self.assertEqual(sorted(form), ["messages", "model", "stream"])
+        self.assertEqual((form["model"], form["stream"]), ("shadow-model", False))
+        self.assertEqual(self.rows()[0]["state"], "agreed")
 
     def test_s5_the_prompt_never_holds_the_function_answer(self) -> None:
         self.publish(DOC)

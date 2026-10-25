@@ -21,6 +21,17 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p136 gate 3 records (IMPLEMENT, store + owui gate 3; tier `kernel` for the `_ask` fix, `data` for records) — target = the commit landing this section
+
+Check set, fixed from p136-store gate 3 + p136-owui gate 3 + the diff lenses: G1 cost measured, G2 live regimen, F1 the live finding's fix (one re-review against its acceptance: a red test + seeds), C1 claims. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| G1 | store gate 3 cost | pass | `.agent/decisions/p136-shadow-bench.json`: committed `220fb55`, clean `src`, load 2.8 on 8 CPUs, 5 repeats at 1 + 1,000 entries; the separate expected-hash cache key (`_serving_key` member `expected_function_hash`) makes a disagreement's commit cost two verifications (769 + 776 ms at 1,000) → README sentence + p141. |
+| G2 | owui gate 3 live | pass | `.agent/decisions/owui-live-e2e.md` `## Shadow sampling`: covered hit → one observation `agreed`; the forwarder shows the shadow call without `tools`; `/api/chat/completed` replay → one duplicate, zero model calls; the learning model called `shadow_drift` + `show_comparator`. |
+| F1 | `_ask` user | fixed | Reverses the `_ask` half of p136-owui C1: 0.12.3's `Users.get_user_by_id` is a coroutine function, so the user passed was a coroutine (live `RuntimeWarning`). Fix = `await`; `test_s5_the_real_shadow_call_awaits_the_account_and_sends_no_tools` red at `220fb55` (`ValueError: not enough values to unpack`, lookup never awaited); seeds `.scratch/p136/ask_seeds.py` (control OK): lookup not awaited, filters not bypassed, tools sent, request dropped → each reds it. Re-provisioned live hit → `agreed`, zero warnings. |
+| C1 | claims | pass | Contract W3's "live-verified that no tool or filter reaches the shadow call" is now backed by G2; README cites medians + the record path; register + article audits rc 0, tripwires PASS. |
+
 ## p136-owui close (IMPLEMENT, unit; tier `kernel` for selection, identity + isolation) — target = the commit landing this section
 
 Check set, fixed from `.agent/decisions/p136-owui-contract.md` + the diff lenses: A1-A7 = O1-O7; S = seeds; C1 correctness. MAIN alone (the store's consultants already ruled the semantics it calls).

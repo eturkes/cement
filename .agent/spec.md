@@ -159,9 +159,9 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.12 under `uv`.
 - [x] 6af77ce p136-cmp — comparator IR + `set_comparator` (v4 table, amended in place) + `Read`/CLI views.
 - [x] a1686ad p136-store — telemetry store + admit / `record_shadow` (captured version, comparator, disagreement → proposal) + `drift` + `observations` + CLI; prune + erase cover it.
 - [x] cb6c82c p136-learn — `cement_runtime.learning` + `skills/cement-learn/`: shadow proposals, comparator authoring, drift reads.
-- [ ] p136-owui — Open WebUI: matched-hit extractor + bounded worker + shadow model call + valves + learning-tool reads; S5 probe; paste-ins regenerated; live regimen run.
+- [x] 220fb55 p136-owui — Open WebUI: matched-hit extractor + bounded worker + shadow model call + valves + learning-tool reads; S5 probe; paste-ins regenerated; live regimen run.
 - [ ] p136-nucllei — `use` hit log + host batch job (stand-in endpoint) + learn commands; jail stand-in smoke.
-- [ ] p135-docs — tier `docs`: E2 + E4 + threat model + README `Deployment boundary` per both plans; `resolve → record → resolve` cost measured.
+- [ ] p135-docs — tier `docs`: E2 + E4 + threat model + README `Deployment boundary` per both plans.
   - Every unit: tier `kernel` unless named; contract `.agent/decisions/<unit>-contract.md` before code; red-first tests (parent + detached-worktree command in the commit body); its own `.agent/review.md` pass; human-facing docs for what it ships.
 - [ ] Phase close — closing-diff reviewers (one per lens) + MAINTAIN's security lens; `.agent/review.md` no open row; CI gate; p135 + p136 closed by acceptance; `Phase: MAINTAIN`.
   - Also owed here: package 0.2.0 → 0.3.0 (the v4 cut) with `uv.lock`, the provider wheel's `cement-runtime` range + the two-wheel smoke, and v4's frozen schema digest — the lock change re-keys every D28 verdict, so it lands once, at the close.

@@ -1,0 +1,134 @@
+{
+ "provenance": {
+  "commit": "220fb55ced9dbe29efd89d5d2445fe383ac09ca2",
+  "dirty": false,
+  "python": "3.13.17 (main, Oct 21 2026, 17:49:22) [Clang 23.1.3 ]",
+  "sqlite": "3.53.1",
+  "platform": "Linux-7.3.0-2-cachyos-gcc-x86_64-with-glibc2.44",
+  "cpus": 8,
+  "load_before": [
+   2.7783203125,
+   3.59423828125,
+   5.1435546875
+  ],
+  "load_after": [
+   2.75390625,
+   3.54833984375,
+   5.10302734375
+  ]
+ },
+ "points": [
+  {
+   "entries": 1,
+   "repeats": 5,
+   "median_ms": {
+    "agree_admit": 3.765,
+    "agree_record": 0.523,
+    "agree_resolve": 0.758,
+    "disagree_admit": 2.229,
+    "disagree_record": 2.738,
+    "disagree_resolve": 2.339
+   },
+   "samples_ms": {
+    "agree_admit": [
+     3.845,
+     3.748,
+     3.86,
+     3.765,
+     3.723
+    ],
+    "agree_record": [
+     0.542,
+     0.523,
+     0.518,
+     0.481,
+     0.529
+    ],
+    "agree_resolve": [
+     0.752,
+     0.788,
+     0.826,
+     0.758,
+     0.712
+    ],
+    "disagree_admit": [
+     2.284,
+     2.282,
+     2.183,
+     2.137,
+     2.229
+    ],
+    "disagree_record": [
+     2.968,
+     2.731,
+     2.738,
+     2.768,
+     2.683
+    ],
+    "disagree_resolve": [
+     2.442,
+     2.305,
+     2.339,
+     2.313,
+     2.424
+    ]
+   }
+  },
+  {
+   "entries": 1000,
+   "repeats": 5,
+   "median_ms": {
+    "agree_admit": 769.239,
+    "agree_record": 0.553,
+    "agree_resolve": 31.164,
+    "disagree_admit": 34.045,
+    "disagree_record": 2.949,
+    "disagree_resolve": 776.483
+   },
+   "samples_ms": {
+    "agree_admit": [
+     760.047,
+     755.508,
+     856.395,
+     770.098,
+     769.239
+    ],
+    "agree_record": [
+     0.553,
+     0.63,
+     0.686,
+     0.551,
+     0.546
+    ],
+    "agree_resolve": [
+     29.143,
+     29.049,
+     37.649,
+     44.143,
+     31.164
+    ],
+    "disagree_admit": [
+     31.909,
+     32.807,
+     38.776,
+     47.762,
+     34.045
+    ],
+    "disagree_record": [
+     2.931,
+     2.871,
+     3.552,
+     3.038,
+     2.949
+    ],
+    "disagree_resolve": [
+     754.622,
+     774.855,
+     877.892,
+     776.483,
+     786.97
+    ]
+   }
+  }
+ ]
+}
