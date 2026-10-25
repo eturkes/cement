@@ -28,7 +28,7 @@ PROVIDER = "examples/command_source/pyproject.toml"
 CONSTRAINTS = "examples/command_source/build-constraints.txt"
 OWUI_LOCK = "examples/open_webui/local-requirements.txt"
 # pin name -> the open queue row that holds it below latest.
-HELD: dict[str, str] = {}
+HELD: dict[str, str] = {"open-webui target": "p144"}
 
 
 class SourceError(Exception):
@@ -111,19 +111,29 @@ def lock_status() -> str:
 
 
 def compile_drift(path: str, requirement: str, python: str) -> str:
-    """Drift of a hash-pinned lock against a fresh compile of its own header requirement."""
+    """Drift of a hash-pinned lock against a fresh compile of its own header requirement.
 
-    pinned = dict(re.findall(r"^([a-z0-9-]+)==(\S+) \\$", read(path), re.M))
+    Keys = name + environment marker: a universal compile writes `name==v ; marker` (torch's
+    CUDA stack, uvloop, pywin32), and a fork by marker lists one name twice.
+    """
+
+    def entries(text: str, tail: str) -> dict[str, str]:
+        found = re.findall(rf"^([a-z0-9-]+)==(\S+)((?: ; [^\\\n]+?)?){tail}$", text, re.M)
+        return {name + marker: version for name, version, marker in found}
+
+    pinned = entries(read(path), r" \\")
     argv = ["uv", "pip", "compile", "--python-version", python, "--universal", "--no-header",
             "--no-annotate", "-"]
     result = subprocess.run(argv, input=f"{requirement}\n", capture_output=True, text=True, check=False,  # noqa: S603 fixed argv
                             cwd=ROOT)
     if result.returncode != 0:
         raise SourceError(f"uv pip compile {requirement}: rc {result.returncode} {result.stderr.strip()[:200]}")
-    fresh = dict(re.findall(r"^([a-z0-9-]+)==(\S+)$", result.stdout, re.M))
-    drift = [f"{name} {pinned.get(name)} -> {version}" for name, version in sorted(fresh.items())
-             if pinned.get(name) != version]
-    drift += [f"{name} {version} -> gone" for name, version in sorted(pinned.items()) if name not in fresh]
+    fresh = entries(result.stdout, "")
+    if not pinned or not fresh:
+        raise SourceError(f"{path}: {len(pinned)} pinned vs {len(fresh)} compiled entries")
+    drift = [f"{key} {pinned.get(key)} -> {version}" for key, version in sorted(fresh.items())
+             if pinned.get(key) != version]
+    drift += [f"{key} {version} -> gone" for key, version in sorted(pinned.items()) if key not in fresh]
     return "; ".join(drift) if drift else "locked"
 
 

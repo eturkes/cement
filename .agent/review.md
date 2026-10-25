@@ -21,6 +21,24 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## Dependency + toolchain upgrade (MAINTAIN, request; tiers `data` for the locks, `kernel` for the census) — target = the commit landing this section
+
+Check set (fixed before the diff was read): U1 every pin listed current vs latest, census + an independent listing; U2 each lock diff = the upgrade alone; U3 the census reads every lock entry, both sides; U4 S23 fires every recorded case; U5 major bumps vs our call sites; U6 each pin below latest held (a row or a ruling); U7 every runnable `Artifacts` entry driven; U8 the instrument repair is lock-independent; U9 correctness lens over the code hunks; U10 rules upkeep; U11 full gate (CI gate, run in the commit body). MAIN alone; advisor consulted on U6.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| U1 | completeness | pass | `.agent/pins` 28 rows (before rc 1: `uv.lock` multidict + 5 Open WebUI-lock transitives; after rc 0); rerun after the CI gate: rc 0 with one hold (U6); independent PyPI listing per entry: `uv.lock` 34/34 at latest after, `build-constraints.txt` 6/6, Open WebUI lock 182/266 (U6 holds the rest); action SHAs = `gh api repos/<r>/commits/<tag>`; uv 0.13.5 ships CPython 3.15.1 + 3.12.15 = python.org's newest; jail image digest unchanged by `podman pull`. |
+| U2 | lock diffs | pass | `uv.lock`: name/version lines = multidict 7.1.0 → 7.2.1 alone; Open WebUI lock: 5 pins + their hashes, header `cmp`-equal to HEAD's (regenerated with `--custom-compile-command`: a plain rerun dropped the `echo open-webui==0.12.3 |` that `test_p128_the_lock_pins_the_target_and_hashes_every_package` reads); `.agent/owui-audit` PASS, 127 findings all on p137. |
+| U3 | census reach | find → fixed | `compile_drift` matched `name==v \` alone: 30 marker-bearing pins unread on either side. Fix keys name + marker, rc 2 on an empty parse; seed `pywin32==1 ;` → pre-fix census silent, fixed census `pywin32 ; sys_platform == 'win32' 1 -> 312`. |
+| U4 | seed group | find → fixed | S23 before 1/3 (`hold-gone` deleted an already-closed p126 row; `shipped` red on live drift) and short of its record's cases → 8 cases incl. the marker seed, 8/8 MATCH; anchors count-asserted (`substitute`). |
+| U5 | majors | pass | none: multidict minor (cosmic-ray → aiohttp), the 5 lock moves minor/patch inside Open WebUI; Cement imports none of them. |
+| U6 | held pins | pass (owner-ruled) | 84 lock entries below PyPI latest, each pinned or capped by a locked parent's requirement back to open-webui 0.12.3 (kubernetes by conflict: pydantic>=2.13.5 vs the target's 2.13.4) → owner: the target holds them; `pins.md` Law clause. open-webui 0.12.4 released during the CI gate (census: `open-webui target 0.12.3 0.12.4 BEHIND`) → owner: hold 0.12.3 while production runs it → born row p144 (the measured 0.12.4 lock + audit facts) + `HELD` entry; census rc 0, `held p144`. |
+| U7 | runnable artifacts | pass | README quick start end to end (signed `eval`, `resolve` hit rc 0 / miss rc 6); hospital OCR `All checks passed.`; both generators byte-identical; Open WebUI regimen on the new lock (setup → serve gpt-6-luna → provision → covered turn, missed turn retained, shadow observation `agreed`, 0 tracebacks); stub smoke 6/6 = `m5u3-smoke.md`; nucllei jail stand-in PASS; prototype capture 10 distinct frames + density + quality floor rc 0; `.agent/mutate` 49 mutants on the bumped cosmic-ray stack. |
+| U8 | instrument repair | pass | `m5u3-stub-model.py` parsed the whole user message; the inlet note (990ec8d, MAINTAIN W2) broke every turn before this change; `raw_decode` of the leading object restores the M5.3 table; no test reads either file. |
+| U9 | correctness | pass | `entries()` read inside `compile_drift`: `(\S+)` stops at the marker's space, the lazy marker group ends at the line's tail; display keys carry the marker, so a fork prints twice; `substitute` mirrors `replace`'s count guard; `raw_decode(None)` = the caught `TypeError`. |
+| U10 | rules upkeep | pass | `pins.md` (Law clause, one Hash-pinned locks definition replacing two partial recipes), `open-webui.md` (points there), `gate-checks.md` (`.agent/pins` record = the after run, landing-commit citation) re-read against `Authoring`. |
+| U11 | full gate | see the commit body | CI gate on this tree: run id, legs + D28 line in the landing commit's body. |
+
 ## Phase close, version cut (IMPLEMENT p135 + p136) — target = the commit landing this section
 
 Check set: the `Decisions` Pin repairs rule (each repaired test id named in the body + here), the new freeze pin, the shipped filter live.

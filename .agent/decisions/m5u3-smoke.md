@@ -1,7 +1,10 @@
 # M5.3 Open WebUI smoke (contract §7)
 
-Open WebUI 0.12.3 in an isolated Python 3.12 venv + this repo installed editable; stub model =
-`.agent/decisions/m5u3-stub-model.py` (deterministic, native tool calls, OpenAI-compatible);
+Open WebUI 0.12.3 in an isolated Python 3.12 venv with `cement_runtime` importable (this repo
+installed editable, or `PYTHONPATH=<repo>/src` on the regimen venv `.open-webui/venv`, server and
+driver alike); stub model = `.agent/decisions/m5u3-stub-model.py` (deterministic, native tool
+calls, OpenAI-compatible; it reads the request as the JSON object that opens the user message,
+since the filter inlet appends its operations note);
 driver = `.agent/decisions/m5u3-smoke.py <examples/open_webui>`. Server env: fresh `DATA_DIR`,
 `WEBUI_AUTH=False`, `OFFLINE_MODE=True`, `BYPASS_EMBEDDING_AND_RETRIEVAL=True`,
 `ENABLE_PIP_INSTALL_FRONTMATTER_REQUIREMENTS=false`, `OPENAI_API_BASE_URL` = the stub; port 18765.

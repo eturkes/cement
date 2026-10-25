@@ -156,6 +156,15 @@ def replace(text, old, new):
     return text.replace(old, new, 1)
 
 
+def substitute(text, pattern, new):
+    """`re.sub` with `replace`'s guard: a missed anchor would otherwise plant nothing."""
+
+    result, count = re.subn(pattern, new, text)
+    if count != 1:
+        raise RuntimeError(f"pattern count={count}, want 1: {pattern!r}")
+    return result
+
+
 class Runner:
     def __init__(self, revision, temporary):
         self.temp = Path(temporary)
@@ -606,13 +615,38 @@ unittest.main()
             with changed(tool, replace(tool.read_text(), f"version={current}\n", "version=1.0.0\n")):
                 self.case("S23", "lowered", root, [sys.executable, ".agent/pins"], 1,
                           [r"^zizmor +1\.0\.0 +\S+ +BEHIND \(no queue row\)"])
-            # A hold outlives its row: the nucllei stand-in stays below latest after p126 leaves the queue.
-            queue = root / ".agent/deferred.md"
-            rows = re.split(r"(?m)^(?=- `p\d+` )", queue.read_text())
-            kept = "".join(row for row in rows if not row.startswith("- `p126` "))
-            with changed(queue, kept):
+            # A hold outlives its row: p126 held the mirrors until it closed into the ledger.
+            census = root / ".agent/pins"
+            with changed(census, substitute(census.read_text(), r"(?m)^HELD: dict\[str, str\] = \{",
+                                            'HELD: dict[str, str] = {"zizmor": "p126", ')):
                 self.case("S23", "hold-gone", root, [sys.executable, ".agent/pins"], 1,
-                          [r"^nucllei jail stand-in python .*HOLD-GONE \(p126 not open\)"])
+                          [r"^zizmor .*HOLD-GONE \(p126 not open\)"])
+            # Each mirror's Python is graded against its target (p126), never the newest line.
+            local = root / "examples/open_webui/local.py"
+            with changed(local, replace(local.read_text(), 'PYTHON = "3.12"\n', 'PYTHON = "3.13"\n')):
+                self.case("S23", "mirror-python", root, [sys.executable, ".agent/pins"], 1,
+                          [r"^open-webui mirror python +3\.13 +3\.12 +BEHIND"])
+            jail = root / ".agent/decisions/nucllei-jail-smoke.sh"
+            with changed(jail, substitute(jail.read_text(), r"library/python:3\.12-slim", "library/python:3.13-slim")):
+                self.case("S23", "jail-python", root, [sys.executable, ".agent/pins"], 1,
+                          [r"^python split leg +3\.12 +3\.13 +BEHIND", r"^requires-python floor +3\.12 +3\.13 +BEHIND",
+                           r"^nucllei jail stand-in python +3\.13 +3\.12 +BEHIND"])
+            # Hash-pinned locks (p34, p131): a lowered pin drifts from a fresh compile of the header.
+            provider = root / "examples/command_source/pyproject.toml"
+            constraints = root / "examples/command_source/build-constraints.txt"
+            with changed(provider, substitute(provider.read_text(), r'"hatchling==[0-9.]+"', '"hatchling==1.27.0"')), \
+                    changed(constraints, substitute(constraints.read_text(), r"(?m)^packaging==\S+ ", "packaging==0 ")):
+                self.case("S23", "provider-lock", root, [sys.executable, ".agent/pins"], 1,
+                          [r"^command-source hatchling +1\.27\.0 .*BEHIND",
+                           r"^command-source build constraints .*packaging 0 -> \S+"])
+            lock = root / "examples/open_webui/local-requirements.txt"
+            with changed(lock, substitute(lock.read_text(), r"(?m)^jiter==\S+ ", "jiter==0 ")):
+                self.case("S23", "owui-lock", root, [sys.executable, ".agent/pins"], 1,
+                          [r"^open-webui lock transitive .*jiter 0 -> \S+.* BEHIND"])
+            # A marker-bearing pin (`name==v ; marker \`) is graded too: the pre-fix census skipped all 30.
+            with changed(lock, substitute(lock.read_text(), r"(?m)^pywin32==\S+ ; ", "pywin32==1 ; ")):
+                self.case("S23", "owui-lock-marker", root, [sys.executable, ".agent/pins"], 1,
+                          [r"^open-webui lock transitive .*pywin32 ; sys_platform == 'win32' 1 -> \S+.* BEHIND"])
             self.case("S23", "shipped", root, [sys.executable, ".agent/pins"], 0,
                       [r"^pins: \d+ pins, rc 0$"])
 

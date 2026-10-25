@@ -31,8 +31,9 @@ def _plan(body: dict) -> dict:
     content = user.get("content")
     if isinstance(content, list):
         content = "".join(part.get("text", "") for part in content if isinstance(part, dict))
+    # The filter inlet appends its operations note after the request (MAINTAIN W2).
     try:
-        cases = json.loads(content)["cases"]
+        cases = json.JSONDecoder().raw_decode(content)[0]["cases"]
     except (TypeError, ValueError, KeyError):
         return {"content": "I can only answer smoke requests."}
     use, record = _tool_name(tools, "use_learned_function"), _tool_name(tools, "record_answer")
