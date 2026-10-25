@@ -21,6 +21,18 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p136-learn close (IMPLEMENT, unit; tiers `data` + `docs`) — target = the commit landing this section
+
+Check set, fixed from `.agent/decisions/p136-learn-contract.md` + the diff lenses: A1-A3 = E1-E3; C1 correctness; C2 claims. MAIN alone (shallow).
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | E1 projection | pass | `test_learn_a_case_names_its_shadow_proposals`: a shadow and an ordinary pending proposal on one case → `pending_proposal_ids` holds both, `shadow_proposal_ids` the shadow one alone; red at a1686ad (`KeyError: 'shadow_proposal_ids'`), the other 23 tests green there. |
+| A2 | E2 skill | pass | Step 3 names keep / adopt / reject with each one's effect (a correction adds a confirmation; an adoption stops the case answering until publication); `## Comparator` with the four rules, the never-loosen rule, the checks Cement runs and their limit; step 5 reports `function drift`. The skill + learning batteries green (54). The skill's compatibility floor 3.11 → 3.12 (`requires-python`). |
+| A3 | E3 README | pass | `### The learning pass` names the field and the decisions; register + article audits rc 0; tripwires PASS. |
+| C1 | correctness | pass | The flag comes from `source_id` in the same query, so it costs no extra read and cannot disagree with `pending_proposal_ids` (same rows). |
+| C2 | claims | pass | The skill says Cement cannot tell whether a rule is right (matches `set_comparator`'s applicability-only checks). |
+
 ## p136-store close (IMPLEMENT, unit; tier `kernel` + `data` payloads) — target = the commit landing this section
 
 Check set, fixed from `.agent/decisions/p136-store-contract.md` revision 2 + the `CLAUDE.md` diff lenses before the diff was reread: A1-A10 = S1-S10; N = consultant-2's eight rows, each re-derived; P = repaired pins; C1-C3 lenses. consultant-2 (`consultant`) attacked revision 1 before code; its N3 + consultant-1's L4 reshaped the design (capture at admission, a durable `prepared` row, recovery by an exact source lookup).

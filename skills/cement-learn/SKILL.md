@@ -2,7 +2,7 @@
 name: cement-learn
 description: Run one Cement learning pass for one operation. Use this skill only when the operator asks for a learning pass. The pass reads the chat answers that a deployment retained, merges the scripts of each recurring case into one output, reviews them as the learning-pass reviewer, and then compiles, verifies and promotes a new function version through the cement CLI. The pass never switches a function on or off.
 license: Apache-2.0
-compatibility: Requires the cement CLI (Python 3.11 or later) and write access to the Cement ledger.
+compatibility: Requires the cement CLI (Python 3.12 or later) and write access to the Cement ledger.
 ---
 
 # Cement learning pass
@@ -84,6 +84,22 @@ and continue from what it shows. Stop and report any other code. The workflow re
    it starts writing, stdout lists the writes that returned: run `cement learn cases` again and
    continue from what it shows.
 
+   A case can list `shadow_proposal_ids`. Each one is an LLM answer that disagreed with the
+   published function for an input that the function already answers. Decide for each one:
+   - The function's answer is still right: merge with the case's current output. The shadow
+     proposal is corrected to it, which adds a confirmation.
+   - The LLM's answer is right, because the expected behavior changed or the function was wrong:
+     merge to the new output. The case stops answering until step 4 publishes it again.
+   - The shadow answer is unusable: reject it, as for any other proposal.
+
+   If many disagreements differ only in wording, spacing, letter case or order, write a comparator
+   so that such answers agree (`references/workflow.md`, "Comparator"). Never ignore or loosen a
+   value that changes the result, such as a dose, a date or a code.
+
+   ```sh
+   cement comparator set "$OP" --comparator - --actor learning-pass < comparator.json
+   ```
+
 4. Publish the new version:
 
    ```sh
@@ -96,11 +112,13 @@ and continue from what it shows. Stop and report any other code. The workflow re
    verification, exit 6: stop and report).
 
 5. Report the new function hash, the difference from the previous version, what the pass
-   learned, and, for a projectable operation, the assumption that the projection makes:
+   learned, the shadow agreement of each version, and, for a projectable operation, the
+   assumption that the projection makes:
 
    ```sh
    cement function versions "$OP"
    cement function diff "$OP" --from "$PREVIOUS_HASH" --to "$NEW_HASH"
+   cement function drift "$OP"
    ```
 
 ## Rules

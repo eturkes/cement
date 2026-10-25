@@ -388,7 +388,10 @@ uv run cement --db demo.db --partition acme learn cases form.plan --program - < 
 ```
 
 `--projectable` derives a program from the raw inputs: one layout for each form structure. The
-result shows that program as `program`.
+result shows that program as `program`. Each case also lists `shadow_proposal_ids`: the pending
+proposals that came from shadow answers that disagreed with a published version. The pass decides
+for each one whether the function's answer stays, the LLM's answer replaces it, or the answer is
+rejected, and it can write a comparator so that answers that differ only in form agree.
 
 Two commands make the changes of a pass. They act as `learning-pass` unless you pass
 `--reviewer` or `--actor`:

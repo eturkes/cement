@@ -265,6 +265,13 @@ class RecordTests(_Case):
         self.assertIn(record["proposal_id"], [i for case in cases["cases"] for i in case["pending_proposal_ids"]])
         self.assertTrue(self.system.resolve(P, OP, {"x": 1}).match.matched)  # serving unchanged
 
+    def test_learn_a_case_names_its_shadow_proposals(self) -> None:
+        ordinary = self.system.submit_proposal(P, OP, {"x": 1}, candidate=Candidate(output={"y": 5}, provenance={}), source_id="chat:plain")
+        shadowed = self.record(self.admit().id, {"y": 9, "note": "n"})["proposal_id"]
+        [case] = [c for c in self.system.learning_cases(P, OP)["cases"] if c["key"] == {"x": 1}]
+        self.assertEqual(sorted(case["pending_proposal_ids"]), sorted([ordinary, shadowed]))
+        self.assertEqual(case["shadow_proposal_ids"], [shadowed])
+
     def test_s4_provenance_keeps_the_first_five_paths_and_the_count(self) -> None:
         answer = {"y": 1, "note": "n"} | {f"k{i}": i for i in range(7)}
         record = self.record(self.admit().id, answer)

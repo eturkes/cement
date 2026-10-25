@@ -142,3 +142,32 @@ End the pass with a short report to the operator:
 
 Do not switch the function on. Tell the operator that the new version is ready to read and
 switch on.
+
+## Comparator
+
+A comparator decides when a shadow answer agrees with the function's answer. Without one, the two
+answers must be byte-equal JSON. Write one only when the shadow disagreements of an operation
+differ in ways that do not change the result. Each rule names a path into the answer; `*` stands
+for every element of a list:
+
+```json
+{"abi": "cement-comparator-v1", "rules": [
+  {"path": ["note"], "rule": "ignore"},
+  {"path": ["patient_name"], "rule": "text"},
+  {"path": ["fields"], "rule": "unordered"},
+  {"path": ["dose_mg"], "rule": "tolerance", "within": "0.5"}
+]}
+```
+
+- `ignore`: the value never counts. Use it only for a value that carries no result, such as a
+  free-text note.
+- `text`: spaces, line breaks and the letter case of A to Z do not count.
+- `unordered`: the items of a list can come in any order. A rule below it starts with `*`.
+- `tolerance`: two numbers, or two decimal strings, agree within `within`.
+
+Every value that no rule names must be equal. `cement comparator set` refuses a rule that names
+no value of its kind in an active example and a comparator that ignores every value of an
+answer. It cannot tell whether a rule is right: that is the pass's judgment, and a wrong rule
+hides a real disagreement. `cement comparator show "$OP"` prints the comparator in force, and
+`cement function read "$OP"` lists it above the cases.
+

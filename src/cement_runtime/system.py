@@ -6451,7 +6451,12 @@ class System:
         unsourced: list[JSONValue] = []
 
         def carry(
-            input_text: str, input_hash: str, output_text: str, kind: str, ident: str
+            input_text: str,
+            input_hash: str,
+            output_text: str,
+            kind: str,
+            ident: str,
+            shadow: bool = False,
         ) -> None:
             key_text = (
                 input_text
@@ -6461,8 +6466,12 @@ class System:
             if key_text is None:
                 unprojected[f"{kind}_ids"].append(ident)
                 return
-            entry = cases.setdefault(key_text, {"example": [], "proposal": [], "outputs": {}})
+            entry = cases.setdefault(
+                key_text, {"example": [], "proposal": [], "shadow": [], "outputs": {}}
+            )
             entry[kind].append(ident)
+            if shadow:
+                entry["shadow"].append(ident)
             slot = entry["outputs"].setdefault(output_text, {"example_ids": [], "proposal_ids": []})
             slot[f"{kind}_ids"].append(ident)
 
@@ -6495,6 +6504,8 @@ class System:
                 str(row["proposed_output_json"]),
                 "proposal",
                 proposal_id,
+                # A shadow disagreement: the LLM answered a case the published function covers.
+                shadow=str(row["source_id"] or "").startswith("shadow:"),
             )
         for row in connection.execute(
             """
@@ -6545,6 +6556,7 @@ class System:
                     "key": key.value,
                     "key_hash": key.digest,
                     "pending_proposal_ids": entry["proposal"],
+                    "shadow_proposal_ids": entry["shadow"],
                     "active_example_ids": entry["example"],
                     "outputs": [
                         {"output": parse_json(text).value, **ids}
