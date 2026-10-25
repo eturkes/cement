@@ -69,6 +69,15 @@ Erratum (closing review, MAIN security S-F1): O2's "a full queue → `drop` … 
 await" = ONE drain task records drops one at a time from a 1,024 backlog; a reply's hits past 256 and drops past
 the backlog are counted only. O3: `_ask` takes the model read once per sample (closing review C-F7).
 
+Erratum (security review 2, owner-ruled): W3 + O3's `bypass_filter=True` keeps no filter off — `generate_chat_completion`
+runs none either way; in 0.12.3 it skips every model permission check (`utils/access_control/__init__.py`
+`check_model_access`), so each user's covered input reaches the shadow model whatever that user may read. Owner: keep it
+for one-model deployments; the example README states it. O3: the worker samples a hit only while its hash names the
+passing served version (`_serves`), else `drop` (reason `the version that served the hit no longer serves`), no
+capture, no model call — replaces gate 1's "a version change between hit and record → the captured hash decides" for
+the filter (a client body can name any earlier hash; each capture rebuilt it uncached); a request carrying
+`state.direct` (the client's direct-connection model) fails before `_ask`. O2: a drop opens the shadow file alone.
+
 ```claims
 33	`asyncio.Queue` (`shadow_queue` valve, default 64)	unchecked	a valve default of the filter (cement_filter.py Valves), not a count	-
 36	(default 60 s)	unchecked	a valve default of the filter (cement_filter.py Valves), not a count	-

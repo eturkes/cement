@@ -11,6 +11,7 @@ import sqlite3
 import tempfile
 import threading
 import unittest
+from collections.abc import Callable, Iterator
 from contextlib import closing
 from unittest import mock
 
@@ -25,6 +26,7 @@ from cement_runtime import (
 )
 from cement_runtime import shadow as sh
 from cement_runtime.cli import main
+from cement_runtime.system import _SERVING_CACHE_MAX
 
 POLICY = CompilePolicy(min_confirmations=2, min_reviewers=1, min_span_seconds=0)
 P, OP = "tenant_a", "op"
@@ -240,6 +242,66 @@ class AdmissionTests(_Case):
         for bad in ("o" * 506, "", "a\nb"):
             with self.subTest(length=len(bad)), self.assertRaises(ValidationError):
                 sh.admit(self.system, self.store, P, OP, observation_id=bad, function_hash=self.v1, input_value={"x": 1}, observed_at_us=1)
+
+    def test_s2_an_observation_id_takes_the_source_id_grammar(self) -> None:
+        # Security review 2 (F4): admission refused control characters (Cc) alone, while the source
+        # id a disagreement becomes also refuses Cf, Zl and Zp, so a U+200B id stranded `prepared`.
+        before = self.store.path.read_bytes()
+        for character in ("\u200b", "\u202e", "\u2028", "\u2029", "\U000e0041"):
+            identity = f"chat:msg:call{character}"
+            for name, call in (
+                ("admit", lambda: sh.admit(self.system, self.store, P, OP, observation_id=identity, function_hash=self.v1, input_value={"x": 1}, observed_at_us=1)),
+                ("drop", lambda: sh.drop(self.store, P, OP, observation_id=identity, function_hash=self.v1, input_value={"x": 1}, observed_at_us=1, reason="queue full")),
+            ):
+                with self.subTest(call=name, character=hex(ord(character))), self.assertRaises(ValidationError):
+                    call()
+        self.assertEqual(self.store.path.read_bytes(), before)
+
+
+@contextlib.contextmanager
+def _verifications() -> Iterator[list[str]]:
+    """Every set or pinned verification the block runs, by method name."""
+
+    calls: list[str] = []
+    originals = {name: getattr(System, name) for name in ("_verify_function_snapshot", "_verify_pinned_snapshot")}
+
+    def counting(name: str) -> Callable[..., object]:
+        def call(self: System, *args: object, **kwargs: object) -> object:
+            calls.append(name)
+            return originals[name](self, *args, **kwargs)
+
+        return call
+
+    with mock.patch.multiple(System, **{name: counting(name) for name in originals}):
+        yield calls
+
+
+class CaptureCostTests(_Case):
+    # Security review 2 (F2): the capture verified through its own `serving` entry keyed on the
+    # expected hash, so each hash a covered result names cost a cold verification and one of the
+    # cache's slots beside the entry `resolve` reuses (p141).
+
+    def test_s2_a_served_admission_reuses_the_resolve_entry(self) -> None:
+        self.system.resolve(P, OP, {"x": 1})
+        with _verifications() as calls:
+            self.assertTrue(self.admit(1).admitted)
+            self.assertTrue(self.system.resolve(P, OP, {"x": 1}).match.matched)
+        self.assertEqual(calls, [])
+
+    def test_s2_hits_naming_old_versions_leave_the_resolve_entry_warm(self) -> None:
+        # One old version per cache slot: an entry per named hash evicted the one `resolve` reuses.
+        old = [self.v1]
+        for value in range(3, 3 + _SERVING_CACHE_MAX):
+            _confirm(self.system, value, {"y": value, "note": "n"})
+            old.append(_publish(self.system))
+        old.pop()  # the newest version serves
+        self.assertEqual(len(old), _SERVING_CACHE_MAX)
+        self.system.resolve(P, OP, {"x": 1})
+        for digest in old:
+            self.assertTrue(self.admit(1, function_hash=digest).admitted)
+        with _verifications() as calls:
+            self.assertTrue(self.system.resolve(P, OP, {"x": 1}).match.matched)
+        self.assertEqual(calls, [])
 
 
 class OutcomeTests(_Case):

@@ -34,6 +34,9 @@ from cement_runtime.system import PROVENANCE_MAX_BYTES
 log = logging.getLogger(__name__)
 
 USE = "use_learned_function"
+QUEUE_FULL = "queue full"
+STALE = "the version that served the hit no longer serves"
+DIRECT = "a direct connection cannot answer a shadow sample"
 # A reply's hits past this count, and drops past the backlog, are counted but not recorded.
 HITS_PER_REPLY = 256
 DROP_BACKLOG = 1_024
@@ -53,6 +56,10 @@ SHADOW_SYSTEM = (
     " Return only the JSON output that the operation produces for that input: one JSON value, with"
     " no prose and no code fence."
 )
+
+
+class _DirectConnectionError(Exception):
+    pass
 
 
 def _shadow_prompt(operation: str, description: str, value: Any) -> tuple[list[dict], str]:
@@ -252,9 +259,18 @@ class Filter:
     def _count(self, outcome: str) -> None:
         self.shadow_counts[outcome] = self.shadow_counts.get(outcome, 0) + 1
 
+    def _shadow_store(self) -> ShadowStore:
+        return ShadowStore(self.valves.shadow_path or shadow_path(self.valves.ledger_path))
+
     def _store(self) -> tuple[System, ShadowStore]:
-        system = System(self.valves.ledger_path, create=False)
-        return system, ShadowStore(self.valves.shadow_path or shadow_path(self.valves.ledger_path))
+        return System(self.valves.ledger_path, create=False), self._shadow_store()
+
+    def _serves(self, system: System, hit: dict[str, Any]) -> bool:
+        """Whether the hit names the version that serves now. A hit's hash is the client's claim:
+        an earlier version would be rebuilt uncached for each forged hit (owner-ruled)."""
+
+        _, served = system.serving(self.valves.partition, hit["operation"])
+        return served is not None and served.passed and served.function_hash == hit["function_hash"]
 
     def _enqueue(self, hits: list[dict[str, Any]], request: Any, user: Any) -> None:
         """Queue each hit for the worker and return at once; a full queue drops the hit (O2)."""
@@ -280,18 +296,18 @@ class Filter:
                 except asyncio.QueueFull:
                     self._count("unrecorded")
 
-    def _drop(self, hit: dict[str, Any]) -> None:
+    def _drop(self, hit: dict[str, Any], reason: str = QUEUE_FULL) -> None:
+        # The shadow file alone: opening the ledger runs a full integrity check, once per drop.
         try:
-            _, store = self._store()
             drop(
-                store,
+                self._shadow_store(),
                 self.valves.partition,
                 hit["operation"],
                 observation_id=hit["observation_id"],
                 function_hash=hit["function_hash"],
                 input_value=hit["input"],
                 observed_at_us=hit["observed_at_us"],
-                reason="queue full",
+                reason=reason,
             )
         except Exception:
             log.exception("cement: a dropped shadow sample was not recorded")
@@ -319,6 +335,10 @@ class Filter:
         """Admit, ask the shadow model, record (O3); every failure stays out of the chat."""
 
         system, store = await asyncio.to_thread(self._store)
+        if not await asyncio.to_thread(self._serves, system, hit):
+            self._count("stale")
+            await asyncio.to_thread(self._drop, hit, STALE)
+            return
         admission = await asyncio.to_thread(
             admit,
             system,
@@ -338,11 +358,17 @@ class Filter:
         model = self.valves.shadow_model  # read once: the record names the model that was asked
         started = time.monotonic()
         try:
+            if getattr(getattr(request, "state", None), "direct", False):
+                # 0.12.3 answers a completion whose model id matches the request's direct-connection
+                # model (the client's `model_item`) from the client's own browser.
+                raise _DirectConnectionError
             reply = await asyncio.wait_for(
                 self._ask(request, user, messages, model),
                 timeout=max(1, self.valves.shadow_timeout),
             )
             answer = _answer(reply)
+        except _DirectConnectionError:
+            reason = DIRECT
         except TimeoutError:
             reason = "the shadow model timed out"
         except Exception as exc:  # noqa: BLE001 — any model or parse failure is one counted outcome
@@ -372,7 +398,9 @@ class Filter:
         )
 
     async def _ask(self, request: Any, user: Any, messages: list[dict], model: str) -> str:
-        """One plain model call: no tools, no filters, the fixed shadow model (O3)."""
+        """One plain model call, no tools, the fixed shadow model (O3). In 0.12.3 `bypass_filter`
+        skips every model permission check (no filter runs here either way); owner-kept for
+        one-model deployments, and the README states it."""
 
         chat = importlib.import_module("open_webui.utils.chat")
         users = importlib.import_module("open_webui.models.users")

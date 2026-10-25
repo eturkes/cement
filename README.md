@@ -510,12 +510,13 @@ function's answer. Cement records each pair in a separate shadow file beside the
 
 A disagreement does not change what Cement answers. The learning pass reviews the proposal like any
 other answer, and only a later publication or a switch changes the served version. Each disagreement
-commits to the ledger. After that commit, the next `resolve` and the next admission each repeat the full
-verification, because an admission verifies the version that it captures apart from `resolve`. With
-1,000 promoted entries, each of these two verifications took about 770 ms. An agreement writes the
-shadow file alone, so both verifications stay valid: the next admission took 34 ms, its agreement
-took 0.6 ms, and the next `resolve` took 31 ms. These numbers are medians of five runs
-(`.agent/decisions/p136-shadow-bench.json`), and with one entry each step took less than 4 ms. If a write fails after the
+commits to the ledger. After that commit, the first `resolve` or admission repeats the full
+verification, and the next of these calls reuses it: an admission captures the served version through
+the verification that `resolve` uses. With 1,000 promoted entries, the verification after a
+disagreement took about 1,430 ms. An agreement writes the shadow file alone, so the verification stays
+valid: the next admission took 52 ms, its agreement took 1.0 ms, and the next `resolve` took 60 ms.
+These numbers are medians of five runs on one host (`.agent/decisions/secrev2-shadow-bench.json`), and
+with one entry each step took less than 8 ms. If a write fails after the
 proposal committed, `finish_shadow` completes the observation and finds that proposal by its source id,
 so a retry never adds a second proposal.
 

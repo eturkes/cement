@@ -36,6 +36,7 @@ from .system import (
     _entity_id,
     _name,
     _stored_int,
+    _text,
 )
 
 __all__ = [
@@ -433,6 +434,12 @@ def _scope(partition: str, operation: str) -> tuple[str, str]:
     return _name(partition, "partition"), _name(operation, "operation")
 
 
+def _observation_id(value: str) -> str:
+    # The source id grammar: a disagreement's proposal carries `shadow:<observation id>`, and an id
+    # graded for Cc alone (a U+200B) left its observation `prepared` for good.
+    return _text(value, "observation_id", maximum=OBSERVATION_ID_MAX_BYTES)
+
+
 def _row_id(value: str) -> str:
     return _entity_id(value, "observation")
 
@@ -504,7 +511,7 @@ def admit(
     one duplicate and returns the original row's id."""
 
     partition, operation = _scope(partition, operation)
-    observation_id = _bounded_text(observation_id, "observation_id", OBSERVATION_ID_MAX_BYTES)
+    observation_id = _observation_id(observation_id)
     observed_at_us = _bounded_int(observed_at_us, "observed_at_us")
     canonical = canonicalize(input_value)
     capture = system.shadow_capture(
@@ -551,7 +558,7 @@ def drop(
     """Record a hit that never reached the model (a full queue) as ``dropped``, without capture."""
 
     partition, operation = _scope(partition, operation)
-    observation_id = _bounded_text(observation_id, "observation_id", OBSERVATION_ID_MAX_BYTES)
+    observation_id = _observation_id(observation_id)
     canonical = canonicalize(input_value)
     return _insert(
         store,

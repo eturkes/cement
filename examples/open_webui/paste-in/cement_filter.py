@@ -23,8 +23,8 @@ from pydantic import BaseModel, Field
 # The embedded source keeps its own line breaks; one of its pragma comments runs past 100
 # columns inside the string, where ruff reads no pragma.
 # ruff: noqa: E501
-_CEMENT_PACKAGE = "_cement_runtime_3184c8a0e622f802"
-_CEMENT_DIGEST = "3184c8a0e622f802ceae122947545bab0ba5de3c3f92f813e0f917caa1a7a882"
+_CEMENT_PACKAGE = "_cement_runtime_05b5765057cb49b4"
+_CEMENT_DIGEST = "05b5765057cb49b4cb6ae68a916de40688f21d3b4a6932aabd92a8bf9db85ca0"
 _CEMENT_SOURCES = {
     "__init__": r'''
 """Cement public API."""
@@ -2674,6 +2674,7 @@ from .system import (
     _entity_id,
     _name,
     _stored_int,
+    _text,
 )
 
 __all__ = [
@@ -3071,6 +3072,12 @@ def _scope(partition: str, operation: str) -> tuple[str, str]:
     return _name(partition, "partition"), _name(operation, "operation")
 
 
+def _observation_id(value: str) -> str:
+    # The source id grammar: a disagreement's proposal carries `shadow:<observation id>`, and an id
+    # graded for Cc alone (a U+200B) left its observation `prepared` for good.
+    return _text(value, "observation_id", maximum=OBSERVATION_ID_MAX_BYTES)
+
+
 def _row_id(value: str) -> str:
     return _entity_id(value, "observation")
 
@@ -3142,7 +3149,7 @@ def admit(
     one duplicate and returns the original row's id."""
 
     partition, operation = _scope(partition, operation)
-    observation_id = _bounded_text(observation_id, "observation_id", OBSERVATION_ID_MAX_BYTES)
+    observation_id = _observation_id(observation_id)
     observed_at_us = _bounded_int(observed_at_us, "observed_at_us")
     canonical = canonicalize(input_value)
     capture = system.shadow_capture(
@@ -3189,7 +3196,7 @@ def drop(
     """Record a hit that never reached the model (a full queue) as ``dropped``, without capture."""
 
     partition, operation = _scope(partition, operation)
-    observation_id = _bounded_text(observation_id, "observation_id", OBSERVATION_ID_MAX_BYTES)
+    observation_id = _observation_id(observation_id)
     canonical = canonicalize(input_value)
     return _insert(
         store,
@@ -9558,10 +9565,15 @@ class System:
                 raise NotFoundError("function_hash names no version of this operation")
             receipt_id = str(receipt["id"])
             revision = _stored_int(receipt["operation_revision"], "receipt revision", minimum=1)
-        # `serving` fails its expected-hash check unless it serves exactly this version, so a
-        # passing verification is the captured one.
-        _, served = self.serving(partition, operation, expected_function_hash=function_hash)
-        if served is not None and served.passed and served.document is not None:
+        # The plain entry `resolve` reuses, its hash compared here: an expected-hash lookup cached
+        # one entry per named hash, so hits naming old versions evicted resolve's (p141).
+        _, served = self.serving(partition, operation)
+        if (
+            served is not None
+            and served.passed
+            and served.document is not None
+            and served.function_hash == function_hash
+        ):
             document = served.document
         else:
             document = self.reconstruct_function_receipt(partition, receipt_id).document
@@ -12689,6 +12701,9 @@ PROVENANCE_MAX_BYTES = _cement_module("system").PROVENANCE_MAX_BYTES
 log = logging.getLogger(__name__)
 
 USE = "use_learned_function"
+QUEUE_FULL = "queue full"
+STALE = "the version that served the hit no longer serves"
+DIRECT = "a direct connection cannot answer a shadow sample"
 # A reply's hits past this count, and drops past the backlog, are counted but not recorded.
 HITS_PER_REPLY = 256
 DROP_BACKLOG = 1_024
@@ -12708,6 +12723,10 @@ SHADOW_SYSTEM = (
     " Return only the JSON output that the operation produces for that input: one JSON value, with"
     " no prose and no code fence."
 )
+
+
+class _DirectConnectionError(Exception):
+    pass
 
 
 def _shadow_prompt(operation: str, description: str, value: Any) -> tuple[list[dict], str]:
@@ -12907,9 +12926,18 @@ class Filter:
     def _count(self, outcome: str) -> None:
         self.shadow_counts[outcome] = self.shadow_counts.get(outcome, 0) + 1
 
+    def _shadow_store(self) -> ShadowStore:
+        return ShadowStore(self.valves.shadow_path or shadow_path(self.valves.ledger_path))
+
     def _store(self) -> tuple[System, ShadowStore]:
-        system = System(self.valves.ledger_path, create=False)
-        return system, ShadowStore(self.valves.shadow_path or shadow_path(self.valves.ledger_path))
+        return System(self.valves.ledger_path, create=False), self._shadow_store()
+
+    def _serves(self, system: System, hit: dict[str, Any]) -> bool:
+        """Whether the hit names the version that serves now. A hit's hash is the client's claim:
+        an earlier version would be rebuilt uncached for each forged hit (owner-ruled)."""
+
+        _, served = system.serving(self.valves.partition, hit["operation"])
+        return served is not None and served.passed and served.function_hash == hit["function_hash"]
 
     def _enqueue(self, hits: list[dict[str, Any]], request: Any, user: Any) -> None:
         """Queue each hit for the worker and return at once; a full queue drops the hit (O2)."""
@@ -12935,18 +12963,18 @@ class Filter:
                 except asyncio.QueueFull:
                     self._count("unrecorded")
 
-    def _drop(self, hit: dict[str, Any]) -> None:
+    def _drop(self, hit: dict[str, Any], reason: str = QUEUE_FULL) -> None:
+        # The shadow file alone: opening the ledger runs a full integrity check, once per drop.
         try:
-            _, store = self._store()
             drop(
-                store,
+                self._shadow_store(),
                 self.valves.partition,
                 hit["operation"],
                 observation_id=hit["observation_id"],
                 function_hash=hit["function_hash"],
                 input_value=hit["input"],
                 observed_at_us=hit["observed_at_us"],
-                reason="queue full",
+                reason=reason,
             )
         except Exception:
             log.exception("cement: a dropped shadow sample was not recorded")
@@ -12974,6 +13002,10 @@ class Filter:
         """Admit, ask the shadow model, record (O3); every failure stays out of the chat."""
 
         system, store = await asyncio.to_thread(self._store)
+        if not await asyncio.to_thread(self._serves, system, hit):
+            self._count("stale")
+            await asyncio.to_thread(self._drop, hit, STALE)
+            return
         admission = await asyncio.to_thread(
             admit,
             system,
@@ -12993,11 +13025,17 @@ class Filter:
         model = self.valves.shadow_model  # read once: the record names the model that was asked
         started = time.monotonic()
         try:
+            if getattr(getattr(request, "state", None), "direct", False):
+                # 0.12.3 answers a completion whose model id matches the request's direct-connection
+                # model (the client's `model_item`) from the client's own browser.
+                raise _DirectConnectionError
             reply = await asyncio.wait_for(
                 self._ask(request, user, messages, model),
                 timeout=max(1, self.valves.shadow_timeout),
             )
             answer = _answer(reply)
+        except _DirectConnectionError:
+            reason = DIRECT
         except TimeoutError:
             reason = "the shadow model timed out"
         except Exception as exc:  # noqa: BLE001 — any model or parse failure is one counted outcome
@@ -13027,7 +13065,9 @@ class Filter:
         )
 
     async def _ask(self, request: Any, user: Any, messages: list[dict], model: str) -> str:
-        """One plain model call: no tools, no filters, the fixed shadow model (O3)."""
+        """One plain model call, no tools, the fixed shadow model (O3). In 0.12.3 `bypass_filter`
+        skips every model permission check (no filter runs here either way); owner-kept for
+        one-model deployments, and the README states it."""
 
         chat = importlib.import_module("open_webui.utils.chat")
         users = importlib.import_module("open_webui.models.users")

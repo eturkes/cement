@@ -209,12 +209,25 @@ reply never waits for the shadow model: the filter puts each covered tool call i
 returns. A background worker then asks the shadow model with the operation's description and the
 input alone. The prompt holds no function answer, no chat and no tool.
 
+The worker asks the shadow model in the name of the user whose chat used the function. Open WebUI
+does not check the model permissions of that user for this call. Thus the shadow model receives
+every covered input, also from a user who cannot select that model. For a deployment with
+one model, this is correct. If you add a model that only some users can use, do not make it the
+shadow model.
+
 - `shadow_exclude` lists operations that never get a shadow answer.
 - `shadow_queue` limits how many shadow answers can wait (default 64). Past that limit, Cement records
   each new one as dropped.
 - One reply contributes at most 256 covered tool calls, and at most 1,024 dropped ones wait to be
   recorded. The filter counts the calls past those limits as dropped, but it records no observation
   for them, because a signed-in user can send a reply with any number of tool calls.
+- The worker asks the shadow model only while the version that answered the tool call still
+  serves. Otherwise it records the call as dropped and asks no model. The filter reads each tool
+  result from the reply that the user's browser sends, so a signed-in user can name an earlier
+  version.
+- A chat over a direct connection gets no shadow answer: the worker records a failed observation.
+  Open WebUI sends such a call to the user's browser, and that browser would then write the shadow
+  answer.
 - `shadow_timeout` limits one shadow answer in seconds (default 60). A timeout, a model error, or a
   reply that is not JSON is a failed observation.
 - `shadow_path` names the shadow file; the default is the ledger path plus `.shadow`.

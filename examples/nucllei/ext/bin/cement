@@ -28,8 +28,8 @@ from typing import Any
 # The embedded source keeps its own line breaks; one of its pragma comments runs past 100
 # columns inside the string, where ruff reads no pragma.
 # ruff: noqa: E501
-_CEMENT_PACKAGE = "_cement_runtime_3184c8a0e622f802"
-_CEMENT_DIGEST = "3184c8a0e622f802ceae122947545bab0ba5de3c3f92f813e0f917caa1a7a882"
+_CEMENT_PACKAGE = "_cement_runtime_05b5765057cb49b4"
+_CEMENT_DIGEST = "05b5765057cb49b4cb6ae68a916de40688f21d3b4a6932aabd92a8bf9db85ca0"
 _CEMENT_SOURCES = {
     "__init__": r'''
 """Cement public API."""
@@ -2679,6 +2679,7 @@ from .system import (
     _entity_id,
     _name,
     _stored_int,
+    _text,
 )
 
 __all__ = [
@@ -3076,6 +3077,12 @@ def _scope(partition: str, operation: str) -> tuple[str, str]:
     return _name(partition, "partition"), _name(operation, "operation")
 
 
+def _observation_id(value: str) -> str:
+    # The source id grammar: a disagreement's proposal carries `shadow:<observation id>`, and an id
+    # graded for Cc alone (a U+200B) left its observation `prepared` for good.
+    return _text(value, "observation_id", maximum=OBSERVATION_ID_MAX_BYTES)
+
+
 def _row_id(value: str) -> str:
     return _entity_id(value, "observation")
 
@@ -3147,7 +3154,7 @@ def admit(
     one duplicate and returns the original row's id."""
 
     partition, operation = _scope(partition, operation)
-    observation_id = _bounded_text(observation_id, "observation_id", OBSERVATION_ID_MAX_BYTES)
+    observation_id = _observation_id(observation_id)
     observed_at_us = _bounded_int(observed_at_us, "observed_at_us")
     canonical = canonicalize(input_value)
     capture = system.shadow_capture(
@@ -3194,7 +3201,7 @@ def drop(
     """Record a hit that never reached the model (a full queue) as ``dropped``, without capture."""
 
     partition, operation = _scope(partition, operation)
-    observation_id = _bounded_text(observation_id, "observation_id", OBSERVATION_ID_MAX_BYTES)
+    observation_id = _observation_id(observation_id)
     canonical = canonicalize(input_value)
     return _insert(
         store,
@@ -9563,10 +9570,15 @@ class System:
                 raise NotFoundError("function_hash names no version of this operation")
             receipt_id = str(receipt["id"])
             revision = _stored_int(receipt["operation_revision"], "receipt revision", minimum=1)
-        # `serving` fails its expected-hash check unless it serves exactly this version, so a
-        # passing verification is the captured one.
-        _, served = self.serving(partition, operation, expected_function_hash=function_hash)
-        if served is not None and served.passed and served.document is not None:
+        # The plain entry `resolve` reuses, its hash compared here: an expected-hash lookup cached
+        # one entry per named hash, so hits naming old versions evicted resolve's (p141).
+        _, served = self.serving(partition, operation)
+        if (
+            served is not None
+            and served.passed
+            and served.document is not None
+            and served.function_hash == function_hash
+        ):
             document = served.document
         else:
             document = self.reconstruct_function_receipt(partition, receipt_id).document

@@ -18,8 +18,9 @@ import unittest
 from typing import Any
 from unittest import mock
 
+from cement_runtime import System
 from cement_runtime import shadow as sh
-from tests.test_open_webui_example import DOC, OP, P, PLAN, _call, _Example
+from tests.test_open_webui_example import DOC, OP, P, PLAN, ROOT, _call, _Example
 
 OUTPUT = {"fields": ["MARKER-OUT"]}
 
@@ -250,16 +251,70 @@ class ShadowSamplingTests(_Example):
         self.assertEqual(self.flood(cap + 20, cap - 1), (1, cap - 1))
         self.assertEqual(self.filter.shadow_counts.get("dropped"), cap + 19)
 
-    def test_s5_the_version_that_served_the_hit_decides(self) -> None:
+    def test_s5_a_hit_whose_version_no_longer_serves_is_dropped(self) -> None:
+        # Owner-ruled (security review 2): `/api/chat/completed` takes the client's body, so a hit
+        # can name any earlier version, and capturing one rebuilt it uncached for each forged hit.
+        # A hit is sampled only while its version serves; this case used to assert `agreed` against
+        # version 1 (`test_s5_the_version_that_served_the_hit_decides`).
         self.publish(DOC)
         body = self.body(1, DOC)  # the tool answered from version 1
         examples = [e["id"] for e in self.system.examples(P, OP)]
         self.system.supersede_examples(P, OP, example_ids=examples, output={"fields": ["NEW"]}, reviewer="lp")
         self._publish(_doc(9), OUTPUT)  # version 2 answers DOC with NEW
         self.assertEqual(self._use(DOC)["output"], {"fields": ["NEW"]})
-        asyncio.run(self.drive([body], self.answering({})))  # the LLM answers like version 1
+        rebuilt: list[tuple[Any, ...]] = []
+        original = System.reconstruct_function_receipt
+
+        def counting(system: System, *args: Any, **kwargs: Any) -> Any:
+            rebuilt.append(args)
+            return original(system, *args, **kwargs)
+
+        with mock.patch.object(System, "reconstruct_function_receipt", counting):
+            asyncio.run(self.drive([body], self.answering({})))
         [row] = self.rows()
-        self.assertEqual((row["state"], row["function_output"]), ("agreed", OUTPUT))
+        self.assertEqual((row["state"], row["note"]), ("dropped", "the version that served the hit no longer serves"))
+        self.assertEqual((self.asked, rebuilt), ([], []))
+        self.assertEqual(self.filter.shadow_counts.get("stale"), 1)
+
+    def test_s5_a_direct_connection_never_answers_a_sample(self) -> None:
+        # Security review 2 (F3): Open WebUI 0.12.3 answers a completion from the client's own
+        # browser when the request carries the client's direct-connection model under the asked id
+        # (`request.state.direct`, set from the body's `model_item`), so the client would write
+        # the shadow answer that the record names as the shadow model's.
+        self.publish(DOC)
+        body = self.body(1, DOC)
+        request = types.SimpleNamespace(state=types.SimpleNamespace(direct=True, model={"id": "shadow-model"}))
+
+        async def scenario() -> None:
+            self.filter._ask = self.answering({})
+            await self.filter.outlet(body, __request__=request, __user__={"id": "u-1", "role": "user"})
+            await self.filter._queue.join()
+
+        asyncio.run(scenario())
+        self.assertEqual(self.asked, [])
+        [row] = self.rows()
+        self.assertEqual((row["state"], row["note"]), ("failed", "a direct connection cannot answer a shadow sample"))
+
+    def test_s5_a_dropped_hit_never_opens_the_ledger(self) -> None:
+        # Security review 2 (F5): each drop opened the ledger (a full `PRAGMA integrity_check`) for
+        # every one of the 1,024 drops a forged body can queue, though a drop writes the shadow file
+        # alone.
+        self.publish(DOC)
+        result = self._use(DOC)
+        hit = {"observation_id": "ward-7:chat-1:msg-1:call-1", "operation": OP,
+               "input": {"document": "forged"}, "function_hash": result["function_hash"], "observed_at_us": 1}
+        names = type(self.filter)._drop.__globals__
+        with mock.patch.dict(names, {"System": mock.Mock(side_effect=AssertionError("the ledger was opened"))}):
+            self.filter._drop(hit)
+        self.assertEqual([(row["state"], row["note"]) for row in self.rows()], [("dropped", "queue full")])
+
+    def test_s5_the_readme_states_that_sampling_skips_model_permissions(self) -> None:
+        # Owner-ruled (security review 2, one model per deployment): `bypass_filter=True` stays, and in
+        # Open WebUI 0.12.3 it skips every model permission check of the shadow call.
+        text = (ROOT / "examples/open_webui/README.md").read_text(encoding="utf-8")
+        section = " ".join(text.split("\n## Shadow answers\n", 1)[1].split("\n## ", 1)[0].split())
+        self.assertIn("Open WebUI does not check the model permissions of that user for this call.", section)
+        self.assertIn("do not make it the shadow model.", section)
 
     def test_s5_a_full_queue_drops_without_blocking(self) -> None:
         documents = [_doc(i) for i in range(3)]
@@ -312,6 +367,8 @@ class ShadowSamplingTests(_Example):
         self.assertEqual(looked_up, ("account", "u-1"))
         self.assertIs(seen_request, request)
         self.assertIs(user, account)
+        # Owner-ruled (security review 2): in Open WebUI 0.12.3 this flag skips every model permission
+        # check of the call; it runs no filter either way. Kept for one-model deployments (README).
         self.assertIs(bypass, True)
         self.assertEqual(sorted(form), ["messages", "model", "stream"])
         self.assertEqual((form["model"], form["stream"]), ("shadow-model", False))

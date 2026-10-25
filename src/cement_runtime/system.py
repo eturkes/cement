@@ -4680,10 +4680,15 @@ class System:
                 raise NotFoundError("function_hash names no version of this operation")
             receipt_id = str(receipt["id"])
             revision = _stored_int(receipt["operation_revision"], "receipt revision", minimum=1)
-        # `serving` fails its expected-hash check unless it serves exactly this version, so a
-        # passing verification is the captured one.
-        _, served = self.serving(partition, operation, expected_function_hash=function_hash)
-        if served is not None and served.passed and served.document is not None:
+        # The plain entry `resolve` reuses, its hash compared here: an expected-hash lookup cached
+        # one entry per named hash, so hits naming old versions evicted resolve's (p141).
+        _, served = self.serving(partition, operation)
+        if (
+            served is not None
+            and served.passed
+            and served.document is not None
+            and served.function_hash == function_hash
+        ):
             document = served.document
         else:
             document = self.reconstruct_function_receipt(partition, receipt_id).document
