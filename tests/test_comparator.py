@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from contextlib import closing
 
-from cement_runtime import Candidate, CompilePolicy, NotFoundError, System, ValidationError
+from cement_runtime import Candidate, CompilePolicy, IntegrityError, NotFoundError, System, ValidationError
 from cement_runtime.cli import main
 from cement_runtime.json_value import canonicalize
 from cement_runtime.comparator import (
@@ -188,6 +188,14 @@ class CompareTests(unittest.TestCase):
         self.assertFalse(self.check(rules, left, {"items": [{"label": "C"}]}).agreed)
         self.assertFalse(self.check(rules, left, {"items": "A b"}).agreed)
 
+    def test_m2_unordered_applies_an_ignore_at_its_elements(self) -> None:
+        # Closing review (reviewer-1 + reviewer-3): `*` ignored below `unordered` = only the count
+        # of elements is compared, as it is without the `unordered` rule.
+        for rules in ([_rule(["v", "*"], "ignore")], [_rule(["v"], "unordered"), _rule(["v", "*"], "ignore")]):
+            with self.subTest(rules=rules):
+                self.assertTrue(self.check(rules, {"k": 1, "v": [10, "a"]}, {"k": 1, "v": [{"x": 2}, 20]}).agreed)
+                self.assertEqual(self.check(rules, {"v": [10]}, {"v": [10, 10]}), Comparison(False, ("$.v",)))
+
     def test_m2_arrays_without_a_rule_compare_in_order(self) -> None:
         rules = [_rule(["rows", "*", "note"], "ignore")]
         left = {"rows": [{"v": 1, "note": "x"}, {"v": 2}]}
@@ -294,6 +302,25 @@ class SetComparatorTests(_Ledger):
         self.assertEqual(self.rows(), 0)
 
 
+    def test_m4_reads_bound_the_revision_and_treat_a_bad_stored_comparator_as_corruption(self) -> None:
+        # Closing review (reviewer-1): 2**63 leaked OverflowError; a stored comparator the grammar
+        # refuses read as a usage error instead of corruption.
+        self.assertIsNone(self.system.comparator("tenant_a", "plan", operation_revision=2**63 - 1))
+        with self.assertRaisesRegex(ValidationError, "operation_revision"):
+            self.system.comparator("tenant_a", "plan", operation_revision=2**63)
+        self.system.set_comparator("tenant_a", "plan", _c(_rule(["note"], "ignore")), actor="lp")
+        with closing(sqlite3.connect(self.db)) as connection:
+            trigger = connection.execute(
+                "SELECT sql FROM sqlite_master WHERE name = 'comparator_settings_no_update'"
+            ).fetchone()[0]
+            connection.execute("DROP TRIGGER comparator_settings_no_update")
+            connection.execute("UPDATE comparator_settings SET comparator_json = '{}'")
+            connection.execute(trigger)
+            connection.commit()
+        with self.assertRaisesRegex(IntegrityError, "stored comparator is invalid"):
+            self.system.comparator("tenant_a", "plan")
+
+
 class ComparatorCLITests(_Ledger):
     def run_cli(self, *argv: str) -> tuple[int, str, str]:
         out, err = io.StringIO(), io.StringIO()
@@ -329,6 +356,21 @@ class ComparatorCLITests(_Ledger):
         )
         self.assertEqual(json.loads(self.run_cli("function", "read", "plan", "--json")[1])["comparator"]["comparator_hash"],
                          self.system.comparator("tenant_a", "plan")["comparator_hash"])
+
+    def test_m5_show_exits_by_class_on_a_huge_revision_and_a_bad_stored_comparator(self) -> None:
+        code, out, _ = self.run_cli("comparator", "show", "plan", "--operation-revision", str(2**63))
+        self.assertEqual((code, out), (2, ""))
+        self.system.set_comparator("tenant_a", "plan", _c(_rule(["note"], "ignore")), actor="lp")
+        with closing(sqlite3.connect(self.db)) as connection:
+            trigger = connection.execute(
+                "SELECT sql FROM sqlite_master WHERE name = 'comparator_settings_no_update'"
+            ).fetchone()[0]
+            connection.execute("DROP TRIGGER comparator_settings_no_update")
+            connection.execute("UPDATE comparator_settings SET comparator_json = '{}'")
+            connection.execute(trigger)
+            connection.commit()
+        code, out, _ = self.run_cli("comparator", "show", "plan")
+        self.assertEqual((code, out), (5, ""))
 
 
 if __name__ == "__main__":

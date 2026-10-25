@@ -19,13 +19,24 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from cement_runtime import Candidate, CementError, ConflictError, System, ValidationError
-from cement_runtime.json_value import canonicalize
-from cement_runtime.shadow import ShadowStore, admit, drop, fail, record_shadow, shadow_path
+from cement_runtime.json_value import canonicalize, parse_json
+from cement_runtime.shadow import (
+    ANSWER_MAX_BYTES,
+    ShadowStore,
+    admit,
+    drop,
+    fail,
+    record_shadow,
+    shadow_path,
+)
 from cement_runtime.system import PROVENANCE_MAX_BYTES
 
 log = logging.getLogger(__name__)
 
 USE = "use_learned_function"
+# A reply's hits past this count, and drops past the backlog, are counted but not recorded.
+HITS_PER_REPLY = 256
+DROP_BACKLOG = 1_024
 RECORD = "record_answer"
 NOTE_HEAD = "Cement learned functions are available for these operations:"
 NOTE_TAIL = (
@@ -65,7 +76,10 @@ def _answer(text: str) -> Any:
         stripped = stripped[3:-3].strip()
         if stripped.startswith("json"):
             stripped = stripped[4:].strip()
-    return json.loads(stripped)
+    json.loads(stripped)  # a reply that is no JSON at all fails as a JSONDecodeError
+    # Cement's strict reader, as `record_shadow` grades the answer: a decimal, a repeated key or an
+    # oversize answer fails the observation here instead of leaving it admitted.
+    return parse_json(stripped, max_bytes=ANSWER_MAX_BYTES).value
 
 
 def _names(text: str) -> set[str]:
@@ -180,6 +194,8 @@ class Filter:
         self._queue: asyncio.Queue | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._worker: asyncio.Task | None = None
+        self._drops: asyncio.Queue | None = None
+        self._dropper: asyncio.Task | None = None
         self.shadow_counts: dict[str, int] = {}
 
     def _hits(self, body: dict[str, Any]) -> list[dict[str, Any]]:
@@ -213,6 +229,9 @@ class Filter:
                 or "input" not in arguments
             ):
                 continue
+            if len(hits) == HITS_PER_REPLY:
+                self._count("dropped")  # counted alone: a forged reply can carry any number
+                continue
             try:
                 canonicalize(arguments["input"])
             except ValidationError:
@@ -243,15 +262,23 @@ class Filter:
         loop = asyncio.get_running_loop()
         if self._queue is None or self._loop is not loop:
             self._queue = asyncio.Queue(maxsize=max(1, self.valves.shadow_queue))
+            # One task records drops, one row at a time: a job per drop let one forged reply
+            # (`/api/chat/completed` takes the client's body) flood the executor that Open WebUI's
+            # own `to_thread` calls share (2,000 drops held an unrelated call for 4.8 s).
+            self._drops = asyncio.Queue(maxsize=DROP_BACKLOG)
             self._loop = loop
-            # The task is held on the instance: the loop keeps only a weak reference to it.
+            # The tasks are held on the instance: the loop keeps only a weak reference to them.
             self._worker = loop.create_task(self._work(self._queue))
+            self._dropper = loop.create_task(self._record_drops(self._drops))
         for hit in hits:
             try:
                 self._queue.put_nowait((hit, request, user))
             except asyncio.QueueFull:
                 self._count("dropped")
-                loop.run_in_executor(None, self._drop, hit)
+                try:
+                    self._drops.put_nowait(hit)
+                except asyncio.QueueFull:
+                    self._count("unrecorded")
 
     def _drop(self, hit: dict[str, Any]) -> None:
         try:
@@ -268,6 +295,14 @@ class Filter:
             )
         except Exception:
             log.exception("cement: a dropped shadow sample was not recorded")
+
+    async def _record_drops(self, drops: asyncio.Queue) -> None:
+        while True:
+            hit = await drops.get()
+            try:
+                await asyncio.to_thread(self._drop, hit)
+            finally:
+                drops.task_done()
 
     async def _work(self, queue: asyncio.Queue) -> None:
         while True:
@@ -300,10 +335,12 @@ class Filter:
             return
         description = _operations(self.valves.operations).get(hit["operation"], "")
         messages, revision = _shadow_prompt(hit["operation"], description, hit["input"])
+        model = self.valves.shadow_model  # read once: the record names the model that was asked
         started = time.monotonic()
         try:
             reply = await asyncio.wait_for(
-                self._ask(request, user, messages), timeout=max(1, self.valves.shadow_timeout)
+                self._ask(request, user, messages, model),
+                timeout=max(1, self.valves.shadow_timeout),
             )
             answer = _answer(reply)
         except TimeoutError:
@@ -317,7 +354,7 @@ class Filter:
                 store,
                 admission.id,
                 llm_output=answer,
-                model=self.valves.shadow_model,
+                model=model,
                 prompt_revision=revision,
                 latency_ms=int((time.monotonic() - started) * 1000),
             )
@@ -329,12 +366,12 @@ class Filter:
             store,
             admission.id,
             reason=reason,
-            model=self.valves.shadow_model,
+            model=model,
             prompt_revision=revision,
             latency_ms=int((time.monotonic() - started) * 1000),
         )
 
-    async def _ask(self, request: Any, user: Any, messages: list[dict]) -> str:
+    async def _ask(self, request: Any, user: Any, messages: list[dict], model: str) -> str:
         """One plain model call: no tools, no filters, the fixed shadow model (O3)."""
 
         chat = importlib.import_module("open_webui.utils.chat")
@@ -342,7 +379,7 @@ class Filter:
         account = await users.Users.get_user_by_id(user["id"])
         response = await chat.generate_chat_completion(
             request,
-            {"model": self.valves.shadow_model, "messages": messages, "stream": False},
+            {"model": model, "messages": messages, "stream": False},
             user=account,
             bypass_filter=True,
         )

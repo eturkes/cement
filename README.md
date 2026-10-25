@@ -89,7 +89,7 @@ authentication, authorization, policy, and idempotent effect execution. Determin
 
 ## Quick start
 
-Requirements: Python 3.11+ with SQLite 3.37+ and `uv` for the development workflow.
+Requirements: Python 3.12+ with SQLite 3.37+ and `uv` for the development workflow.
 
 Spell every option in full. The CLI rejects an abbreviated option, such as `--part` for
 `--partition`, with exit 2 and `unrecognized arguments`.
@@ -154,7 +154,7 @@ these commands: see [The learning pass](https://github.com/eturkes/cement#the-le
 
 ### The function group
 
-`cement function` has eleven leaves:
+`cement function` has sixteen leaves:
 
 | Leaf | Purpose |
 |---|---|
@@ -170,6 +170,10 @@ these commands: see [The learning pass](https://github.com/eturkes/cement#the-le
 | `versions` | List the promoted versions, newest first. `--check` also reports whether each one can serve now. |
 | `diff` | Compare two versions: the cases that the second one adds, removes, or changes. |
 | `eval` | Answer one canonical input from a bundle, with no ledger. |
+| `quarantine-plan` | List each promoted member with a local finding, and the digest of that plan. Writes nothing. |
+| `quarantine` | Suspend exactly the members of one plan, under one write lock. |
+| `drift` | Count the shadow observations of each version by state. |
+| `observations` | List the shadow observations in sequence order, with both answers. |
 
 Pass `--expected-function-hash` to `function verify` to pin the verified snapshot. The check then fails
 on set growth and on any other drift. That result is one read snapshot, not a lease. A later export can

@@ -11,6 +11,8 @@ import asyncio
 import copy
 import json
 import sys
+import threading
+import time
 import types
 import unittest
 from typing import Any
@@ -52,7 +54,7 @@ class ShadowSamplingTests(_Example):
         }
 
     def answering(self, replies: dict[str, Any]):
-        async def ask(request: Any, user: Any, messages: list[dict]) -> str:
+        async def ask(request: Any, user: Any, messages: list[dict], model: str) -> str:
             self.asked.append(messages)
             reply = next((answer for marker, answer in replies.items() if marker in messages[1]["content"]), OUTPUT)
             if isinstance(reply, BaseException):
@@ -133,7 +135,7 @@ class ShadowSamplingTests(_Example):
         async def scenario() -> None:
             gate = asyncio.Event()
 
-            async def ask(request: Any, user: Any, messages: list[dict]) -> str:
+            async def ask(request: Any, user: Any, messages: list[dict], model: str) -> str:
                 order.append("asked")
                 await gate.wait()
                 order.append("answered")
@@ -156,7 +158,7 @@ class ShadowSamplingTests(_Example):
         self.publish(_doc(1), _doc(2), _doc(3))
         self.filter.valves.shadow_timeout = 1
 
-        async def ask(request: Any, user: Any, messages: list[dict]) -> str:
+        async def ask(request: Any, user: Any, messages: list[dict], model: str) -> str:
             content = messages[1]["content"]
             if "P1\\n" in content:
                 raise ConnectionError("model down")
@@ -174,6 +176,79 @@ class ShadowSamplingTests(_Example):
              ("failed", "the shadow model timed out")],
         )
         self.assertEqual(self._counts(), before)  # no proposal, no event
+
+    def test_s5_an_answer_outside_cement_json_is_a_failure(self) -> None:
+        # Closing review (reviewer-1): JSON that Cement refuses (a decimal, a repeated key) fails the
+        # observation; `record_shadow` used to raise and leave it admitted for good.
+        self.publish(_doc(1), _doc(2))
+        replies = {"P1\\n": '{"fields": [1.5]}', "P2\\n": '{"fields": [], "fields": ["MARKER-OUT"]}'}
+        before = self._counts()
+        asyncio.run(self.drive([self.body(i, _doc(i), chat=f"c{i}") for i in (1, 2)], self.answering(replies)))
+        self.assertEqual(
+            [(row["state"], row["note"]) for row in self.rows()],
+            [("failed", "the shadow call failed: ValidationError")] * 2,
+        )
+        self.assertEqual(self._counts(), before)
+
+    def flood(self, count: int, expect: int) -> tuple[int, int]:
+        """One reply carrying `count` covered results (the first real, the rest forged) with a
+        one-slot queue → (the most drop writes in flight at once, the dropped rows written once
+        `expect` rows exist, or after 120 s)."""
+
+        self.publish(DOC)
+        result = self._use(DOC)
+        self.filter.valves.shadow_queue = 1
+        output = _call("call-0", "use_learned_function", {"operation": OP, "input": DOC}, result)
+        for i in range(1, count):
+            forged = {"operation": OP, "input": {"document": f"forged {i}"}}
+            output += _call(f"call-{i}", "use_learned_function", forged, result)
+        body = {"model": "m", "chat_id": "chat-f", "id": "msg-f", "messages": [
+            {"id": "user-f", "role": "user", "content": "plan this"},
+            {"id": "msg-f", "role": "assistant", "content": "Done.", "output": output},
+        ]}
+        lock, active, peak = threading.Lock(), [0], [0]
+        original = self.filter._drop
+
+        def counting(hit: dict) -> None:
+            with lock:
+                active[0] += 1
+                peak[0] = max(peak[0], active[0])
+            try:
+                time.sleep(0.002)
+                original(hit)
+            finally:
+                with lock:
+                    active[0] -= 1
+
+        self.filter._drop = counting
+
+        def dropped() -> int:
+            return sum(row["state"] == "dropped" for row in self.rows()) if sh.shadow_path(self.db).exists() else 0
+
+        async def scenario() -> None:
+            self.filter._ask = self.answering({})
+            self.assertIs(await self.filter.outlet(body), body)
+            await self.filter._queue.join()
+            for _ in range(600):  # until the expected rows exist; a slow fsync only waits longer
+                if dropped() >= expect:
+                    break
+                await asyncio.sleep(0.2)
+            await asyncio.sleep(0.2)  # a write past the expected count would land here
+
+        asyncio.run(scenario())
+        return peak[0], dropped()
+
+    def test_s5_drops_are_written_one_at_a_time(self) -> None:
+        # Security review F-S1: `/api/chat/completed` takes the client's body, so one forged reply
+        # can carry many covered results; a job per drop on the executor that Open WebUI's own
+        # `to_thread` calls share let one body hold an unrelated call for seconds.
+        self.assertEqual(self.flood(40, 39), (1, 39))
+        self.assertEqual(self.filter.shadow_counts.get("dropped"), 39)
+
+    def test_s5_a_reply_past_the_hit_cap_is_counted_not_recorded(self) -> None:
+        cap = type(self.filter)._hits.__globals__["HITS_PER_REPLY"]  # the loaded filter module's own
+        self.assertEqual(self.flood(cap + 20, cap - 1), (1, cap - 1))
+        self.assertEqual(self.filter.shadow_counts.get("dropped"), cap + 19)
 
     def test_s5_the_version_that_served_the_hit_decides(self) -> None:
         self.publish(DOC)
@@ -241,6 +316,33 @@ class ShadowSamplingTests(_Example):
         self.assertEqual(sorted(form), ["messages", "model", "stream"])
         self.assertEqual((form["model"], form["stream"]), ("shadow-model", False))
         self.assertEqual(self.rows()[0]["state"], "agreed")
+
+    def test_s5_the_record_names_the_model_that_was_asked(self) -> None:
+        # Closing review (reviewer-1): a valve change during the call relabelled the observation.
+        self.publish(DOC)
+        body = self.body(1, DOC)
+        asked: list[str] = []
+
+        async def get_user_by_id(user_id: str) -> object:
+            return object()
+
+        async def generate_chat_completion(request: Any, form: dict, *, user: Any, bypass_filter: bool = False) -> Any:
+            asked.append(form["model"])
+            self.filter.valves.shadow_model = "replacement-model"
+            return {"choices": [{"message": {"content": json.dumps(OUTPUT)}}]}
+
+        modules = {
+            "open_webui.utils.chat": types.SimpleNamespace(generate_chat_completion=generate_chat_completion),
+            "open_webui.models.users": types.SimpleNamespace(Users=types.SimpleNamespace(get_user_by_id=get_user_by_id)),
+        }
+
+        async def scenario() -> None:
+            await self.filter.outlet(body, __request__=object(), __user__={"id": "u-1"})
+            await self.filter._queue.join()
+
+        with mock.patch.dict(sys.modules, modules):
+            asyncio.run(scenario())
+        self.assertEqual((asked, self.rows()[0]["model"]), (["shadow-model"], "shadow-model"))
 
     def test_s5_the_prompt_never_holds_the_function_answer(self) -> None:
         self.publish(DOC)

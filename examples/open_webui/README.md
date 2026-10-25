@@ -212,6 +212,9 @@ input alone. The prompt holds no function answer, no chat and no tool.
 - `shadow_exclude` lists operations that never get a shadow answer.
 - `shadow_queue` limits how many shadow answers can wait (default 64). Past that limit, Cement records
   each new one as dropped.
+- One reply contributes at most 256 covered tool calls, and at most 1,024 dropped ones wait to be
+  recorded. The filter counts the calls past those limits as dropped, but it records no observation
+  for them, because a signed-in user can send a reply with any number of tool calls.
 - `shadow_timeout` limits one shadow answer in seconds (default 60). A timeout, a model error, or a
   reply that is not JSON is a failed observation.
 - `shadow_path` names the shadow file; the default is the ledger path plus `.shadow`.

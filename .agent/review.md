@@ -21,6 +21,29 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## Phase close review, ffe130f..eb5cc4d (IMPLEMENT p135 + p136) — fixes = the commit landing this section
+
+Check set fixed before any reading: one `reviewer` per lens over `src/` + the two Open WebUI example sources (+ skills + changed tests for correctness), each a seeded table graded both ways (`| unknown |` 56 / 54 / 9 at seed, 0 filled; `.agent/validate-anchors` rc 0); MAIN alone = the security lens S1-S10. Tables: `.scratch/close/reviewer-{1,2,3}/verdicts.md`, `.scratch/close/security.md`. Every finding below MAIN-reproduced at eb5cc4d before its ruling; each fixed one pinned by a test red there (commit body).
+
+| id | lens | verdict | ruling + pin |
+|---|---|---|---|
+| C-F1 / A-F1 | correctness + altitude: `unordered` dropped an `ignore` at `*` (`_normal` handled ignored keys only) | fixed | `_normal` maps an ignored node to one constant (the rule covers every element on both sides); `test_m2_unordered_applies_an_ignore_at_its_elements`. |
+| C-F2 | correctness: valid JSON outside cement-json-v1 (a decimal) left the observation `admitted` for good | fixed | `_answer` grades with `parse_json` at `ANSWER_MAX_BYTES` after `json.loads`; `test_s5_an_answer_outside_cement_json_is_a_failure` (also a repeated key, which `json.loads` collapsed into an agreement). |
+| C-F3 | correctness: `finish_shadow` recovery matched only the observation id inside the provenance | fixed | whole-provenance digest against `_provenance(row, differences)` (S5); `test_s5_recovery_binds_the_whole_shadow_provenance`. |
+| C-F4 / C-F5 | correctness: `comparator(operation_revision=2**63)` leaked `OverflowError`; a stored comparator the grammar refuses read as usage (exit 2) | fixed | bound 1..2⁶³−1; `ValidationError` on a stored row → `IntegrityError` (`comparator` + the captured reader); `test_m4_reads_bound_…`, `test_m5_show_exits_by_class_…`. |
+| C-F6 | correctness: observation reads trusted a captured comparator hash (S6) | fixed | `_captured_comparator` re-checks JSON + hash in `_record` and `record_shadow`; `test_s6_a_read_rechecks_the_captured_comparator_hash`. |
+| C-F7 | correctness: the filter recorded the valve's model read after the call | fixed | `_sample` reads the model once and passes it to `_ask`; `test_s5_the_record_names_the_model_that_was_asked`. |
+| C-F8 | correctness: skill line "The case stops answering until step 4 publishes it again" | fixed | probe (`.scratch/close/f8_probe.py`): under `follow` the whole function answers nothing, a pinned version keeps its old answer; `skills/cement-learn/SKILL.md` says so. |
+| C-F9 / A-F2 | correctness + altitude: `ShadowStore` forked the ledger opener without its guards | fixed | only a creating open initializes, only a pristine file (`application_id` 0, no schema); `journal_mode = DELETE` after identity; `test_s1_only_a_creating_open_initializes_a_pristine_file`, `test_s1_a_reopen_restores_the_rollback_journal`. |
+| K-F1 | cleanup: shadow schema helpers duplicate `store.py` + rebuilt per open | fixed (partly) | `_schema_objects` reused, `_expected_objects` cached (`functools.cache`); `_statements` kept (the ledger's executor is bound to its own DDL + a pinned call). |
+| K-F2 | cleanup: `OBSERVATION_ID_MAX_BYTES` from a copied 512 | fixed | `SOURCE_ID_MAX_BYTES - len(SOURCE_PREFIX)` (505 unchanged; the adjacent pair still pins it). |
+| K-F3 | cleanup: sampling + retention each decode the reply's tool items | declined | the outlet keeps them in two failure-isolated blocks; one shared decode would couple them for one JSON parse. |
+| S-F1 | security S6: one forged `/api/chat/completed` body queued one executor job per drop (2,000 forged hits held an unrelated `to_thread` call 4,825 ms) | fixed | one drain task records drops one at a time from a 1,024 backlog; a reply's hits past 256 counted, never canonicalized; example README states both; `test_s5_drops_are_written_one_at_a_time` (eb5cc4d: 12 in flight), `test_s5_a_reply_past_the_hit_cap_is_counted_not_recorded`. |
+| S1-S5, S7-S10 | security | pass | `.scratch/close/security.md` rows. |
+| R1 | register: p136-store S9 "without constructing a System" vs p51 | ruled | p51 precedes (`## p136-store` A9/C1); erratum appended to the contract. |
+| R3 | register: README `Python 3.11+`, `cement function` "eleven leaves" | fixed | 3.12+ (`requires-python`); sixteen leaves, the table gains `quarantine-plan`, `quarantine`, `drift`, `observations`. |
+| R4 | register: p136-cmp M4 names `ComparatorRecord` as `set_comparator`'s return | ruled | `ComparatorChange` is the shipped + documented return; erratum appended. |
+
 ## p135-docs close (IMPLEMENT, unit; tier `docs`) — target = the commit landing this section
 
 Check set, fixed from `.agent/decisions/p135-docs-contract.md` + p87 gate 3: G1-G4 = its obligations; P = p87's E3 + E5 doc bullets (landed by those units); C1 claims re-derived against code. MAIN alone (consistency pass).

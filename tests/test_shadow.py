@@ -123,6 +123,32 @@ class StoreIdentityTests(_Case):
             sh.ShadowStore(missing, create=False)
         self.assertFalse(missing.exists())
 
+    def test_s1_only_a_creating_open_initializes_a_pristine_file(self) -> None:
+        # Closing review (reviewer-3): as the ledger, an existing-only open never writes a schema,
+        # and a file another application marked is refused byte-identical.
+        empty = self.root / "empty.shadow"
+        empty.touch()
+        with self.assertRaisesRegex(IntegrityError, "not a Cement shadow store"):
+            sh.ShadowStore(empty, create=False)
+        self.assertEqual(empty.stat().st_size, 0)
+        marked = self.root / "marked.db"
+        with closing(sqlite3.connect(marked)) as connection:
+            connection.execute("PRAGMA application_id = 1234")
+            connection.commit()
+        before = marked.read_bytes()
+        with self.assertRaisesRegex(IntegrityError, "not a Cement shadow store"):
+            sh.ShadowStore(marked)
+        self.assertEqual(marked.read_bytes(), before)
+        sh.ShadowStore(empty)  # a creating open initializes the pristine file
+        self.assertGreater(empty.stat().st_size, 0)
+
+    def test_s1_a_reopen_restores_the_rollback_journal(self) -> None:
+        with closing(sqlite3.connect(self.store.path)) as connection:
+            self.assertEqual(connection.execute("PRAGMA journal_mode = WAL").fetchone()[0], "wal")
+        sh.ShadowStore(self.store.path, create=False)
+        with closing(sqlite3.connect(self.store.path)) as connection:
+            self.assertEqual(connection.execute("PRAGMA journal_mode").fetchone()[0], "delete")
+
     def test_s1_transitions_and_capture_are_guarded(self) -> None:
         admitted = self.admit()
         agreed = self.record(self.admit().id, {"y": 1, "note": "n"})
@@ -309,6 +335,18 @@ class FinishTests(_Case):
             self.record(admission.id, {"y": 9, "note": "n"})
         self.assertEqual(sh.observations(self.store, P, OP)[0]["state"], "prepared")
 
+    def test_s5_recovery_binds_the_whole_shadow_provenance(self) -> None:
+        # Closing review (reviewer-1): the same input, output, revision and observation id under
+        # another model, receipt or hash is not this observation's proposal.
+        admission = self.admit()
+        forged = {"shadow": {"observation_id": "chat:1:call", "function_hash": "0" * 64, "model": "other"}}
+        self.system.submit_proposal(
+            P, OP, {"x": 1}, candidate=Candidate(output={"y": 9, "note": "n"}, provenance=forged), source_id="shadow:chat:1:call"
+        )
+        with self.assertRaisesRegex(ConflictError, "does not match this observation"):
+            self.record(admission.id, {"y": 9, "note": "n"})
+        self.assertEqual(sh.observations(self.store, P, OP)[0]["state"], "prepared")
+
     def test_s5_a_revision_change_writes_no_proposal(self) -> None:
         admission = self.admit()
         self.system.revise_operation(P, OP, policy=POLICY, revised_by="ops")
@@ -361,6 +399,25 @@ class ReadTests(_Case):
         for bad in (0, 1001, True):
             with self.assertRaises(ValidationError):
                 sh.observations(self.store, P, OP, limit=bad)
+
+
+class CapturedComparatorTests(_Case):
+    def test_s6_a_read_rechecks_the_captured_comparator_hash(self) -> None:
+        # Closing review (reviewer-1): a read returned a captured comparator hash that no longer
+        # matched the captured comparator.
+        self.system.set_comparator(P, OP, IGNORE_NOTE, actor="lp")
+        self.admit()
+        self.assertIsNotNone(sh.observations(self.store, P, OP)[0]["comparator_hash"])
+        with closing(sqlite3.connect(self.store.path)) as connection:
+            trigger = connection.execute(
+                "SELECT sql FROM sqlite_master WHERE name = 'observations_capture_immutable'"
+            ).fetchone()[0]
+            connection.execute("DROP TRIGGER observations_capture_immutable")
+            connection.execute("UPDATE observations SET comparator_hash = ?", ("0" * 64,))
+            connection.execute(trigger)
+            connection.commit()
+        with self.assertRaisesRegex(IntegrityError, "stored comparator does not match its hash"):
+            sh.observations(sh.ShadowStore(self.store.path, create=False), P, OP)
 
 
 class RetentionTests(_Case):

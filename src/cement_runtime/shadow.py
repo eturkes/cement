@@ -11,6 +11,7 @@ promotes, challenges or edits a function.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import os
 import sqlite3
@@ -22,12 +23,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, TypedDict, cast
 
-from .comparator import compare, parse_comparator
+from .comparator import Comparator, compare, parse_comparator
 from .errors import ConflictError, IntegrityError, NotFoundError, StateError, ValidationError
 from .json_value import JSONValue, canonicalize, parse_json
 from .models import Candidate
+from .store import _schema_objects
 from .system import (
     _MAX_AGE_SECONDS,
+    SOURCE_ID_MAX_BYTES,
     System,
     _digest,
     _entity_id,
@@ -56,8 +59,8 @@ __all__ = [
 
 SHADOW_SCHEMA_VERSION = 1
 SOURCE_PREFIX = "shadow:"
-# The observation id becomes the ledger source id, which is bounded at 512 UTF-8 bytes.
-OBSERVATION_ID_MAX_BYTES = 512 - len(SOURCE_PREFIX)
+# The observation id becomes the ledger source id.
+OBSERVATION_ID_MAX_BYTES = SOURCE_ID_MAX_BYTES - len(SOURCE_PREFIX)
 TEXT_MAX_BYTES = 256
 ANSWER_MAX_BYTES = 1_048_576
 PROVENANCE_PATHS = 5
@@ -182,22 +185,14 @@ def _statements(script: str) -> Iterator[str]:
             statement = ""
 
 
-def _objects(connection: sqlite3.Connection) -> dict[tuple[str, str], str]:
-    return {
-        (str(row[0]), str(row[1])): str(row[2])
-        for row in connection.execute(
-            "SELECT type, name, sql FROM sqlite_master WHERE sql IS NOT NULL"
-            " AND name NOT LIKE 'sqlite_%'"
-        )
-    }
-
-
+@functools.cache
 def _expected_objects() -> dict[tuple[str, str], str]:
+    # Built once: the filter opens the store once per sampled hit.
     connection = sqlite3.connect(":memory:")
     try:
         for statement in _statements(SHADOW_SCHEMA):
             connection.execute(statement)
-        return _objects(connection)
+        return _schema_objects(connection)
     finally:
         connection.close()
 
@@ -252,7 +247,7 @@ class ShadowStore:
                 pass
             except OSError as exc:
                 raise ValidationError("shadow store path could not be created safely") from exc
-        self._open()
+        self._open(initialize=create)
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=10.0, isolation_level=None)
@@ -270,12 +265,17 @@ class ShadowStore:
             raise
         return connection
 
-    def _open(self) -> None:
+    def _open(self, *, initialize: bool) -> None:
         try:
             with self.transaction() as connection:
                 version = int(connection.execute("PRAGMA user_version").fetchone()[0])
                 if version == 0:
-                    if connection.execute("SELECT 1 FROM sqlite_master LIMIT 1").fetchone():
+                    # As the ledger: only a creating open initializes, and only a pristine file.
+                    if (
+                        not initialize
+                        or connection.execute("SELECT 1 FROM sqlite_master LIMIT 1").fetchone()
+                        or int(connection.execute("PRAGMA application_id").fetchone()[0]) != 0
+                    ):
                         raise IntegrityError("the file is not a Cement shadow store")
                     for statement in _statements(SHADOW_SCHEMA):
                         connection.execute(statement)
@@ -302,10 +302,19 @@ class ShadowStore:
                     raise IntegrityError("the file is not a Cement shadow store") from None
                 if stored is None or stored[0] != SHADOW_FINGERPRINT:
                     raise IntegrityError("shadow store schema fingerprint mismatch")
-                if _objects(connection) != _expected_objects():
+                if _schema_objects(connection) != _expected_objects():
                     raise IntegrityError("shadow store schema does not match the runtime schema")
+            # Journal policy changes only after identity is established (as the ledger): a file an
+            # operator switched to WAL returns to a rollback journal.
+            connection = self._connect()
+            try:
+                connection.execute("PRAGMA journal_mode = DELETE")
+            finally:
+                connection.close()
         except StateError:
             raise
+        except sqlite3.OperationalError as exc:
+            raise StateError("shadow store is busy or unavailable") from exc
         except sqlite3.DatabaseError as exc:
             raise IntegrityError("the file is not a Cement shadow store") from exc
 
@@ -613,10 +622,25 @@ def _json(text: object, label: str) -> JSONValue:
         raise IntegrityError(f"stored {label} is invalid") from exc
 
 
+def _captured_comparator(row: sqlite3.Row) -> Comparator | None:
+    """The comparator an observation captured, re-checked against its stored hash."""
+
+    if row["comparator_json"] is None:
+        return None
+    try:
+        comparator = parse_comparator(_json(row["comparator_json"], "comparator"))
+    except ValidationError:
+        raise IntegrityError("stored comparator is invalid") from None
+    if comparator.comparator_hash != row["comparator_hash"]:
+        raise IntegrityError("stored comparator does not match its hash")
+    return comparator
+
+
 def _record(row: sqlite3.Row) -> ObservationRecord:
     input_value = _json(row["input_json"], "input")
     if canonicalize(input_value).digest != row["input_hash"]:
         raise IntegrityError("stored observation input does not match its hash")
+    _captured_comparator(row)
     state = str(row["state"])
     if state not in STATES:
         raise IntegrityError("stored observation state is invalid")
@@ -692,13 +716,10 @@ def record_shadow(
         row = _row(connection, ident)
         if row["state"] != "admitted":
             raise ConflictError(f"the observation is {row['state']}, not admitted")
-        comparator = None
-        if row["comparator_json"] is not None:
-            comparator = parse_comparator(_json(row["comparator_json"], "comparator"))
-            if comparator.comparator_hash != row["comparator_hash"]:
-                raise IntegrityError("stored comparator does not match its hash")
         verdict = compare(
-            comparator, _json(row["function_output_json"], "function output"), answer.value
+            _captured_comparator(row),
+            _json(row["function_output_json"], "function output"),
+            answer.value,
         )
         connection.execute(
             """
@@ -737,15 +758,19 @@ def _provenance(row: sqlite3.Row, differences: list[str]) -> dict[str, JSONValue
     return {"shadow": shadow}
 
 
-def _matches(existing: Any, row: sqlite3.Row, answer_digest: str, revision: int) -> bool:
-    provenance = existing["provenance"]
-    shadow = provenance.get("shadow") if isinstance(provenance, dict) else None
+def _matches(
+    existing: Any,
+    row: sqlite3.Row,
+    answer_digest: str,
+    revision: int,
+    provenance: dict[str, JSONValue],
+) -> bool:
+    # An earlier attempt wrote exactly this provenance from the same prepared row.
     return bool(
         canonicalize(existing["input"]).digest == row["input_hash"]
         and canonicalize(existing["proposed_output"]).digest == answer_digest
         and existing["operation_revision"] == revision
-        and isinstance(shadow, dict)
-        and shadow.get("observation_id") == row["observation_id"]
+        and canonicalize(existing["provenance"]).digest == canonicalize(provenance).digest
     )
 
 
@@ -772,7 +797,7 @@ def finish_shadow(system: System, store: ShadowStore, ident: str) -> Observation
         note: str | None = None
         existing = system.proposal_by_source(partition, operation, source_id)
         if existing is not None:
-            if not _matches(existing, row, answer.digest, revision):
+            if not _matches(existing, row, answer.digest, revision, _provenance(row, differences)):
                 raise ConflictError(
                     f"source id {source_id} names a proposal that does not match this observation"
                 )

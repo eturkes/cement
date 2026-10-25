@@ -4525,9 +4525,12 @@ class System:
         partition = _name(partition, "partition")
         operation = _name(operation, "operation")
         if operation_revision is not None and (
-            type(operation_revision) is not int or operation_revision < 1
+            type(operation_revision) is not int
+            or not 1 <= operation_revision <= _MAX_SQLITE_INTEGER
         ):
-            raise ValidationError("operation_revision must be a positive integer")
+            raise ValidationError(
+                f"operation_revision must be an integer from 1 to {_MAX_SQLITE_INTEGER}"
+            )
         with self.store.transaction(write=False) as connection:
             current = self._submission_revision_in(connection, partition, operation)
             revision = current if operation_revision is None else operation_revision
@@ -4536,9 +4539,13 @@ class System:
             )
             if row is None:
                 return None
-            parsed = parse_comparator(
-                parse_json(str(row["comparator_json"]), max_bytes=COMPARATOR_MAX_BYTES).value
-            )
+            try:
+                parsed = parse_comparator(
+                    parse_json(str(row["comparator_json"]), max_bytes=COMPARATOR_MAX_BYTES).value
+                )
+            except ValidationError:
+                # A stored comparator was graded when it was set: a refusal now is corruption.
+                raise IntegrityError("stored comparator is invalid") from None
             if parsed.comparator_hash != row["comparator_hash"]:
                 raise IntegrityError("stored comparator does not match its hash")
             return {

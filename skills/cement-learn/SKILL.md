@@ -89,7 +89,9 @@ and continue from what it shows. Stop and report any other code. The workflow re
    - The function's answer is still right: merge with the case's current output. The shadow
      proposal is corrected to it, which adds a confirmation.
    - The LLM's answer is right, because the expected behavior changed or the function was wrong:
-     merge to the new output. The case stops answering until step 4 publishes it again.
+     merge to the new output. This contradicts the published case: until step 4 publishes a new
+     version, a function that follows the newest version answers nothing, and a pinned version
+     keeps its old answer.
    - The shadow answer is unusable: reject it, as for any other proposal.
 
    If many disagreements differ only in wording, spacing, letter case or order, write a comparator

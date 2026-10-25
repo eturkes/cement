@@ -23,8 +23,8 @@ from pydantic import BaseModel, Field
 # The embedded source keeps its own line breaks; one of its pragma comments runs past 100
 # columns inside the string, where ruff reads no pragma.
 # ruff: noqa: E501
-_CEMENT_PACKAGE = "_cement_runtime_dad41dfc8db2f34b"
-_CEMENT_DIGEST = "dad41dfc8db2f34b56aac75e4b19e2a263b87f99731ee99be3a9e104a8ee5179"
+_CEMENT_PACKAGE = "_cement_runtime_3184c8a0e622f802"
+_CEMENT_DIGEST = "3184c8a0e622f802ceae122947545bab0ba5de3c3f92f813e0f917caa1a7a882"
 _CEMENT_SOURCES = {
     "__init__": r'''
 """Cement public API."""
@@ -542,6 +542,9 @@ def _normal(value: JSONValue, node: _Node) -> JSONValue:
     exists under an unordered rule, so a normal form decides agreement there."""
 
     rule = node.rule.rule if node.rule is not None else None
+    if rule == "ignore":
+        # Every element under this path is ignored on both sides, so one constant cannot collide.
+        return None
     if rule == "text" and isinstance(value, str):
         return _text(value)
     if isinstance(value, dict):
@@ -2646,6 +2649,7 @@ promotes, challenges or edits a function.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import os
 import sqlite3
@@ -2657,12 +2661,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, TypedDict, cast
 
-from .comparator import compare, parse_comparator
+from .comparator import Comparator, compare, parse_comparator
 from .errors import ConflictError, IntegrityError, NotFoundError, StateError, ValidationError
 from .json_value import JSONValue, canonicalize, parse_json
 from .models import Candidate
+from .store import _schema_objects
 from .system import (
     _MAX_AGE_SECONDS,
+    SOURCE_ID_MAX_BYTES,
     System,
     _digest,
     _entity_id,
@@ -2691,8 +2697,8 @@ __all__ = [
 
 SHADOW_SCHEMA_VERSION = 1
 SOURCE_PREFIX = "shadow:"
-# The observation id becomes the ledger source id, which is bounded at 512 UTF-8 bytes.
-OBSERVATION_ID_MAX_BYTES = 512 - len(SOURCE_PREFIX)
+# The observation id becomes the ledger source id.
+OBSERVATION_ID_MAX_BYTES = SOURCE_ID_MAX_BYTES - len(SOURCE_PREFIX)
 TEXT_MAX_BYTES = 256
 ANSWER_MAX_BYTES = 1_048_576
 PROVENANCE_PATHS = 5
@@ -2817,22 +2823,14 @@ def _statements(script: str) -> Iterator[str]:
             statement = ""
 
 
-def _objects(connection: sqlite3.Connection) -> dict[tuple[str, str], str]:
-    return {
-        (str(row[0]), str(row[1])): str(row[2])
-        for row in connection.execute(
-            "SELECT type, name, sql FROM sqlite_master WHERE sql IS NOT NULL"
-            " AND name NOT LIKE 'sqlite_%'"
-        )
-    }
-
-
+@functools.cache
 def _expected_objects() -> dict[tuple[str, str], str]:
+    # Built once: the filter opens the store once per sampled hit.
     connection = sqlite3.connect(":memory:")
     try:
         for statement in _statements(SHADOW_SCHEMA):
             connection.execute(statement)
-        return _objects(connection)
+        return _schema_objects(connection)
     finally:
         connection.close()
 
@@ -2887,7 +2885,7 @@ class ShadowStore:
                 pass
             except OSError as exc:
                 raise ValidationError("shadow store path could not be created safely") from exc
-        self._open()
+        self._open(initialize=create)
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=10.0, isolation_level=None)
@@ -2905,12 +2903,17 @@ class ShadowStore:
             raise
         return connection
 
-    def _open(self) -> None:
+    def _open(self, *, initialize: bool) -> None:
         try:
             with self.transaction() as connection:
                 version = int(connection.execute("PRAGMA user_version").fetchone()[0])
                 if version == 0:
-                    if connection.execute("SELECT 1 FROM sqlite_master LIMIT 1").fetchone():
+                    # As the ledger: only a creating open initializes, and only a pristine file.
+                    if (
+                        not initialize
+                        or connection.execute("SELECT 1 FROM sqlite_master LIMIT 1").fetchone()
+                        or int(connection.execute("PRAGMA application_id").fetchone()[0]) != 0
+                    ):
                         raise IntegrityError("the file is not a Cement shadow store")
                     for statement in _statements(SHADOW_SCHEMA):
                         connection.execute(statement)
@@ -2937,10 +2940,19 @@ class ShadowStore:
                     raise IntegrityError("the file is not a Cement shadow store") from None
                 if stored is None or stored[0] != SHADOW_FINGERPRINT:
                     raise IntegrityError("shadow store schema fingerprint mismatch")
-                if _objects(connection) != _expected_objects():
+                if _schema_objects(connection) != _expected_objects():
                     raise IntegrityError("shadow store schema does not match the runtime schema")
+            # Journal policy changes only after identity is established (as the ledger): a file an
+            # operator switched to WAL returns to a rollback journal.
+            connection = self._connect()
+            try:
+                connection.execute("PRAGMA journal_mode = DELETE")
+            finally:
+                connection.close()
         except StateError:
             raise
+        except sqlite3.OperationalError as exc:
+            raise StateError("shadow store is busy or unavailable") from exc
         except sqlite3.DatabaseError as exc:
             raise IntegrityError("the file is not a Cement shadow store") from exc
 
@@ -3248,10 +3260,25 @@ def _json(text: object, label: str) -> JSONValue:
         raise IntegrityError(f"stored {label} is invalid") from exc
 
 
+def _captured_comparator(row: sqlite3.Row) -> Comparator | None:
+    """The comparator an observation captured, re-checked against its stored hash."""
+
+    if row["comparator_json"] is None:
+        return None
+    try:
+        comparator = parse_comparator(_json(row["comparator_json"], "comparator"))
+    except ValidationError:
+        raise IntegrityError("stored comparator is invalid") from None
+    if comparator.comparator_hash != row["comparator_hash"]:
+        raise IntegrityError("stored comparator does not match its hash")
+    return comparator
+
+
 def _record(row: sqlite3.Row) -> ObservationRecord:
     input_value = _json(row["input_json"], "input")
     if canonicalize(input_value).digest != row["input_hash"]:
         raise IntegrityError("stored observation input does not match its hash")
+    _captured_comparator(row)
     state = str(row["state"])
     if state not in STATES:
         raise IntegrityError("stored observation state is invalid")
@@ -3327,13 +3354,10 @@ def record_shadow(
         row = _row(connection, ident)
         if row["state"] != "admitted":
             raise ConflictError(f"the observation is {row['state']}, not admitted")
-        comparator = None
-        if row["comparator_json"] is not None:
-            comparator = parse_comparator(_json(row["comparator_json"], "comparator"))
-            if comparator.comparator_hash != row["comparator_hash"]:
-                raise IntegrityError("stored comparator does not match its hash")
         verdict = compare(
-            comparator, _json(row["function_output_json"], "function output"), answer.value
+            _captured_comparator(row),
+            _json(row["function_output_json"], "function output"),
+            answer.value,
         )
         connection.execute(
             """
@@ -3372,15 +3396,19 @@ def _provenance(row: sqlite3.Row, differences: list[str]) -> dict[str, JSONValue
     return {"shadow": shadow}
 
 
-def _matches(existing: Any, row: sqlite3.Row, answer_digest: str, revision: int) -> bool:
-    provenance = existing["provenance"]
-    shadow = provenance.get("shadow") if isinstance(provenance, dict) else None
+def _matches(
+    existing: Any,
+    row: sqlite3.Row,
+    answer_digest: str,
+    revision: int,
+    provenance: dict[str, JSONValue],
+) -> bool:
+    # An earlier attempt wrote exactly this provenance from the same prepared row.
     return bool(
         canonicalize(existing["input"]).digest == row["input_hash"]
         and canonicalize(existing["proposed_output"]).digest == answer_digest
         and existing["operation_revision"] == revision
-        and isinstance(shadow, dict)
-        and shadow.get("observation_id") == row["observation_id"]
+        and canonicalize(existing["provenance"]).digest == canonicalize(provenance).digest
     )
 
 
@@ -3407,7 +3435,7 @@ def finish_shadow(system: System, store: ShadowStore, ident: str) -> Observation
         note: str | None = None
         existing = system.proposal_by_source(partition, operation, source_id)
         if existing is not None:
-            if not _matches(existing, row, answer.digest, revision):
+            if not _matches(existing, row, answer.digest, revision, _provenance(row, differences)):
                 raise ConflictError(
                     f"source id {source_id} names a proposal that does not match this observation"
                 )
@@ -9375,9 +9403,12 @@ class System:
         partition = _name(partition, "partition")
         operation = _name(operation, "operation")
         if operation_revision is not None and (
-            type(operation_revision) is not int or operation_revision < 1
+            type(operation_revision) is not int
+            or not 1 <= operation_revision <= _MAX_SQLITE_INTEGER
         ):
-            raise ValidationError("operation_revision must be a positive integer")
+            raise ValidationError(
+                f"operation_revision must be an integer from 1 to {_MAX_SQLITE_INTEGER}"
+            )
         with self.store.transaction(write=False) as connection:
             current = self._submission_revision_in(connection, partition, operation)
             revision = current if operation_revision is None else operation_revision
@@ -9386,9 +9417,13 @@ class System:
             )
             if row is None:
                 return None
-            parsed = parse_comparator(
-                parse_json(str(row["comparator_json"]), max_bytes=COMPARATOR_MAX_BYTES).value
-            )
+            try:
+                parsed = parse_comparator(
+                    parse_json(str(row["comparator_json"]), max_bytes=COMPARATOR_MAX_BYTES).value
+                )
+            except ValidationError:
+                # A stored comparator was graded when it was set: a refusal now is corruption.
+                raise IntegrityError("stored comparator is invalid") from None
             if parsed.comparator_hash != row["comparator_hash"]:
                 raise IntegrityError("stored comparator does not match its hash")
             return {
@@ -12640,6 +12675,8 @@ ConflictError = _cement_module("").ConflictError
 System = _cement_module("").System
 ValidationError = _cement_module("").ValidationError
 canonicalize = _cement_module("json_value").canonicalize
+parse_json = _cement_module("json_value").parse_json
+ANSWER_MAX_BYTES = _cement_module("shadow").ANSWER_MAX_BYTES
 ShadowStore = _cement_module("shadow").ShadowStore
 admit = _cement_module("shadow").admit
 drop = _cement_module("shadow").drop
@@ -12652,6 +12689,9 @@ PROVENANCE_MAX_BYTES = _cement_module("system").PROVENANCE_MAX_BYTES
 log = logging.getLogger(__name__)
 
 USE = "use_learned_function"
+# A reply's hits past this count, and drops past the backlog, are counted but not recorded.
+HITS_PER_REPLY = 256
+DROP_BACKLOG = 1_024
 RECORD = "record_answer"
 NOTE_HEAD = "Cement learned functions are available for these operations:"
 NOTE_TAIL = (
@@ -12691,7 +12731,10 @@ def _answer(text: str) -> Any:
         stripped = stripped[3:-3].strip()
         if stripped.startswith("json"):
             stripped = stripped[4:].strip()
-    return json.loads(stripped)
+    json.loads(stripped)  # a reply that is no JSON at all fails as a JSONDecodeError
+    # Cement's strict reader, as `record_shadow` grades the answer: a decimal, a repeated key or an
+    # oversize answer fails the observation here instead of leaving it admitted.
+    return parse_json(stripped, max_bytes=ANSWER_MAX_BYTES).value
 
 
 def _names(text: str) -> set[str]:
@@ -12806,6 +12849,8 @@ class Filter:
         self._queue: asyncio.Queue | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._worker: asyncio.Task | None = None
+        self._drops: asyncio.Queue | None = None
+        self._dropper: asyncio.Task | None = None
         self.shadow_counts: dict[str, int] = {}
 
     def _hits(self, body: dict[str, Any]) -> list[dict[str, Any]]:
@@ -12839,6 +12884,9 @@ class Filter:
                 or "input" not in arguments
             ):
                 continue
+            if len(hits) == HITS_PER_REPLY:
+                self._count("dropped")  # counted alone: a forged reply can carry any number
+                continue
             try:
                 canonicalize(arguments["input"])
             except ValidationError:
@@ -12869,15 +12917,23 @@ class Filter:
         loop = asyncio.get_running_loop()
         if self._queue is None or self._loop is not loop:
             self._queue = asyncio.Queue(maxsize=max(1, self.valves.shadow_queue))
+            # One task records drops, one row at a time: a job per drop let one forged reply
+            # (`/api/chat/completed` takes the client's body) flood the executor that Open WebUI's
+            # own `to_thread` calls share (2,000 drops held an unrelated call for 4.8 s).
+            self._drops = asyncio.Queue(maxsize=DROP_BACKLOG)
             self._loop = loop
-            # The task is held on the instance: the loop keeps only a weak reference to it.
+            # The tasks are held on the instance: the loop keeps only a weak reference to them.
             self._worker = loop.create_task(self._work(self._queue))
+            self._dropper = loop.create_task(self._record_drops(self._drops))
         for hit in hits:
             try:
                 self._queue.put_nowait((hit, request, user))
             except asyncio.QueueFull:
                 self._count("dropped")
-                loop.run_in_executor(None, self._drop, hit)
+                try:
+                    self._drops.put_nowait(hit)
+                except asyncio.QueueFull:
+                    self._count("unrecorded")
 
     def _drop(self, hit: dict[str, Any]) -> None:
         try:
@@ -12894,6 +12950,14 @@ class Filter:
             )
         except Exception:
             log.exception("cement: a dropped shadow sample was not recorded")
+
+    async def _record_drops(self, drops: asyncio.Queue) -> None:
+        while True:
+            hit = await drops.get()
+            try:
+                await asyncio.to_thread(self._drop, hit)
+            finally:
+                drops.task_done()
 
     async def _work(self, queue: asyncio.Queue) -> None:
         while True:
@@ -12926,10 +12990,12 @@ class Filter:
             return
         description = _operations(self.valves.operations).get(hit["operation"], "")
         messages, revision = _shadow_prompt(hit["operation"], description, hit["input"])
+        model = self.valves.shadow_model  # read once: the record names the model that was asked
         started = time.monotonic()
         try:
             reply = await asyncio.wait_for(
-                self._ask(request, user, messages), timeout=max(1, self.valves.shadow_timeout)
+                self._ask(request, user, messages, model),
+                timeout=max(1, self.valves.shadow_timeout),
             )
             answer = _answer(reply)
         except TimeoutError:
@@ -12943,7 +13009,7 @@ class Filter:
                 store,
                 admission.id,
                 llm_output=answer,
-                model=self.valves.shadow_model,
+                model=model,
                 prompt_revision=revision,
                 latency_ms=int((time.monotonic() - started) * 1000),
             )
@@ -12955,12 +13021,12 @@ class Filter:
             store,
             admission.id,
             reason=reason,
-            model=self.valves.shadow_model,
+            model=model,
             prompt_revision=revision,
             latency_ms=int((time.monotonic() - started) * 1000),
         )
 
-    async def _ask(self, request: Any, user: Any, messages: list[dict]) -> str:
+    async def _ask(self, request: Any, user: Any, messages: list[dict], model: str) -> str:
         """One plain model call: no tools, no filters, the fixed shadow model (O3)."""
 
         chat = importlib.import_module("open_webui.utils.chat")
@@ -12968,7 +13034,7 @@ class Filter:
         account = await users.Users.get_user_by_id(user["id"])
         response = await chat.generate_chat_completion(
             request,
-            {"model": self.valves.shadow_model, "messages": messages, "stream": False},
+            {"model": model, "messages": messages, "stream": False},
             user=account,
             bypass_filter=True,
         )

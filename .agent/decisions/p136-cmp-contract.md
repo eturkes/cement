@@ -110,3 +110,6 @@ witnesses, a 64 KiB budget, capped paths, the comparator captured at admission (
 88	256 / 257-character segment	unchecked	adjacent bound pairs the gate pins	-
 92	the 20 cap	unchecked	the cap `MAX_PATHS`	-
 ```
+
+Erratum (closing review, reviewer-1 R4): `set_comparator` returns a `ComparatorChange`
+(`changed`, `comparator_hash`, `operation_revision`), not the `ComparatorRecord` that `comparator` reads.

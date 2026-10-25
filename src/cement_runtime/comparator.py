@@ -242,6 +242,9 @@ def _normal(value: JSONValue, node: _Node) -> JSONValue:
     exists under an unordered rule, so a normal form decides agreement there."""
 
     rule = node.rule.rule if node.rule is not None else None
+    if rule == "ignore":
+        # Every element under this path is ignored on both sides, so one constant cannot collide.
+        return None
     if rule == "text" and isinstance(value, str):
         return _text(value)
     if isinstance(value, dict):

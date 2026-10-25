@@ -125,3 +125,6 @@ honest two-file retention.
 53	within 1 MiB	unchecked	the answer bound `ANSWER_MAX_BYTES`, pinned by an adjacent pair	-
 116	3. Register + article audits rc 0;	unchecked	a gate expectation	-
 ```
+
+Erratum (closing review, reviewer-1 R1): S9's `without constructing a `System`` describes the shadow
+read itself; p51 precedes it, so both leaves open the ledger existing-only first (exit 5 when absent).
