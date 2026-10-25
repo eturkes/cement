@@ -134,6 +134,22 @@ Cement verifies the grammar and the consistency of a program, never its semantic
 learning pass decides that the answers of an operation depend on structure alone, and its report
 states that assumption.
 
+### Comparators
+
+A comparator (`cement-comparator-v1`) decides when two answers to one input agree. It is a closed list
+of rules, one path each: `ignore`, `text` (runs of a fixed whitespace set collapse and A to Z fold, from
+explicit tables, so the verdict never depends on the interpreter's Unicode data), `unordered` (a
+multiset of items, with the rules below the list, which start at `*`, applied to each item), and
+`tolerance` (integers or decimal strings, compared as scaled integers, so no rounding enters a
+verdict). A value that no rule
+names compares exactly, and no comparator means canonical JSON equality. The grammar refuses a repeated
+path, `ignore` at the root, any rule below `ignore`, `text` or `tolerance`, and `tolerance` below
+`unordered`. `set_comparator` stores one append-only `comparator_settings` row for each change in the
+current operation revision. It refuses a rule that names no value of its kind in an active example
+and a comparator that ignores every value of an example answer; those checks run when it is set,
+and they prove applicability, not that the values a comparator keeps are enough. An equal comparator writes nothing. `comparator` reads the newest row of a
+revision. `partition erase` deletes those rows with every other row of the partition.
+
 ### Entry points
 
 `System.submit_proposal` and `System.propose` both write one proposal row and one

@@ -2390,7 +2390,7 @@ class ObligationBatteryTests(unittest.TestCase):
                 )
 
         before = _table_counts(path)
-        self.assertEqual(len(before), 17)  # p135-e3: schema v4 adds erasure_grants + erasures
+        self.assertEqual(len(before), 18)  # schema v4: + erasure_grants, erasures, comparator_settings
         status, stdout, stderr = _invoke(
             [
                 "--db",

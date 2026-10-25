@@ -21,6 +21,29 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p136-cmp close (IMPLEMENT, unit; tier `kernel`) — target = the commit landing this section
+
+Check set, fixed from `.agent/decisions/p136-cmp-contract.md` revision 2 + the `CLAUDE.md` diff lenses before the diff was reread: A1-A6 = M1-M6; L = consultant-1's six rows, each re-derived; P = repaired pins; C1-C3 lenses. consultant-1 (`consultant`, reused from E3) attacked revision 1 before code; consultant-2's store review (N3) independently found the comparator-time flip.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | M1 grammar | pass | `tests.test_comparator.GrammarTests`: a valid comparator round-trips and hashes order-free; 14 refusals each name their rule index (repeated path, root ignore, under ignore / text / tolerance, an unordered child not through `*`, tolerance under unordered, kind, keys, abi, segment); 256 / 257 rules, 32 / 33 segments, 256 / 257 characters, `within` forms, and the 65,536 / 65,537-byte document as exact adjacent pairs. |
+| A2 | M2 compare | pass | `CompareTests`: each rule's adjacent pair; tolerance over integers + decimal strings by scaled integers (32-digit edge, 65-character operand exact); the text rule folds A-Z + the fixed whitespace set and leaves `ß`, `É`, U+A7CB, combining marks and EM SPACE exact (identical on 3.12 and 3.15 by construction); multiplicity; nested rules below `unordered`; a literal `*` key stays exact; paths sorted, capped at 20 + 256 characters; `None` walks like an empty list. |
+| A3 | M3 storage | pass | `comparator_settings` + scope index + two triggers (delete opens only under an erase grant); `partition erase` counts it (retention battery fixture now holds a row, so its every-table control covers it). |
+| A4 | M4 set + read | pass | Equal hash → no write before revalidation; typed witnesses (text vs list, tolerance vs string refused); a wholly ignored answer refused; revision scoping; stored JSON re-hashed on read; one `comparator.set` event with the previous hash. |
+| A5 | M5 CLI + Read | pass | `comparator set/show`, exit 2 / 3; `function read` header names revision + hash + setting sequence and says a later setting replaces it; the no-match tail stays last (pinned test unchanged). |
+| A6 | M6 docs | pass | README `### Comparing answers` (exact text table, the `*` limitation, set-time applicability, a tolerance that covers every dose as the named limit, mutable policy); architecture `### Comparators`; threat model: comparators are the learning pass's judgment. Register + article audits rc 0. |
+| L1 | grammar | accept | Budget 64 KiB (projection's), typed `*` edge, descent through `*`, original indices; the `within` spelling (`1.0` vs `1.00`) keeps distinct hashes by design. |
+| L2 | determinism | accept, remedy chosen | Measured interpreter split → explicit tables. MAIN chose A-Z + a fixed whitespace set (the projection precedent) over a packaged Unicode-15 fold table: deterministic, no generated data module; the narrowing is in the docs. |
+| L3 | the floor | accept as documentation | No owner-ratified semantic criterion exists; M4 = applicability + non-erasure, stated as such; typed witnesses + empty-container leaves close the `[{}]` loophole. |
+| L4 | capture | accept | Revision-scoped mutable policy; p136-store captures comparator JSON + hash + sequence at admission (contract amended there). |
+| L5 | collateral | accept | Table count 17 → 18 (4 pins), `runtime.md`, the retention census + fixture, B20 write + read sites + helper, identity + event censuses, typed-record fixture, SHAPE. |
+| L6 | gates | accept | Seeds fired (`.scratch/p136/cmp_seeds.py` + `cmp_seeds2.py`, control OK first, source restored byte-for-byte): A-Z fold dropped, host `casefold`, multiset as a set (both sides), `<=` → `<`, ignored-key presence counted, `*` conflated with a literal key, descent check off, witness type ignored, path cap off, whole-answer check off, unwitnessed check off, idempotence off, tolerance under unordered → each reds its owner. |
+| P | repaired pins | pass | Live re-pins for the deliberate change: `test_submission` + D22 + V25 + X25 table counts 17 → 18; B20 + `set_comparator` / `comparator` / `_comparator_row`; identity census + writer; `EVENT_PAYLOAD_KEYS` + `comparator.set`; typed-record caller fixture + 9 fields; `ParserShapeTests` SHAPE (272, 3003b326d5555606) → (287, 1a14d23d9e0d17ec). |
+| C1 | correctness | pass, fixes | Revision 1's text rule read the host's Unicode tables (L2); the walk conflated a literal `*` key with the array edge (L1); a huge key overflowed provenance downstream (consultant-2 N3) → all fixed + pinned. |
+| C2 | cleanup | pass | `_document` is the one canonical builder for parse + `document()`. |
+| C3 | altitude | pass | Grammar + compare in a pure module; storage follows `projection_settings`. |
+
 ## p135-e3 close (IMPLEMENT, unit; tier `kernel`) — target = the commit landing this section
 
 Check set, fixed from `.agent/decisions/p135-e3-contract.md` revision 2 + the `CLAUDE.md` diff lenses before the diff was reread: A1-A7 = V1, V2, V2a, V3, V4, V5, V6; K = consultant-1's eight rows, each re-derived; P = every repaired pin; C1-C3 lenses; S1 security. consultant-1 (`consultant`) attacked revision 1 before code (`.scratch/p135/consultant-1/verdicts.md`, probes at `3333d7c`).

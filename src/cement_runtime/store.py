@@ -219,6 +219,19 @@ CREATE TABLE IF NOT EXISTS projection_settings (
     FOREIGN KEY (partition, operation) REFERENCES operations(partition, name)
 ) STRICT;
 
+CREATE TABLE IF NOT EXISTS comparator_settings (
+    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT NOT NULL UNIQUE,
+    partition TEXT NOT NULL,
+    operation TEXT NOT NULL,
+    operation_revision INTEGER NOT NULL CHECK (operation_revision >= 1),
+    comparator_json TEXT NOT NULL,
+    comparator_hash TEXT NOT NULL,
+    set_by TEXT NOT NULL,
+    set_at_us INTEGER NOT NULL,
+    FOREIGN KEY (partition, operation) REFERENCES operations(partition, name)
+) STRICT;
+
 CREATE TABLE IF NOT EXISTS switch_settings (
     sequence INTEGER PRIMARY KEY AUTOINCREMENT,
     id TEXT NOT NULL UNIQUE,
@@ -283,6 +296,8 @@ CREATE INDEX IF NOT EXISTS function_receipts_feed
     ON function_receipts(partition, operation, sequence);
 CREATE INDEX IF NOT EXISTS projection_settings_scope
     ON projection_settings(partition, operation, operation_revision, sequence);
+CREATE INDEX IF NOT EXISTS comparator_settings_scope
+    ON comparator_settings(partition, operation, operation_revision, sequence);
 CREATE INDEX IF NOT EXISTS switch_settings_scope
     ON switch_settings(partition, operation, sequence);
 CREATE INDEX IF NOT EXISTS function_memberships_artifact
@@ -451,6 +466,19 @@ WHEN NOT EXISTS (
 )
 BEGIN
     SELECT RAISE(ABORT, 'projection settings are append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS comparator_settings_no_update
+BEFORE UPDATE ON comparator_settings BEGIN
+    SELECT RAISE(ABORT, 'comparator settings are append-only');
+END;
+CREATE TRIGGER IF NOT EXISTS comparator_settings_no_delete
+BEFORE DELETE ON comparator_settings
+WHEN NOT EXISTS (
+    SELECT 1 FROM erasure_grants WHERE partition =
+        OLD.partition
+)
+BEGIN
+    SELECT RAISE(ABORT, 'comparator settings are append-only');
 END;
 CREATE TRIGGER IF NOT EXISTS switch_settings_no_update
 BEFORE UPDATE ON switch_settings BEGIN

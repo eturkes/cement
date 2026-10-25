@@ -155,7 +155,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.12 under `uv`.
 ## Tasks
 
 - [x] cd0d2cf p135-e5 — bundle signatures: `cement_runtime.signature` (SSHSIG + allowed-signers + RFC 8032 verify) + `function eval --signature --allowed-signers`; D7 refusal.
-- [ ] p135-e3 — schema v4 + `retention prune` + `partition erase` over the ledger.
+- [x] 723abe9 p135-e3 — schema v4 + `retention prune` + `partition erase` over the ledger.
 - [ ] p136-cmp — comparator IR + `set_comparator` (v4 table, amended in place) + `Read`/CLI views.
 - [ ] p136-store — telemetry store + admit / `record_shadow` (captured version, comparator, disagreement → proposal) + `drift` + `observations` + CLI; prune + erase cover it.
 - [ ] p136-learn — `cement_runtime.learning` + `skills/cement-learn/`: shadow proposals, comparator authoring, drift reads.

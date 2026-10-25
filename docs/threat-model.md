@@ -21,8 +21,10 @@
   example states how). In the nucllei example, the chat model itself writes each retained answer and
   runs the switch command when the user asks. The sandbox cannot tell who asked, so there a model
   that ignores its skills can switch a function on (the example README states this limit).
-- The learning pass's judgment. It is an LLM run: its reviews, merges, and projection programs can be
-  wrong. Cement verifies a program's grammar and consistency, never its semantic correctness. The
+- The learning pass's judgment. It is an LLM run: its reviews, merges, projection programs, and
+  comparators can be wrong. Cement verifies the grammar and consistency of a program or a comparator,
+  never its semantic correctness. A careless comparator can hide a real difference between two
+  answers, so `function read` shows it. The
   switch keeps a person's decision between learned versions and production: it starts `off`, `follow`
   is a standing choice to serve each new version, and `pinned` keeps one version.
 - Stored input/output content when rendered by another system.

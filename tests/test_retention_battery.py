@@ -44,7 +44,7 @@ DOCS = sorted((ROOT / "examples/hospital_ocr/documents").glob("*.txt"))
 # Direct = carries `partition`; child = reaches it through the parent named; shared + meta = neither.
 DIRECT = {
     "operations", "proposals", "examples", "artifacts", "function_receipts",
-    "projection_settings", "switch_settings", "events",
+    "projection_settings", "switch_settings", "events", "comparator_settings",
 }
 CHILD = {
     "example_revocations": "SELECT x.rowid FROM example_revocations AS x JOIN examples AS e ON e.id = x.example_id WHERE e.partition = ?",
@@ -66,6 +66,7 @@ GUARDED = {  # `*_no_delete` trigger → its table, every one but schema metadat
     "projection_settings_no_delete": "projection_settings",
     "switch_settings_no_delete": "switch_settings",
     "events_no_delete": "events",
+    "comparator_settings_no_delete": "comparator_settings",
 }
 
 
@@ -167,6 +168,10 @@ def _populate(system: System, partition: str, marker: str, texts: list[str], *, 
     system.revoke_example(partition, examples[4], revoked_by="person", reason="wrong")
     system.supersede_examples(partition, "echo", example_ids=[examples[0]], output={"y": 10}, reviewer="learning-pass")
     system.challenge(partition, "echo", {"x": 2, "m": marker}, {"y": 20}, reviewer="learning-pass")
+    system.set_comparator(
+        partition, "echo", {"abi": "cement-comparator-v1", "rules": [{"path": ["y"], "rule": "tolerance", "within": "0"}]},
+        actor="learning-pass",
+    )
     if extra_program:
         system.register_operation(partition, "solo", policy=POLICY)
         for _ in (1, 2):

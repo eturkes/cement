@@ -430,6 +430,36 @@ example (exit 4). `example revoke` withdraws an example that is wrong, and it al
 stops every version built on that example from answering.
 
 
+### Comparing answers
+
+A comparator decides when two answers to one input agree. Without one, two answers agree only when
+their canonical JSON is equal. The learning pass writes one comparator for each operation revision:
+
+```bash
+uv run cement --db demo.db --partition acme comparator set support.reply \
+  --comparator '{"abi":"cement-comparator-v1","rules":[{"path":["text"],"rule":"text"}]}' \
+  --actor learning-pass
+uv run cement --db demo.db --partition acme comparator show support.reply
+```
+
+A rule names a path into the answer. A path holds object keys, and `*` stands for every element of a
+list, so a rule cannot name an object key that is literally `*`. Four rules exist:
+
+| Rule | Two values agree when |
+|---|---|
+| `ignore` | Always. The value can also be missing on one side. |
+| `text` | Both are strings, and they are equal after each run of spaces, tabs, line breaks, no-break spaces, and ideographic spaces becomes one space, the ends are trimmed, and capital letters A to Z become lower case. Other letters compare exactly, so the result is the same on every supported Python. |
+| `unordered` | Both are lists that hold the same items, each as many times, in any order. A rule below the list starts with `*` and applies to each item. |
+| `tolerance` | Both are integers or decimal strings of at most 64 characters, and they differ by `within` or less. Cement compares them exactly, with no rounding. |
+
+Every value that no rule names must be equal. When the comparator is set, Cement checks the grammar
+and two facts against the active examples of the revision: each rule names a value of its kind in an
+example answer, and no example answer has every value ignored. Cement does not judge whether a rule
+is right or whether the values that it keeps are enough. A careless rule can hide a real difference,
+for example a tolerance that covers every dose. `function read` therefore lists the comparator above
+the cases of each version. The comparator is the current policy of the revision, not a part of a
+sealed version, so a later setting replaces it.
+
 ### Retention and erasure
 
 A retained answer stays in the ledger until you delete it. Two commands delete rows. Each one

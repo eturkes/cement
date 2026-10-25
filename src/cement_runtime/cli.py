@@ -349,6 +349,24 @@ def _parser() -> argparse.ArgumentParser:
     projection_show = projection_commands.add_parser("show", allow_abbrev=False)
     projection_show.add_argument("operation")
 
+    comparator = commands.add_parser(
+        "comparator", help="set or show the rule that decides when two answers agree"
+    )
+    comparator_commands = comparator.add_subparsers(dest="comparator_command", required=True)
+    comparator_set = comparator_commands.add_parser(
+        "set", help="set the comparator of the operation's current revision"
+    )
+    comparator_set.add_argument("operation")
+    comparator_set.add_argument("--comparator", required=True, help="JSON text; '-' reads stdin")
+    comparator_set.add_argument("--actor", required=True)
+    comparator_show = comparator_commands.add_parser(
+        "show", help="show the comparator of one operation revision"
+    )
+    comparator_show.add_argument("operation")
+    comparator_show.add_argument(
+        "--operation-revision", type=int, help="read this revision instead of the current one"
+    )
+
     learn = commands.add_parser(
         "learn", help="run the learning pass: read its work, merge one case, publish a version"
     )
@@ -841,11 +859,46 @@ def _function_listing(
         "receipt_id": receipt.id,
         "function_hash": receipt.function_hash,
         "projection_hash": reconstruction.document.projection_hash,
+        "comparator": system.comparator(
+            partition, operation, operation_revision=receipt.operation_revision
+        ),
         "switch": state.mode,
         "answers": answers and state.mode != "off",
         "newest": receipt.id == newest,
         "cases": cases,
     }
+
+
+_RULE_WORDS = {
+    "ignore": "ignored",
+    "text": "equal as text, spaces and letter case aside",
+    "unordered": "the same items in any order",
+}
+
+
+def _comparator_lines(record: Any, revision: int) -> list[str]:
+    """How a shadow answer must match, one line per rule. The comparator is the revision's
+    current policy, never part of the sealed version, so a later setting can change these lines."""
+
+    if record is None:
+        return [
+            f"# Revision {revision} has no comparator: a shadow answer agrees when it is equal."
+        ]
+    lines = [
+        (
+            f"# Revision {revision} comparator {record['comparator_hash']} (setting"
+            f" {record['sequence']}, a later setting replaces it): a shadow answer agrees when"
+            " every value is equal, except:"
+        )
+    ]
+    for rule in record["comparator"]["rules"]:
+        where = "$" + "".join(
+            "[*]" if segment == "*" else f"[{canonicalize(segment).text}]"
+            for segment in rule["path"]
+        )
+        words = _RULE_WORDS.get(rule["rule"], f"within {rule.get('within')}")
+        lines.append(f"#   {where}: {words}")
+    return lines
 
 
 def _render_listing(listing: dict[str, Any]) -> str:
@@ -872,6 +925,7 @@ def _render_listing(listing: dict[str, Any]) -> str:
         lines.append(
             f"# Each input maps to its case through projection {listing['projection_hash']}."
         )
+    lines += _comparator_lines(listing["comparator"], listing["operation_revision"])
     lines.append("")
     for case in listing["cases"]:
         lines += [f"if case == {text(case['case'])}:", f"    answer {text(case['output'])}"]
@@ -1294,6 +1348,14 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
                 args.partition, args.operation, _input(args.program), actor=args.actor
             )
         return {"projection": system.projection(args.partition, args.operation)}
+    if args.command == "comparator":
+        if args.comparator_command == "set":
+            return system.set_comparator(
+                args.partition, args.operation, _input(args.comparator), actor=args.actor
+            )
+        return system.comparator(
+            args.partition, args.operation, operation_revision=args.operation_revision
+        )
     if args.command == "learn":
         if args.learn_command == "merge":
             try:

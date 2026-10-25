@@ -573,6 +573,21 @@ class ProjectionRecord(TypedDict):
     program_hash: str
 
 
+class ComparatorRecord(TypedDict):
+    operation_revision: int
+    comparator: JSONValue
+    comparator_hash: str
+    set_by: str
+    set_at_us: int
+    sequence: int
+
+
+class ComparatorChange(TypedDict):
+    changed: bool
+    comparator_hash: str
+    operation_revision: int
+
+
 class ProjectionChange(TypedDict):
     changed: bool
     program_hash: str

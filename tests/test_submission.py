@@ -75,7 +75,7 @@ def _p06_handle_spans() -> tuple[str, str, str]:
 # the only one: SQLite owns the `sqlite_` prefix, and `events.sequence` is
 # AUTOINCREMENT, so `sqlite_sequence` legitimately moves on every success.
 SQLITE_OWNED = "sqlite_"
-DECLARED_APPLICATION_TABLES = 17  # p135-e3: + erasure_grants, erasures (schema v4)
+DECLARED_APPLICATION_TABLES = 18  # schema v4: + erasure_grants, erasures (p135-e3), comparator_settings (p136-cmp)
 
 
 def _application_tables(connection: sqlite3.Connection) -> list[str]:

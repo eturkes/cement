@@ -28,6 +28,8 @@ from .artifacts import (
     execute,
     validate_artifact,
 )
+from .comparator import MAX_BYTES as COMPARATOR_MAX_BYTES
+from .comparator import compared_leaves, parse_comparator, witnesses
 from .errors import (
     CandidateSourceError,
     ConflictError,
@@ -62,6 +64,8 @@ from .models import (
     ArtifactSummaryRecord,
     Candidate,
     CandidateRequest,
+    ComparatorChange,
+    ComparatorRecord,
     CompilePolicy,
     CompileResult,
     CompileScope,
@@ -417,6 +421,7 @@ _PARTITION_PRESENT = """
     UNION ALL SELECT 1 FROM function_receipts WHERE partition = :p
     UNION ALL SELECT 1 FROM projection_settings WHERE partition = :p
     UNION ALL SELECT 1 FROM switch_settings WHERE partition = :p
+    UNION ALL SELECT 1 FROM comparator_settings WHERE partition = :p
     UNION ALL SELECT 1 FROM events WHERE partition = :p
     LIMIT 1
 """
@@ -463,6 +468,7 @@ _ERASE_STEPS = (
     ("switch_settings", "DELETE FROM switch_settings WHERE partition = ?"),
     ("function_receipts", "DELETE FROM function_receipts WHERE partition = ?"),
     ("projection_settings", "DELETE FROM projection_settings WHERE partition = ?"),
+    ("comparator_settings", "DELETE FROM comparator_settings WHERE partition = ?"),
     ("artifacts", "DELETE FROM artifacts WHERE partition = ?"),
     ("examples", "DELETE FROM examples WHERE partition = ?"),
     ("proposals", "DELETE FROM proposals WHERE partition = ?"),
@@ -4491,6 +4497,154 @@ class System:
             set_at_us=_stored_int(row["set_at_us"], "switch set_at_us"),
             sequence=_stored_int(row["sequence"], "switch sequence", minimum=1),
         )
+
+    # -- comparator (p136-cmp) --------------------------------------------------
+
+    def _comparator_row(
+        self, connection: sqlite3.Connection, *, partition: str, operation: str, revision: int
+    ) -> sqlite3.Row | None:
+        return cast(
+            "sqlite3.Row | None",
+            connection.execute(
+                """
+                SELECT * FROM comparator_settings
+                WHERE partition = ? AND operation = ? AND operation_revision = ?
+                ORDER BY sequence DESC LIMIT 1
+                """,
+                (partition, operation, revision),
+            ).fetchone(),
+        )
+
+    def comparator(
+        self, partition: str, operation: str, *, operation_revision: int | None = None
+    ) -> ComparatorRecord | None:
+        """The comparator the learning pass set for one operation revision (default: the current
+        one), or ``None``: answers then agree only when their canonical JSON is equal."""
+
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        if operation_revision is not None and (
+            type(operation_revision) is not int or operation_revision < 1
+        ):
+            raise ValidationError("operation_revision must be a positive integer")
+        with self.store.transaction(write=False) as connection:
+            current = self._submission_revision_in(connection, partition, operation)
+            revision = current if operation_revision is None else operation_revision
+            row = self._comparator_row(
+                connection, partition=partition, operation=operation, revision=revision
+            )
+            if row is None:
+                return None
+            parsed = parse_comparator(
+                parse_json(str(row["comparator_json"]), max_bytes=COMPARATOR_MAX_BYTES).value
+            )
+            if parsed.comparator_hash != row["comparator_hash"]:
+                raise IntegrityError("stored comparator does not match its hash")
+            return {
+                "operation_revision": revision,
+                "comparator": cast(JSONValue, parsed.document()),
+                "comparator_hash": parsed.comparator_hash,
+                "set_by": str(row["set_by"]),
+                "set_at_us": _stored_int(row["set_at_us"], "comparator set_at_us"),
+                "sequence": _stored_int(row["sequence"], "comparator sequence", minimum=1),
+            }
+
+    def set_comparator(
+        self, partition: str, operation: str, comparator: object, *, actor: str
+    ) -> ComparatorChange:
+        """Set the comparator that decides when a shadow answer agrees, for the current revision.
+
+        Cement checks the grammar and two facts over the revision's active examples: every rule
+        names a value at least one example answer holds, and no example answer has all of its
+        values ignored. It never judges whether a rule is right; that is the learning pass's
+        call. An equal comparator writes nothing; otherwise one setting row and one
+        ``comparator.set`` event. A refusal writes nothing.
+        """
+
+        partition = _name(partition, "partition")
+        operation = _name(operation, "operation")
+        parsed = parse_comparator(comparator)
+        actor = _text(actor, "actor", maximum=256)
+        with self.store.transaction(write=True) as connection:
+            revision = self._submission_revision_in(connection, partition, operation)
+            previous = self._comparator_row(
+                connection, partition=partition, operation=operation, revision=revision
+            )
+            previous_hash = None if previous is None else str(previous["comparator_hash"])
+            if previous_hash == parsed.comparator_hash:
+                # An equal comparator is already in force: no revalidation, clock, id or write.
+                return {
+                    "changed": False,
+                    "comparator_hash": parsed.comparator_hash,
+                    "operation_revision": revision,
+                }
+            examples = [
+                (str(row["id"]), parse_json(str(row["output_json"])).value)
+                for row in connection.execute(
+                    """
+                    SELECT e.id, e.output_json FROM examples AS e
+                    LEFT JOIN example_revocations AS x ON x.example_id = e.id
+                    WHERE e.partition = ? AND e.operation = ? AND e.operation_revision = ?
+                      AND x.example_id IS NULL
+                      AND NOT EXISTS (
+                          SELECT 1 FROM examples AS s WHERE s.supersedes_example_id = e.id)
+                    ORDER BY e.id
+                    """,
+                    (partition, operation, revision),
+                )
+            ]
+            for rule in parsed.rules:
+                if not any(witnesses(output, rule) for _, output in examples):
+                    raise ValidationError(
+                        f"comparator rule at {list(rule.path)} names no {rule.rule} value in an"
+                        " active example"
+                    )
+            for example_id, output in examples:
+                leaves, compared = compared_leaves(parsed, output)
+                if leaves and not compared:
+                    raise ValidationError(
+                        f"the comparator ignores the whole answer of example {example_id}"
+                    )
+            now = self._now()
+            connection.execute(
+                """
+                INSERT INTO comparator_settings(
+                    id, partition, operation, operation_revision, comparator_json,
+                    comparator_hash, set_by, set_at_us
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    _new_id("cmp"),
+                    partition,
+                    operation,
+                    revision,
+                    canonicalize(
+                        cast(JSONValue, parsed.document()), max_bytes=COMPARATOR_MAX_BYTES
+                    ).text,
+                    parsed.comparator_hash,
+                    actor,
+                    now,
+                ),
+            )
+            _event(
+                connection,
+                partition=partition,
+                kind="comparator.set",
+                subject_type="operation",
+                subject_id=f"{partition}/{operation}",
+                payload={
+                    "actor": actor,
+                    "comparator_hash": parsed.comparator_hash,
+                    "operation_revision": revision,
+                    "previous_comparator_hash": previous_hash,
+                },
+                now_us=now,
+            )
+            return {
+                "changed": True,
+                "comparator_hash": parsed.comparator_hash,
+                "operation_revision": revision,
+            }
 
     def switch(self, partition: str, operation: str) -> SwitchState:
         """Read the operation's current switch (``off`` until a person sets one)."""

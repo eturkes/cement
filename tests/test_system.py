@@ -17234,6 +17234,7 @@ class PreservedInvariantCensusTests(unittest.TestCase):
         "quarantine": ["events.payload_json[json]"],
         "prune_proposals": ["events.payload_json[json]"],
         "erase_partition": ["erasures.erased_by"],
+        "set_comparator": ["comparator_settings.set_by", "events.payload_json[json]"],
     }
     EVENT_PAYLOAD_KEYS = {
         "artifact.challenged": ("example_id", "receipt_hash", "reviewer", "suspended"),
@@ -17248,6 +17249,7 @@ class PreservedInvariantCensusTests(unittest.TestCase):
         "artifact.suspended": ("reason", "suspended_by"),
         "artifact.verification_failed": ("failures", "report_id", "scope_hash", "tests", "verified_by"),
         "artifact.verified": ("failures", "report_id", "scope_hash", "tests", "verified_by"),
+        "comparator.set": ("actor", "comparator_hash", "operation_revision", "previous_comparator_hash"),
         "example.revoked": (
             "reason", "revoked_by", "suspended_artifact_count", "suspended_artifact_ids",
             "suspended_artifact_ids_hash",
@@ -17397,6 +17399,10 @@ class PreservedInvariantCensusTests(unittest.TestCase):
              lambda s, c, i: s.prune_proposals(p, older_than_seconds=0, actor=i)),
             ("erase_partition", "actor", lambda s: None,
              lambda s, c, i: s.erase_partition(p, actor=i)),
+            ("set_comparator", "actor", lambda s: None,
+             lambda s, c, i: s.set_comparator(
+                 p, op, {"abi": "cement-comparator-v1", "rules": [{"path": ["y"], "rule": "tolerance", "within": "0"}]},
+                 actor=i)),
         )
 
     @staticmethod

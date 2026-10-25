@@ -227,3 +227,16 @@ def read_every_field(  # noqa: PLR0915 — one binding per field, by design
     r15_min_confirmations: int = r15["min_confirmations"]
     r15_min_reviewers: int = r15["min_reviewers"]
     r15_min_span_seconds: int = r15["min_span_seconds"]
+    r16 = system.set_comparator(partition, operation, program, actor="caller")
+    r16_changed: bool = r16["changed"]
+    r16_comparator_hash: str = r16["comparator_hash"]
+    r16_operation_revision: int = r16["operation_revision"]
+    maybe_r17 = system.comparator(partition, operation)
+    assert maybe_r17 is not None
+    r17 = maybe_r17
+    r17_operation_revision: int = r17["operation_revision"]
+    r17_comparator: JSONValue = r17["comparator"]
+    r17_comparator_hash: str = r17["comparator_hash"]
+    r17_set_by: str = r17["set_by"]
+    r17_set_at_us: int = r17["set_at_us"]
+    r17_sequence: int = r17["sequence"]

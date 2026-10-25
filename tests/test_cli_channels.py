@@ -1302,7 +1302,7 @@ class CliChannelTests(unittest.TestCase):
         claim.
         """
         before = self.table_counts()
-        self.assertEqual(len(before), 17)  # p135-e3: schema v4 adds erasure_grants + erasures
+        self.assertEqual(len(before), 18)  # schema v4: + erasure_grants, erasures, comparator_settings
         source = json.dumps({"input": 1, "output": 2, "provenance": {}})
         run = self.run_cli(
             "proposal", "submit", "absent", "--submission", source
@@ -2728,7 +2728,7 @@ class CliChannelTests(unittest.TestCase):
         """
         self.register()
         before = self.table_counts()
-        self.assertEqual(len(before), 17)  # p135-e3: schema v4 adds erasure_grants + erasures
+        self.assertEqual(len(before), 18)  # schema v4: + erasure_grants, erasures, comparator_settings
         source = json.dumps(
             {"input": {"value": 1}, "output": {"value": 2}, "provenance": {}}
         )
