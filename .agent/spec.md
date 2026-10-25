@@ -149,8 +149,8 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.12 under `uv`.
   - T2 + T9: each observation keeps the original input, the function's answer, the LLM's answer, model + prompt revision + timing; the agreement derives from the CAPTURED version, never the version current at record time.
   - T3: a disagreement also becomes a pending ledger proposal (source id `shadow:<observation id>`, provenance marks it shadow) that the learning pass merges like any other answer; agreements stay telemetry. Each disagreement commit makes the next `resolve` cold (docs cite the measured cost).
   - T7: observation id = chat message + tool-call id, admitted once before any model work. T8: a fixed admin-chosen model + a versioned prompt from the operation's description + the input alone — never the function's answer, the chat or Cement's tools.
-  - T4: nucllei INCLUDED as a batch job: `use` logs each hit to a per-user telemetry file in `/workspace/.cement/`; a host-side script (outside the jail, with model access) walks the workspaces, asks the model and records; delivered as a file the owner copies, tested against a stand-in endpoint.
-  - Reads: `function drift` + `function observations` (library + CLI), the Open WebUI learning tool + skill, the nucllei learn commands.
+  - T4: nucllei shadow sampling DEFERRED → `.agent/deferred.md` p142 (owner, at the p136-nucllei unit: "Defer nucllei shadow"), since each `/workspace` is a loopback ext4 image the sandbox mounts inside its own container, so no host job may walk it directly; carried ruling for that row: in-jail sampling = marker opt-in (owner: "Marker opt-in").
+  - Reads: `function drift` + `function observations` (library + CLI), the Open WebUI learning tool + skill.
 
 ## Tasks
 
@@ -160,7 +160,6 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.12 under `uv`.
 - [x] a1686ad p136-store — telemetry store + admit / `record_shadow` (captured version, comparator, disagreement → proposal) + `drift` + `observations` + CLI; prune + erase cover it.
 - [x] cb6c82c p136-learn — `cement_runtime.learning` + `skills/cement-learn/`: shadow proposals, comparator authoring, drift reads.
 - [x] 220fb55 p136-owui — Open WebUI: matched-hit extractor + bounded worker + shadow model call + valves + learning-tool reads; S5 probe; paste-ins regenerated; live regimen run.
-- [ ] p136-nucllei — `use` hit log + host batch job (stand-in endpoint) + learn commands; jail stand-in smoke.
 - [ ] p135-docs — tier `docs`: E2 + E4 + threat model + README `Deployment boundary` per both plans.
   - Every unit: tier `kernel` unless named; contract `.agent/decisions/<unit>-contract.md` before code; red-first tests (parent + detached-worktree command in the commit body); its own `.agent/review.md` pass; human-facing docs for what it ships.
 - [ ] Phase close — closing-diff reviewers (one per lens) + MAINTAIN's security lens; `.agent/review.md` no open row; CI gate; p135 + p136 closed by acceptance; `Phase: MAINTAIN`.
