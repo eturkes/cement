@@ -18,6 +18,7 @@ import sys
 import tempfile
 import types
 import typing
+import unicodedata
 import unittest
 from dataclasses import dataclass
 from unittest import mock
@@ -4055,6 +4056,37 @@ class CLITests(unittest.TestCase):
             self.assertRegex(text, rf"    # proposal {proposal}: proposed {{\"y\":5}}, accepted, later superseded by example ex_\w+\n")
         self.assertEqual(text.count(": from a challenge, no proposal\n"), 2)
         self.assertTrue(text.endswith("otherwise:\n    ask the LLM\n"))
+
+    def test_function_read_escapes_characters_a_terminal_hides(self) -> None:
+        # Security review 2 (F6): the listing printed C1 controls, bidi controls, zero-width, tag and
+        # line-separator characters from retained answers raw, so the version a person reads before
+        # switching it on could display other text than the bytes that answer.
+        hidden = ["\x7f", "\x9b", "\u00ad", "\u200b", "\u202e", "\u2066", "\u2028", "\u2029", "\ufeff", "\U000e0041"]
+        output = {"dose": "10 mg" + "".join(hidden), "note\u202e": "ok"}
+        case = {"x": "1\u200b"}
+        system = System(self.database)
+        system.register_operation("tenant", "read-me", policy=CompilePolicy(2, 1, 0))
+        for reviewer in ("r1", "r2"):
+            proposal = system.submit_proposal("tenant", "read-me", case, candidate=Candidate(output=output, provenance={}))
+            system.review("tenant", proposal, reviewer=reviewer, decision="accept")
+        system.compile("tenant", "read-me")
+        self.assertTrue(system.verify_drafts("tenant", "read-me", verified_by="learning-pass").passed)
+        manifest = system.inspect_function_promotion("tenant", "read-me")
+        system.promote_function("tenant", "read-me", expected_function_hash=manifest.function_hash, promoted_by="learning-pass")
+        system.set_comparator("tenant", "read-me", {"abi": "cement-comparator-v1", "rules": [{"path": ["note\u202e"], "rule": "text"}]}, actor="learning-pass")
+        run = self.run_cli("function", "read", "read-me")
+        self.assertEqual((run.status, run.stderr_text), (0, ""))
+        text = run.stdout_text
+        self.assertIn('#   $["note\\u202e"]: equal as text', text)
+        shown = {character for character in text if unicodedata.category(character) in {"Cc", "Cf", "Zl", "Zp"}}
+        self.assertEqual(shown, {"\n"})  # line breaks of the listing alone
+        [condition] = [line for line in text.splitlines() if line.startswith("if case == ")]
+        [answer] = [line for line in text.splitlines() if line.startswith("    answer ")]
+        # Lossless: each escape is JSON, so the listed text parses to the stored value.
+        self.assertEqual(json.loads(condition.removeprefix("if case == ").removesuffix(":")), case)
+        self.assertEqual(json.loads(answer.removeprefix("    answer ")), output)
+        listing = self.payload(self.run_cli("function", "read", "read-me", "--json"))
+        self.assertEqual(([c["case"] for c in listing["cases"]], [c["output"] for c in listing["cases"]]), ([case], [output]))
 
     def test_function_read_names_cases_past_the_member_projection(self) -> None:
         self._read_fixture()

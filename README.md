@@ -188,7 +188,10 @@ not change it. To roll back, pin an earlier version that `function versions` lis
 `function read OPERATION` shows a version as code before you switch it on. Each case is one branch,
 with the proposals that the learning pass confirmed for it. The command reads the version that the
 switch pins, or else the newest version. `--receipt-id` reads any version, and `--json` prints the same
-listing as JSON. An operation that has no promoted version exits 3.
+listing as JSON. An operation that has no promoted version exits 3. A terminal can hide a control
+character, a format character such as a right-to-left override, or a line separator, and a retained
+answer can hold one. Thus, without `--json`, the command writes each such character as its JSON
+escape (`\u202e`), and every value that you read parses to the stored value.
 
 When verification fails because promoted members are damaged, or because two members claim one input,
 contain them in two steps.

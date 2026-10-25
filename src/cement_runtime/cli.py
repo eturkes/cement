@@ -9,6 +9,7 @@ import os
 import pathlib
 import stat
 import sys
+import unicodedata
 from collections.abc import Iterator
 from dataclasses import asdict, dataclass, field, is_dataclass
 from typing import Any, Never, cast
@@ -910,6 +911,29 @@ def _function_listing(
     }
 
 
+# Characters a terminal draws as nothing or reorders: controls, format characters (bidi, zero-width,
+# tags) and line/paragraph separators. A retained answer holding one would make the listing a person
+# reads before switching a version on show other text than the bytes that answer.
+_HIDDEN = frozenset({"Cc", "Cf", "Zl", "Zp"})
+
+
+def _visible(text: str) -> str:
+    """Canonical JSON with each hidden character as its JSON escape: the same value, readable.
+
+    Canonical JSON has such characters only inside strings, where an escape is valid.
+    """
+
+    def escape(character: str) -> str:
+        # One `\uXXXX` per UTF-16 unit: a character past U+FFFF escapes as its surrogate pair.
+        units = character.encode("utf-16-be")
+        return "".join(f"\\u{units[at] << 8 | units[at + 1]:04x}" for at in range(0, len(units), 2))
+
+    return "".join(
+        escape(character) if unicodedata.category(character) in _HIDDEN else character
+        for character in text
+    )
+
+
 _RULE_WORDS = {
     "ignore": "ignored",
     "text": "equal as text, spaces and letter case aside",
@@ -934,7 +958,7 @@ def _comparator_lines(record: Any, revision: int) -> list[str]:
     ]
     for rule in record["comparator"]["rules"]:
         where = "$" + "".join(
-            "[*]" if segment == "*" else f"[{canonicalize(segment).text}]"
+            "[*]" if segment == "*" else f"[{_visible(canonicalize(segment).text)}]"
             for segment in rule["path"]
         )
         words = _RULE_WORDS.get(rule["rule"], f"within {rule.get('within')}")
@@ -946,7 +970,7 @@ def _render_listing(listing: dict[str, Any]) -> str:
     """The human reading of `_function_listing`: one guarded branch per case, then the miss."""
 
     def text(value: Any) -> str:
-        return canonicalize(value).text
+        return _visible(canonicalize(value).text)
 
     if listing["answers"]:
         serving = "this version answers matching inputs"
