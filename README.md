@@ -237,6 +237,31 @@ options, and FIDO security keys such as `sk-ssh-ed25519@openssh.com`, because it
 It ignores a line with another key type, so that key can never verify a bundle. The check runs in the
 same process, so `function eval` still starts no other program.
 
+### Storing bundles in a registry
+
+Cement has no registry service and no network code. Store a bundle and its signature in any store
+that your deployment runs, for example an OCI registry through ORAS, an object store, or a git
+repository. The publisher exports, signs, and pushes both files:
+
+```bash
+uv run cement --db demo.db --partition acme function export support.reply --out support.function.json
+ssh-keygen -Y sign -n cement-function-v3 -f ~/.ssh/id_ed25519 support.function.json
+oras push registry.example.com/cement/support-reply:v3 support.function.json support.function.json.sig
+```
+
+Each consumer pulls both files and checks the signature before it uses the bundle:
+
+```bash
+oras pull registry.example.com/cement/support-reply:v3
+uv run cement function eval --bundle support.function.json \
+  --input '{"question":"Where is my invoice?"}' \
+  --signature support.function.json.sig --allowed-signers allowed_signers
+```
+
+Trust never comes from a registry. A party that can change a registry can replace both files, so
+deliver the allowed signers file to each consumer through another channel. If you also pin an
+expected function hash, deliver it the same way.
+
 ### Answering one input from the ledger
 
 `cement resolve` reads the operation's switch, verifies the version that the switch selects, and then
@@ -786,6 +811,20 @@ with mode `0600`, but evidence is plaintext. CLI actor names are recorded assert
 authentication. Cement makes no principal or permission decision. Authentication, authorization,
 encryption, retention, signing keys, and tenant-aware API access all remain deployment
 responsibilities. Cement verifies a bundle signature, but it never signs one.
+
+Cement does not encrypt, and it holds no key. Put every file that holds Cement data on an encrypted
+volume, for example dm-crypt with LUKS, fscrypt, or an encrypted cloud disk, and encrypt swap too:
+
+- The ledger file and its rollback journal `<ledger>-journal`, which holds page images during a write.
+  If an operator switched the ledger to WAL mode, also `<ledger>-wal` and `<ledger>-shm`.
+- The shadow file `<ledger>.shadow` and its journal.
+- Each temporary file that `function export --out` writes beside the destination before it replaces
+  the destination.
+- Each exported bundle and each backup.
+
+SQLite keeps its other temporary data in memory, because Cement sets `temp_store` to `MEMORY`. To make
+data on a volume unreadable, destroy the key of that volume. In the Open WebUI example, the ledger
+and the shadow file are in Open WebUI's data volume.
 
 An exported bundle is a second deployment object with its own boundary. It executes without the
 database, so the ledger's file permissions no longer protect it.

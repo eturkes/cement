@@ -21,6 +21,19 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p135-docs close (IMPLEMENT, unit; tier `docs`) — target = the commit landing this section
+
+Check set, fixed from `.agent/decisions/p135-docs-contract.md` + p87 gate 3: G1-G4 = its obligations; P = p87's E3 + E5 doc bullets (landed by those units); C1 claims re-derived against code. MAIN alone (consistency pass).
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| G1 | README encryption | pass | `## Deployment boundary`: Cement does not encrypt + holds no key; volume encryption + swap; the ledger + `-journal` (`-wal`/`-shm` after a switch), `<ledger>.shadow` + journal, each export temporary file, each bundle + backup; volume-key erasure; Open WebUI's data volume. |
+| G2 | threat model | pass | Evidence bullet names the same files + "Cement does not encrypt"; `## Deliberately absent`: field-level encryption + the volume-key sentence, registry line added. |
+| G3 | registry recipe | pass | README `### Storing bundles in a registry`: export → `ssh-keygen -Y sign` → `oras push`; `oras pull` → `function eval --signature --allowed-signers`; the allowed signers file + a pinned hash travel another channel. Placeholder-free blocks; the README command parsers (D23, X-placeholder census) green. |
+| G4 | untouched claims | pass | `CLI actor names are recorded assertions, not authentication` kept (E1 → p140). |
+| P | plan bullets | pass | E5: threat model lines 63-67 (unkeyed hash, then the signature check), `External signatures` gone; E3: line 79 `database-immutable outside a partition erasure`, the evidence bullet names `retention prune` + `partition erase`. |
+| C1 | claims | pass | `journal_mode = DELETE` (`store.py` `_initialize`), `temp_store = MEMORY` on every store + shadow connection (`_connect`, read and write), export temporary `.<name>.<12 hex>` mode 0600 beside the destination (`cli.py` `_export_temporary`), `oras push <ref> <file> <file>` / `oras pull <ref>` (ORAS command reference). Register + article audits rc 0, tripwires PASS. |
+
 ## p136 gate 3 records (IMPLEMENT, store + owui gate 3; tier `kernel` for the `_ask` fix, `data` for records) — target = the commit landing this section
 
 Check set, fixed from p136-store gate 3 + p136-owui gate 3 + the diff lenses: G1 cost measured, G2 live regimen, F1 the live finding's fix (one re-review against its acceptance: a red test + seeds), C1 claims. MAIN alone.

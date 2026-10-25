@@ -118,7 +118,9 @@
   holds plaintext inputs and answers too; both commands cover it. Stop shadow sampling for a partition
   before you erase it, because the shadow file and the ledger are two transactions. Set a backup
   retention period too, because backups keep erased rows. The
-  ledger is plaintext and a blind copy of a live SQLite database is unsafe. An exported bundle is
+  ledger is plaintext and a blind copy of a live SQLite database is unsafe. Cement does not encrypt.
+  Put the ledger, its rollback journal, the shadow file and its journal, each temporary file of
+  `function export --out`, each bundle, each backup, and swap on encrypted volumes. An exported bundle is
   plaintext too. It carries the exact inputs, the exact outputs, and the governance digests, so it
   creates a second data-classification, retention, and disclosure surface outside the ledger.
 - An exported bundle is intentionally sealed from later ledger state. If a revocation, a policy
@@ -154,7 +156,8 @@
 This local release excludes:
 
 - Remote API and authentication.
-- Encryption and key erasure.
+- Field-level encryption. To erase data at rest, destroy the key of its encrypted volume.
+- A registry service. Store bundles in any store; their origin comes from signatures.
 - Arbitrary code sandboxing.
 - Generalized-rule synthesis. A projection maps inputs to exact keys; it never synthesizes a rule.
 - Domain schemas and oracles.
