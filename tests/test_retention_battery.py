@@ -194,6 +194,23 @@ class _Ledger(unittest.TestCase):
 
 
 class SchemaV4Tests(_Ledger):
+    def test_v1_v4_and_shadow_v1_are_frozen_by_the_0_3_0_release(self) -> None:
+        # Both schemas shipped in 0.3.0, so their text is frozen: a change needs a new version.
+        import tomllib
+
+        from cement_runtime.shadow import SHADOW_FINGERPRINT, SHADOW_SCHEMA_VERSION
+
+        project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+        self.assertEqual(project["version"], "0.3.0")
+        self.assertEqual(
+            (SCHEMA_VERSION, SCHEMA_FINGERPRINT),
+            (4, "0a9ac5147c9cc3785a97058c35f9b3f3e7253f58dae22da9681881a67ddb1e3f"),
+        )
+        self.assertEqual(
+            (SHADOW_SCHEMA_VERSION, SHADOW_FINGERPRINT),
+            (1, "7ad0a8f185a0348ac39693e6da24daa7ae22f8e81c82765a44733441a1546777"),
+        )
+
     def test_v1_version_four_binds_the_schema_text(self) -> None:
         self.assertEqual(SCHEMA_VERSION, 4)
         self.assertEqual(SCHEMA_FINGERPRINT, hashlib.sha256(SCHEMA.encode("utf-8")).hexdigest())

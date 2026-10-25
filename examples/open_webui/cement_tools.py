@@ -1,7 +1,7 @@
 """
 title: Cement learned functions
 author: Cement
-version: 0.2.0
+version: 0.3.0
 license: Apache-2.0
 description: Answers a request from a switched-on learned function, or asks the model to record it.
 """

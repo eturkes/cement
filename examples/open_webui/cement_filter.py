@@ -1,7 +1,7 @@
 """
 title: Cement answer retention
 author: Cement
-version: 0.2.0
+version: 0.3.0
 license: Apache-2.0
 description: Retains recorded answers to uncovered requests for the Cement learning pass.
 """

@@ -153,8 +153,13 @@ class SchemaIdentityBattery(_Ledger):
     def test_s1_the_package_version_is_the_cut(self) -> None:
         import tomllib
 
-        project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
-        self.assertEqual(project["version"], "0.2.0")
+        # The v3 cut is a closed transition: read at its unit's close (M3.6b squash 93007ac);
+        # the v4 cut moved the working tree to 0.3.0.
+        text = subprocess.run(
+            ["git", "-C", str(ROOT), "show", "93007ac:pyproject.toml"],
+            check=True, capture_output=True, text=True,
+        ).stdout
+        self.assertEqual(tomllib.loads(text)["project"]["version"], "0.2.0")
 
 
 class AppendOnlyBattery(_Ledger):

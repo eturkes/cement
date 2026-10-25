@@ -113,3 +113,7 @@ route `/api/v1/functions/id/cement_filter/valves/update`.
   (real `_ask`, stub `open_webui` modules). Re-provisioned → note 03 in a new chat → `agreed`, 3,865 ms;
   zero warnings after the re-provision (positive control: the same scan over the whole log finds the one
   earlier warning).
+- Shipped filter (after the closing review: strict answer grading, drop drain + caps, the model passed to `_ask`):
+  `serve` re-pasted the regenerated paste-ins on the same instance + ledger; note a04 in a new chat → covered → observation 4
+  `agreed`, `gpt-6-luna`, 5,077 ms; the shadow call = keys `messages`, `model`, `stream`, no tools; zero warnings after
+  the restart (positive control: the whole log still holds the one earlier warning).

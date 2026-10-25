@@ -1,7 +1,7 @@
 """
 title: Cement learning pass
 author: Cement
-version: 0.2.0
+version: 0.3.0
 license: Apache-2.0
 description: Admin-only learning pass steps: merge retained answers by case, publish a new version.
 """

@@ -8,7 +8,7 @@ license-files = ["LICENSE"]
 requires-python = ">=3.12"
 # The provider speaks `cement-candidate-v2` and imports public `cement_runtime` names; a 0.x
 # minor release of the core may break both, so the range stops at the next minor.
-dependencies = ["cement-runtime>=0.2.0,<0.3"]
+dependencies = ["cement-runtime>=0.3.0,<0.4"]
 
 [project.urls]
 Repository = "https://github.com/eturkes/cement"

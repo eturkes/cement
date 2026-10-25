@@ -1,6 +1,6 @@
 [project]
 name = "cement-runtime"
-version = "0.2.0"
+version = "0.3.0"
 description = "Supervised LLM fallback that compiles confirmed behavior into exact deterministic artifacts"
 readme = "README.md"
 license = "Apache-2.0"

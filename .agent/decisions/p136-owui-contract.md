@@ -64,3 +64,14 @@ response isolation (the chat must never change or wait); `data` for the model's 
 3. Live regimen: `examples/open_webui/local.py` with `gpt-6-luna` — a hit in chat produces one admitted
    then recorded observation; the shadow call shows no tool use; record in
    `.agent/decisions/owui-live-e2e.md`. Register + article audits rc 0.
+
+Erratum (closing review, MAIN security S-F1): O2's "a full queue → `drop` … in a thread the outlet does not
+await" = ONE drain task records drops one at a time from a 1,024 backlog; a reply's hits past 256 and drops past
+the backlog are counted only. O3: `_ask` takes the model read once per sample (closing review C-F7).
+
+```claims
+33	`asyncio.Queue` (`shadow_queue` valve, default 64)	unchecked	a valve default of the filter (cement_filter.py Valves), not a count	-
+36	(default 60 s)	unchecked	a valve default of the filter (cement_filter.py Valves), not a count	-
+41	the first 16 hex of SHA-256	unchecked	a format width of prompt_revision, pinned by test_s5_the_prompt_never_holds_the_function_answer	-
+58	disagreements on that hash, 0 elsewhere	unchecked	a gate expectation of the S5 probe, not a count	-
+```

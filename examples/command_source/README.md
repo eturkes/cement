@@ -61,7 +61,7 @@ failure, 3 for an unregistered operation, 4 for a conflict, and 5 for an integri
 as a missing ledger. An adapter failure writes no proposal.
 
 Each distribution has its own version. `cement-command-source` 0.1.0 depends on
-`cement-runtime>=0.2.0,<0.3`, because a new minor version of the core can change the candidate
+`cement-runtime>=0.3.0,<0.4`, because a new minor version of the core can change the candidate
 protocol or the public names that the provider imports. Maintainers of this repository release
 both distributions. When the provider code or its core range changes, increase the provider
 version. When the core starts a new minor version, test the provider against it and then move the

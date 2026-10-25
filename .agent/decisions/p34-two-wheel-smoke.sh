@@ -39,7 +39,7 @@ uv pip install -q --python "$python" --no-index "$work"/dist/cement_runtime-*.wh
 check "core alone: no runner command" "$(test -e "$bin/cement-command-source" && echo present || echo absent)" absent
 uv pip install -q --python "$python" --no-index --find-links "$work/dist" "$work"/dist/cement_command_source-*.whl
 check "installed distributions" "$(uv pip list -q --python "$python" --format freeze | sort | tr '\n' ' ')" \
-    "cement-command-source==0.1.0 cement-runtime==0.2.0 "
+    "cement-command-source==0.1.0 cement-runtime==0.3.0 "
 
 wheel=$(echo "$work"/dist/cement_command_source-*.whl)
 members=$("$python" -c 'import sys, zipfile

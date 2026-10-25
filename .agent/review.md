@@ -21,6 +21,16 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## Phase close, version cut (IMPLEMENT p135 + p136) — target = the commit landing this section
+
+Check set: the `Decisions` Pin repairs rule (each repaired test id named in the body + here), the new freeze pin, the shipped filter live.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| PR1 | pin repair | pass | `tests.test_schema_v3_battery.SchemaIdentityBattery.test_s1_the_package_version_is_the_cut` read the working tree's `pyproject.toml` = a frame freezing the CLOSED v3 cut → re-scoped to git object `93007ac:pyproject.toml` (M3.6b's squash), assertion unchanged (`0.2.0`); nothing deleted, skipped or weakened. |
+| V1 | freeze pin | pass | `test_v1_v4_and_shadow_v1_are_frozen_by_the_0_3_0_release`: version half red at the fixes commit (0.2.0); digest halves fired by a one-character seed in each schema (`.scratch/close/freeze_seed.py`, control OK). Mutation credit (`.agent/mutate`) not run: seeds are closure, the version half carries the red-first credential. |
+| L1 | live, shipped filter | pass | the regenerated paste-ins on the regimen instance (`.agent/decisions/owui-live-e2e.md` last line): one covered hit → observation 4 `agreed`, model `gpt-6-luna`, the shadow call without tools, zero warnings. |
+
 ## Phase close review, ffe130f..eb5cc4d (IMPLEMENT p135 + p136) — fixes = the commit landing this section
 
 Check set fixed before any reading: one `reviewer` per lens over `src/` + the two Open WebUI example sources (+ skills + changed tests for correctness), each a seeded table graded both ways (`| unknown |` 56 / 54 / 9 at seed, 0 filled; `.agent/validate-anchors` rc 0); MAIN alone = the security lens S1-S10. Tables: `.scratch/close/reviewer-{1,2,3}/verdicts.md`, `.scratch/close/security.md`. Every finding below MAIN-reproduced at eb5cc4d before its ruling; each fixed one pinned by a test red there (commit body).
