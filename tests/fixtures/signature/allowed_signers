@@ -1,0 +1,4 @@
+# alice signs bundles only; bob signs anything under two names; carol is ECDSA.
+alice@example.test namespaces="cement-function-v3" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA7X8A20kvHSsvwskIuYnLQL51jLiSyIwSxR6r4LXGYG alice laptop
+"bob@example.test,builder@example.test" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBYOS63Om04R4Y7pQETPcjYjf5PPFVAUyLg0FFCJSifa
+carol@example.test ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBJoXI0VVaEijyaNSjuXi/WPk3ttPdLI1KiF/sZ7l86IAWTZk7g2OGn7nvrx9ws48Ojrs1B+ldXNY6efbiBJBZUw=

@@ -32,6 +32,12 @@ from .json_value import (
     parse_json,
 )
 from .models import Candidate, CompilePolicy, ExampleRecord
+from .signature import (
+    ALLOWED_SIGNERS_MAX_BYTES,
+    FUNCTION_NAMESPACE,
+    SIGNATURE_MAX_BYTES,
+    verify_signature,
+)
 from .system import PROVENANCE_MAX_BYTES, SOURCE_ID_MAX_BYTES, System, _name, _text
 
 
@@ -312,6 +318,13 @@ def _parser() -> argparse.ArgumentParser:
     function_eval.add_argument(
         "--expected-function-hash", help="require the bundle to hash to this digest"
     )
+    function_eval.add_argument(
+        "--signature", help="path of the bundle's SSH signature, checked before the bundle parses"
+    )
+    function_eval.add_argument(
+        "--allowed-signers", help="path of the allowed signers file that the signature must match"
+    )
+    function_eval.add_argument("--signer", help="require this principal to have signed the bundle")
 
     projection = commands.add_parser(
         "projection", help="test, set or show the program that maps raw input to case keys"
@@ -627,8 +640,8 @@ def _write_export(target: pathlib.Path, document: FunctionDocument) -> dict[str,
     return {"out": str(target), "bytes": len(payload), "function_hash": document.function_hash}
 
 
-def _read_function_bundle(value: str) -> str:
-    """Read one bounded regular file as strict UTF-8 text.
+def _read_regular(value: str, *, limit: int, label: str) -> bytes:
+    """Read one bounded regular file.
 
     `O_NONBLOCK` keeps the identity check reachable on a FIFO with no writer,
     which a plain open would wait on with no timeout to end the wait. The
@@ -638,7 +651,7 @@ def _read_function_bundle(value: str) -> str:
     try:
         descriptor = os.open(value, os.O_RDONLY | os.O_NONBLOCK)
     except (OSError, ValueError) as exc:
-        raise ValidationError("function bundle could not be read") from exc
+        raise ValidationError(f"{label} could not be read") from exc
     try:
         try:
             # Identity is graded on the descriptor, before any buffered stream:
@@ -646,27 +659,39 @@ def _read_function_bundle(value: str) -> str:
             # failure where the honest verdict is the file type.
             info = os.fstat(descriptor)
             if not stat.S_ISREG(info.st_mode):
-                raise ValidationError("function bundle path must identify a regular file")
-            if info.st_size > FUNCTION_MAX_BYTES:
-                raise ValidationError(f"function bundle exceeds {FUNCTION_MAX_BYTES} bytes")
+                raise ValidationError(f"{label} path must identify a regular file")
+            if info.st_size > limit:
+                raise ValidationError(f"{label} exceeds {limit} bytes")
             stream = os.fdopen(descriptor, "rb")
         except BaseException:
             os.close(descriptor)
             raise
         with stream:
-            raw = stream.read(FUNCTION_MAX_BYTES + 1)
+            raw = stream.read(limit + 1)
     except ValidationError:
         # `ValidationError` subclasses `ValueError`, so the residual clause below
         # would otherwise rewrite this helper's own two verdicts as a read failure.
         raise
     except (OSError, ValueError) as exc:
-        raise ValidationError("function bundle could not be read") from exc
-    if len(raw) > FUNCTION_MAX_BYTES:
-        raise ValidationError(f"function bundle exceeds {FUNCTION_MAX_BYTES} bytes")
+        raise ValidationError(f"{label} could not be read") from exc
+    if len(raw) > limit:
+        raise ValidationError(f"{label} exceeds {limit} bytes")
+    return raw
+
+
+def _utf8(raw: bytes, label: str) -> str:
     try:
         return raw.decode("utf-8")
     except UnicodeDecodeError as exc:
-        raise ValidationError("function bundle is not valid UTF-8") from exc
+        raise ValidationError(f"{label} is not valid UTF-8") from exc
+
+
+def _read_function_bundle(value: str) -> str:
+    """Read one bounded regular file as strict UTF-8 text (the seam `function eval` tests patch)."""
+
+    return _utf8(
+        _read_regular(value, limit=FUNCTION_MAX_BYTES, label="function bundle"), "function bundle"
+    )
 
 
 def _policy(args: argparse.Namespace) -> CompilePolicy:
@@ -849,11 +874,38 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
         # Ahead of the ledger gate and constructing no System: the bundle is the
         # whole evaluation domain. The input is graded first because it costs no
         # filesystem work, and a bundle read costs up to 64 MiB.
+        if (args.signature is None) != (args.allowed_signers is None):
+            parser.error("--signature and --allowed-signers must be given together")
+        if args.signer is not None and args.signature is None:
+            parser.error("--signer needs --signature and --allowed-signers")
         input_json = canonicalize(_input(args.input))
-        document = parse_function(
-            _read_function_bundle(args.bundle),
-            expected_function_hash=args.expected_function_hash,
-        )
+        text = _read_function_bundle(args.bundle)
+        signed: dict[str, Any] = {}
+        if args.signature is not None:
+            # Strict UTF-8 decoding is a bijection, so this encoding is the file's exact bytes,
+            # which is what the signer signed; the check runs before the text parses.
+            checked = verify_signature(
+                text.encode("utf-8"),
+                _utf8(
+                    _read_regular(args.signature, limit=SIGNATURE_MAX_BYTES, label="signature"),
+                    "signature",
+                ),
+                _utf8(
+                    _read_regular(
+                        args.allowed_signers,
+                        limit=ALLOWED_SIGNERS_MAX_BYTES,
+                        label="allowed signers file",
+                    ),
+                    "allowed signers file",
+                ),
+                namespace=FUNCTION_NAMESPACE,
+                signer=args.signer,
+            )
+            signed = {
+                "signers": list(checked.principals),
+                "signing_key": checked.fingerprint,
+            }
+        document = parse_function(text, expected_function_hash=args.expected_function_hash)
         match = evaluate(document, input_json=input_json)
         return _Outcome(
             {
@@ -861,6 +913,7 @@ def _run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> Any:
                 "function_hash": document.function_hash,
                 "matched": match.matched,
                 "output": match.output,
+                **signed,
             },
             status=0 if match.matched else 6,
         )

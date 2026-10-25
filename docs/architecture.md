@@ -62,7 +62,9 @@ must complete step 9 before step 10 can pass.
 
 Entry order is normalized by key hash, so equal content always produces equal bytes and one equal
 `function_hash`. The embedded hash proves normalized self-consistency. Only an independently obtained
-expected hash binds caller-held identity. Neither mode proves origin or supplies a signature.
+expected hash binds caller-held identity. Neither mode proves origin or supplies a signature. An SSH
+signature over the bundle file proves origin: `function eval --signature` checks it before the bundle
+parses.
 
 Function identity is verified-content identity, not activation identity. `entry_seal` excludes the
 promoter and the promotion time, so those values never change the `function_hash`. The
@@ -317,7 +319,14 @@ An exported bundle leaves that trust root. It evaluates with no database, and an
 expected function hash binds its identity instead. That hash is unkeyed and proves no origin. An
 expected hash copied from the same untrusted bundle adds no trust. Before export, establish ledger
 governance with `verify_function` or receipt reconstruction. Then transfer the expected hash over a
-channel that the database file does not protect.
+channel that the database file does not protect, or sign the bundle file.
+
+`cement_runtime.signature.verify_signature` reads an OpenSSH SSHSIG envelope and an allowed signers
+file, both as untrusted text, and checks the Ed25519 signature in pure Python. Its RFC 8032 checks
+are strict: canonical point encodings, a scalar `S` below `L`, a public key of prime order, and a
+verification equation without cofactor multiplication. That policy never refuses a signature that
+`ssh-keygen` makes. A verified evaluation trusts the allowed signers file, so each consumer keeps that
+file where the bundle's publisher and channel cannot change it.
 
 ## Tooling decision
 

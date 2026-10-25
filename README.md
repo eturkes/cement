@@ -210,6 +210,32 @@ uv run cement function eval --bundle support.function.json \
 `matched`, and `output`. `function export --receipt-id` serves a historical receipt, including one from
 a superseded operation revision.
 
+A function hash proves what a bundle contains, not who published it. To prove the publisher, the
+person who switched the version on signs the exported file with their own SSH key. Each consumer
+lists that person in an allowed signers file and passes both files to `function eval`:
+
+```bash
+ssh-keygen -Y sign -n cement-function-v3 -f ~/.ssh/id_ed25519 support.function.json
+printf 'ops-lead@example.com namespaces="cement-function-v3" %s\n' \
+  "$(cut -d' ' -f1,2 ~/.ssh/id_ed25519.pub)" > allowed_signers
+uv run cement function eval --bundle support.function.json \
+  --input '{"question":"Where is my invoice?"}' \
+  --signature support.function.json.sig --allowed-signers allowed_signers
+```
+
+`function eval` checks the signature against the exact bundle bytes before it parses the bundle. The
+key must be an `ssh-ed25519` key, and it must sign in the `cement-function-v3` namespace. A verified
+result adds `signers`, the principals that the file lists for the key, and `signing_key`, the key
+fingerprint in the form that `ssh-keygen -l` prints. Pass `--signer NAME` to require one principal. A
+signature that does not match exits 5, and a malformed signature or allowed signers file exits 2.
+In both cases the command parses nothing and evaluates nothing.
+
+The allowed signers file is a subset of the `ssh-keygen` format: exact principals and the `namespaces`
+option. Cement refuses principal patterns, the `cert-authority`, `valid-after`, and `valid-before`
+options, and FIDO security keys such as `sk-ssh-ed25519@openssh.com`, because it does not apply them.
+It ignores a line with another key type, so that key can never verify a bundle. The check runs in the
+same process, so `function eval` still starts no other program.
+
 ### Answering one input from the ledger
 
 `cement resolve` reads the operation's switch, verifies the version that the switch selects, and then
@@ -444,6 +470,11 @@ refusal writes nothing:
 | Versions + switch | `function_receipts`, `function_versions`, `diff_versions`, `set_switch` (`off`, `follow`, `pinned`), `switch`, `serving` |
 | Answer | `resolve`, `verify_function`, `function_report`, `reconstruct_function_receipt`; `evaluate` + `parse_function` answer from a bundle with no ledger |
 
+`cement_runtime.signature.verify_signature` checks an SSH signature over bundle bytes against an
+allowed signers file before you parse the bundle. It returns a `SignatureVerification` with the
+principals, the key fingerprint, and the hash algorithm. A malformed input raises `ValidationError`,
+and a signature that does not match raises `IntegrityError`.
+
 `cement_runtime.learning` makes the changes of a learning pass over these methods. `merge_case`
 and `publish` do what `learn merge` and `learn publish` do, and they return a `Merge` and a
 `Publication`. `cases` and `raw_inputs` read what they group by. A merge whose write fails after
@@ -638,18 +669,22 @@ produces the wheel and the source distribution.
 This release is a local control plane, not a network service or an ACL system. A new database starts
 with mode `0600`, but evidence is plaintext. CLI actor names are recorded assertions, not
 authentication. Cement makes no principal or permission decision. Authentication, authorization,
-encryption, retention, signing, and tenant-aware API access all remain deployment responsibilities.
+encryption, retention, signing keys, and tenant-aware API access all remain deployment
+responsibilities. Cement verifies a bundle signature, but it never signs one.
 
 An exported bundle is a second deployment object with its own boundary. It executes without the
 database, so the ledger's file permissions no longer protect it.
 The bundle is plaintext and carries the exact inputs, the exact outputs, and the governance digests.
-Classify it with your other sensitive data. Apply the same retention and disclosure rules.
+Classify it with your other sensitive data. Apply the same retention and disclosure rules. Sign it
+when it leaves the database host, so that each consumer can prove which allowed signer published it.
 `function export --out` writes atomically through a mode-0600 temporary file and refuses a non-regular
 destination. The reader accepts one strict UTF-8 regular file and bounds it at 64 MiB, independently
 from the 1 MiB bound on the evaluation input. `function eval` is ledger-free, not import-free: it opens
 and reads the bundle path, and importing `cement_runtime` still loads `sqlite3`. A test runs
 `function eval` in a child process with an audit hook that the child installs before it imports
 `cement_runtime`. That hook records no database connection and no file open other than the bundle.
+With `--signature`, a second test records only the bundle, the signature, and the allowed signers
+file, and no process start.
 `python -S` does not remove it, because the child installs it itself. It does not see interpreter
 startup, or file access that bypasses Python audit events.
 

@@ -5384,17 +5384,18 @@ class CLITests(unittest.TestCase):
             return {action.dest: action for action in node._actions}
 
         actions = options("function", "eval")
-        self.assertEqual(
-            set(actions) - {"help"}, {"bundle", "input", "expected_function_hash"}
-        )
+        optional = ("expected_function_hash", "signature", "allowed_signers", "signer")
+        self.assertEqual(set(actions) - {"help"}, {"bundle", "input", *optional})
         self.assertTrue(actions["bundle"].required)
         self.assertTrue(actions["input"].required)
         self.assertFalse(actions["expected_function_hash"].required)
+        for name in ("signature", "allowed_signers", "signer"):
+            self.assertFalse(actions[name].required, name)
         # M3.5b removed `handle`, the original reference leaf. `resolve` is the
         # surviving leaf carrying the same `--input` channel, so the register
         # claim is re-based onto it rather than dropped.
         self.assertEqual(actions["input"].help, options("resolve")["input"].help)
-        for name in ("bundle", "input", "expected_function_hash"):
+        for name in ("bundle", "input", *optional):
             with self.subTest(option=name):
                 text = str(actions[name].help)
                 self.assertEqual(text, text.strip())
@@ -5424,7 +5425,7 @@ class ParserShapeTests(unittest.TestCase):
     grammar or help change re-pins it.
     """
 
-    SHAPE = (251, "eddcf2507077bbfb")  # p134: `--submission` help names operation_revision
+    SHAPE = (254, "d94acb97863332de")  # p135-e5: `function eval` signature flags
 
     @staticmethod
     def shape(parser: argparse.ArgumentParser) -> tuple[int, str]:

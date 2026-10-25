@@ -8,8 +8,9 @@
   context represented by their partition. The CLI records identity strings but does not authenticate
   them.
 - The provider adapter process as a credential-bearing transport. Its model output remains untrusted.
-- For offline evaluation, the host runtime and the channel that delivers an independently held function
-  hash. That path opens no database and starts no adapter. A child-process audit hook proves this
+- For offline evaluation, the host runtime, the channel that delivers an independently held function
+  hash, and the allowed signers file that `function eval --signature` checks a bundle signature
+  against. That path opens no database and starts no adapter. A child-process audit hook proves this
   for `function eval`, and `python -S` does not remove it (README `Deployment boundary`).
 
 ## Untrusted
@@ -26,8 +27,9 @@
   is a standing choice to serve each new version, and `pinned` keeps one version.
 - Stored input/output content when rendered by another system.
 - Frequency by itself, reviewer labels without deployment authentication, and any inferred scope.
-- Exported bundle files, including the hash embedded in them. The parser validates every bundle as
-  untrusted input. Only an independently obtained expected hash pins identity.
+- Exported bundle files, including the hash embedded in them, and their signature files. The parser
+  validates every bundle and every signature as untrusted input. Only an independently obtained
+  expected hash pins identity, and only a verified signature proves the publisher.
 
 ## Enforced controls
 
@@ -54,6 +56,11 @@
   `function_hash`. The embedded hash proves normalized self-consistency only. An independently obtained
   expected hash additionally pins caller-held identity. The hash is unkeyed, so neither mode proves
   origin or acts as a signature. An expected hash copied from the same untrusted bundle adds no trust.
+- A bundle signature proves origin. `function eval --signature` checks an `ssh-ed25519` SSHSIG
+  signature in the `cement-function-v3` namespace against the allowed signers file before the bundle
+  parses, under strict RFC 8032 rules. The allowed signers file takes exact principals and the
+  `namespaces` option. Cement refuses patterns, certificate authorities, validity windows, and FIDO
+  keys rather than ignore them. A verified result names the principals of the signing key.
 - An export follows the switch. Under `follow` it emits bundle bytes only after all seven set checks
   pass; under `pinned` only after the four pinned checks pass; under `off` it emits nothing. A
   drifted set produces no bytes and reports the complete failed check vector on stderr. A historical
@@ -121,9 +128,10 @@
   operation instead of overwriting contradictory history.
 - Deploy command adapters on Linux. If crash-resilient process-tree containment is required, add an
   external cgroup/job/container boundary on every platform.
-- If the database-file trust root is insufficient, protect or sign exported artifacts. Cement supplies
-  an embedded self-hash and an optional caller-held expected hash. Neither establishes origin, so an
-  external signature or a protected channel remains a deployment responsibility.
+- Sign each exported bundle that leaves the database host. The person who switched the version on
+  signs it with their own SSH key (`ssh-keygen -Y sign -n cement-function-v3`). Keep each private key
+  and each allowed signers file where the bundle's consumers and its channel cannot change them.
+  Cement verifies signatures and never holds a private key.
 
 ## Deliberately absent
 
@@ -131,7 +139,6 @@ This local release excludes:
 
 - Remote API and authentication.
 - Encryption and key erasure.
-- External signatures. A `function_hash` binds content integrity only.
 - Arbitrary code sandboxing.
 - Generalized-rule synthesis. A projection maps inputs to exact keys; it never synthesizes a rule.
 - Domain schemas and oracles.
