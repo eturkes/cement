@@ -199,3 +199,24 @@ The example tests run without Open WebUI:
 ```sh
 uv run python -m unittest tests.test_open_webui_example tests.test_open_webui_paste_in tests.test_open_webui_local
 ```
+
+## Shadow answers
+
+The filter can ask a second model about every input that a learned function answered, so that
+Cement can compare the two answers. Set the filter valve `shadow_model` to an Open WebUI model id
+to turn this on; an empty value turns it off. The user always gets the function's answer, and the
+reply never waits for the shadow model: the filter puts each covered tool call in a queue and
+returns. A background worker then asks the shadow model with the operation's description and the
+input alone. The prompt holds no function answer, no chat and no tool.
+
+- `shadow_exclude` lists operations that never get a shadow answer.
+- `shadow_queue` limits how many shadow answers can wait (default 64). Past that limit, Cement records
+  each new one as dropped.
+- `shadow_timeout` limits one shadow answer in seconds (default 60). A timeout, a model error, or a
+  reply that is not JSON is a failed observation.
+- `shadow_path` names the shadow file; the default is the ledger path plus `.shadow`.
+
+Each observation is named by the deployment id, the chat, the reply and the tool call. A second
+run of the same reply finds that name and adds nothing. An answer that disagrees becomes a pending
+proposal for the learning pass. The learning tool reads the results with `shadow_drift` and
+`shadow_observations`, and it can set a comparator with `set_comparator`.

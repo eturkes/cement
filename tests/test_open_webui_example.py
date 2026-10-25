@@ -447,6 +447,8 @@ NOTE_C = {"document": "PHYSICIAN PROGRESS NOTE\nPatient: C\n"}
 LEARNING_FUNCTIONS = {
     "learn_cases", "show_proposal", "merge_case", "reject_proposal", "revoke_example",
     "publish_version", "function_versions", "diff_versions",
+    # p136-owui: the pass writes comparators and reads shadow drift.
+    "set_comparator", "show_comparator", "shadow_drift", "shadow_observations",
 }
 LAB = {"document": "LAB RESULT SLIP\nPatient: A\nPotassium: 4.2\n"}
 LAYOUT = {"name": "physician progress note", "title": "PHYSICIAN PROGRESS NOTE", "entries": [{"label": "Patient"}]}

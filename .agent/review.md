@@ -21,6 +21,22 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p136-owui close (IMPLEMENT, unit; tier `kernel` for selection, identity + isolation) — target = the commit landing this section
+
+Check set, fixed from `.agent/decisions/p136-owui-contract.md` + the diff lenses: A1-A7 = O1-O7; S = seeds; C1 correctness. MAIN alone (the store's consultants already ruled the semantics it calls).
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | O1 hits | pass | Only covered `use_learned_function` calls of the current message with a listed, not excluded operation and a hash; identity `ward-7:chat-1:msg-1:call-1` pinned. |
+| A2 | O2 isolation | pass | The returned body is the same object and serializes byte-identically with sampling off and on; a blocked shadow call → the reply returns first; a full queue (1) → two `dropped` rows, no wait. |
+| A3 | O3 worker | pass | N = 5 hits → 5 calls + 5 rows; mixed (2 disagree), all-agree (0), all-disagree (5) → `drift` exact on the one hash; a repeated completed run → one row + one duplicate; ConnectionError, non-JSON, timeout (1 s valve) → `failed` with their notes, no proposal or event; the version that served the hit decides after a newer promotion. |
+| A4 | O4 prompt | pass | Two messages (system + user), the function's answer marker absent, `prompt_revision` = `sha256:` + 16 hex. |
+| A5 | O5 valves | pass | `shadow_model` empty = off (no call, no file), `shadow_exclude`, `shadow_queue`, `shadow_timeout`, `shadow_path`. |
+| A6 | O6 learning tool | pass | `set_comparator`, `show_comparator`, `shadow_drift`, `shadow_observations` (admin-checked `_run`); W3 surface pin + the skill names each; the no-switch AST pin holds. |
+| A7 | O7 paste-ins + README | pass | Regenerated (freshness green); example README `## Shadow answers`; register + article audits rc 0; tripwires PASS. |
+| S | seeds | pass | `.scratch/p136/owui_seeds.py`, control OK, source restored: outlet awaits the worker, exclusion ignored, call id dropped from the identity, prompt carries the answer, off switch ignored, timeout not failed → each reds its owner. |
+| C1 | correctness | pass | The worker task is held on the instance (the loop keeps a weak reference); `_ask` imports Open WebUI by full module name (the generator's `replace_imports` rule); every worker failure is counted + logged, never raised into a chat. Gate 3's live run is owed (records commit). |
+
 ## p136-learn close (IMPLEMENT, unit; tiers `data` + `docs`) — target = the commit landing this section
 
 Check set, fixed from `.agent/decisions/p136-learn-contract.md` + the diff lenses: A1-A3 = E1-E3; C1 correctness; C2 claims. MAIN alone (shallow).

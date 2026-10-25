@@ -158,7 +158,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.12 under `uv`.
 - [x] 723abe9 p135-e3 — schema v4 + `retention prune` + `partition erase` over the ledger.
 - [x] 6af77ce p136-cmp — comparator IR + `set_comparator` (v4 table, amended in place) + `Read`/CLI views.
 - [x] a1686ad p136-store — telemetry store + admit / `record_shadow` (captured version, comparator, disagreement → proposal) + `drift` + `observations` + CLI; prune + erase cover it.
-- [ ] p136-learn — `cement_runtime.learning` + `skills/cement-learn/`: shadow proposals, comparator authoring, drift reads.
+- [x] cb6c82c p136-learn — `cement_runtime.learning` + `skills/cement-learn/`: shadow proposals, comparator authoring, drift reads.
 - [ ] p136-owui — Open WebUI: matched-hit extractor + bounded worker + shadow model call + valves + learning-tool reads; S5 probe; paste-ins regenerated; live regimen run.
 - [ ] p136-nucllei — `use` hit log + host batch job (stand-in endpoint) + learn commands; jail stand-in smoke.
 - [ ] p135-docs — tier `docs`: E2 + E4 + threat model + README `Deployment boundary` per both plans; `resolve → record → resolve` cost measured.

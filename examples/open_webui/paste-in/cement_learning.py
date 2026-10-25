@@ -12642,6 +12642,10 @@ MergeInterruptedError = _cement_module("learning").MergeInterruptedError
 cases = _cement_module("learning").cases
 merge_case = _cement_module("learning").merge_case
 publish = _cement_module("learning").publish
+ShadowStore = _cement_module("shadow").ShadowStore
+drift = _cement_module("shadow").drift
+observations = _cement_module("shadow").observations
+shadow_path = _cement_module("shadow").shadow_path
 
 
 _KINDS = (
@@ -12691,6 +12695,9 @@ def _json_shaped(value: object) -> Any:
 class Tools:
     class Valves(BaseModel):
         ledger_path: str = Field(default="", description="Path of the existing Cement ledger file.")
+        shadow_path: str = Field(
+            default="", description="Shadow observation file; empty = the ledger path + .shadow."
+        )
         partition: str = Field(default="", description="Cement partition of this deployment.")
         operations: str = Field(
             default="",
@@ -12893,6 +12900,65 @@ class Tools:
             __user__,
             operation,
             lambda system, partition: system.function_versions(partition, operation, check=True),
+        )
+
+    def _shadow(self) -> ShadowStore:
+        return ShadowStore(
+            self.valves.shadow_path or shadow_path(self.valves.ledger_path), create=False
+        )
+
+    async def set_comparator(self, operation: str, comparator: dict, __user__: Any = None) -> dict:
+        """
+        Set the rule that decides when a shadow answer agrees with the function's answer.
+        :param operation: The Cement operation.
+        :param comparator: {"abi": "cement-comparator-v1", "rules": [{"path": [...], "rule": ...}]}.
+        """
+
+        return await self._run(
+            __user__,
+            operation,
+            lambda system, partition: system.set_comparator(
+                partition, operation, comparator, actor=REVIEWER
+            ),
+        )
+
+    async def show_comparator(self, operation: str, __user__: Any = None) -> dict:
+        """
+        Show the comparator in force for the operation's current revision, or null.
+        :param operation: The Cement operation.
+        """
+
+        return await self._run(
+            __user__, operation, lambda system, partition: system.comparator(partition, operation)
+        )
+
+    async def shadow_drift(self, operation: str, __user__: Any = None) -> dict:
+        """
+        Count the shadow answers of each version that agreed or disagreed with the function.
+        :param operation: The Cement operation.
+        """
+
+        return await self._run(
+            __user__,
+            operation,
+            lambda _system, partition: drift(self._shadow(), partition, operation),
+        )
+
+    async def shadow_observations(
+        self, operation: str, state: str = "disagreed", __user__: Any = None
+    ) -> dict:
+        """
+        List up to 100 shadow observations in one state, with both answers.
+        :param operation: The Cement operation.
+        :param state: admitted, prepared, agreed, disagreed, failed, cancelled or dropped.
+        """
+
+        return await self._run(
+            __user__,
+            operation,
+            lambda _system, partition: observations(
+                self._shadow(), partition, operation, state=state
+            ),
         )
 
     async def diff_versions(
