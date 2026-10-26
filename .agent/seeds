@@ -595,9 +595,9 @@ unittest.main()
 
     def S22(self):
         with self.tree() as root:
+            # Template copy (`ops.md` Template rulings): its reason text moves with the template.
             lint = root / ".agent/spec-lint"
-            directive = "# shellcheck disable=SC2016 # the single quotes hold the awk program; its `$` are awk's\n"
-            with changed(lint, replace(lint.read_text(), directive, "")):
+            with changed(lint, substitute(lint.read_text(), r"(?m)^# shellcheck disable=SC2016\b.*\n", "")):
                 self.case("S22", "awk-in-a-variable", root, [".agent/shellcheck"], 1,
                           [r"In \.agent/spec-lint line \d+", "SC2016"])
             # A sourced library has no `#!`: it enters the set by its `# shellcheck shell=` line alone.

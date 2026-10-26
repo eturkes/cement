@@ -21,7 +21,23 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
-## Security review 2 (MAINTAIN, request) — target = the implementation at `5ae4d9f`, fixes `92f62da` (F1-F5), `2fc7e8b` (F6, this section) and the `filter (MAINTAIN):` commit after it (F8)
+## Template refresh → agents@7e8ad36 (MAINTAIN, request) — target = the diff this commit lands, base `e7336bd`
+
+Template delta = `Authoring` `@path` bullet (NEW), MAINTAIN request kinds `+ a code review`, `.agent/spec-lint` SC2016 directive. The first copy dropped that directive (a local line since `95fb113`) → gate step `shell` rc 1; owner ruling at the session's question = fix upstream: agents@7e8ad36 carries it inline, recopied by `copy-template`. Owner ruling: README `~/.ssh/id_ed25519` (`:226`, `:228`, `:255`) = the reader's own key in a signing example, kept. MAIN alone; 10 lenses fixed before the diff was read.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | template fidelity | pass | `cmp` rc 0 vs agents@7e8ad36: `CLAUDE.md` (`claude/CLAUDE.project.md`), 6 roles, `.agent/spec-lint` (100755); `copy-template --check` → `The template files are current.` |
+| R2 | obligation coverage | pass | `@path` → practice holds: live law's one `@` import = `CLAUDE.md:1` `@.agent/spec.md` (other `@` hits = npm scopes, decorators, prose), rules + roles named by plain path; `a code review` → Template rulings (3) already gives every request close its pass here; SC2016 → upstream + `ops.md` Template rulings (template copies incl. `.agent/spec-lint`, fixes land upstream). |
+| R3 | old forms | pass | `queued rows, a security review` + `the single quotes hold the awk program` → `rg --hidden -g '!.git' -F` rc 1 each; HEAD controls 1 + 2 hits. |
+| R4 | spec preservation | pass | `.agent/spec.md` diff 0 bytes (layout clause unchanged); `.agent/spec-lint` rc 0. |
+| R5 | check strength: `shell` | pass | `.agent/shellcheck` rc 0, 11 scripts; suppression scope = the old one (one inline directive on the awk call). |
+| R6 | check strength: S22 | pass | literal anchor → `substitute(r"(?m)^# shellcheck disable=SC2016\b.*\n")`, count-1 guard kept, same planted input + expectation; 3/3 MATCH at `e7336bd` (old seed) and on tree `10f118c` (new seed). |
+| R7 | check strength: S03 | pass | `.agent/spec-lint` = a comment line changed; S03 2/2 MATCH before (`e7336bd`) + after (tree `85e47f5`); agents@7e8ad36 `check-spec-lint` 18/18 under gawk, busybox awk, Debian mawk. |
+| R8 | law consistency | pass | `ops.md` Static checks (inline directive per false positive) holds; `gate-checks.md` S22 record (`without its SC2016 directive`) unchanged + true. |
+| R9 | portability + settings | pass | live-law sweep (home paths, other repos, machine tools) → README `~/.ssh` alone (ruled); no project `.claude/settings*.json`; `upstream-sync.md` absent since `9194f41`. |
+| R10 | queue | pass | no new finding outside the contract ⇒ no row born; on-demand `p10-scratch-census.py` rc 1 (5 unmarked, p135/p136 contracts) reproduces at `e7336bd` = open p143; grader PASS. |
+ — target = the implementation at `5ae4d9f`, fixes `92f62da` (F1-F5), `2fc7e8b` (F6, this section) and the `filter (MAINTAIN):` commit after it (F8)
 
 Owner body: threat surface from `Intent` + `Artifacts`; the committed scanners run (a stack with none = a finding), then a manual pass over remotely reachable code on a check set fixed before any code was read: each untrusted input traced to every sink it reaches; trust model: env vars + CLI flags trusted, the server = the enforcement boundary, framework auto-escaping holds outside raw-HTML sinks; each finding = severity + `file:line` + a red test or repro; every finding above informational fixed, the rest → `.agent/deferred.md`. MAIN alone (security vocabulary stays off the teammate route); advisor read the fix plan before the owner questions. Surfaces: L library + CLI; O Open WebUI paste-ins (every signed-in chat user through the tools and the `/api/chat/completed` body; admins through the learning tool + action) + `local.py`; N nucllei `ext/bin/cement` (the chat model's `run_shell`); K skills; P prototype server (loopback); X other examples; G CI + gate tooling. Scope note: 66 commits since review 1 (`99f260a`) added signatures, retention/erase, comparators and shadow sampling; those got the deepest reading. Owner rulings (AskUserQuestion): F1 "Keep + document" (one model per deployment); F2 "Skip, record dropped".
 
