@@ -8,7 +8,7 @@ section, `  SURVIVED src/cement_runtime/<module>:<line> <operator> #<occurrence>
 survivors. Subjects come from `.agent/decisions/survivor-subjects.json` (`test id` → list of
 `module.py:Qualified.name`), the pin's named subject per `.claude/rules/assurance.md` Survivor
 scope. Per survivor, at the section's revision:
-  out-of-scope  its enclosing function is no subject, nor nested in one → `contract-open` by construction
+  out-of-scope  its enclosing definition is no subject, nor nested in one → `contract-open` by construction
   killed        in scope, and the mutant (rebuilt with cosmic-ray at that revision) reds some test
                 module that names a subject (D28's module excluded) → covered elsewhere
   survived      in scope and no such module kills it → needs a ruling (equivalent | contract-open
@@ -63,8 +63,8 @@ def _functions(source: str) -> list[tuple[int, int, str]]:
         for child in ast.iter_child_nodes(node):
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                 name = f"{prefix}{child.name}"
-                if not isinstance(child, ast.ClassDef):
-                    spans.append((child.lineno, child.end_lineno or child.lineno, name))
+                first = min([child.lineno, *(decorator.lineno for decorator in child.decorator_list)])
+                spans.append((first, child.end_lineno or child.lineno, name))
                 walk(child, f"{name}.")
             else:
                 walk(child, prefix)
