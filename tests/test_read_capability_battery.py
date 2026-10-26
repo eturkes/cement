@@ -17,7 +17,7 @@ from cement_runtime import System
 from cement_runtime import cli as cement_cli
 from cement_runtime import store as store_module
 from cement_runtime.errors import IntegrityError, StateError
-from tests.test_read_capability_census import _sql_values
+from tests.test_read_capability_census import MUTATING, _sql_statements, _sql_values
 
 
 
@@ -788,11 +788,11 @@ class ReadCapabilityBatteryTests(unittest.TestCase):
                                 )
                             else:
                                 for text in texts:
-                                    verb = text.lstrip().split(None, 1)[0].upper()
-                                    if verb != "SELECT":
-                                        violations.append(
-                                            f"{' -> '.join(trail)}:{node.lineno} executes {verb}"
-                                        )
+                                    for words in _sql_statements(text) or [[""]]:
+                                        if words[0] != "SELECT" or any(word in MUTATING for word in words):
+                                            violations.append(
+                                                f"{' -> '.join(trail)}:{node.lineno} executes {words[0]}"
+                                            )
                     if not (
                         isinstance(receiver, ast.Name)
                         and receiver.id == "self"

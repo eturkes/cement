@@ -149,41 +149,44 @@ def _record_sql() -> typing.Iterator[
                 (id(self._owner), self._owner.in_transaction, channel, sql, args)
             )
 
-        def execute(self, sql: str, *args: object, **kwargs: object) -> sqlite3.Cursor:
+        def execute(self, sql: str, *args: object, **kwargs: object) -> "RecordingCursor":
             self._record("cursor.execute", sql, args)
-            return self._inner.execute(sql, *args, **kwargs)
+            self._inner.execute(sql, *args, **kwargs)
+            return self
 
         def executemany(
             self, sql: str, *args: object, **kwargs: object
-        ) -> sqlite3.Cursor:
+        ) -> "RecordingCursor":
             self._record("cursor.executemany", sql, args)
-            return self._inner.executemany(sql, *args, **kwargs)
+            self._inner.executemany(sql, *args, **kwargs)
+            return self
 
         def executescript(
             self, sql: str, *args: object, **kwargs: object
-        ) -> sqlite3.Cursor:
+        ) -> "RecordingCursor":
             self._record("cursor.executescript", sql, args)
-            return self._inner.executescript(sql, *args, **kwargs)
+            self._inner.executescript(sql, *args, **kwargs)
+            return self
 
     class RecordingConnection(sqlite3.Connection):
         def _record(self, channel: str, sql: str, args: tuple[object, ...]) -> None:
             records.append((id(self), self.in_transaction, channel, sql, args))
 
-        def execute(self, sql: str, *args: object, **kwargs: object) -> sqlite3.Cursor:
+        def execute(self, sql: str, *args: object, **kwargs: object) -> RecordingCursor:
             self._record("execute", sql, args)
-            return super().execute(sql, *args, **kwargs)
+            return RecordingCursor(super().execute(sql, *args, **kwargs), self)
 
         def executemany(
             self, sql: str, *args: object, **kwargs: object
-        ) -> sqlite3.Cursor:
+        ) -> RecordingCursor:
             self._record("executemany", sql, args)
-            return super().executemany(sql, *args, **kwargs)
+            return RecordingCursor(super().executemany(sql, *args, **kwargs), self)
 
         def executescript(
             self, sql: str, *args: object, **kwargs: object
-        ) -> sqlite3.Cursor:
+        ) -> RecordingCursor:
             self._record("executescript", sql, args)
-            return super().executescript(sql, *args, **kwargs)
+            return RecordingCursor(super().executescript(sql, *args, **kwargs), self)
 
         def cursor(self, *args: object, **kwargs: object) -> RecordingCursor:
             return RecordingCursor(super().cursor(*args, **kwargs), self)

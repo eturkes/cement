@@ -10,11 +10,26 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+import re
 
 import unittest
 
 SOURCE = Path(__file__).resolve().parents[1] / "src" / "cement_runtime" / "system.py"
 MUTATING = ("INSERT", "UPDATE", "DELETE", "CREATE", "DROP", "ALTER", "REPLACE", "ATTACH", "VACUUM")
+# SQLite skips comments and `executescript` runs every `;`-separated statement, so a write
+# behind a leading SELECT, a comment or a CTE still writes: classify every word of every
+# statement once comments + quoted text are gone, never the first token alone.
+_SQL_NOISE = re.compile(r"'(?:[^']|'')*'|\"(?:[^\"]|\"\")*\"|--[^\n]*|/\*.*?(?:\*/|\Z)", re.S)
+
+
+def _sql_statements(text: str) -> list[list[str]]:
+    """Each statement of ``text`` as its upper-cased words."""
+    parts = _SQL_NOISE.sub(" ", text).split(";")
+    return [words for part in parts if (words := re.findall(r"[A-Za-z_]+", part.upper()))]
+
+
+def _sql_writes(text: str) -> bool:
+    return any(word in MUTATING for words in _sql_statements(text) for word in words)
 
 
 def _is_transaction_call(node: ast.AST) -> bool:
@@ -168,9 +183,7 @@ def census() -> dict[str, object]:
             bound = item.optional_vars
             name = bound.id if isinstance(bound, ast.Name) else None
             for statement in _sql_literals(node):
-                head = statement.strip().split(None, 1)
-                verb = head[0].upper() if head else ""
-                if verb in MUTATING or statement in {"<non-literal>", "<no-argument>"}:
+                if _sql_writes(statement) or statement in {"<non-literal>", "<no-argument>"}:
                     offenders.append(f"line {node.lineno}: {statement[:70]}")
             # Helpers handed the read connection.
             for child in ast.walk(node):
@@ -204,9 +217,7 @@ def census() -> dict[str, object]:
     for node in functions:
         if node.name in helpers:
             for statement in _sql_literals(node):
-                head = statement.strip().split(None, 1)
-                verb = head[0].upper() if head else ""
-                if verb in MUTATING or statement in {"<non-literal>", "<no-argument>"}:
+                if _sql_writes(statement) or statement in {"<non-literal>", "<no-argument>"}:
                     offenders.append(f"helper {node.name}: {statement[:70]}")
             for child in ast.walk(node):
                 if (

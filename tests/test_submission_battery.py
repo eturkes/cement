@@ -30,6 +30,7 @@ import cement_runtime
 from cement_runtime import Candidate, CandidateRequest, CompilePolicy, System
 from cement_runtime.json_value import canonicalize
 from cement_runtime.store import SCHEMA, SCHEMA_FINGERPRINT, SCHEMA_VERSION
+from tests.test_proposal_binding_battery import _record_sql
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -818,23 +819,6 @@ class SubmissionBatteryTests(unittest.TestCase):
 
     def test_d13_the_revision_read_is_scoped_to(self) -> None:
         """D13. Recorded SQL uses equality for tenant_a/echo_1 twice and never calls broad operations()."""
-        real_connect = sqlite3.connect
-        statements: list[tuple[str, tuple[object, ...]]] = []
-
-        class RecordingConnection(sqlite3.Connection):
-            def execute(
-                self,
-                sql: str,
-                parameters: object = (),
-            ) -> sqlite3.Cursor:
-                parameter_tuple = tuple(parameters)  # type: ignore[arg-type]
-                statements.append((sql, parameter_tuple))
-                return super().execute(sql, parameters)  # type: ignore[arg-type]
-
-        def connect(*args: object, **kwargs: object) -> sqlite3.Connection:
-            kwargs["factory"] = RecordingConnection
-            return real_connect(*args, **kwargs)  # type: ignore[arg-type]
-
         source = _ReturningSource()
         system, _ = self.new_system(source=source, partition="tenant_a", operation="echo_1")
         for partition, operation in (
@@ -854,13 +838,15 @@ class SubmissionBatteryTests(unittest.TestCase):
                 revised_by="scope_13",
             )
 
-        with mock.patch.object(sqlite3, "connect", side_effect=connect), mock.patch.object(
+        # An exact count needs a recorder TOTAL over the channel (`.claude/rules/assurance.md`).
+        with _record_sql() as (records, _), mock.patch.object(
             system,
             "operations",
             side_effect=AssertionError("propose must not materialize operations()"),
         ) as broad_read:
             system.propose("tenant_a", "echo_1", INPUT)
 
+        statements = [(sql, tuple(args[0]) if args else ()) for *_, sql, args in records]  # type: ignore[call-overload]
         self.assertTrue(statements, "statement recorder positive control")
         operation_reads = [
             (" ".join(sql.lower().split()), parameters)
@@ -1182,14 +1168,6 @@ class SubmissionBatteryTests(unittest.TestCase):
                 states_at_now: list[tuple[bool, ...]] = []
 
                 class RecordingConnection(sqlite3.Connection):
-                    def execute(
-                        self,
-                        sql: str,
-                        parameters: object = (),
-                    ) -> sqlite3.Cursor:
-                        statements.append(sql)
-                        return super().execute(sql, parameters)  # type: ignore[arg-type]
-
                     def close(self) -> None:
                         if self in active_connections:
                             active_connections.remove(self)
@@ -1198,6 +1176,8 @@ class SubmissionBatteryTests(unittest.TestCase):
                 def connect(*args: object, **kwargs: object) -> sqlite3.Connection:
                     kwargs["factory"] = RecordingConnection
                     connection = real_connect(*args, **kwargs)  # type: ignore[arg-type]
+                    # SQLite's trace sees every statement, whatever channel or cursor runs it.
+                    connection.set_trace_callback(statements.append)
                     active_connections.append(connection)
                     return connection
 

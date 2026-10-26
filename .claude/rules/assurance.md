@@ -32,7 +32,7 @@ paths:
 - A mutation control aims at the test that OWNS the property. Where an obligation reads "frame F preserves property P", the clause is a static check on F's text, so a production mutation cannot redden it; the target is F.
 - A test whose subject is a CONSTRAINT needs a positive control that the constrained ROW exists: a zero-row `UPDATE` raises nothing, so `assertRaises` over a no-op is green-and-empty.
 - A self-test control that mutates `rows[0]` dies at scale once several rows cover one clause: drop the whole COVERING SET, and re-run `--self-test` after every scale-up — a both-ways credential earned at seed size is not one at fill size.
-- Recording instruments must be TOTAL over their channel: override `execute`, `executemany`, `executescript` AND wrap `cursor()`, else a base-cursor read bypasses the instrument while the test reports clean.
+- Recording instruments must be TOTAL over their channel: override `execute`, `executemany`, `executescript` AND wrap `cursor()` + every cursor those calls return (a chained `.execute` on a returned raw cursor runs unrecorded), or read SQLite's own `set_trace_callback`, which sees every statement on every channel; else a base-cursor read bypasses the instrument while the test reports clean. Reusable total recorder = `tests/test_proposal_binding_battery.py` `_record_sql`.
 - A probe that records AFTER the call loses every deliberately-raising case: append the record BEFORE the call, mutate it after. Pair with a per-call positive control that round-trips through the system under measurement, and make the grader FAIL on uniformity over a heterogeneous population.
 
 ## Mutation campaigns

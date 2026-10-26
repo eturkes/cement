@@ -15589,6 +15589,9 @@ class SystemTests(unittest.TestCase):
                 "SQLITE_ANALYZE",
                 "SQLITE_CREATE_VTABLE",
                 "SQLITE_DROP_VTABLE",
+                # Ending or nesting the transaction would let later reads see another snapshot.
+                "SQLITE_TRANSACTION",
+                "SQLITE_SAVEPOINT",
             )
             if hasattr(sqlite3, name)
         }
@@ -15654,6 +15657,10 @@ class SystemTests(unittest.TestCase):
                 return cursor
 
             def __getattr__(self, name: str):
+                # `execute` is the one recorded channel: a delegated commit, cursor or batch call
+                # would run outside the snapshot record.
+                if name in {"commit", "rollback", "cursor", "executemany", "executescript"}:
+                    raise AssertionError(f"function report reached connection.{name}")
                 return getattr(self.connection, name)
 
         @contextmanager
