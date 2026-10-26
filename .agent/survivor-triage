@@ -83,6 +83,26 @@ def _environment(tree: pathlib.Path) -> dict[str, str]:
                 PYTHONPATH=os.pathsep.join([str(tree), str(tree / "src")]))
 
 
+def _control(tree: pathlib.Path, modules: list[str], timeout: float | None = None) -> bool:
+    if not modules:
+        print("CONTROL red: no selected tests", file=sys.stderr)
+        return False
+    try:
+        result = subprocess.run([sys.executable, "-m", "unittest", *modules], cwd=tree,
+                                env=_environment(tree), capture_output=True, text=True,
+                                timeout=timeout)
+    except subprocess.TimeoutExpired:
+        print(f"CONTROL red: {modules} timed out", file=sys.stderr)
+        return False
+    counts = re.findall(r"^Ran (\d+) tests? in", result.stderr, flags=re.MULTILINE)
+    ran = int(counts[-1]) if counts else 0
+    passed = result.returncode == 0 and ran > 0
+    print(f"CONTROL {'green' if passed else 'red'}: {modules}; rc {result.returncode}, ran {ran}")
+    if not passed:
+        print(result.stderr[-3000:], file=sys.stderr)
+    return passed
+
+
 def _killers(revision: str, subjects: list[str]) -> list[str]:
     names = sorted({subject.split(":", 1)[1].rsplit(".", 1)[-1] for subject in subjects})
     found: set[str] = set()
@@ -237,7 +257,9 @@ def _at(args: argparse.Namespace, subjects: dict[str, list[str]],
         try:
             for tree in trees:
                 _git("worktree", "add", "--detach", str(tree), target)
-                _regenerate(tree)
+                if not _regenerate(tree):
+                    print("survivor-triage: CONTROL red: generator refused", file=sys.stderr)
+                    return 2
 
             def run(tree: pathlib.Path, share: list[tuple[object, ...]]) -> None:
                 for module, mutated, modules in share:
@@ -262,7 +284,15 @@ def _at(args: argparse.Namespace, subjects: dict[str, list[str]],
                         row["verdict_at"] = verdict
 
             shares = [keys[index::args.workers] for index in range(args.workers)]
+
+            def control(tree: pathlib.Path, share: list[tuple[object, ...]]) -> bool:
+                return all(_control(tree, list(modules), args.timeout)
+                           for modules in sorted({key[2] for key in share}))
+
             with concurrent.futures.ThreadPoolExecutor(args.workers) as pool:
+                controls = list(pool.map(lambda pair: control(*pair), zip(trees, shares, strict=True)))
+                if not all(controls):
+                    return 2
                 list(pool.map(lambda pair: run(*pair), zip(trees, shares, strict=True)))
         finally:
             for tree in trees:

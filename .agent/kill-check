@@ -9,7 +9,8 @@ with cosmic-ray at its section's revision, re-anchors it onto HEAD with `.agent/
 hunk matcher, writes it into a detached HEAD worktree carrying the primary tree's `tests/*.py`
 (the uncommitted pins), regenerates the embedded copies, runs TEST_ID and restores. Prints
 `killed/total` and one `ALIVE` line per mutant TEST_ID leaves alive or cannot place (`anchor N` =
-its text matches N places inside its function → apply it by hand). rc 0 = the run completed.
+its text matches N places inside its function → apply it by hand). rc 0 = the run completed;
+2 = setup failure (pristine generators or the selected test fail, or no tests run).
 """
 
 import argparse
@@ -50,9 +51,14 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="cement-kill-check-") as directory:
         tree = pathlib.Path(directory) / "tree"
         TRIAGE["_git"]("worktree", "add", "--detach", str(tree), "HEAD")
-        for test in (ROOT / "tests").glob("*.py"):
-            shutil.copyfile(test, tree / "tests" / test.name)
         try:
+            for test in (ROOT / "tests").glob("*.py"):
+                shutil.copyfile(test, tree / "tests" / test.name)
+            if not TRIAGE["_regenerate"](tree):
+                print("kill-check: CONTROL red: generator refused", file=sys.stderr)
+                return 2
+            if not TRIAGE["_control"](tree, [args.test_id]):
+                return 2
             for (module, line, op, occ, revision), row in sorted(seen.items()):
                 original = TRIAGE["_git"]("show", f"{revision}:{TRIAGE['_path'](module)}")
                 mutated = mutate_code(original, cosmic_ray.plugins.get_operator(op)(), occ) or original
