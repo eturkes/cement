@@ -4,7 +4,8 @@
 Usage: uv run python .agent/seeds [--rev REV] [--only S01 ...] [--list]
        uv run python .agent/seeds --self-test
 
-Every recorded recipe has an S01–S23 group, with a result per constituent case.
+S01–S24 group the implemented recipes, with a result per executed case. Coverage
+excludes wheel failure seeds, embedded-copy/umask replay, and owui-audit recipes.
 rc 0 = every selected expectation matched and every worktree restored; 1 = a
 verdict differs; 2 = setup/restoration failure. --self-test repeats the selected
 set after neutralizing skip-census: exactly S12's four red seeds must change.
