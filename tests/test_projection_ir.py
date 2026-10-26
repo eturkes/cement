@@ -875,6 +875,75 @@ class DraftProgramV2Tests(unittest.TestCase):
             "layouts": [{"name": "note", "title": "NOTE", "entries": [{"label": "Patient"}, {"label": "MRN"}]}],
         })
 
+    def test_a_structure_no_layout_can_hold_stays_unprojected_and_every_draft_parses(self):
+        from cement_runtime.projection import draft_program, parse_program, project
+
+        form = {"document": "NOTE\nPatient: A\n"}
+        plain = {"document": "Where is my invoice?"}
+        edged = {"document": "  NOTE\nPatient: B\n"}
+        long_label = {"document": "NOTE\n" + "L" * 257 + ": x\n"}
+        drafted = draft_program([form, plain, edged, long_label])
+        program = parse_program(drafted)
+        self.assertEqual([layout["title"] for layout in drafted["layouts"]], ["NOTE"])
+        self.assertEqual(
+            [project(program, value).matched for value in (form, plain, edged, long_label)],
+            [True, False, False, False],
+        )
+        with self.assertRaises(ValidationError):
+            draft_program([plain])
+
+    def test_a_layout_name_folds_ascii_alone_and_keeps_a_valid_title_valid(self):
+        from cement_runtime.projection import draft_program, parse_program
+
+        title = "İ" * 255 + "N"  # U+0130 lowercases to two characters under str.lower
+        drafted = draft_program([{"document": f"{title}\nPatient: A\n"}])
+        parse_program(drafted)
+        self.assertEqual(drafted["layouts"][0]["name"], "İ" * 255 + "n")
+        self.assertEqual(draft_program([{"document": "ÉTAT\nNom: A\n"}])["layouts"][0]["name"], "État")
+
+    def test_a_draft_stops_at_the_layout_count_and_byte_bounds(self):
+        from cement_runtime.projection import (
+            MAX_LAYOUTS, PROGRAM_MAX_BYTES, draft_program, parse_program,
+        )
+
+        forms = [{"document": f"F{index:04d}\nP: A\n"} for index in range(MAX_LAYOUTS + 1)]
+        drafted = draft_program(forms)
+        parse_program(drafted)
+        self.assertEqual([layout["title"] for layout in drafted["layouts"]],
+                         [f"F{index:04d}" for index in range(MAX_LAYOUTS)])
+        wide = [{"document": f"{index:04d}" + "T" * 250 + "\nP: A\n"} for index in range(400)]
+        drafted = draft_program(wide)
+        parse_program(drafted)
+        kept = len(drafted["layouts"])
+        self.assertLess(kept, 400)
+        self.assertLessEqual(len(canonicalize(drafted, max_bytes=2 * PROGRAM_MAX_BYTES).text.encode()),
+                             PROGRAM_MAX_BYTES)
+        grown = dict(drafted, layouts=drafted["layouts"] + [draft_program([wide[kept]])["layouts"][0]])
+        with self.assertRaises(ValidationError):
+            parse_program(grown)
+
+    def test_full_width_only_forms_verify_under_the_structural_probe(self):
+        import tempfile
+
+        from cement_runtime import Candidate, System
+        from cement_runtime.projection import draft_program
+
+        for separator in (":", "："):
+            with self.subTest(separator=separator), tempfile.TemporaryDirectory() as directory:
+                values = [{"document": f"FORM\nPatient{separator} {name}"} for name in ("A", "B")]
+                system = System(Path(directory) / "ledger.db")
+                system.register_operation("p", "extract")
+                for value in values:
+                    proposal = system.submit_proposal(
+                        "p", "extract", value, candidate=Candidate({"read": "Patient"}, {})
+                    )
+                    system.review("p", proposal, reviewer="learning-pass", decision="accept")
+                system.set_projection("p", "extract", draft_program(values), actor="learning-pass")
+                self.assertEqual(len(system.compile("p", "extract").created), 1)
+                verified = system.verify_drafts("p", "extract", verified_by="learning-pass")
+                self.assertTrue(verified.passed)
+                self.assertEqual(len(verified.entries), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

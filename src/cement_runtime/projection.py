@@ -47,6 +47,7 @@ _LITERAL_FORBIDDEN = frozenset(
 # Input lines keep TAB: it is the one control character the grammar trims and partitions around.
 _TEXT_FORBIDDEN = _LITERAL_FORBIDDEN - {"\t"}
 _EDGE = " \t"
+_ASCII_LOWER = str.maketrans(string.ascii_uppercase, string.ascii_lowercase)
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,12 +175,25 @@ def program_abi(program: ProjectionProgram) -> str:
     return str(root["abi"])
 
 
+def _lines(text: str) -> list[str]:
+    return text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+
+
+def label_lines(program: ProjectionProgram, text: str) -> tuple[list[str], list[int]]:
+    """The text's lines as the grammar splits them, and the indices of the lines that hold one of
+    the program's label separators (structure lines; title and section bodies aside)."""
+
+    lines = _lines(text)
+    separators = _SEPARATORS[program_abi(program)]
+    return lines, [i for i, line in enumerate(lines) if any(s in line for s in separators)]
+
+
 def _structure(
     text: str, separators: tuple[str, ...] = (":",)
 ) -> tuple[tuple[str, tuple[tuple[str, str], ...]] | None, int]:
     work = len(text)
     lines: list[str] = []
-    for raw in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+    for raw in _lines(text):
         line = raw.rstrip(_EDGE)
         work += len(raw) + 1
         if any(char in _TEXT_FORBIDDEN for char in line):
@@ -290,6 +304,8 @@ class ProgramDocument(TypedDict):
 def draft_program(inputs: list[JSONValue]) -> ProgramDocument:
     """One layout per distinct title + structure of the raw inputs, as a v1 program unless some
     input reads differently under v2's separators (a U+FF1A label): then a v2 program (p97).
+    The result always parses: a structure no layout can hold, and layouts past the program's
+    count + byte bounds, stay out, so their inputs stay unprojected (the LLM answers them).
 
     The learning pass decides that an operation is projectable; the program itself is mechanical,
     so it is derived here and nobody copies a label by hand.
@@ -314,6 +330,7 @@ def draft_program(inputs: list[JSONValue]) -> ProgramDocument:
     ):
         raise ValidationError("a projection needs inputs that hold exactly one text field")
     (field,) = fields
+    _field(field, "projection text")
     texts = [str(cast(dict[str, JSONValue], value)[field]) for value in inputs]
     v2 = _SEPARATORS[PROJECTION_ABI_V2]
     abi = (
@@ -327,16 +344,29 @@ def draft_program(inputs: list[JSONValue]) -> ProgramDocument:
         if parsed is None or parsed in layouts:
             continue
         title, pairs = parsed
-        layouts[parsed] = {
-            "name": title.lower(),
+        layout: LayoutDocument = {
+            # ASCII-only folding: `str.lower` varies across the supported Unicode databases and
+            # can lengthen a valid title past MAX_LITERAL (U+0130 → 2 characters).
+            "name": title.translate(_ASCII_LOWER),
             "title": title,
             "entries": [{kind: key} for kind, key in pairs],
         }
+        try:
+            # A structure the grammar reads but no layout can hold (no entry, an over-long or
+            # space-edged title or label) stays out of the program: that input is unprojected.
+            parse_program({"abi": abi, "text": field, "keep": [], "layouts": [layout]})
+        except ValidationError:
+            continue
+        layouts[parsed] = layout
     if not layouts:
         raise ValidationError("no input has a form layout that a projection can read")
-    return {
-        "abi": abi,
-        "text": field,
-        "keep": [],
-        "layouts": [layouts[key] for key in sorted(layouts)],
-    }
+    program: ProgramDocument = {"abi": abi, "text": field, "keep": [], "layouts": []}
+    size = len(canonicalize(program).text.encode())
+    for key in sorted(layouts):
+        # Layouts past the program bounds stay out, in key order: their inputs are unprojected.
+        grown = size + len(canonicalize(layouts[key]).text.encode()) + bool(program["layouts"])
+        if len(program["layouts"]) == MAX_LAYOUTS or grown > PROGRAM_MAX_BYTES:
+            break
+        program["layouts"].append(layouts[key])
+        size = grown
+    return program

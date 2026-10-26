@@ -116,7 +116,7 @@ from .models import (
     SwitchState,
     VerificationReport,
 )
-from .projection import ProjectionProgram, parse_program, program_abi, project
+from .projection import ProjectionProgram, label_lines, parse_program, program_abi, project
 from .source import CandidateSource
 from .store import Store
 
@@ -642,12 +642,14 @@ def _reported_operation(
 
 def _structural_edit_leaves(program: ProjectionProgram, input_text: str, key_text: str) -> bool:
     """Deleting the example's LAST structural line (contract §5) moves it off this case: body
-    lines hold no `:` (the grammar), so that line is the last one carrying one."""
+    lines hold no label separator (the grammar), so that line is the last one carrying one."""
 
     raw = parse_json(input_text).value
     if type(raw) is dict and type(raw.get(program.text)) is str:
-        lines = str(raw[program.text]).replace("\r\n", "\n").split("\n")
-        last = max(i for i, line in enumerate(lines) if ":" in line)
+        lines, structural = label_lines(program, str(raw[program.text]))
+        if not structural:
+            return False
+        last = structural[-1]
         probed = {**raw, program.text: "\n".join(lines[:last] + lines[last + 1 :])}
         projected = project(program, probed)
         return not projected.matched or (
