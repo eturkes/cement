@@ -18536,5 +18536,49 @@ class StoredStateClassificationTests(unittest.TestCase):
         )
         self.assertEqual(status, 5, stderr)
 
+
+class PathBindingTests(unittest.TestCase):
+    """A ledger (and its shadow file) opened by a relative path stays the file it named when the
+    host process later changes directory."""
+
+    def setUp(self) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.first = pathlib.Path(temporary.name) / "first"
+        self.second = pathlib.Path(temporary.name) / "second"
+        self.first.mkdir()
+        self.second.mkdir()
+        self.addCleanup(os.chdir, os.getcwd())
+
+    def test_a_relative_ledger_path_keeps_its_file_across_a_chdir(self) -> None:
+        System(self.first / "ledger.db").register_operation("tenant", "first")
+        System(self.second / "ledger.db").register_operation("tenant", "second")
+        os.chdir(self.first)
+        relative = System("ledger.db", create=False)
+        os.chdir(self.second)
+        self.assertEqual([row["name"] for row in relative.operations("tenant")], ["first"])
+        relative.register_operation("tenant", "written")
+        self.assertEqual(
+            [row["name"] for row in System(self.first / "ledger.db").operations("tenant")],
+            ["first", "written"],
+        )
+        self.assertEqual(
+            [row["name"] for row in System(self.second / "ledger.db").operations("tenant")],
+            ["second"],
+        )
+
+    def test_a_relative_shadow_path_keeps_its_file_across_a_chdir(self) -> None:
+        from cement_runtime.shadow import ShadowStore
+
+        ShadowStore(self.first / "x.shadow")
+        os.chdir(self.first)
+        relative = ShadowStore("x.shadow", create=False)
+        os.chdir(self.second)
+        self.assertEqual(relative.path, self.first.resolve() / "x.shadow")
+        with relative.transaction() as connection:
+            self.assertEqual(connection.execute("PRAGMA database_list").fetchone()[2],
+                             str(self.first.resolve() / "x.shadow"))
+        self.assertFalse((self.second / "x.shadow").exists())
+
 if __name__ == "__main__":
     unittest.main()

@@ -728,6 +728,12 @@ class Store:
             raise ValidationError("database path must not contain NUL")
         if path_text == ":memory:":
             raise ValidationError("the durable ledger does not support ':memory:' databases")
+        try:
+            # Absolute now: every connection opens this path, so a later `chdir` in the host
+            # process must not move the ledger a validated `System` reads and writes.
+            self.path = self.path.absolute()
+        except OSError as exc:
+            raise ValidationError("database path is relative to a missing directory") from exc
         if self.path.is_symlink():
             raise ValidationError("database path must not be a symbolic link")
         if self.path.exists() and not self.path.is_file():

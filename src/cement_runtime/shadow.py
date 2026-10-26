@@ -235,6 +235,10 @@ class ShadowStore:
         text = str(self.path)
         if "\0" in text or text == ":memory:":
             raise ValidationError("shadow store path must name a file")
+        try:
+            self.path = self.path.absolute()  # as `Store`: a later `chdir` keeps this file
+        except OSError as exc:
+            raise ValidationError("shadow store path is relative to a missing directory") from exc
         if self.path.is_symlink():
             raise ValidationError("shadow store path must not be a symbolic link")
         if self.path.exists() and not self.path.is_file():

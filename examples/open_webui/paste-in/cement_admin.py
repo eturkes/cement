@@ -20,8 +20,8 @@ from pydantic import BaseModel, Field
 # The embedded source keeps its own line breaks; one of its pragma comments runs past 100
 # columns inside the string, where ruff reads no pragma.
 # ruff: noqa: E501
-_CEMENT_PACKAGE = "_cement_runtime_8e7607a90f34bc4b"
-_CEMENT_DIGEST = "8e7607a90f34bc4b7dc0b03dc8dda3aae50e24c5428e4b4fd93700992fda4971"
+_CEMENT_PACKAGE = "_cement_runtime_2c0666d37c0841c9"
+_CEMENT_DIGEST = "2c0666d37c0841c94f01aefcc86a384f8878eef1b0bbab4d18e067824ca91f91"
 _CEMENT_SOURCES = {
     "__init__": r'''
 """Cement public API."""
@@ -2900,6 +2900,10 @@ class ShadowStore:
         text = str(self.path)
         if "\0" in text or text == ":memory:":
             raise ValidationError("shadow store path must name a file")
+        try:
+            self.path = self.path.absolute()  # as `Store`: a later `chdir` keeps this file
+        except OSError as exc:
+            raise ValidationError("shadow store path is relative to a missing directory") from exc
         if self.path.is_symlink():
             raise ValidationError("shadow store path must not be a symbolic link")
         if self.path.exists() and not self.path.is_file():
@@ -4763,6 +4767,12 @@ class Store:
             raise ValidationError("database path must not contain NUL")
         if path_text == ":memory:":
             raise ValidationError("the durable ledger does not support ':memory:' databases")
+        try:
+            # Absolute now: every connection opens this path, so a later `chdir` in the host
+            # process must not move the ledger a validated `System` reads and writes.
+            self.path = self.path.absolute()
+        except OSError as exc:
+            raise ValidationError("database path is relative to a missing directory") from exc
         if self.path.is_symlink():
             raise ValidationError("database path must not be a symbolic link")
         if self.path.exists() and not self.path.is_file():
