@@ -4,7 +4,7 @@
 Usage: uv run python .agent/seeds [--rev REV] [--only S01 ...] [--list]
        uv run python .agent/seeds --self-test
 
-S01–S24 group the implemented recipes, with a result per executed case. Coverage
+S01–S25 group the implemented recipes, with a result per executed case. Coverage
 excludes wheel failure seeds, embedded-copy/umask replay, and owui-audit recipes.
 rc 0 = every selected expectation matched and every worktree restored; 1 = a
 verdict differs; 2 = setup/restoration failure. --self-test repeats the selected
@@ -44,7 +44,7 @@ GROUPS = [
     ("S01", "`.agent/gate` (", "gate", True),
     ("S02", "`tests/test_read_capability_census.py` (", "read census", False),
     ("S03", "`.agent/spec-lint`:", "spec lint", False),
-    ("S04", "`.agent/decisions/m3-deferred-validate.py`,", "queue validator @21b7463", False),
+    ("S04", "`.agent/decisions/m3-deferred-validate.py` (gate step `queue`),", "queue validator @21b7463", False),
     ("S05", "D28 verdict cache (", "D28 cache @1935f68", True),
     ("S06", "D28 (`", "D28 and census floors", False),
     ("S07", "D28 pairing (", "D28 pairing", True),
@@ -65,6 +65,7 @@ GROUPS = [
     ("S22", "`.agent/shellcheck` (", "shell lint", False),
     ("S23", "`.agent/pins` (", "pin census", False),
     ("S24", "`.agent/law-census` (", "law census", False),
+    ("S25", "`.agent/decisions/p03-stored-int-census.py` + ", "stored ints, anchors, revisions", False),
 ]
 
 
@@ -675,6 +676,29 @@ unittest.main()
             with changed(local, substitute(local.read_text(), r"(?m)^ +# Fixed arguments: .*\n +# another line .*\n", "")):
                 self.python(sid, "bare-suppression", root, census, 1,
                             [r"^REASONS: examples/open_webui/local\.py:\d+: noqa: S603 without a reason"])
+
+    def S25(self):
+        sid = "S25"
+        p03, p76, p94 = (f".agent/decisions/{name}.py" for name in ("p03-stored-int-census", "p76-anchor-census", "p94-sha-census"))
+        with self.tree() as root:
+            self.python(sid, "p03-shipped", root, p03, 0, [r"'UNGUARDED': 0\}"])
+            self.case(sid, "p76-shipped", root, [sys.executable, p76, "--quiet"], 0, [r"failures 0$"])
+            self.python(sid, "p94-shipped", root, p94, 0, [r"'unreachable': 0\}"])
+            system = root / "src/cement_runtime/system.py"
+            with changed(system, system.read_text() + '\n\ndef _seed_bare(row):\n    return int(row["seed"])\n'):
+                self.python(sid, "bare-int", root, p03, 1, [r"^UNGUARDED system\.py:\d+ _seed_bare: int\(row\['seed'\]\)"])
+            marks = root / ".agent/decisions/p76-retired.json"
+            text = marks.read_text()
+            mark = json.loads(text)
+            del mark["m3u5a-mutants.json:M01"]
+            with changed(marks, json.dumps(mark, indent=2) + "\n"):
+                self.case(sid, "mark-gone", root, [sys.executable, p76, "--quiet"], 1,
+                          [r"^UNMARKED m3u5a-mutants\.json:M01 count 0 \(src/cement_runtime/cli\.py\)"])
+            # A commit outside HEAD's history: an orphan over HEAD's tree, never a ref.
+            orphan = git(root, "commit-tree", "HEAD^{tree}", "-m", "S25 seed")
+            with changed(root / ".agent/decisions/zz_s25_seed.py", f'"""S25 seed."""\nREV = "{orphan[:12]}"\n'):
+                self.python(sid, "off-history", root, p94, 1,
+                            [rf"^UNREACHABLE \.agent/decisions/zz_s25_seed\.py: {orphan[:12]} \(not in HEAD's history"])
 
     def S14(self):
         sid = "S14"

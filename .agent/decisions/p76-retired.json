@@ -463,6 +463,10 @@
     "retired": "ffe9848bbe98f9ca4d7515e0fb69bd0ddeef8b80",
     "path": "src/cement_runtime/system.py"
   },
+  "m3u6a1-mutants.json:M87": {
+    "retired": "b7b27ecf7a155aee1664140cd637bc35187f8eba",
+    "path": "src/cement_runtime/models.py"
+  },
   "m3u6a1-mutants.json:M89": {
     "retired": "635a47387c247c06338411c352d7bef17c931c06",
     "path": "src/cement_runtime/_command_supervisor.py"
