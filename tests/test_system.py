@@ -4877,7 +4877,6 @@ class SystemTests(unittest.TestCase):
 
         def verify() -> None:
             outcomes["verify"] = verifier.verify_drafts("tenant-a", "echo", verified_by="verifier")
-            outcomes["verified_at"] = time.monotonic()
 
         def write() -> None:
             outcomes["revision"] = writer.register_operation("tenant-a", "other")
@@ -4899,7 +4898,13 @@ class SystemTests(unittest.TestCase):
         self.assertTrue(outcomes["verify"].passed)
         self.assertEqual(len(outcomes["verify"].entries), 3)
         self.assertEqual(outcomes["revision"], 1)
-        self.assertLess(outcomes["verified_at"], outcomes["written_at"])
+        # Commit order = event order: a return timestamp sampled after the commit can fall
+        # either side of the other thread's.
+        events = self.system.events("tenant-a")
+        verified = [event["sequence"] for event in events if event["kind"] == "artifact.verified"]
+        written = [event["sequence"] for event in events if event["subject_id"] == "tenant-a/other@1"]
+        self.assertEqual((len(verified), len(written)), (3, 1))
+        self.assertLess(max(verified), written[0])
         self.assertGreaterEqual(outcomes["written_at"] - started, 0.5)
 
     def test_promote_function_rolls_back_when_its_clock_reenters_the_ledger(self) -> None:
