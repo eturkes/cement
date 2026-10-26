@@ -181,6 +181,22 @@ class PasteInBattery(_PasteIn):
         with self.assertRaisesRegex(ImportError, "embedded cement_runtime was edited"):
             self._load(edited)
 
+    def test_w7_a_bare_interpreter_loads_the_embedded_library(self) -> None:
+        # Under `python -I -S` nothing preloads importlib.machinery; a source with no import of its
+        # own gives the loader no help, so a finder installed before that import re-enters itself.
+        import subprocess
+
+        source = "from cement_runtime.json_value import canonicalize\n\nprint(canonicalize({'a': 1}).text)\n"
+        rendered = GENERATOR.render(source, GENERATOR.runtime_sources(ROOT), "0")
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "bare.py"
+            path.write_text(rendered, encoding="utf-8")
+            run = subprocess.run(
+                [sys.executable, "-I", "-S", "-B", str(path)],
+                capture_output=True, text=True, timeout=60, check=False,
+            )
+        self.assertEqual((run.returncode, run.stdout), (0, '{"a":1}\n'), run.stderr[-500:])
+
     def test_w6_the_generator_refuses_import_shapes_it_cannot_rebind(self) -> None:
         sources = {"__init__": '"""x"""\n', "json_value": '"""y"""\n'}
         for label, source in (
