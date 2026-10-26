@@ -141,8 +141,12 @@ def self_test() -> int:
     fired = 0
     for label, c, b, expect in controls:
         lines, failures = report(c, b)
-        hit = any(line.startswith(expect) and not line.endswith(" 0") for line in lines) if expect \
-            else failures == 0
+        if expect:
+            pattern = r"OBLIGATIONS: \d+ BROKEN\b" if expect == "OBLIGATIONS" \
+                else rf"{re.escape(expect)}: [1-9]\d*\b"
+            hit = failures > 0 and any(re.match(pattern, line) for line in lines)
+        else:
+            hit = failures == 0
         print(f"  {'FIRING' if hit else 'SILENT'}  {label}")
         fired += 1 if hit else 0
     print(f"SELF-TEST: {fired}/{len(controls)} firing")
