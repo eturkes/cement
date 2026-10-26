@@ -792,7 +792,7 @@ function renderMetrics() {
     ${row("distinct model answers for one scope", distinct)}
     <div class="tiny dim" style="margin-top:9px">
       ${plural(stats.reviews, "review")} recorded.
-      Every resolve runs the full six-check verification and caches nothing.
+      A cold resolve runs the full seven-check verification; later ones reuse it until the ledger changes.
     </div>`;
 }
 
@@ -838,11 +838,11 @@ function sentCaption() {
   if (!turn) return CAPTION;
   const parts = turnParts();
   const fixed = parts.filter((p) => p.source === "function").length;
-  if (fixed === parts.length) return "A tool call to Cement answered. No AI.";
-  if (fixed) return "A tool call to Cement did part. The AI did the rest.";
+  if (fixed === parts.length) return "A learned function answered. No AI.";
+  if (fixed) return "A learned function did part. The AI did the rest.";
   return taskStage().learned && !taskStage().on
     ? "An ordinary chatbot answer. A function exists but is switched off."
-    : "An ordinary chatbot answer. Cement has nothing reusable for this yet.";
+    : "An ordinary chatbot answer. Nothing reusable is learned for this yet.";
 }
 
 async function learnNow() {
@@ -1086,6 +1086,8 @@ $("reset").addEventListener("click", async () => {
   if (parameters.has("reset")) await call("/api/reset", {});
   STATE = await (await fetch("/api/state")).json();
   if (parameters.has("source")) SOURCE_OPEN = parameters.get("source");
+  // A reload keeps the session: the band describes its latest turn, not the empty start.
+  if (STATE.latest_turn) CAPTION = sentCaption();
   render();
   /* The webfonts load after the first paint and change every line height, so the
      scroll offsets computed above land short. Render again once they are in. */

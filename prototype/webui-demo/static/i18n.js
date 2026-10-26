@@ -61,12 +61,12 @@ const JA = new Map(Object.entries({
   "Learn from chats": "チャットから学習",
   "Pick a task, then a request — or play the story.":
     "タスクを選び、次にリクエストを選んでください。ストーリーの再生もできます。",
-  "A tool call to Cement answered. No AI.": "Cement へのツール呼び出しが回答しました。AIは使っていません。",
-  "A tool call to Cement did part. The AI did the rest.": "一部は Cement へのツール呼び出しが、残りはAIが回答しました。",
+  "A learned function answered. No AI.": "学習した関数が回答しました。AIは使っていません。",
+  "A learned function did part. The AI did the rest.": "一部は学習した関数が、残りはAIが回答しました。",
   "An ordinary chatbot answer. A function exists but is switched off.":
     "通常のチャットボットの回答です。関数はありますが、オフになっています。",
-  "An ordinary chatbot answer. Cement has nothing reusable for this yet.":
-    "通常のチャットボットの回答です。Cement にはまだ再利用できるものがありません。",
+  "An ordinary chatbot answer. Nothing reusable is learned for this yet.":
+    "通常のチャットボットの回答です。まだ再利用できるものは学習されていません。",
   "On: matching forms are answered by the function.": "オン: 一致するフォームには関数が回答します。",
   "Off: the AI answers again.": "オフ: 再びAIが回答します。",
   "Going back…": "戻っています…",

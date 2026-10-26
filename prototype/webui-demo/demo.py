@@ -1434,8 +1434,8 @@ class Session:
             )
         elif cemented:
             note = (
-                "No model ran. Every resolve runs the full six-check verification "
-                "and caches nothing. A shell adds about 110 ms of interpreter "
+                "No model ran. A cold resolve runs the full seven-check verification, and "
+                "later ones reuse it until the ledger changes. A shell adds about 110 ms of interpreter "
                 "startup, which is why the page calls the library here."
             )
         elif not ruled:
