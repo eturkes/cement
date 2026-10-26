@@ -119,5 +119,22 @@ class ExpectedRevisionTests(unittest.TestCase):
         self.assertEqual(spy.call_args.kwargs["expected_revision"], 1)
 
 
+    def test_a_revise_at_the_largest_revision_refuses_and_writes_nothing(self) -> None:
+        # Boundary fixture: ordinary SQL sets the stored revision; the schema stays intact.
+        from cement_runtime.json_value import MAX_INTEGER
+
+        path = pathlib.Path(self.database).with_name("revisions.db")
+        system = System(path)
+        system.register_operation("p", "op", policy=CompilePolicy())
+        with system.store.transaction(write=True) as connection:
+            connection.execute("UPDATE operations SET revision = ?", (MAX_INTEGER - 1,))
+        system = System(path, create=False)
+        self.assertEqual(system.revise_operation("p", "op", policy=CompilePolicy(), revised_by="o"),
+                         MAX_INTEGER)
+        before = path.read_bytes()
+        with self.assertRaises(StateError):
+            system.revise_operation("p", "op", policy=CompilePolicy(), revised_by="o")
+        self.assertEqual(path.read_bytes(), before)
+
 if __name__ == "__main__":
     unittest.main()

@@ -28,8 +28,8 @@ from typing import Any
 # The embedded source keeps its own line breaks; one of its pragma comments runs past 100
 # columns inside the string, where ruff reads no pragma.
 # ruff: noqa: E501
-_CEMENT_PACKAGE = "_cement_runtime_dbbc3aa0036fe137"
-_CEMENT_DIGEST = "dbbc3aa0036fe13710d9dc9a427eb6ab9563acd5673c225581d01d31883e016a"
+_CEMENT_PACKAGE = "_cement_runtime_b98250737ce48c70"
+_CEMENT_DIGEST = "b98250737ce48c705abbfeb9a02b9db1e5929d48a3f0270a32324556c1560149"
 _CEMENT_SOURCES = {
     "__init__": r'''
 """Cement public API."""
@@ -6491,6 +6491,8 @@ class System:
             if current is None:
                 raise NotFoundError("operation is not registered in this partition")
             previous = _stored_int(current["revision"], "stored operation revision", minimum=1)
+            if previous == _MAX_SQLITE_INTEGER:
+                raise StateError("operation revision cannot grow past 2**63 - 1")
             revision = previous + 1
             connection.execute(
                 """

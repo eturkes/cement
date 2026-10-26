@@ -1551,6 +1551,8 @@ class System:
             if current is None:
                 raise NotFoundError("operation is not registered in this partition")
             previous = _stored_int(current["revision"], "stored operation revision", minimum=1)
+            if previous == _MAX_SQLITE_INTEGER:
+                raise StateError("operation revision cannot grow past 2**63 - 1")
             revision = previous + 1
             connection.execute(
                 """
