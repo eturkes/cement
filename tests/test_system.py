@@ -18654,5 +18654,46 @@ class ReceiptEnvelopeTests(unittest.TestCase):
         )
         self.assertEqual(len(superseding), 1)
 
+
+class ReviewContradictionCostTests(unittest.TestCase):
+    """A review that contradicts one projected case reads each distinct program once, not once
+    per promoted member."""
+
+    def test_a_contradicting_review_loads_each_program_once(self) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        system = System(pathlib.Path(temporary.name) / "ledger.db")
+        system.register_operation("p", "op")
+        value = {"document": "Form\nName: Ada\n", "case": 0}
+        for case in range(12):
+            for _ in range(2):
+                proposal = system.submit_proposal(
+                    "p", "op", {**value, "case": case},
+                    candidate=Candidate(output={"answer": case}, provenance={}),
+                )
+                system.review("p", proposal, reviewer="learning-pass", decision="accept")
+        program = {
+            "abi": "cement-projection-v1", "text": "document", "keep": ["case"],
+            "layouts": [{"name": "form", "title": "Form", "entries": [{"label": "Name"}]}],
+        }
+        system.set_projection("p", "op", program, actor="learning-pass")
+        self.assertEqual(len(system.compile("p", "op").created), 12)
+        system.verify_drafts("p", "op", verified_by="learning-pass")
+        manifest = system.inspect_function_promotion("p", "op")
+        system.promote_function(
+            "p", "op", expected_function_hash=manifest.function_hash, promoted_by="learning-pass"
+        )
+        proposal = system.submit_proposal(
+            "p", "op", value, candidate=Candidate(output={"answer": "changed"}, provenance={})
+        )
+        with mock.patch.object(system, "_program_by_hash", wraps=system._program_by_hash) as loads:
+            system.review("p", proposal, reviewer="learning-pass", decision="accept")
+        self.assertEqual(loads.call_count, 1)
+        contradicted = [
+            event["payload"] for event in system.events("p", limit=1000)
+            if event["kind"] == "artifact.contradicted"
+        ]
+        self.assertEqual(len(contradicted), 1)
+
 if __name__ == "__main__":
     unittest.main()

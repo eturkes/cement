@@ -2152,7 +2152,9 @@ class System:
             # it leaves every artifact's status alone, so a pinned version survives it, while the
             # live set now fails verification on the contrary evidence and follow answers nothing.
             contradicted_ids = [str(item["id"]) for item in conflicting_artifacts]
-            # X7: a projected artifact matches the new confirmation through its program's key.
+            # X7: a projected artifact matches the new confirmation through its program's key;
+            # members share their version's program, so each distinct one loads once.
+            programs: dict[str, ProjectionProgram | None] = {}
             for artifact in connection.execute(
                 """
                 SELECT id, input_json, output_json, projection_hash FROM artifacts
@@ -2161,7 +2163,10 @@ class System:
                 """,
                 (partition, binding.operation, binding.operation_revision),
             ):
-                program = self._program_by_hash(connection, str(artifact["projection_hash"]))
+                program_hash = str(artifact["projection_hash"])
+                if program_hash not in programs:
+                    programs[program_hash] = self._program_by_hash(connection, program_hash)
+                program = programs[program_hash]
                 if (
                     program is not None
                     and self._case_key_text(program, input_json.text, input_json.digest)
