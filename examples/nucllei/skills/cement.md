@@ -30,12 +30,12 @@ description: "学習済みの関数 (Cement) で決まった種類の頼みに�
 2. 出力の最後の `次の手:` に従う。
    - 「学習済みの関数が答えた」: `出力:` の JSON をそのまま使って返答を書く。中身を足したり直したりしない。`record` は流さない
    - 「学習済みの関数はこの頼みに答えない」: 自分で答えの出力 (上の形の JSON) を作り、返答を書く前に記録する。
+     出力は用紙と同じく `write_file` でファイルに書く (例: `/workspace/.cement/in/answer-1.json`)。
+     出力をシェルのコマンドの中に書かない。`record` は読んだファイルを消す。
      `--request` にはユーザーの頼みの文をそのまま入れる (文に `'` があれば `'\''` と書く):
 
      ```sh
-     /ext/bin/cement record <控え> --request '<ユーザーの頼みの文>' <<'CEMENT_EOF'
-     <出力の JSON>
-     CEMENT_EOF
+     /ext/bin/cement record <控え> --request '<ユーザーの頼みの文>' --output-file /workspace/.cement/in/answer-1.json
      ```
 
      返答では、記録した出力と同じ内容を普段の返答の形 (表や箇条書き) で示す

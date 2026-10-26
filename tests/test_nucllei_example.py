@@ -560,6 +560,65 @@ class JapaneseOutputBattery(_Jail):
         self.assertNotIn("版 0", text)
 
 
+class HandOverBattery(_Jail):
+    """Documents and model answers reach the command as files under `$CEMENT_HOME/in/`, never as
+    shell text (a heredoc ends at a line equal to its delimiter and runs the rest); each command
+    deletes its hand-over file once the ledger or the ticket holds the content."""
+
+    def handed(self, name: str, text: str) -> pathlib.Path:
+        (self.home / "in").mkdir(parents=True, exist_ok=True)
+        path = self.home / "in" / name
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def test_use_deletes_its_hand_over_file_and_keeps_any_other(self) -> None:
+        inside = self.handed("plan-1.txt", NOTE_A)
+        status, text = self.run_cement("use", OP, "--field", "document", "--input-file", str(inside))
+        self.assertEqual(status, 0, text)
+        self.assertFalse(inside.exists())
+        outside = self.home.parent / "plan-2.txt"
+        outside.write_text(NOTE_B, encoding="utf-8")
+        self.run_cement("use", OP, "--field", "document", "--input-file", str(outside))
+        self.assertTrue(outside.exists())
+
+    def test_record_and_merge_read_an_answer_file_and_delete_it_after_the_write(self) -> None:
+        tickets = []
+        for document in (NOTE_A, NOTE_B):
+            _, _, ticket = self.use(document)
+            tickets.append(ticket)
+        for index, ticket in enumerate(tickets):
+            answer = self.handed(f"answer-{index}.json", json.dumps(PLAN))
+            status, text = self.run_cement(
+                "record", str(ticket), "--request", "plan", "--output-file", str(answer)
+            )
+            self.assertEqual(status, 0, text)
+            self.assertFalse(answer.exists())
+        work = json.loads(self.run_cement("learn", OP, "--projectable", "yes")[1].split("\n", 1)[1])
+        (case,) = work["cases"]
+        merged = self.handed("merge-1.json", json.dumps(PLAN))
+        status, text = self.run_cement(
+            "merge", OP, "--projectable", "yes", "--proposals", ",".join(case["pending_proposal_ids"]),
+            "--note", "n", "--output-file", str(merged),
+        )
+        self.assertEqual(status, 0, text)
+        self.assertFalse(merged.exists())
+
+    def test_a_refused_record_keeps_its_answer_file_for_the_retry(self) -> None:
+        _, _, ticket = self.use(NOTE_A)
+        answer = self.handed("answer-1.json", json.dumps(PLAN))
+        with mock.patch.object(System, "submit_proposal", side_effect=StateError("busy")):
+            status, _ = self.run_cement("record", str(ticket), "--request", "p", "--output-file", str(answer))
+        self.assertEqual(status, 4)
+        self.assertTrue(answer.exists())
+
+    def test_the_skills_hand_every_document_and_answer_over_as_a_file(self) -> None:
+        for name, command in (("cement", "record"), ("cement-learn", "merge")):
+            with self.subTest(skill=name):
+                _, text = _front(name)
+                self.assertNotIn("<<", text)
+                self.assertRegex(text, rf"/ext/bin/cement {command} .*--output-file /workspace/\.cement/in/")
+
+
 class SwitchBattery(_Jail):
     def two_versions(self) -> None:
         self.use()

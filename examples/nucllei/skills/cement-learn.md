@@ -37,12 +37,12 @@ description: "Cement の学習 (記録した答えをまとめ、学習済みの
 4. 場合ごとに、頼みのどれにも足りる出力を 1 つ作る。行の一番多い出力から始め、他の出力にあって足りない行を足す。
    欄の分け方が違うときは両方の行を残す。頼みが求めた違いは残す。用紙の形でまとめる出力には入力の値を入れない。
    そのうえで、場合ごとに 1 回 `merge` を流す。`--proposals` には作業一覧のその場合の `pending_proposal_ids` を、
-   `--examples` には `active_example_ids` を、`,` でつないで渡す。どちらかが空なら、その引数は付けない:
+   `--examples` には `active_example_ids` を、`,` でつないで渡す。どちらかが空なら、その引数は付けない。
+   まとめた出力は `write_file` でファイルに書き (例: `/workspace/.cement/in/merge-1.json`)、シェルのコマンドの中に書かない。
+   `merge` は読んだファイルを消す:
 
    ```sh
-   /ext/bin/cement merge <操作> --projectable <yes|no> --proposals <id,id> --note '<何を残し何を足したか>' <<'CEMENT_EOF'
-   <まとめた出力の JSON>
-   CEMENT_EOF
+   /ext/bin/cement merge <操作> --projectable <yes|no> --proposals <id,id> --note '<何を残し何を足したか>' --output-file /workspace/.cement/in/merge-1.json
    ```
 
    - その操作の答えになっていない提案は、`merge` の前に `/ext/bin/cement reject <提案 id> --note '<理由>'` で退け、id を外す

@@ -184,6 +184,15 @@ def _discard(path: pathlib.Path) -> list[str]:
     return []
 
 
+def _handed_over(path: str | None) -> list[str]:
+    """Delete a skill's hand-over file once its content is parsed: `write_file` puts each document
+    or answer under `$CEMENT_HOME/in/` (never shell text), and the ledger or ticket keeps it."""
+
+    if path is not None and pathlib.Path(path).parent.resolve() == (_home() / "in").resolve():
+        return _discard(pathlib.Path(path))
+    return []
+
+
 def _read(path: str | None) -> str:
     if path is None:
         return sys.stdin.read()
@@ -343,10 +352,7 @@ def _use(args: argparse.Namespace) -> int:
     value = {args.field: text.rstrip("\n")} if args.field else _parse(text, "入力")
     if args.field:
         _parse(json.dumps(value), "入力")
-    if args.input_file is not None:
-        handed = pathlib.Path(args.input_file)
-        if handed.parent.resolve() == (_home() / "in").resolve():
-            _discard(handed)  # the chat skill's hand-over copy; the ticket keeps the input
+    _handed_over(args.input_file)  # the ticket keeps the input
     try:
         _home().mkdir(parents=True, exist_ok=True)
         system = System(_home() / "ledger.db", clock_us=_clock_us)
@@ -457,9 +463,15 @@ def _record(args: argparse.Namespace) -> int:
             source_id=f"nucllei:{args.ticket}",
         )
     except ConflictError:
-        _say(f"控え {args.ticket} は記録済み。", *_discard(path), "次の手: 返答を書く。")
+        _say(
+            f"控え {args.ticket} は記録済み。",
+            *_handed_over(args.output_file),
+            *_discard(path),
+            "次の手: 返答を書く。",
+        )
         return 0
-    notes = _discard(path)
+    # Only now: a refused write keeps the file, so the retry its 次の手 asks for can read it.
+    notes = [*_handed_over(args.output_file), *_discard(path)]
     try:
         count = _learnable(system, operation, proposal_id, output)
     except CementError:
@@ -565,7 +577,10 @@ def _merge(args: argparse.Namespace) -> int:
         return status
     # Only a pass that wrote rules on projectability; a refused or confused one rules nothing.
     _say(
-        "場合をまとめた。", _json(dataclasses.asdict(done)), *_remember(args.operation, projectable)
+        "場合をまとめた。",
+        _json(dataclasses.asdict(done)),
+        *_handed_over(args.output_file),  # the confirmed examples keep it; a refusal keeps the file
+        *_remember(args.operation, projectable),
     )
     return 0
 
