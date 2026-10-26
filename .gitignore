@@ -12,6 +12,9 @@ dist/
 *.db-journal
 *.db-shm
 *.db-wal
+# A ledger's shadow observation file (`<ledger>.shadow`): plaintext inputs + answers.
+*.shadow
+*.shadow-journal
 
 # Claude Code local/runtime state (personal; not shared)
 .claude/settings.local.json
