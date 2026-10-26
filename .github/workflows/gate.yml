@@ -60,6 +60,14 @@ jobs:
       - name: Run the full gate
         run: .agent/gate
 
+      - name: Check that the gate left the tree clean
+        # Every file a gate step writes is gitignored or removed (`CLAUDE.md` Execution: `.gitignore`
+        # kept current; task close removes temporary artifacts).
+        run: |
+          status=$(git status --porcelain --untracked-files=all)
+          printf '%s\n' "$status"
+          test -z "$status"
+
       - name: Save D28 verdicts
         # Green verdicts only ever enter the store, so saving after a failed or cancelled run is safe.
         if: always()
@@ -101,3 +109,11 @@ jobs:
 
       - name: Run the gate without D28
         run: .agent/gate --omit-d28
+
+      - name: Check that the gate left the tree clean
+        # Every file a gate step writes is gitignored or removed (`CLAUDE.md` Execution: `.gitignore`
+        # kept current; task close removes temporary artifacts).
+        run: |
+          status=$(git status --porcelain --untracked-files=all)
+          printf '%s\n' "$status"
+          test -z "$status"

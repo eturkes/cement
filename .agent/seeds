@@ -63,6 +63,7 @@ GROUPS = [
     ("S21", "`.agent/zizmor` (", "Actions audit", False),
     ("S22", "`.agent/shellcheck` (", "shell lint", False),
     ("S23", "`.agent/pins` (", "pin census", False),
+    ("S24", "`.agent/law-census` (", "law census", False),
 ]
 
 
@@ -649,6 +650,30 @@ unittest.main()
                           [r"^open-webui lock transitive .*pywin32 ; sys_platform == 'win32' 1 -> \S+.* BEHIND"])
             self.case("S23", "shipped", root, [sys.executable, ".agent/pins"], 0,
                       [r"^pins: \d+ pins, rc 0$"])
+
+    def S24(self):
+        sid = "S24"
+        census = ".agent/law-census"
+        with self.tree() as root:
+            self.python(sid, "shipped", root, census, 0, [r"^frontmatter: 0 violation", r"^reasons: 0 violation"])
+            self.case(sid, "self-test", root, [sys.executable, census, "--self-test"], 0,
+                      [rf"^SELF-TEST {name}: fires alone$" for name in
+                       ("frontmatter", "imports", "settings", "symlinks", "portable", "reasons")])
+            rule = root / ".claude/rules/open-webui.md"
+            with changed(rule, replace(rule.read_text(), '  - "examples/open_webui/**"\n', "  - examples/open_webui/**\n")):
+                self.python(sid, "unquoted-glob", root, census, 1,
+                            [r"^FRONTMATTER: \.claude/rules/open-webui\.md:3: unquoted glob"])
+            claude = root / "CLAUDE.md"
+            with changed(claude, replace(claude.read_text(), "@.agent/spec.md\n", "@.agent/specs.md\n")):
+                self.python(sid, "dead-import", root, census, 1, [r"^IMPORTS: CLAUDE\.md:1: @\.agent/specs\.md"])
+            docs = root / "docs/architecture.md"
+            with changed(docs, docs.read_text() + "\nRun /home/someone/bin/tool.\n"):
+                self.python(sid, "machine-path", root, census, 1, [r"^PORTABLE: docs/architecture\.md:\d+: machine path /home/someone"])
+            # The reason heads the paragraph: deleting the comment block leaves the suppression bare.
+            local = root / "examples/open_webui/local.py"
+            with changed(local, substitute(local.read_text(), r"(?m)^ +# Fixed arguments: .*\n +# another line .*\n", "")):
+                self.python(sid, "bare-suppression", root, census, 1,
+                            [r"^REASONS: examples/open_webui/local\.py:\d+: noqa: S603 without a reason"])
 
     def S14(self):
         sid = "S14"

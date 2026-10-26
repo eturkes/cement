@@ -1,0 +1,196 @@
+#!/usr/bin/env python3
+"""law-census — the tool-decidable clauses of `CLAUDE.md` + `.claude/rules/` that no other check grades.
+
+Clauses (each a named check; rc 1 prints every violation, rc 0 prints one count line per check):
+  frontmatter  every `.claude/{rules,agents}/*.md` frontmatter parses, quotes each glob and each
+               scalar opening with `[ { } ] , & * ! | > % @ # :`, a backtick or a double quote,
+               and each `paths:` glob matches a tracked file (`CLAUDE.md` Authoring)
+  imports      every `@path` line of `CLAUDE.md` names a tracked file (`CLAUDE.md` Authoring)
+  settings     no tracked project `.claude/settings.json` (`.claude/rules/ops.md` Settings)
+  symlinks     no tracked symbolic link points at nothing (`CLAUDE.md` Execution task close)
+  portable     live law, config, code + docs name no machine path (`CLAUDE.md` Authoring)
+  reasons      every `noqa` / `type: ignore` in `src/` + `examples/` carries its reason on its line
+               or in the comment that heads its paragraph (`.claude/rules/ops.md` Static checks)
+Usage: .agent/law-census [--root DIR] [--self-test]
+--self-test plants one violation per check in a scratch copy and requires each check alone to fail.
+"""
+
+from __future__ import annotations
+
+import argparse
+import fnmatch
+import os
+import pathlib
+import re
+import subprocess
+import sys
+import tempfile
+
+SPECIAL = tuple("[{}],&*!|>%@#:`\"")
+MACHINE = re.compile(r"/home/[A-Za-z0-9_.-]+|/Users/[A-Za-z0-9_.-]+|[A-Z]:\\Users\\")
+PORTABLE = ("CLAUDE.md", "README.md", "pyproject.toml", ".agent/spec.md")
+PORTABLE_DIRS = (".claude/", ".github/", "src/", "examples/", "docs/", "skills/")
+SUPPRESSION = re.compile(r"#\s*(noqa(?::\s*[A-Z0-9, ]+)?|type:\s*ignore(?:\[[^\]]*\])?)(.*)$")
+
+
+def tracked(root: pathlib.Path) -> list[str]:
+    out = subprocess.run(["git", "ls-files", "-z"], cwd=root, check=True, capture_output=True)
+    return [name for name in out.stdout.decode().split("\0") if name]
+
+
+def frontmatter(root: pathlib.Path, files: list[str]) -> list[str]:
+    bad: list[str] = []
+    for name in files:
+        if not re.fullmatch(r"\.claude/(rules|agents)/[^/]+\.md", name):
+            continue
+        text = (root / name).read_text(encoding="utf-8")
+        if not text.startswith("---\n"):
+            continue
+        end = text.find("\n---\n", 4)
+        if end < 0:
+            bad.append(f"{name}: frontmatter never closes")
+            continue
+        for number, line in enumerate(text[4:end].splitlines(), 2):
+            item = re.fullmatch(r"\s+-\s+(.*)", line)
+            pair = re.fullmatch(r"([A-Za-z_][\w-]*):\s*(.*)", line)
+            if item:
+                value = item.group(1)
+                if not (value.startswith('"') and value.endswith('"') and len(value) > 1):
+                    bad.append(f"{name}:{number}: unquoted glob {value}")
+                    continue
+                pattern = value[1:-1]
+                if not any(fnmatch.fnmatchcase(path, pattern) for path in files):
+                    bad.append(f"{name}:{number}: glob matches no tracked file: {pattern}")
+            elif pair:
+                value = pair.group(2)
+                if value.startswith(SPECIAL) and not (value.startswith('"') and value.endswith('"')):
+                    bad.append(f"{name}:{number}: unquoted scalar {value[:40]}")
+            elif line.strip():
+                bad.append(f"{name}:{number}: unparsed frontmatter line {line[:40]}")
+    return bad
+
+
+def imports(root: pathlib.Path, files: list[str]) -> list[str]:
+    lines = (root / "CLAUDE.md").read_text(encoding="utf-8").splitlines()
+    return [
+        f"CLAUDE.md:{number}: @{line[1:]} is not a tracked file"
+        for number, line in enumerate(lines, 1)
+        if line.startswith("@") and line[1:].strip() not in files
+    ]
+
+
+def settings(_root: pathlib.Path, files: list[str]) -> list[str]:
+    return [f"{name}: a tracked project settings file" for name in files if name == ".claude/settings.json"]
+
+
+def symlinks(root: pathlib.Path, files: list[str]) -> list[str]:
+    return [
+        f"{name}: dangling symbolic link"
+        for name in files
+        if os.path.islink(root / name) and not os.path.exists(root / name)
+    ]
+
+
+def portable(root: pathlib.Path, files: list[str]) -> list[str]:
+    bad: list[str] = []
+    for name in files:
+        if not (name in PORTABLE or name.startswith(PORTABLE_DIRS)) or os.path.islink(root / name):
+            continue
+        try:
+            text = (root / name).read_text(encoding="utf-8")
+        except (UnicodeDecodeError, IsADirectoryError):
+            continue
+        for number, line in enumerate(text.splitlines(), 1):
+            found = MACHINE.search(line)
+            if found:
+                bad.append(f"{name}:{number}: machine path {found.group(0)}")
+    return bad
+
+
+def _commented(lines: list[str], index: int) -> bool:
+    """A comment block heads the run of non-blank lines holding `lines[index]`."""
+    for line in reversed(lines[:index]):
+        if not line.strip():
+            return False
+        if line.strip().startswith("#"):
+            return True
+    return False
+
+
+def reasons(root: pathlib.Path, files: list[str]) -> list[str]:
+    bad: list[str] = []
+    for name in files:
+        if not (name.startswith(("src/", "examples/")) and name.endswith(".py")) or "/paste-in/" in name:
+            continue
+        lines = (root / name).read_text(encoding="utf-8").splitlines()
+        for number, line in enumerate(lines, 1):
+            found = SUPPRESSION.search(line)
+            if not found or found.group(2).strip(" —-:#"):
+                continue
+            if not _commented(lines, number - 1):
+                bad.append(f"{name}:{number}: {found.group(1)} without a reason")
+    return bad
+
+
+CHECKS = {
+    "frontmatter": frontmatter,
+    "imports": imports,
+    "settings": settings,
+    "symlinks": symlinks,
+    "portable": portable,
+    "reasons": reasons,
+}
+PLANTS = {
+    "frontmatter": (".claude/rules/zz-seed.md", "---\npaths:\n  - no-such-file\n---\n\n# seed\n"),
+    "imports": ("CLAUDE.md", "@.agent/no-such-file.md\n"),
+    "settings": (".claude/settings.json", "{}\n"),
+    "symlinks": ("docs/zz-seed-link", None),
+    "portable": ("docs/zz-seed.md", "Run /home/someone/bin/tool here.\n"),
+    "reasons": ("src/zz_seed.py", "import os  # noqa: F401\n"),
+}
+
+
+def census(root: pathlib.Path) -> dict[str, list[str]]:
+    files = tracked(root)
+    return {name: check(root, files) for name, check in CHECKS.items()}
+
+
+def self_test(root: pathlib.Path) -> int:
+    failures = 0
+    for name, (path, text) in PLANTS.items():
+        with tempfile.TemporaryDirectory() as scratch:
+            copy = pathlib.Path(scratch) / "tree"
+            subprocess.run(["git", "clone", "-q", "--no-hardlinks", str(root), str(copy)], check=True)
+            target = copy / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if text is None:
+                target.symlink_to("no-such-target")
+            elif path == "CLAUDE.md":
+                target.write_text(target.read_text(encoding="utf-8") + text, encoding="utf-8")
+            else:
+                target.write_text(text, encoding="utf-8")
+            subprocess.run(["git", "add", "-f", path], cwd=copy, check=True)
+            fired = {check: bool(found) for check, found in census(copy).items()}
+            ok = fired[name] and not any(other for check, other in fired.items() if check != name)
+            failures += not ok
+            print(f"SELF-TEST {name}: {'fires alone' if ok else f'WRONG {fired}'}")
+    return 1 if failures else 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser.add_argument("--root", type=pathlib.Path, default=pathlib.Path(__file__).resolve().parents[1])
+    parser.add_argument("--self-test", action="store_true")
+    args = parser.parse_args()
+    if args.self_test:
+        return self_test(args.root)
+    found = census(args.root)
+    for name, violations in found.items():
+        for violation in violations:
+            print(f"{name.upper()}: {violation}")
+        print(f"{name}: {len(violations)} violation(s)")
+    return 1 if any(found.values()) else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
