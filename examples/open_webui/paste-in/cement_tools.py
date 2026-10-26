@@ -18,8 +18,8 @@ from pydantic import BaseModel, Field
 # The embedded source keeps its own line breaks; one of its pragma comments runs past 100
 # columns inside the string, where ruff reads no pragma.
 # ruff: noqa: E501
-_CEMENT_PACKAGE = "_cement_runtime_b98250737ce48c70"
-_CEMENT_DIGEST = "b98250737ce48c705abbfeb9a02b9db1e5929d48a3f0270a32324556c1560149"
+_CEMENT_PACKAGE = "_cement_runtime_5c0613d0da56051a"
+_CEMENT_DIGEST = "5c0613d0da56051ae9eddd4e3ce2e17a148a4ef5854fe21b8f8d2195f8b91401"
 _CEMENT_SOURCES = {
     "__init__": r'''
 """Cement public API."""
@@ -11580,6 +11580,7 @@ class System:
         promote_work: list[JSONValue] = []
         promote_blocked: str | None = None
         prospective: str | None = None
+        members = 0
         try:
             plan = self._function_promotion_plan(
                 connection, partition=partition, operation=operation, projections=current
@@ -11588,6 +11589,7 @@ class System:
             promote_blocked = str(exc)
         else:
             prospective = plan.manifest.function_hash
+            members = len(plan.manifest.entries)
             promote_work = [
                 entry.artifact_id
                 for entry in plan.manifest.entries
@@ -11605,8 +11607,11 @@ class System:
             "prospective_function_hash": prospective,
             "live_function_hash": None if live is None else str(live["function_hash"]),
         }
+        # A revoked or suspended member leaves the live version failing while every remaining
+        # member is retained: no candidate, yet a publication of the smaller set restores serving.
+        republish = live is not None and members > 0 and prospective != work["live_function_hash"]
         unfinished = any(
-            (merge_work, compile_work, drafts, promote_work, promote_blocked is not None)
+            (merge_work, compile_work, drafts, promote_work, promote_blocked is not None, republish)
         )
         return work, unfinished
 

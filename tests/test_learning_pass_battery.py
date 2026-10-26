@@ -491,6 +491,36 @@ class LearningCasesBattery(_Ledger):
         resumed = self.system.learning_cases(P, OP)["work"]
         self.assertEqual((resumed["merge_key_hashes"], resumed["compile_key_hashes"]), ([], [canonicalize(DOC).digest]))
 
+    def test_lp2h_a_revocation_that_needs_only_a_smaller_republication_keeps_the_pass_open(
+        self,
+    ) -> None:
+        # Every remaining member is retained (no candidate), yet the live version fails: only a
+        # publication of the smaller set restores `follow`, so the work list must stay open.
+        from cement_runtime.learning import publish
+
+        examples: dict[str, list[str]] = {}
+        for key in ("removed", "retained"):
+            examples[key] = []
+            for _ in range(2):
+                review = self.system.review(
+                    P, self._submit(key, key.upper()), reviewer="learning-pass", decision="accept"
+                )
+                examples[key].append(str(review.example_id))
+        self.assertTrue(publish(self.system, P, OP).published)
+        self.system.set_switch(P, OP, mode="follow", actor="person")
+        self.assertTrue(self.system.learning_cases(P, OP)["nothing_to_learn"])
+        self.system.revoke_example(P, examples["removed"][0], revoked_by="learning-pass", reason="r")
+        self.assertFalse(self.system.resolve(P, OP, "retained").verification.passed)
+        view = self.system.learning_cases(P, OP)
+        self.assertEqual(view["work"]["promote_artifact_ids"], [])
+        self.assertNotEqual(
+            view["work"]["prospective_function_hash"], view["work"]["live_function_hash"]
+        )
+        self.assertFalse(view["nothing_to_learn"])
+        self.assertTrue(publish(self.system, P, OP).published)
+        self.assertTrue(self.system.resolve(P, OP, "retained").match.matched)
+        self.assertTrue(self.system.learning_cases(P, OP)["nothing_to_learn"])
+
     def test_lp2g_one_snapshot_reconstructs_the_build_current_cases_once(self) -> None:
         self._confirm(NARROW)
         self._confirm(NARROW)
