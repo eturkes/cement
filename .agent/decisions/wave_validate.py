@@ -653,11 +653,14 @@ class ColumnTables(SimpleNamespace):
                 differs = row.get("differs")
                 if isinstance(differs, str) and differs not in self.DIFFERS:
                     problems.append(f"{identifier}.differs: must be one of {self.DIFFERS}")
-        seeded = {
-            "probes": len(self.PROBE_SUBJECTS),
-            "review": len(self.REVIEW_SUBJECTS),
-            "mutants": len(self.MUTANT_SUBJECTS),
+        subjects = {
+            "probes": self.PROBE_SUBJECTS,
+            "review": self.REVIEW_SUBJECTS,
+            "mutants": self.MUTANT_SUBJECTS,
         }[kind]
+        seeded = len(subjects)
+        missing = {identifier for identifier, _, _ in subjects} - seen
+        problems.extend(f"missing seeded id {identifier}" for identifier in sorted(missing))
         for problem in problems:
             self._fail(problem)
         print(f"KIND: {kind}")
