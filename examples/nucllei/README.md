@@ -57,7 +57,7 @@ switch of a new operation starts off. A version answers only while the switch se
 
 - The sandbox gives the command no chat ID or message ID. A regenerated reply therefore looks
   up the same input again. `record` accepts one record for each ticket. The learning work list
-  marks an answer as a suspected regeneration when the same input came in less than 10 minutes
+  marks an answer as a suspected regeneration when the same input came in 10 minutes or less
   earlier. The `cement-learn` skill rejects that answer, and the check that asks for a learning
   pass ignores it.
 - The model runs the switch command when the user asks for it. The `cement-switch` skill has an

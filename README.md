@@ -350,7 +350,7 @@ uv run cement --db demo.db --partition acme proposal submit support.reply --subm
 ```
 
 One frame carries every field at its maximum size. Separate flags cannot, because the operating system
-refuses an argument list above 131,071 bytes, and only one flag can read standard input. Inline text is
+refuses any one argument above 131,071 bytes, and only one flag can read standard input. Inline text is
 also visible to observers on the same host, because it enters the argument list of the process.
 Prefer `-` for a candidate you must protect.
 
@@ -544,8 +544,9 @@ plaintext inputs and answers. Classify it with the ledger, and expire it with `r
 ### Retention and erasure
 
 A retained answer stays in the ledger until you delete it. Two commands delete rows. Each one
-writes in one transaction, and each write overwrites any space that it frees, so deleted rows leave
-the ledger file.
+deletes in two transactions, one for each file: first the shadow file, then the ledger. If the
+second transaction fails, run the command again, and it completes the ledger side. Each write
+overwrites any space that it frees, so deleted rows leave the file.
 
 `retention prune` deletes the partition's proposals that are older than an age and that no example
 uses:
@@ -607,8 +608,9 @@ Put every fact that can change the answer into the JSON input, including identit
 permissions, time, external-state revision, and policy revision. Cement cannot compile hidden context
 safely.
 
-The `System` methods group by purpose. Each write runs in one transaction and writes one event; a
-refusal writes nothing:
+Each write runs in one transaction. Most writes record one event, and `compile` records one for each
+draft that it creates. A refusal before the commit writes nothing. A write can also fail after its
+commit, as `submit_proposal` below describes. The `System` methods group by purpose:
 
 | Purpose | Methods |
 |---|---|
@@ -678,9 +680,10 @@ candidate. `propose` raises `StateError` when no candidate source is configured.
 `CandidateSourceError` when the source fails or returns an unusable candidate. That error carries no
 detail from the source. Both methods raise `NotFoundError` when the partition holds no such
 operation. `propose` also raises `StateError` when the operation revision changes during generation,
-because it captures the revision before it calls the source. `submit_proposal` captures no revision.
-It binds whatever revision is current under its own write lock, so a concurrent revision change
-cannot make it fail.
+because it captures the revision before it calls the source. Without `expected_revision`,
+`submit_proposal` captures no revision: it binds whatever revision is current under its own write
+lock, so a concurrent revision change cannot make it fail. With `expected_revision`, a different
+current revision refuses it, as the next paragraphs describe.
 
 A failure before the commit writes nothing. One window is different. If the database commit succeeds
 and then fails, Cement raises `StateError` and returns no identifier, but the proposal and its event

@@ -24,9 +24,11 @@ export CEMENT_DB=/path/to/ledger.db CEMENT_PARTITION=tenant_a OP=extraction_plan
 ```
 
 Every command prints JSON. Exit code 0 means success. Any other exit code is a refusal. A
-refusal with exit 2 or 3 wrote nothing: fix the command or the id, then run it again. A refusal
-with exit 4 means that the ledger state does not allow the step: run `cement learn cases` again
-and continue from what it shows. Stop and report any other code. The workflow reference
+refusal with exit 2 or 3 names a command or an id to fix. `learn merge` and `learn publish`
+write step by step, so their refusal can follow writes that committed: after any refusal of
+theirs, run `cement learn cases` again and continue from what it shows. A refusal with exit 4
+means that the ledger state does not allow the step: run `cement learn cases` again and continue
+from what it shows. Stop and report any other code. The workflow reference
 (`references/workflow.md`) explains each code.
 
 ## Steps

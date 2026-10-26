@@ -85,7 +85,8 @@
   mechanism is lifecycle containment for the trusted adapter, not a hostile-code sandbox. The outer
   watchdog covers unexpected supervisor exit for the shared process group. A cgroup/container is
   necessary to contain detached descendants across simultaneous supervisor/watchdog failure or OOM.
-- `retention prune` and `partition erase` delete rows in one transaction each. Each write connection
+- `retention prune` and `partition erase` delete rows in two transactions each: the shadow file
+  first, then the ledger; a rerun completes a ledger side that failed. Each write connection
   runs SQLite `secure_delete`, so deleted bytes leave the ledger file. Backups, snapshots, disk
   blocks of a rollback journal, and the `-wal` file of a ledger that an operator switched to
   WAL mode are outside that control. An erasure keeps one record with an unkeyed digest of the

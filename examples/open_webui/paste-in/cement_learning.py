@@ -13022,8 +13022,9 @@ class Tools:
     ) -> dict:
         """
         Publish a new function version: store the derived projection program (when projectable),
-        compile the confirmed cases, verify them and promote the verified set. A version never
-        answers until a person switches it on.
+        compile the confirmed cases, verify them and promote the verified set. The switch decides
+        what answers: under `off` nothing, under `follow` this new version at once, and a pinned
+        switch keeps its version.
         :param operation: The Cement operation.
         :param projectable: The value that you passed to learn_cases.
         """
