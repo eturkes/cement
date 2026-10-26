@@ -24,8 +24,8 @@ from pydantic import BaseModel, Field
 # The embedded source keeps its own line breaks; one of its pragma comments runs past 100
 # columns inside the string, where ruff reads no pragma.
 # ruff: noqa: E501
-_CEMENT_PACKAGE = "_cement_runtime_27959c08e2d8dc8f"
-_CEMENT_DIGEST = "27959c08e2d8dc8f949c0ba7a7ecff4020a481c9de7780215aeff61142056ab3"
+_CEMENT_PACKAGE = "_cement_runtime_98c46f63d62c7345"
+_CEMENT_DIGEST = "98c46f63d62c7345841c4b95a708f5c764a46498cdeec1d862b6c8f500973183"
 _CEMENT_SOURCES = {
     "__init__": r'''
 """Cement public API."""
@@ -3995,11 +3995,15 @@ def verify_signature(
         raise ValidationError("signature and allowed signers must be text")
     if type(namespace) is not str or not namespace:
         raise ValidationError("namespace must be non-empty text")
+    try:
+        expected_namespace = namespace.encode("utf-8")
+    except UnicodeEncodeError:  # a lone surrogate: text that no signature can carry
+        raise ValidationError("namespace must be valid Unicode text") from None
     if signer is not None and (type(signer) is not str or not signer):
         raise ValidationError("signer must be non-empty text")
     signers = _read_allowed_signers(allowed_signers)
     envelope = _read_sshsig(signature)
-    if envelope.namespace != namespace.encode("utf-8"):
+    if envelope.namespace != expected_namespace:
         raise IntegrityError(
             f"signature namespace is {_shown(envelope.namespace)}, expected {namespace}"
         )

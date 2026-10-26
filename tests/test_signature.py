@@ -335,6 +335,7 @@ class EnvelopeTests(unittest.TestCase):
             ("bytes signature", lambda: verify_signature(b"d", armored.encode(), allowed, namespace="n"), "^signature and allowed signers must be text$"),  # type: ignore[arg-type]
             ("empty namespace", lambda: verify_signature(b"d", armored, allowed, namespace=""), "^namespace must be non-empty text$"),
             ("empty signer", lambda: verify_signature(b"d", armored, allowed, namespace="n", signer=""), "^signer must be non-empty text$"),
+            ("lone surrogate namespace", lambda: verify_signature(b"d", armored, allowed, namespace="\ud800"), "^namespace must be valid Unicode text$"),
         ):
             with self.subTest(case=name), self.assertRaisesRegex(ValidationError, pattern):
                 call()

@@ -350,11 +350,15 @@ def verify_signature(
         raise ValidationError("signature and allowed signers must be text")
     if type(namespace) is not str or not namespace:
         raise ValidationError("namespace must be non-empty text")
+    try:
+        expected_namespace = namespace.encode("utf-8")
+    except UnicodeEncodeError:  # a lone surrogate: text that no signature can carry
+        raise ValidationError("namespace must be valid Unicode text") from None
     if signer is not None and (type(signer) is not str or not signer):
         raise ValidationError("signer must be non-empty text")
     signers = _read_allowed_signers(allowed_signers)
     envelope = _read_sshsig(signature)
-    if envelope.namespace != namespace.encode("utf-8"):
+    if envelope.namespace != expected_namespace:
         raise IntegrityError(
             f"signature namespace is {_shown(envelope.namespace)}, expected {namespace}"
         )
