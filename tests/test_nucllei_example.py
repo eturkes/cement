@@ -619,6 +619,21 @@ class HandOverBattery(_Jail):
                 self.assertRegex(text, rf"/ext/bin/cement {command} .*--output-file /workspace/\.cement/in/")
 
 
+class ReadListingBattery(_Jail):
+    def test_the_version_listing_escapes_characters_a_terminal_hides(self) -> None:
+        # A user reads `read` before switching a version on: a right-to-left override or a
+        # zero-width character inside a retained answer must show as its escape.
+        self.use()
+        hidden = {"fields": [{"name": "dose\u202e01", "label": "Patient\u200b"}]}
+        self.publish(NOTE_A, output=hidden)
+        status, text = self.run_cement("read", OP)
+        self.assertEqual(status, 0, text)
+        self.assertIn("dose\\u202e01", text)
+        self.assertIn("Patient\\u200b", text)
+        self.assertNotIn("\u202e", text)
+        self.assertNotIn("\u200b", text)
+
+
 class SwitchBattery(_Jail):
     def two_versions(self) -> None:
         self.use()

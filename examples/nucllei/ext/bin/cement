@@ -21,6 +21,7 @@ import re
 import secrets
 import sys
 import time
+import unicodedata
 from collections.abc import Callable
 from typing import Any, NoReturn
 
@@ -12884,6 +12885,23 @@ def _json(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, indent=2)
 
 
+def _visible(value: object) -> str:
+    """One line of JSON with each control, format (bidi, zero-width) or separator character as its
+    escape: the version a user reads before switching it on shows the bytes that answer (as the
+    core CLI's `function read`); Japanese and every other visible text stays as written."""
+
+    def escape(character: str) -> str:
+        units = character.encode("utf-16-be")
+        return "".join(f"\\u{units[at] << 8 | units[at + 1]:04x}" for at in range(0, len(units), 2))
+
+    return "".join(
+        escape(character)
+        if unicodedata.category(character) in {"Cc", "Cf", "Zl", "Zp"}
+        else character
+        for character in json.dumps(value, ensure_ascii=False)
+    )
+
+
 def _same(left: object, right: object) -> bool:
     return canonicalize(left).digest == canonicalize(right).digest
 
@@ -13498,8 +13516,8 @@ def _read_version(args: argparse.Namespace) -> int:
     for index, entry in enumerate(document.entries, start=1):
         lines += [
             f"場合 {index}:",
-            f"  入力{keyed}: {json.dumps(entry.input.value, ensure_ascii=False)}",
-            f"  出力: {json.dumps(entry.output.value, ensure_ascii=False)}",
+            f"  入力{keyed}: {_visible(entry.input.value)}",
+            f"  出力: {_visible(entry.output.value)}",
         ]
     _say(*lines)
     return 0
