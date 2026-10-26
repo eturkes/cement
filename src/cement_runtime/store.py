@@ -574,7 +574,7 @@ def _expected_schema() -> dict[tuple[str, str], str]:
     return _EXPECTED_SCHEMA
 
 
-class _ReadOnlyViolation(CementError):  # noqa: N818 — a private signal, never raised to callers
+class _ReadOnlyViolation(CementError):  # noqa: N818 — private: only a read block that writes (a bug)
     """A write reached the read-only ledger capability."""
 
 
@@ -705,9 +705,10 @@ class Store:
     def __init__(self, path: str | os.PathLike[str], *, create: bool = True) -> None:
         """Open the ledger at ``path``; ``create=False`` opens an EXISTING ledger only.
 
-        An existing-only open never creates or writes: a missing ledger raises
-        ``IntegrityError`` before any connection exists, and validation runs on the read-only
-        connection. ``create=True`` creates and initializes a missing ledger.
+        An existing-only open never creates or writes: a missing ledger (its directory present)
+        raises ``IntegrityError`` and an invalid path (a directory, a symbolic link, a missing
+        parent) raises ``ValidationError``, both before any connection exists; validation runs on
+        the read-only connection. ``create=True`` creates and initializes a missing ledger.
         """
 
         if type(create) is not bool:

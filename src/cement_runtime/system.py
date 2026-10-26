@@ -4113,8 +4113,9 @@ class System:
         One read snapshot holds the switch, the served version and its checks, so a writer
         committing in between changes the next call, never this one. ``off`` runs no
         verification and answers nothing. ``follow`` runs the full set verification over the
-        live promoted set on a cold call (it costs what ``verify_function`` costs: ~36.5 s and
-        ~963 MiB at 50,000 entries, ``.agent/decisions/m3u2b-resolve-bench.json``). ``pinned``
+        live promoted set on a cold call, the cost of ``verify_function`` (measured in exact
+        mode before the seventh check and the serving cache existed: ~36.5 s and ~963 MiB at
+        50,000 entries, ``.agent/decisions/m3u2b-resolve-bench.json``). ``pinned``
         rebuilds the pinned receipt and checks that no explicit negative judgment (revoked
         evidence, a suspended member, a counterexample) has reached it since. Arguments are
         validated first, so a rejected call reads no ledger. This call writes nothing; a later
@@ -7539,7 +7540,7 @@ class System:
         _bounded_int(limit, "limit", minimum=1, maximum=10_000)
         with self.store.transaction() as connection:
             # Events deliberately avoid indexing private inputs. Subjects for
-            # operations carry a partition prefix; other records are joined.
+            # operations carry a partition prefix; every event row keeps its own partition.
             rows = connection.execute(
                 """
                 SELECT * FROM events

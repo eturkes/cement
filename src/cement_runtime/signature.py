@@ -106,8 +106,9 @@ def _ed25519_verify(public: bytes, message: bytes, signature: bytes) -> bool:
     s = int.from_bytes(signature[32:], "little")
     if s >= _L:
         return False
-    # Small-order and mixed-order keys satisfy only the cofactored equation; an honest key [a]B
-    # has prime order, so refusing them never refuses an ssh-keygen signature.
+    # A small-order key lets one signature verify many messages (the identity key accepts any
+    # R = [S]B), and a mixed-order key makes cofactored and cofactorless verifiers disagree; an
+    # honest key [a]B has prime order L, so refusing both never refuses an ssh-keygen signature.
     if _equal(_multiply(8, key), _IDENTITY) or not _equal(_multiply(_L, key), _IDENTITY):
         return False
     k = int.from_bytes(hashlib.sha512(signature[:32] + public + message).digest(), "little") % _L

@@ -242,8 +242,9 @@ def publish(
     """Publish a new version: set the derived projection program (when projectable), compile,
     verify the drafts and promote the verified set. The switch stays as it is: ``off`` answers
     nothing, ``follow`` serves the new version at once, ``pinned`` keeps its version. A failing
-    step raises; a rerun repeats the earlier steps without new rows
-    (an identical program is a no-op, compile lists existing drafts as ``existing``)."""
+    step raises; a rerun sets no new program and compiles no new draft (an identical program is
+    a no-op, compile lists existing drafts as ``existing``), but each draft it verifies again
+    records one more report and event."""
 
     layouts: tuple[str, ...] = ()
     projection = None

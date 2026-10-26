@@ -29,8 +29,8 @@ from typing import Any, NoReturn
 # The embedded source keeps its own line breaks; one of its pragma comments runs past 100
 # columns inside the string, where ruff reads no pragma.
 # ruff: noqa: E501
-_CEMENT_PACKAGE = "_cement_runtime_98c46f63d62c7345"
-_CEMENT_DIGEST = "98c46f63d62c7345841c4b95a708f5c764a46498cdeec1d862b6c8f500973183"
+_CEMENT_PACKAGE = "_cement_runtime_7c354d67c657809f"
+_CEMENT_DIGEST = "7c354d67c657809f3bbea06c03dbbe70427a306847a136313e0e6198e0b24852"
 _CEMENT_SOURCES = {
     "__init__": r'''
 """Cement public API."""
@@ -307,7 +307,8 @@ def build_digest(
 """`cement-comparator-v1`: when an LLM's shadow answer agrees with a function's answer.
 
 Contract: `.agent/decisions/p136-cmp-contract.md`. A comparator is a closed list of rules the
-learning pass writes; Cement interprets it, evaluates nothing, and walks each value once. Every
+learning pass writes; Cement interprets it and evaluates nothing. It walks each value once, except
+that an `unordered` rule re-encodes its items to order them, one more pass per nested level. Every
 field no rule names compares exactly, and no comparator at all means canonical JSON equality.
 Decimal quantities compare as scaled integers, so no rounding context enters a verdict. Text rules
 are explicit tables, never the interpreter's Unicode data: Python 3.12-3.15 ship different Unicode
@@ -695,7 +696,9 @@ class NotFoundError(CementError, LookupError):
 
 
 class ConflictError(CementError):
-    """A unique identity was reused for different immutable content."""
+    """A write conflicts with the ledger's current state: an identity already in use (a source id,
+    an observation id) or a hash or plan that changed after the caller read it. Re-read the
+    state; this is the one class where a retry is the intended recovery (CLI exit 4)."""
 
 
 class StateError(CementError):
@@ -1592,8 +1595,9 @@ def publish(
     """Publish a new version: set the derived projection program (when projectable), compile,
     verify the drafts and promote the verified set. The switch stays as it is: ``off`` answers
     nothing, ``follow`` serves the new version at once, ``pinned`` keeps its version. A failing
-    step raises; a rerun repeats the earlier steps without new rows
-    (an identical program is a no-op, compile lists existing drafts as ``existing``)."""
+    step raises; a rerun sets no new program and compiles no new draft (an identical program is
+    a no-op, compile lists existing drafts as ``existing``), but each draft it verifies again
+    records one more report and event."""
 
     layouts: tuple[str, ...] = ()
     projection = None
@@ -1637,7 +1641,8 @@ def publish(
     return replace(report, published=True, reason=None, promotion=promotion)
 ''',
     "models": r'''
-"""Small immutable public values; all effectful behavior lives in ``System``."""
+"""Public value types — frozen dataclasses, and the plain-dict records (``TypedDict``) that
+inspection methods return; all effectful behavior lives in ``System``."""
 
 from __future__ import annotations
 
@@ -3595,7 +3600,8 @@ def observations(
     after_sequence: int = 0,
     limit: int = 100,
 ) -> list[ObservationRecord]:
-    """One page of observations in sequence order, every stored field included."""
+    """One page of observations in sequence order: both answers, the model, the prompt revision,
+    the timing and the verdict; the captured artifact hash and comparator stay in the file."""
 
     partition, operation = _scope(partition, operation)
     if state is not None and state not in STATES:
@@ -3756,8 +3762,9 @@ def _ed25519_verify(public: bytes, message: bytes, signature: bytes) -> bool:
     s = int.from_bytes(signature[32:], "little")
     if s >= _L:
         return False
-    # Small-order and mixed-order keys satisfy only the cofactored equation; an honest key [a]B
-    # has prime order, so refusing them never refuses an ssh-keygen signature.
+    # A small-order key lets one signature verify many messages (the identity key accepts any
+    # R = [S]B), and a mixed-order key makes cofactored and cofactorless verifiers disagree; an
+    # honest key [a]B has prime order L, so refusing both never refuses an ssh-keygen signature.
     if _equal(_multiply(8, key), _IDENTITY) or not _equal(_multiply(_L, key), _IDENTITY):
         return False
     k = int.from_bytes(hashlib.sha512(signature[:32] + public + message).digest(), "little") % _L
@@ -4631,7 +4638,7 @@ def _expected_schema() -> dict[tuple[str, str], str]:
     return _EXPECTED_SCHEMA
 
 
-class _ReadOnlyViolation(CementError):  # noqa: N818 — a private signal, never raised to callers
+class _ReadOnlyViolation(CementError):  # noqa: N818 — private: only a read block that writes (a bug)
     """A write reached the read-only ledger capability."""
 
 
@@ -4762,9 +4769,10 @@ class Store:
     def __init__(self, path: str | os.PathLike[str], *, create: bool = True) -> None:
         """Open the ledger at ``path``; ``create=False`` opens an EXISTING ledger only.
 
-        An existing-only open never creates or writes: a missing ledger raises
-        ``IntegrityError`` before any connection exists, and validation runs on the read-only
-        connection. ``create=True`` creates and initializes a missing ledger.
+        An existing-only open never creates or writes: a missing ledger (its directory present)
+        raises ``IntegrityError`` and an invalid path (a directory, a symbolic link, a missing
+        parent) raises ``ValidationError``, both before any connection exists; validation runs on
+        the read-only connection. ``create=True`` creates and initializes a missing ledger.
         """
 
         if type(create) is not bool:
@@ -9058,8 +9066,9 @@ class System:
         One read snapshot holds the switch, the served version and its checks, so a writer
         committing in between changes the next call, never this one. ``off`` runs no
         verification and answers nothing. ``follow`` runs the full set verification over the
-        live promoted set on a cold call (it costs what ``verify_function`` costs: ~36.5 s and
-        ~963 MiB at 50,000 entries, ``.agent/decisions/m3u2b-resolve-bench.json``). ``pinned``
+        live promoted set on a cold call, the cost of ``verify_function`` (measured in exact
+        mode before the seventh check and the serving cache existed: ~36.5 s and ~963 MiB at
+        50,000 entries, ``.agent/decisions/m3u2b-resolve-bench.json``). ``pinned``
         rebuilds the pinned receipt and checks that no explicit negative judgment (revoked
         evidence, a suspended member, a counterexample) has reached it since. Arguments are
         validated first, so a rejected call reads no ledger. This call writes nothing; a later
@@ -12484,7 +12493,7 @@ class System:
         _bounded_int(limit, "limit", minimum=1, maximum=10_000)
         with self.store.transaction() as connection:
             # Events deliberately avoid indexing private inputs. Subjects for
-            # operations carry a partition prefix; other records are joined.
+            # operations carry a partition prefix; every event row keeps its own partition.
             rows = connection.execute(
                 """
                 SELECT * FROM events

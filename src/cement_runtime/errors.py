@@ -14,7 +14,9 @@ class NotFoundError(CementError, LookupError):
 
 
 class ConflictError(CementError):
-    """A unique identity was reused for different immutable content."""
+    """A write conflicts with the ledger's current state: an identity already in use (a source id,
+    an observation id) or a hash or plan that changed after the caller read it. Re-read the
+    state; this is the one class where a retry is the intended recovery (CLI exit 4)."""
 
 
 class StateError(CementError):

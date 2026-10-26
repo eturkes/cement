@@ -956,7 +956,7 @@ def _visible(text: str) -> str:
 
 _RULE_WORDS = {
     "ignore": "ignored",
-    "text": "equal as text, spaces and letter case aside",
+    "text": "equal as text, runs of spaces and ASCII letter case aside",
     "unordered": "the same items in any order",
 }
 

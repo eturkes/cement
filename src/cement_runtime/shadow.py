@@ -921,7 +921,8 @@ def observations(
     after_sequence: int = 0,
     limit: int = 100,
 ) -> list[ObservationRecord]:
-    """One page of observations in sequence order, every stored field included."""
+    """One page of observations in sequence order: both answers, the model, the prompt revision,
+    the timing and the verdict; the captured artifact hash and comparator stay in the file."""
 
     partition, operation = _scope(partition, operation)
     if state is not None and state not in STATES:

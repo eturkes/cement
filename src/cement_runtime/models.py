@@ -1,4 +1,5 @@
-"""Small immutable public values; all effectful behavior lives in ``System``."""
+"""Public value types — frozen dataclasses, and the plain-dict records (``TypedDict``) that
+inspection methods return; all effectful behavior lives in ``System``."""
 
 from __future__ import annotations
 

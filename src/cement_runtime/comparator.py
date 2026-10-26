@@ -1,7 +1,8 @@
 """`cement-comparator-v1`: when an LLM's shadow answer agrees with a function's answer.
 
 Contract: `.agent/decisions/p136-cmp-contract.md`. A comparator is a closed list of rules the
-learning pass writes; Cement interprets it, evaluates nothing, and walks each value once. Every
+learning pass writes; Cement interprets it and evaluates nothing. It walks each value once, except
+that an `unordered` rule re-encodes its items to order them, one more pass per nested level. Every
 field no rule names compares exactly, and no comparator at all means canonical JSON equality.
 Decimal quantities compare as scaled integers, so no rounding context enters a verdict. Text rules
 are explicit tables, never the interpreter's Unicode data: Python 3.12-3.15 ship different Unicode
