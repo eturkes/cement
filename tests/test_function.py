@@ -729,17 +729,9 @@ print(json.dumps({"function_hash": bundle.function_hash, "text": bundle.text}, s
         del bundle
         gc.collect()
 
-        repeated = FunctionEntry(
-            input=0,
-            output=0,
-            artifact_hash=provenance_hash,
-            evidence_snapshot_hash=provenance_hash,
-            entry_seal=provenance_hash,
-            report_details_hash=provenance_hash,
-            report_test_set_hash=provenance_hash,
-        )
-        with self.assertRaises(ValidationError):
-            _build(repeated for _ in range(FUNCTION_MAX_ENTRIES + 1))
+        # Distinct inputs: a repeated entry would raise as a duplicate even past a loosened cap.
+        with self.assertRaisesRegex(ValidationError, f"^function exceeds {FUNCTION_MAX_ENTRIES} entries$"):
+            _build(entries(FUNCTION_MAX_ENTRIES + 1))
 
     def test_real_artifact_round_trip_preserves_output_and_provenance(self) -> None:
         artifact = build_exact_lookup(
