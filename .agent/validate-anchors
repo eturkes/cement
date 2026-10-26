@@ -48,13 +48,17 @@ def main() -> int:
                          "\t".join(parts[2:]).strip()))
 
     bad = 0
-    cache: dict[pathlib.Path, list[str]] = {}
+    cache: dict[pathlib.Path, list[str] | OSError] = {args.report.resolve(): text.splitlines()}
     for at, path, line, fragment in rows:
         target = (root / path).resolve()
-        try:
-            lines = cache.setdefault(target, target.read_text(encoding="utf-8").splitlines())
-        except OSError as exc:
-            print(f"ANCHOR-BAD\treport:{at}\t{path}:{line}\tunreadable: {exc.strerror}")
+        if target not in cache:
+            try:
+                cache[target] = target.read_text(encoding="utf-8").splitlines()
+            except OSError as exc:
+                cache[target] = exc
+        lines = cache[target]
+        if isinstance(lines, OSError):
+            print(f"ANCHOR-BAD\treport:{at}\t{path}:{line}\tunreadable: {lines.strerror}")
             bad += 1
             continue
         if not line.isdecimal() or not 1 <= int(line) <= len(lines):

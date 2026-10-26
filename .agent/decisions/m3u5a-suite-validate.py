@@ -114,7 +114,8 @@ def emit_stub() -> str:
 def grade(path: pathlib.Path) -> int:
     rows = _rows()
     wanted = {row["id"]: _name(row) for row in rows}
-    tree = ast.parse(path.read_text(encoding="utf-8"))
+    source = path.read_text(encoding="utf-8")
+    tree = ast.parse(source)
 
     found: dict[str, ast.FunctionDef] = {}
     for node in ast.walk(tree):
@@ -125,8 +126,8 @@ def grade(path: pathlib.Path) -> int:
     unfilled: list[str] = []
     assertionless: list[str] = []
     for name, node in found.items():
-        source = ast.get_source_segment(path.read_text(encoding="utf-8"), node) or ""
-        if MARKER in source:
+        segment = ast.get_source_segment(source, node) or ""
+        if MARKER in segment:
             unfilled.append(by_name.get(name, name))
             continue
         if not has_assertion(node):
