@@ -23,6 +23,8 @@ const esc = (value) =>
 const short = (value, size = 12) =>
   value ? esc(String(value).slice(0, size)) + "\u2026" : "\u2014";
 const plural = (count, word) => `${count} ${count === 1 ? word : word === "entry" ? "entries" : word + "s"}`;
+/* What one function entry stands for: a kind of form, or one note when the words decide. */
+const coverage = (fn) => operationOf(fn.operation).keyed_on === "text" ? plural(fn.entries, "note") : `${plural(fn.entries, "kind")} of form`;
 
 function jsonHtml(value) {
   if (value === null || value === undefined) return "";
@@ -309,11 +311,13 @@ function taskStage() {
 function renderAction() {
   const s = taskStage();
   const billing = STATE.selected === "bill";
+  // An exact repeat of one note is a case like any other: once Learn seals it, it can switch on.
+  const billingLearned = STATE.functions.some((row) => row.operation === "document.billing_codes" && row.promoted);
   document.querySelectorAll("#how li").forEach((li) => {
     const n = Number(li.dataset.step);
     li.classList.toggle("now", n === s.step);
     li.classList.toggle("done", n < s.step || (n === 3 && s.on));
-    li.classList.toggle("blocked", billing && n === 3);
+    li.classList.toggle("blocked", billing && n === 3 && !billingLearned);
   });
   const button = (label, attr) => `<button class="button primary" ${attr} ${BUSY ? "disabled" : ""}>${label}</button>`;
   let html = "";
@@ -331,11 +335,11 @@ function renderFunctionsList() {
     if (!fn) {
       const never = operationOf(name).keyed_on === "text";
       return `<div class="fn-row muted"><span class="tool-icon" aria-hidden="true">ƒ</span><code>${esc(name)}</code>
-        <span class="fn-note ${never ? "never" : ""}">${never ? "never repeats" : "not learned yet"}</span></div>`;
+        <span class="fn-note ${never ? "never" : ""}">${never ? "decided by the note's words" : "not learned yet"}</span></div>`;
     }
     const on = isOn(name);
     return `<div class="fn-row"><span class="tool-icon" aria-hidden="true">ƒ</span><code>${esc(name)}</code>
-      <span class="fn-note">${plural(fn.entries, "kind")} of form</span>
+      <span class="fn-note">${coverage(fn)}</span>
       <button class="button small" data-read="${esc(name)}">Read</button>
       <button class="switch ${on ? "on" : ""}" data-switch="${esc(name)}" data-on="${on ? "" : "1"}" aria-pressed="${on}" aria-label="${on ? "Switch off" : "Switch on"} ${esc(name)}" ${BUSY ? "disabled" : ""}><span class="knob"></span></button></div>`;
   });
@@ -353,7 +357,12 @@ function renderFnView() {
   const rowsOf = METHOD[fn.operation][1];
   const lines = [`<span class="kw">function</span> ${esc(fn.operation)}(form):`];
   for (const entry of fn.source.entries) {
-    lines.push(`  <span class="kw">if</span> form is a ${esc(humanKey(entry.input.document_type || "form"))}:`);
+    /* A text-keyed entry matches one note's exact words, never every note of its type. */
+    const words = typeof entry.input.assessment === "string" ? entry.input.assessment.replace(/\s+/g, " ").trim() : null;
+    const kind = esc(humanKey(entry.input.document_type || "form"));
+    if (words === null) lines.push(`  <span class="kw">if</span> form is a ${kind}:`);
+    else lines.push(`  <span class="kw">if</span> form is a ${kind}`,
+      `     <span class="kw">and</span> its assessment reads exactly "${esc(words.length > 44 ? words.slice(0, 43) + "…" : words)}":`);
     const rows = rowsOf(entry.output || {});
     const scripts = (entry.originals || []).map((o) => ({ id: o.document_id, rows: rowsOf(o.provider_plan || {}).map(([k, v]) => k + "|" + v) }));
     const width = Math.max(...rows.map(([k]) => k.length));
@@ -366,7 +375,7 @@ function renderFnView() {
   }
   lines.push("  <span class=\"kw\">otherwise</span>:", "      ask the AI");
   $("fnview-title").textContent = METHOD[fn.operation][0];
-  $("fnview-sub").textContent = `readable rendering · ${plural(fn.entries, "kind")} of form · ${isOn(fn.operation) ? "on" : "off"}`;
+  $("fnview-sub").textContent = `readable rendering · ${coverage(fn)} · ${isOn(fn.operation) ? "on" : "off"}`;
   $("fnview-body").innerHTML = lines.join("\n");
 }
 
@@ -456,8 +465,8 @@ function renderTerminal() {
 
 function categoryStatus(category) {
   if (category.promoted) return ["promoted", "set"];
-  if (category.keyed_on === "text") return ["never repeats", "warn"];
   if (category.confirmations >= category.required) return ["ready to compile", "pass"];
+  if (category.keyed_on === "text") return ["no repeat yet", "warn"];
   return ["gathering evidence", "llm"];
 }
 
@@ -555,9 +564,9 @@ function unpromotedBody(fn) {
     .join("");
   const reason = fn.keyed_on === "text"
     ? `<div class="tiny dim" style="margin-top:9px">This operation is keyed on the
-       note's own words, and no second note repeats them. Every scope stays at one
-       confirmation, so the compiler blocks it forever and the model keeps answering.
-       That is the design, not a gap.</div>`
+       note's own words, which differ from note to note. A scope stays at one
+       confirmation until the same note comes back, so the compiler blocks it and the model
+       keeps answering. That is the design, not a gap.</div>`
     : `<div class="tiny dim" style="margin-top:9px">A draft is not a function.
        Promotion is a separate, explicit act.</div>`;
   const empty = drafts || blocked
@@ -887,7 +896,7 @@ const STORY = [
   { run: async () => { for (const id of ["q08", "q09", "q10", "q11"]) await send(id); await learnAll(); await switchAllOn(); }, beats: [
     { el: "#tally", title: "Two more jobs", text: () => `Learned and switched on the same way. AI ${STATE.stats.provider_calls}, function ${STATE.stats.cement_answers}.`, side: "bottom" } ] },
   { run: async () => { await send("q12"); await learnAll(); }, beats: [
-    { el: "#functions-list", title: "Never repeats", text: () => "Every note’s words differ, so Learn finds no repeat. Billing stays with the AI.", side: "top" } ] },
+    { el: "#functions-list", title: "No repeat", text: () => "Each note has its own words, so Learn finds no repeat. Billing stays with the AI.", side: "top" } ] },
   { beats: [
     { el: "#tally", title: "Done", text: () => `AI ${STATE.stats.provider_calls}, function ${STATE.stats.cement_answers}. Same replies.`, side: "bottom" },
     { el: "#tech", title: "For experts", text: () => "Real commands and evidence.", side: "top" } ] },

@@ -40,7 +40,7 @@ const JA = new Map(Object.entries({
   "The function": "関数",
   "Functions": "関数",
   "not learned yet": "未学習",
-  "never repeats": "繰り返しなし",
+  "decided by the note's words": "記録の文面で決まる",
   "Read": "読む",
   "answers written by the AI": "AIが書いた回答",
   "answers from a learned function": "学習済みの関数による回答",
@@ -95,8 +95,8 @@ const JA = new Map(Object.entries({
   "A new job reuses the function. Learn added a second one for its new part.":
     "新しい仕事がこの関数を再利用します。新しい部分のために、学習が2つ目の関数を追加しました。",
   "Two more jobs": "さらに2つの仕事",
-  "Never repeats": "繰り返しなし",
-  "Every note’s words differ, so Learn finds no repeat. Billing stays with the AI.":
+  "No repeat": "繰り返しなし",
+  "Each note has its own words, so Learn finds no repeat. Billing stays with the AI.":
     "記録ごとに文面が違うので、学習は繰り返しを見つけません。請求はAIが回答し続けます。",
   "Done": "完了",
   "For experts": "専門家向け",
@@ -109,7 +109,9 @@ const onOff = (state) => (state === "on" ? "オン" : "オフ");
 const PATTERNS = [
   [/^(Show|Hide) (\d+) earlier turns?$/, (verb, n) => `以前のやり取りを${n}件${verb === "Show" ? "表示" : "隠す"}`],
   [/^(\d+) kinds? of form$/, (n) => `${n}種類のフォーム`],
+  [/^(\d+) notes?$/, (n) => `${n}件の記録`],
   [/^readable rendering · (\d+) kinds? of form · (on|off)$/, (n, state) => `読みやすく書き直した表示 · ${n}種類のフォーム · ${onOff(state)}`],
+  [/^readable rendering · (\d+) notes? · (on|off)$/, (n, state) => `読みやすく書き直した表示 · ${n}件の記録 · ${onOff(state)}`],
   [/^Function (\d+)$/, (n) => `関数 ${n}`],
   [/^Switch (on|off) (\S+)$/, (state, name) => `${name} を${onOff(state)}にする`],
   [/^(.+): pick a request\.$/, (task) => `${TASKS[task] || task}: リクエストを選んでください。`],

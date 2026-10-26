@@ -56,7 +56,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.12 under `uv`.
   brand and the tool-call caption (owner-ruled at the queue run's close, p95).
   - Header = the `cement` brand + `Concept demo` beside the headline (p95). Strip = three icons `Ask` → `Learn` → `Switch on`, one word + a
     2-3 word sub each, doubling as the selected task's progress (done / now; billing strikes
-    `Switch on`).
+    `Switch on` while no billing function exists).
   - Band under the strip = one short line on what just happened + the next action: `Learn from
     chats` while answers are retained, `Switch on` for a learned function that is off; in the
     story `Leave the story`.
@@ -74,7 +74,7 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.12 under `uv`.
     `Reply`. The script = a way to handle a KIND of form in plain rows (`Patient name | "Patient:"
     line`), never a patient's values; chip amber `AI script` vs green `Function`. Below it
     `Functions` = one row per operation of the selected task: `ƒ <operation>`, `n kinds of form`,
-    `Read`, its own switch; `not learned yet` / billing `never repeats`. `Read` = the function
+    `Read`, its own switch; `not learned yet` / billing `decided by the note's words`. `Read` = the function
     alone as code (`if form is a <kind>:` rows … `otherwise: ask the AI`), each row tagged
     `shared` (in every merged script) or `from <request>` (only the scripts that needed it),
     computed from the entry's lineage — the union is how one function generalizes over
@@ -120,9 +120,11 @@ Env + gate = `.claude/rules/ops.md`; stdlib-only Python ≥3.12 under `uv`.
   is portrayed BOTH ways: the function card names its callers, and switching tasks lands on the
   same card. A turn's parts may split across a promoted function and the model; the bubble shows
   the function part's tool call and nothing for the model part. `document.billing_codes` is keyed on one note's ASSESSMENT TEXT, not the
-  layout, so no second note repeats the input, every scope stays at support 1, `compile` blocks
-  it, and it stays with the model BY DESIGN — the boundary is the claim, not a gap. The story cements
-  every cementable task.
+  layout, so two different notes never share an input: across notes every scope stays at support 1,
+  `compile` blocks it, and it stays with the model BY DESIGN — the boundary is the claim, not a gap.
+  The same note sent again IS an exact repeat, which Learn seals like any case (owner-ruled at the
+  code review: the runtime is right, the wording moves). The story sends each billing note once and
+  cements every cementable task.
 - Human-facing prose (README, `docs/`, example README, CLI help, this spec's `Intent`) = ASD-STE100 register, graded by D25 except `Intent` (ungraded, p75); everything else agent-optimized.
 - Gate tooling (owner-ruled; lands at a unit boundary; versions = latest release, pins → `.claude/rules/pins.md`): mypy `strict` over `src/cement_runtime` alone; ruff format + check, `extend-exclude = ["tests", ".agent", "prototype"]`; scanners = `uv audit` (native, OSV/SARIF) + gitleaks as ONE sha256-pinned binary the gate downloads into a gitignored tools dir, CI running that same gate command (owner: supersedes the gitleaks Action) + ruff `S` + zizmor (Actions + Dependabot) + ShellCheck (every tracked shell script), both owner-picked at the security review and pinned like gitleaks; mutation tool = cosmic-ray behind one committed command (p74; mutmut 3 = pytest-only + source trampolines this suite's source pins would see); `license = "Apache-2.0"`; CI = GitHub Actions + Dependabot (`uv` + `github-actions`), the full gate on the latest Python (3.15; D28's range from `99f260a`, p123) + the suite minus D28 on the Kimi target's Python (3.12), named as a split run; D28 = p78's verdict cache (green only, keyed on replayed tree id + interpreter + `uv.lock` digest; CI restores it through `actions/cache`). The gate-tooling unit also carries p66's standing skip census + p85's reason classes and p12/p40's register audit, owner-approved: all are gate changes that one boundary covers. Grounds + config → `.claude/rules/ops.md`; firing seeds + records → `.claude/rules/gate-checks.md`, its `paths:` extended to the new check files; checker + CI measurements → `.agent/decisions/m3u10-*`. `github.com/eturkes/cement` is PUBLIC ⇒ `push`/`pull_request` carry the gate, a cron alone is disabled after 60 idle days.
 - Supported Python (owner-ruled, MAINTAIN queue run 3): the latest CPython line + the Kimi target's line (LLENS = the nucllei jail, 3.12) — `requires-python >=3.12`; CI's full leg (D28) runs the latest, the split leg 3.12; the Open WebUI regimen runs 3.12; figure-verification targets the same Kimi system and follows Cement's versions. The paste-ins are not tested on a stock Open WebUI 0.12.3 image (Python 3.11). The JSON aliases `JSONValue` + `JSONScalar` = PEP 695 `type` statements (owner, p132: the more correct form; `UP040` enforced).

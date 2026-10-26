@@ -135,8 +135,9 @@ def _digest(value: JSONValue) -> str:
 
 # `keyed_on` is a reason, not a label: it names what the canonical input carries.
 # Four operations are decided by the LAYOUT, so their scopes repeat and they cement.
-# The fifth is decided by the note's own words, which no second visit repeats, so its
-# scopes never reach a second confirmation and the compiler blocks it forever.
+# The fifth is decided by the note's own words, which differ from note to note, so a scope
+# reaches a second confirmation only when the same note comes back; until then the compiler
+# blocks it.
 OPERATIONS: dict[str, dict[str, str]] = {
     "document.extraction_plan": {
         "label": "extraction plan",
@@ -1063,7 +1064,7 @@ class Session:
                     f"{len(document['signature']['structure'])} structural keys, "
                     "no patient values"
                     if keyed_on == "layout"
-                    else "the note's own assessment text, which no second visit repeats"
+                    else "the note's own assessment text, which no other note shares"
                 ),
             )
         return category

@@ -82,10 +82,11 @@ answers an operation and an exact input, and nothing else.
 
 Four operations are decided by the document layout. Their inputs repeat, so they reach
 the floor of two answers, and the learning pass turns them into functions.
-`document.billing_codes` is decided by the words of one assessment. No second note repeats
-those words. Every case therefore stays at one answer, the compiler blocks it, and the model
-keeps answering.
-That is the design, not a gap.
+`document.billing_codes` is decided by the words of one assessment. Two different notes do
+not share those words. Each case therefore stays at one answer, the compiler blocks it, and the
+model keeps answering.
+That is the design, not a gap. If you send the same note again, that is an exact repeat, and the
+learning pass turns it into a function like any other case.
 
 One function serves several tasks. **File it into the record** promotes
 `document.extraction_plan`. Three later tasks then reach the same function for free.
@@ -102,8 +103,8 @@ One function serves several tasks. **File it into the record** promotes
    all of the requests.
 5. Select **Switch on**. The next form of that kind gets its answer without an AI call. The
    reply is the same, and a tool-call line above it shows that the function answered.
-6. Select **Code it for billing**. **Switch on** is struck through, because no two notes
-   repeat the same words.
+6. Select **Code it for billing**. **Switch on** is struck through, because two different
+   notes do not repeat the same words.
 7. Select **Show technical details** for the commands, the evidence and the function source.
 
 ## Third-party code
@@ -225,7 +226,7 @@ Each numbered frame must show its claim:
 | `04-cemented.png` | A learned function that is off, with **Switch on** in the band. |
 | `05-routed.png` | A03 answered without the AI: the same reply under a tool-call line. |
 | `06-reuse.png` | One answer from a function and the AI together, under one tool-call line. |
-| `07-blocked.png` | Billing stays with the AI because assessment words do not repeat. |
+| `07-blocked.png` | Billing stays with the AI because each note has its own assessment words. |
 | `08-bundle.png` | The extraction plan drawer, with the answer from the exported bundle. |
 | `09-source.png` | The function read as source, with the four hops behind one entry. |
 
