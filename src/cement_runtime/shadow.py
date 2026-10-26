@@ -247,11 +247,16 @@ class ShadowStore:
             if not create:
                 raise NotFoundError("shadow store file is missing")
             try:
-                os.close(os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600))
+                descriptor = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
             except FileExistsError:
                 pass
             except OSError as exc:
                 raise ValidationError("shadow store path could not be created safely") from exc
+            else:
+                try:
+                    os.fchmod(descriptor, 0o600)  # as `Store`: the umask masks `os.open`'s mode
+                finally:
+                    os.close(descriptor)
         self._open(initialize=create)
 
     def _connect(self) -> sqlite3.Connection:

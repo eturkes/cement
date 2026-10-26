@@ -18,8 +18,8 @@ from pydantic import BaseModel, Field
 # The embedded source keeps its own line breaks; one of its pragma comments runs past 100
 # columns inside the string, where ruff reads no pragma.
 # ruff: noqa: E501
-_CEMENT_PACKAGE = "_cement_runtime_2c0666d37c0841c9"
-_CEMENT_DIGEST = "2c0666d37c0841c94f01aefcc86a384f8878eef1b0bbab4d18e067824ca91f91"
+_CEMENT_PACKAGE = "_cement_runtime_160b290159dc270b"
+_CEMENT_DIGEST = "160b290159dc270b712187dd6b4619b2d2a40a7f2c383309013fc550492c44c2"
 _CEMENT_SOURCES = {
     "__init__": r'''
 """Cement public API."""
@@ -2910,11 +2910,16 @@ class ShadowStore:
             if not create:
                 raise NotFoundError("shadow store file is missing")
             try:
-                os.close(os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600))
+                descriptor = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
             except FileExistsError:
                 pass
             except OSError as exc:
                 raise ValidationError("shadow store path could not be created safely") from exc
+            else:
+                try:
+                    os.fchmod(descriptor, 0o600)  # as `Store`: the umask masks `os.open`'s mode
+                finally:
+                    os.close(descriptor)
         self._open(initialize=create)
 
     def _connect(self) -> sqlite3.Connection:
@@ -4792,7 +4797,11 @@ class Store:
         except (OSError, ValueError, UnicodeError) as exc:
             raise ValidationError("database path could not be created safely") from exc
         else:
-            os.close(descriptor)
+            try:
+                # `os.open`'s mode is masked by the umask: 0277 would leave an unwritable 0400.
+                os.fchmod(descriptor, 0o600)
+            finally:
+                os.close(descriptor)
         if self.path.is_symlink():
             raise ValidationError("database path must not be a symbolic link")
         try:

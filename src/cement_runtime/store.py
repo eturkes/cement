@@ -755,7 +755,11 @@ class Store:
         except (OSError, ValueError, UnicodeError) as exc:
             raise ValidationError("database path could not be created safely") from exc
         else:
-            os.close(descriptor)
+            try:
+                # `os.open`'s mode is masked by the umask: 0277 would leave an unwritable 0400.
+                os.fchmod(descriptor, 0o600)
+            finally:
+                os.close(descriptor)
         if self.path.is_symlink():
             raise ValidationError("database path must not be a symbolic link")
         try:

@@ -18580,5 +18580,30 @@ class PathBindingTests(unittest.TestCase):
                              str(self.first.resolve() / "x.shadow"))
         self.assertFalse((self.second / "x.shadow").exists())
 
+
+class FileModeTests(unittest.TestCase):
+    """The ledger and its shadow file are created 0600 whatever the process umask."""
+
+    def test_a_restrictive_umask_still_creates_writable_0600_files(self) -> None:
+        import stat
+
+        from cement_runtime.shadow import ShadowStore
+
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        ledger = pathlib.Path(temporary.name) / "ledger.db"
+        shadow = pathlib.Path(temporary.name) / "ledger.db.shadow"
+        previous = os.umask(0o277)
+        try:
+            System(ledger).register_operation("tenant", "op")
+            ShadowStore(shadow)
+        finally:
+            os.umask(previous)
+        for path in (ledger, shadow):
+            with self.subTest(path=path.name):
+                self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+        self.assertEqual([row["name"] for row in System(ledger, create=False).operations("tenant")], ["op"])
+        ShadowStore(shadow, create=False)
+
 if __name__ == "__main__":
     unittest.main()
