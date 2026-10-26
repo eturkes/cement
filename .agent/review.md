@@ -21,6 +21,455 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## Code review (MAINTAIN, request) — target = the implementation at `686e86e`, fixes = the commits after it that name this section
+
+Owner body: code, tests, gates, config + docs; check set fixed + committed here before the first read; rows = lens × module, `CLAUDE.md` conformance = lens × clause; finding = severity (`blocker` | `major` | `minor` | `info`) + `file:line` + proof (behavior → a red test; text → anchor bytes `rg -Fn` matches); fix at the root cause, sweep the defect class, one scoped commit per class, gate green at each; law vs code → fix the stale side; a fix changing `Intent`, `Decisions` or a grading check → owner ruling first; security defects met here → MAIN alone. Pre-check-set reads (orientation, disclosed): this ledger (its `## Security review 2` heading lost to `686e86e`'s splice at the line that now opens ` — target = the implementation at \`5ae4d9f\``), `.claude/rules/*`, `.agent/deferred.md`, `.agent/gate:1-40`, `.agent/ci-gate`, `.claude/agents/reviewer.md`, file lists + def names. Verdicts: `pass` | `finding <F-id>` | `excluded (<reason>)` — `excluded` = a clause that binds no tracked file (process, history, conversation) or a lens the target's law places outside (PROTOTYPE law, Template ruling (1)). Teammate verdicts = leads; every row's verdict here = MAIN's own check.
+
+Lenses: B baseline (the full gate + each runnable `Artifacts` entry by its run command; a red step or failed run = a finding) · C correctness · K cleanup · A altitude (`CLAUDE.md` `Engineering` code diff lenses, one pass each, every function read with its callers + callees) · S claim soundness + guarantee-vs-claim gaps (docstrings, comments, error text, `--help`, README, docs, `Artifacts` vs behavior) · V verification integrity (`Engineering`: tests that cannot fail, retyped expected values, fixture values returned, test/gate detection in shipped code, the skip set, checks that never fire) · F spec fit (behavior vs `Intent` + `Decisions`) · L conformance (each bullet of `CLAUDE.md` + `.claude/rules/*.md`: tool-decidable → its check runs + fires on a planted bad input, none → finding fixed by wiring a check; judgment → judged on the lens rows it names). Grain: one `L` row per bullet; a rules file's indented sub-bullets (`pins.md` `Where each lives`) fold into their parent row, whose basis enumerates them.
+
+Modules (paths fixed here; `system.py` areas by method name, each with the module helpers it calls):
+- `sys-intake` = `System.register_operation`, `revise_operation`, `submit_proposal`, `propose`, `get_proposal`, `proposal`, `proposals`, `proposal_by_source`, `review`, `challenge` · `sys-build` = `compile`, `verify_drafts`, `verify`, `inspect_function_promotion`, `promote_function`, `promote`, `learning_cases`, `supersede_examples`, `revoke_example`, `suspend_artifact`, `quarantine_plan`, `quarantine` · `sys-serve` = `latest_function_receipt`, `function_receipts`, `function_report`, `reconstruct_function_receipt`, `verify_function`, `resolve`, `serving`, `switch`, `set_switch`, `function_versions`, `diff_versions`, `shadow_capture` · `sys-config` = `System.__init__` + private infrastructure, `test_projection`, `projection`, `set_projection`, `comparator`, `set_comparator`, `operations`, `examples`, `artifacts`, `artifact`, `report`, `reports`, `prune_proposals`, `erase_partition`, `events`
+- `src/cement_runtime/`: `store` `models` `function` `artifacts` `json_value` `pkg` (= `errors.py` + `__init__.py` + `__main__.py` + `py.typed`) `source` `projection` `comparator` `learning` `shadow` `signature` `cli`
+- examples: `owui-src` (`examples/open_webui/cement_{tools,filter,learning,admin}.py` + `cement-learn/SKILL.md`) · `owui-gen` (`generate.py`, `paste-in/`, `local.py`, `local-requirements.txt`) · `nucllei` (`examples/nucllei/**`) · `ocr` (`examples/hospital_ocr/**`) · `outbox` (`examples/outbox/**`) · `cmdsrc` (`examples/command_source/**`)
+- `skill` = `skills/cement-learn/**`
+- tests: `t-system` (`test_system.py`) · `t-cli` (`test_cli*.py`) · `t-battery` (every other `test_*battery*.py` + `test_authority_removal`, `test_read_capability_census`, `test_survivor_pins`, `test_assertion_strength`, `test_expected_revision`) · `t-module` (`test_{function,json_value,comparator,projection_ir,shadow,signature,source,submission,proposal_binding,typed_records,publication_metadata,command_source_distribution}.py` + `typed_records_caller.py`, `ed25519_signer.py`, `projection_oracle.py`, `tests/fixtures/**`) · `t-example` (`test_{hospital_ocr_example,nucllei_example,open_webui_*,outbox_example}.py`)
+- gates + config: `g-chain` (`.agent/gate`, `.agent/suite`, `.agent/ci-gate`, `.github/**`) · `g-steps` (`.agent/{skip-census,register-audit,article-audit,article-glossary.txt,fetch-tool,gitleaks,zizmor,shellcheck,spec-lint}`, `.agent/decisions/m3-report-validate.py`, `.agent/decisions/p34-two-wheel-smoke.sh`) · `g-instr` (`.agent/{seeds,pins,owui-audit,mutate,replay-mutants,survivor-triage,kill-check,validate-anchors,contract-claims}`, `.agent/decisions/m3-deferred-validate.py` + the on-demand censuses `ops.md` names + every `.agent/decisions/` file the suite reads or runs, census `rg -o '\.agent/[A-Za-z0-9_./-]+' tests/`) · `config` (`pyproject.toml`, `uv.lock`, `.gitignore`, `.gitleaksignore`, `LICENSE`)
+- docs: `readme` (`README.md`) · `docs` (`docs/*.md`) · `ex-readme` (`examples/*/README.md`) · `artifacts-spec` (`.agent/spec.md` `Artifacts`) · `help` (every `cement … --help` page) · `ledger` (`.agent/review.md`, `.agent/deferred.md`)
+- `proto` = `prototype/webui-demo/**` (PROTOTYPE law: B + F only)
+
+| id | lens | target | verdict | basis |
+|---|---|---|---|---|
+| B1 | B | full gate `.agent/gate` at HEAD (CI gate: both legs, D28 included) | unknown | unknown |
+| B2 | B | library smoke `from cement_runtime import System` at the package boundary | unknown | unknown |
+| B3 | B | CLI `uv run cement --help` + the README quick start end to end | unknown | unknown |
+| B4 | B | CLI leaves `Artifacts` names: projection test/set/show, learn cases/merge/publish, function versions/diff/export/eval (+ `--signature`), retention prune, partition erase, comparator set/show, function drift/observations | unknown | unknown |
+| B5 | B | learning pass skill `skills/cement-learn/` run per its SKILL.md by an Agent Skills runtime | unknown | unknown |
+| B6 | B | hospital OCR `uv run python examples/hospital_ocr/run_demo.py` → `All checks passed.` + `.agent/decisions/m3u8-transcript.py` | unknown | unknown |
+| B7 | B | Open WebUI `examples/open_webui/generate.py` (paste-ins fresh) | unknown | unknown |
+| B8 | B | Open WebUI local instance `local.py setup | serve | provision` + a live chat turn | unknown | unknown |
+| B9 | B | `.agent/owui-audit` (lock OSV audit) | unknown | unknown |
+| B10 | B | stub smoke `.agent/decisions/m5u3-smoke.py` | unknown | unknown |
+| B11 | B | nucllei `generate.py` + jail stand-in `.agent/decisions/nucllei-jail-smoke.sh` | unknown | unknown |
+| B12 | B | outbox `examples/outbox/outbox.py` | unknown | unknown |
+| B13 | B | command source wheel `.agent/decisions/p34-two-wheel-smoke.sh` | unknown | unknown |
+| B14 | B | prototype `uv run python prototype/webui-demo/app.py` + `capture.sh` + `density.mjs` + `quality.mjs` | unknown | unknown |
+| C1 | C | `sys-intake` | unknown | unknown |
+| C2 | C | `sys-build` | unknown | unknown |
+| C3 | C | `sys-serve` | unknown | unknown |
+| C4 | C | `sys-config` | unknown | unknown |
+| C5 | C | `store` | unknown | unknown |
+| C6 | C | `models` | unknown | unknown |
+| C7 | C | `function` | unknown | unknown |
+| C8 | C | `artifacts` | unknown | unknown |
+| C9 | C | `json_value` | unknown | unknown |
+| C10 | C | `pkg` | unknown | unknown |
+| C11 | C | `source` | unknown | unknown |
+| C12 | C | `projection` | unknown | unknown |
+| C13 | C | `comparator` | unknown | unknown |
+| C14 | C | `learning` | unknown | unknown |
+| C15 | C | `shadow` | unknown | unknown |
+| C16 | C | `signature` | unknown | unknown |
+| C17 | C | `cli` | unknown | unknown |
+| C18 | C | `owui-src` | unknown | unknown |
+| C19 | C | `owui-gen` | unknown | unknown |
+| C20 | C | `nucllei` | unknown | unknown |
+| C21 | C | `ocr` | unknown | unknown |
+| C22 | C | `outbox` | unknown | unknown |
+| C23 | C | `cmdsrc` | unknown | unknown |
+| C24 | C | `g-chain` | unknown | unknown |
+| C25 | C | `g-steps` | unknown | unknown |
+| C26 | C | `g-instr` | unknown | unknown |
+| C27 | C | `config` | unknown | unknown |
+| K1 | K | `sys-intake` | unknown | unknown |
+| K2 | K | `sys-build` | unknown | unknown |
+| K3 | K | `sys-serve` | unknown | unknown |
+| K4 | K | `sys-config` | unknown | unknown |
+| K5 | K | `store` | unknown | unknown |
+| K6 | K | `models` | unknown | unknown |
+| K7 | K | `function` | unknown | unknown |
+| K8 | K | `artifacts` | unknown | unknown |
+| K9 | K | `json_value` | unknown | unknown |
+| K10 | K | `pkg` | unknown | unknown |
+| K11 | K | `source` | unknown | unknown |
+| K12 | K | `projection` | unknown | unknown |
+| K13 | K | `comparator` | unknown | unknown |
+| K14 | K | `learning` | unknown | unknown |
+| K15 | K | `shadow` | unknown | unknown |
+| K16 | K | `signature` | unknown | unknown |
+| K17 | K | `cli` | unknown | unknown |
+| K18 | K | `owui-src` | unknown | unknown |
+| K19 | K | `owui-gen` | unknown | unknown |
+| K20 | K | `nucllei` | unknown | unknown |
+| K21 | K | `ocr` | unknown | unknown |
+| K22 | K | `outbox` | unknown | unknown |
+| K23 | K | `cmdsrc` | unknown | unknown |
+| K24 | K | `g-chain` | unknown | unknown |
+| K25 | K | `g-steps` | unknown | unknown |
+| K26 | K | `g-instr` | unknown | unknown |
+| K27 | K | `config` | unknown | unknown |
+| A1 | A | `sys-intake` | unknown | unknown |
+| A2 | A | `sys-build` | unknown | unknown |
+| A3 | A | `sys-serve` | unknown | unknown |
+| A4 | A | `sys-config` | unknown | unknown |
+| A5 | A | `store` | unknown | unknown |
+| A6 | A | `models` | unknown | unknown |
+| A7 | A | `function` | unknown | unknown |
+| A8 | A | `artifacts` | unknown | unknown |
+| A9 | A | `json_value` | unknown | unknown |
+| A10 | A | `pkg` | unknown | unknown |
+| A11 | A | `source` | unknown | unknown |
+| A12 | A | `projection` | unknown | unknown |
+| A13 | A | `comparator` | unknown | unknown |
+| A14 | A | `learning` | unknown | unknown |
+| A15 | A | `shadow` | unknown | unknown |
+| A16 | A | `signature` | unknown | unknown |
+| A17 | A | `cli` | unknown | unknown |
+| A18 | A | `owui-src` | unknown | unknown |
+| A19 | A | `owui-gen` | unknown | unknown |
+| A20 | A | `nucllei` | unknown | unknown |
+| A21 | A | `ocr` | unknown | unknown |
+| A22 | A | `outbox` | unknown | unknown |
+| A23 | A | `cmdsrc` | unknown | unknown |
+| A24 | A | `g-chain` | unknown | unknown |
+| A25 | A | `g-steps` | unknown | unknown |
+| A26 | A | `g-instr` | unknown | unknown |
+| S1 | S | `sys-intake` | unknown | unknown |
+| S2 | S | `sys-build` | unknown | unknown |
+| S3 | S | `sys-serve` | unknown | unknown |
+| S4 | S | `sys-config` | unknown | unknown |
+| S5 | S | `store` | unknown | unknown |
+| S6 | S | `models` | unknown | unknown |
+| S7 | S | `function` | unknown | unknown |
+| S8 | S | `artifacts` | unknown | unknown |
+| S9 | S | `json_value` | unknown | unknown |
+| S10 | S | `pkg` | unknown | unknown |
+| S11 | S | `source` | unknown | unknown |
+| S12 | S | `projection` | unknown | unknown |
+| S13 | S | `comparator` | unknown | unknown |
+| S14 | S | `learning` | unknown | unknown |
+| S15 | S | `shadow` | unknown | unknown |
+| S16 | S | `signature` | unknown | unknown |
+| S17 | S | `cli` | unknown | unknown |
+| S18 | S | `owui-src` | unknown | unknown |
+| S19 | S | `owui-gen` | unknown | unknown |
+| S20 | S | `nucllei` | unknown | unknown |
+| S21 | S | `ocr` | unknown | unknown |
+| S22 | S | `outbox` | unknown | unknown |
+| S23 | S | `cmdsrc` | unknown | unknown |
+| S24 | S | `g-chain` | unknown | unknown |
+| S25 | S | `g-steps` | unknown | unknown |
+| S26 | S | `g-instr` | unknown | unknown |
+| S27 | S | `config` | unknown | unknown |
+| S28 | S | `skill` | unknown | unknown |
+| S29 | S | `readme` | unknown | unknown |
+| S30 | S | `docs` | unknown | unknown |
+| S31 | S | `ex-readme` | unknown | unknown |
+| S32 | S | `artifacts-spec` | unknown | unknown |
+| S33 | S | `help` | unknown | unknown |
+| S34 | S | `ledger` | unknown | unknown |
+| V1 | V | `t-system` | unknown | unknown |
+| V2 | V | `t-cli` | unknown | unknown |
+| V3 | V | `t-battery` | unknown | unknown |
+| V4 | V | `t-module` | unknown | unknown |
+| V5 | V | `t-example` | unknown | unknown |
+| V6 | V | `src/cement_runtime (shipped code: no test/gate detection, no fixture value returned, no branch keyed to a test input)` | unknown | unknown |
+| V7 | V | `examples (same, shipped example code)` | unknown | unknown |
+| V8 | V | `g-steps + g-instr (each check fires on its planted input)` | unknown | unknown |
+| F1 | F | `sys-intake` | unknown | unknown |
+| F2 | F | `sys-build` | unknown | unknown |
+| F3 | F | `sys-serve` | unknown | unknown |
+| F4 | F | `sys-config` | unknown | unknown |
+| F5 | F | `store` | unknown | unknown |
+| F6 | F | `projection` | unknown | unknown |
+| F7 | F | `comparator` | unknown | unknown |
+| F8 | F | `learning` | unknown | unknown |
+| F9 | F | `shadow` | unknown | unknown |
+| F10 | F | `signature` | unknown | unknown |
+| F11 | F | `cli` | unknown | unknown |
+| F12 | F | `owui-src` | unknown | unknown |
+| F13 | F | `owui-gen` | unknown | unknown |
+| F14 | F | `nucllei` | unknown | unknown |
+| F15 | F | `ocr` | unknown | unknown |
+| F16 | F | `outbox` | unknown | unknown |
+| F17 | F | `cmdsrc` | unknown | unknown |
+| F18 | F | `skill` | unknown | unknown |
+| F19 | F | `readme` | unknown | unknown |
+| F20 | F | `docs` | unknown | unknown |
+| F21 | F | `ex-readme` | unknown | unknown |
+| F22 | F | `proto` | unknown | unknown |
+| L.cl.1 | L | `CLAUDE.md:7` Uncertain / needs a decision / benefits from my | unknown | unknown |
+| L.cl.2 | L | `CLAUDE.md:8` When discussion may improve the work, open one proactively: | unknown | unknown |
+| L.cl.3 | L | `CLAUDE.md:9` Stay objective; push back on my ideas when warranted | unknown | unknown |
+| L.cl.4 | L | `CLAUDE.md:10` A failed attempt is a valid result: report it | unknown | unknown |
+| L.cl.5 | L | `CLAUDE.md:14` Install/configure project-local; work within the launch dir + children; | unknown | unknown |
+| L.cl.6 | L | `CLAUDE.md:15` Long horizon → orient, then execute: one session carries | unknown | unknown |
+| L.cl.7 | L | `CLAUDE.md:16` Finish line = a pasted body's Met when, else | unknown | unknown |
+| L.cl.8 | L | `CLAUDE.md:17` Research, whenever a tooling, method or design choice is | unknown | unknown |
+| L.cl.9 | L | `CLAUDE.md:18` Git: creds in the global gitconfig; standing permission for | unknown | unknown |
+| L.cl.10 | L | `CLAUDE.md:19` Gate command = the full check chain .claude/rules/ records; | unknown | unknown |
+| L.cl.11 | L | `CLAUDE.md:20` CI gate: a public GitHub repo whose main CI | unknown | unknown |
+| L.cl.12 | L | `CLAUDE.md:21` Evidence: capture rc on the spot (cmd; rc=$?); an | unknown | unknown |
+| L.cl.13 | L | `CLAUDE.md:22` Command output rides the context → the quietest useful | unknown | unknown |
+| L.cl.14 | L | `CLAUDE.md:23` Task close → remove the temporary + stale artifacts | unknown | unknown |
+| L.cl.15 | L | `CLAUDE.md:24` UI design (artifact, variant or unit): the subject's domain, | unknown | unknown |
+| L.cl.16 | L | `CLAUDE.md:25` Charts + figures: the data's job picks the form, | unknown | unknown |
+| L.cl.17 | L | `CLAUDE.md:29` AI agents = the sole developers ⇒ agent-optimized = | unknown | unknown |
+| L.cl.18 | L | `CLAUDE.md:30` State rules, facts + warnings plainly; omit provenance — | unknown | unknown |
+| L.cl.19 | L | `CLAUDE.md:31` Future-facing text, esp. prompts → state the desired action | unknown | unknown |
+| L.cl.20 | L | `CLAUDE.md:32` Prompts + instruction files state task, finish line + | unknown | unknown |
+| L.cl.21 | L | `CLAUDE.md:33` Guidance + checks on text = goals + reasons, | unknown | unknown |
+| L.cl.22 | L | `CLAUDE.md:34` Instruction files = yours to maintain → update any | unknown | unknown |
+| L.cl.23 | L | `CLAUDE.md:35` .claude/rules/ reaches MAIN + every teammate of an interactive | unknown | unknown |
+| L.cl.24 | L | `CLAUDE.md:36` @path imports (instruction files) + attaches (my messages) a | unknown | unknown |
+| L.cl.25 | L | `CLAUDE.md:37` Human-facing = strictly user-facing surfaces a person reads at | unknown | unknown |
+| L.cl.26 | L | `CLAUDE.md:41` Elegant, tightly-scoped modular components; deduplicate; KISS + UNIX where | unknown | unknown |
+| L.cl.27 | L | `CLAUDE.md:42` Code = agent-read artifact → concise within three bounds: | unknown | unknown |
+| L.cl.28 | L | `CLAUDE.md:43` Comments cost tokens → spend them on the why | unknown | unknown |
+| L.cl.29 | L | `CLAUDE.md:44` Target sufficient scope, evidence-backed claims + real success criteria. | unknown | unknown |
+| L.cl.30 | L | `CLAUDE.md:45` Established methods (TDD red-green-refactor, differential oracles, adversarial review) + | unknown | unknown |
+| L.cl.31 | L | `CLAUDE.md:46` Open tooling decisions (language/library/package…) → research (Execution) + select | unknown | unknown |
+| L.cl.32 | L | `CLAUDE.md:47` Deterministic checks own every rule a tool can decide: | unknown | unknown |
+| L.cl.33 | L | `CLAUDE.md:48` Tests/verification: derive scope from requested outcome + regression risk | unknown | unknown |
+| L.cl.34 | L | `CLAUDE.md:49` Runnable change → run the real app by its | unknown | unknown |
+| L.cl.35 | L | `CLAUDE.md:50` Verification integrity binds every check on the implementation; a | unknown | unknown |
+| L.cl.36 | L | `CLAUDE.md:51` Assurance tier, declared per unit with its contract: kernel | unknown | unknown |
+| L.cl.37 | L | `CLAUDE.md:52` Units = the shortest path to the consumable artifact, | unknown | unknown |
+| L.cl.38 | L | `CLAUDE.md:53` A gate backing a durable claim must rerun from | unknown | unknown |
+| L.cl.39 | L | `CLAUDE.md:54` Repairs to a generated artifact land as one idempotent | unknown | unknown |
+| L.cl.40 | L | `CLAUDE.md:55` Adversarial review (code or session) → scrutinize correctness + | unknown | unknown |
+| L.cl.41 | L | `CLAUDE.md:56` Code diff lenses = the author's self-review before each | unknown | unknown |
+| L.cl.42 | L | `CLAUDE.md:57` Split assurance by what it costs the decider: mechanical | unknown | unknown |
+| L.cl.43 | L | `CLAUDE.md:58` Review terminates on a check set fixed before the | unknown | unknown |
+| L.cl.44 | L | `CLAUDE.md:59` Delegated reports are two-tier: a verdict table the decider | unknown | unknown |
+| L.cl.45 | L | `CLAUDE.md:60` Remotely-exploitable code → highest security standard: periodically audit, update | unknown | unknown |
+| L.cl.46 | L | `CLAUDE.md:64` MAIN does the work: a planned unit's code, docs | unknown | unknown |
+| L.cl.47 | L | `CLAUDE.md:65` Offload economics: fresh-context + blindness fits pay at any | unknown | unknown |
+| L.cl.48 | L | `CLAUDE.md:66` Briefs + prompts (teammates, SendMessage, claude -p) = broader | unknown | unknown |
+| L.cl.49 | L | `CLAUDE.md:67` Names = role + gapless ordinal (reviewer-2), so SendMessage | unknown | unknown |
+| L.cl.50 | L | `CLAUDE.md:68` Harvest: marker + turn end → read the deliverable | unknown | unknown |
+| L.cl.51 | L | `CLAUDE.md:69` A code-writing teammate works in git worktree add -b | unknown | unknown |
+| L.cl.52 | L | `CLAUDE.md:70` Shared mutable resources (build stores, DBs, ports, work tree, | unknown | unknown |
+| L.cl.53 | L | `CLAUDE.md:71` Advisor, where present = MAIN's call per case at | unknown | unknown |
+| L.cl.54 | L | `CLAUDE.md:75` Phases, Phase: in .agent/spec.md = the phase + its | unknown | unknown |
+| L.cl.55 | L | `CLAUDE.md:76` .agent/spec.md = the sole attached state, imported by the | unknown | unknown |
+| L.cl.56 | L | `CLAUDE.md:77` PROTOTYPE = the fastest path to an artifact I | unknown | unknown |
+| L.cl.57 | L | `CLAUDE.md:78` IMPLEMENT = the best version of the intended software, | unknown | unknown |
+| L.cl.58 | L | `CLAUDE.md:79` Routing: phase per kind of work — an open | unknown | unknown |
+| L.cl.59 | L | `CLAUDE.md:80` Routed state: Phase line 1 = <PHASE> — <scope>; | unknown | unknown |
+| L.cl.60 | L | `CLAUDE.md:81` This file + .claude/agents/ = copies of a shared | unknown | unknown |
+| L.cl.61 | L | `CLAUDE.md:82` Rules upkeep rides the Tasks clearing: each phase close | unknown | unknown |
+| L.cl.62 | L | `CLAUDE.md:83` Checkpointing: a phase session compacts many times ⇒ state | unknown | unknown |
+| L.cl.63 | L | `CLAUDE.md:84` Teammates: fits, reasons + mechanics = Teammates; the phase | unknown | unknown |
+| L.cl.64 | L | `CLAUDE.md:85` PROTOTYPE + ITERATE: teammates = cheap + shallow, artifacts | unknown | unknown |
+| L.cl.65 | L | `CLAUDE.md:86` IMPLEMENT + MAINTAIN: teammates = deep; each unit's depth | unknown | unknown |
+| L.cl.66 | L | `CLAUDE.md:87` IMPLEMENT phase fits, any depth: researcher = SOTA survey | unknown | unknown |
+| L.cl.67 | L | `CLAUDE.md:88` Advisor (fits + rulings = Teammates; its bar follows | unknown | unknown |
+| L.cl.68 | L | `CLAUDE.md:89` Read cost control = .gitignore kept current — content | unknown | unknown |
+| L.assurance.1 | L | `.claude/rules/assurance.md:11` Mutation criterion, binding: for every check, some committed test | unknown | unknown |
+| L.assurance.2 | L | `.claude/rules/assurance.md:12` A green suite is NEVER closure for a removal: | unknown | unknown |
+| L.assurance.3 | L | `.claude/rules/assurance.md:13` Token-absence cannot prove structural deletion — a rename satisfies | unknown | unknown |
+| L.assurance.4 | L | `.claude/rules/assurance.md:14` A residue classifier needs a stable domain, an exact | unknown | unknown |
+| L.assurance.5 | L | `.claude/rules/assurance.md:15` One row per clause certifies only that the clause | unknown | unknown |
+| L.assurance.6 | L | `.claude/rules/assurance.md:16` Three blind-conjunct shapes: VACUOUS BY A SIBLING GATE (a | unknown | unknown |
+| L.assurance.7 | L | `.claude/rules/assurance.md:17` A clause whose subject is committed history is insensitive | unknown | unknown |
+| L.assurance.8 | L | `.claude/rules/assurance.md:18` attack + mut = WORK-UNIT instruments with --check patchers: | unknown | unknown |
+| L.assurance.9 | L | `.claude/rules/assurance.md:22` A prototype runs under PROTOTYPE law. This repo's = | unknown | unknown |
+| L.assurance.10 | L | `.claude/rules/assurance.md:23` An expected-output table the contract does not own is | unknown | unknown |
+| L.assurance.11 | L | `.claude/rules/assurance.md:24` Red-first and preservation are two credentials, not one. A | unknown | unknown |
+| L.assurance.12 | L | `.claude/rules/assurance.md:25` Survivor scope (owner-ruled at the MAINTAIN queue run's close): | unknown | unknown |
+| L.assurance.13 | L | `.claude/rules/assurance.md:26` The shipped suite's skip set is CLOSED at three, | unknown | unknown |
+| L.assurance.14 | L | `.claude/rules/assurance.md:27` The grading check is fixed when the contract is: | unknown | unknown |
+| L.assurance.15 | L | `.claude/rules/assurance.md:31` An instrument that cannot fire reports exactly like an | unknown | unknown |
+| L.assurance.16 | L | `.claude/rules/assurance.md:32` A mutation control aims at the test that OWNS | unknown | unknown |
+| L.assurance.17 | L | `.claude/rules/assurance.md:33` A test whose subject is a CONSTRAINT needs a | unknown | unknown |
+| L.assurance.18 | L | `.claude/rules/assurance.md:34` A self-test control that mutates rows[0] dies at scale | unknown | unknown |
+| L.assurance.19 | L | `.claude/rules/assurance.md:35` Recording instruments must be TOTAL over their channel: override | unknown | unknown |
+| L.assurance.20 | L | `.claude/rules/assurance.md:36` A probe that records AFTER the call loses every | unknown | unknown |
+| L.assurance.21 | L | `.claude/rules/assurance.md:40` Purge __pycache__ and set PYTHONDONTWRITEBYTECODE=1: CPython invalidates bytecode on | unknown | unknown |
+| L.assurance.22 | L | `.claude/rules/assurance.md:41` Address every mutant by line plus an asserted anchor | unknown | unknown |
+| L.assurance.23 | L | `.claude/rules/assurance.md:42` Run a pristine CONTROL sweep at full worker count | unknown | unknown |
+| L.assurance.24 | L | `.claude/rules/assurance.md:43` A survivor count is meaningless without its VERDICT MODULE | unknown | unknown |
+| L.assurance.25 | L | `.claude/rules/assurance.md:44` An author-run sweep certifies only the families its author | unknown | unknown |
+| L.assurance.26 | L | `.claude/rules/assurance.md:45` The sweep patches src/ in place ⇒ git status | unknown | unknown |
+| L.assurance.27 | L | `.claude/rules/assurance.md:46` A replay that mutates an embedded source (src/cement_runtime minus | unknown | unknown |
+| L.assurance.28 | L | `.claude/rules/assurance.md:50` Vary every fixture across the boundary its check depends | unknown | unknown |
+| L.assurance.29 | L | `.claude/rules/assurance.md:51` Enumeration completeness needs a tail sentinel beyond any plausible | unknown | unknown |
+| L.assurance.30 | L | `.claude/rules/assurance.md:52` Pin every bound as an adjacent accept/reject PAIR (max | unknown | unknown |
+| L.assurance.31 | L | `.claude/rules/assurance.md:53` Frozen public shape is invisible to behavioral tests: one | unknown | unknown |
+| L.assurance.32 | L | `.claude/rules/assurance.md:54` Behavioral tests cannot see resource contracts: slicing after the | unknown | unknown |
+| L.assurance.33 | L | `.claude/rules/assurance.md:55` Mock the LIBRARY boundary, never the module's own dispatch | unknown | unknown |
+| L.assurance.34 | L | `.claude/rules/assurance.md:59` A diff-blind author pins what it can see, so | unknown | unknown |
+| L.assurance.35 | L | `.claude/rules/assurance.md:60` Red-at-baseline / green-at-HEAD is MAIN's credential, run in a | unknown | unknown |
+| L.assurance.36 | L | `.claude/rules/assurance.md:61` tester is diff-blind on TWO counts, audited separately: its | unknown | unknown |
+| L.assurance.37 | L | `.claude/rules/assurance.md:62` Dispatch the phase-1 table BEFORE implementing; its divergences are | unknown | unknown |
+| L.assurance.38 | L | `.claude/rules/assurance.md:66` DERIVE the instrument, never hand-list it, and assert the | unknown | unknown |
+| L.assurance.39 | L | `.claude/rules/assurance.md:67` Grade by whole-token set membership, never containment (24 sits | unknown | unknown |
+| L.assurance.40 | L | `.claude/rules/assurance.md:68` A validator that passes on its first run has | unknown | unknown |
+| L.assurance.41 | L | `.claude/rules/assurance.md:69` A grader's strict branch guarded by a surface heuristic | unknown | unknown |
+| L.assurance.42 | L | `.claude/rules/assurance.md:70` A validator's clean grade says nothing about columns it | unknown | unknown |
+| L.assurance.43 | L | `.claude/rules/assurance.md:71` Run every idempotent patcher twice before trusting it once: | unknown | unknown |
+| L.assurance.44 | L | `.claude/rules/assurance.md:75` Every number a contract states must be RUN in | unknown | unknown |
+| L.assurance.45 | L | `.claude/rules/assurance.md:76` Nothing grades the contract against its own instruments' results, | unknown | unknown |
+| L.assurance.46 | L | `.claude/rules/assurance.md:77` A set obligation states its DERIVATION, and the spellings | unknown | unknown |
+| L.assurance.47 | L | `.claude/rules/assurance.md:78` Obligation and gate numbers are NOT keys across contracts: | unknown | unknown |
+| L.assurance.48 | L | `.claude/rules/assurance.md:79` A prescription authored in an earlier unit is a | unknown | unknown |
+| L.assurance.49 | L | `.claude/rules/assurance.md:83` Three tripwire classes: what the DELETION breaks (staged burden | unknown | unknown |
+| L.assurance.50 | L | `.claude/rules/assurance.md:84` Every instrument reading tests/ sees the unit's own battery, | unknown | unknown |
+| L.assurance.51 | L | `.claude/rules/assurance.md:85` A scope pin read against the WORKING TREE expires: | unknown | unknown |
+| L.assurance.52 | L | `.claude/rules/assurance.md:86` A whole battery grading a CLOSED transition takes both | unknown | unknown |
+| L.assurance.53 | L | `.claude/rules/assurance.md:87` Before adding a file to a frozen tree, read | unknown | unknown |
+| L.assurance.54 | L | `.claude/rules/assurance.md:88` Measure a removal by deleting it and running the | unknown | unknown |
+| L.assurance.55 | L | `.claude/rules/assurance.md:89` Compare the failure SET between stages, never the count: | unknown | unknown |
+| L.assurance.56 | L | `.claude/rules/assurance.md:90` Scripted, count-asserted, idempotent surgery beats hand editing past ~30 | unknown | unknown |
+| L.assurance.57 | L | `.claude/rules/assurance.md:94` Seed the deliverable, and seed its row SUBJECTS: filling | unknown | unknown |
+| L.assurance.58 | L | `.claude/rules/assurance.md:95` Order the graded artifact FIRST in the brief; a | unknown | unknown |
+| L.assurance.59 | L | `.claude/rules/assurance.md:96` Instruct the oracle NOT to match MAIN's rulings: a | unknown | unknown |
+| L.assurance.60 | L | `.claude/rules/assurance.md:97` A mid-wave contract edit expires every seeded predicate at | unknown | unknown |
+| L.assurance.61 | L | `.claude/rules/assurance.md:98` MAIN's fill of an exempt column belongs in an | unknown | unknown |
+| L.assurance.62 | L | `.claude/rules/assurance.md:99` Re-derive a teammate artifact before crediting it; a PASS | unknown | unknown |
+| L.example-demo.1 | L | `.claude/rules/example-demo.md:8` run_demo.py prints exactly TWO per-run dynamic values, one art_<32hex> | unknown | unknown |
+| L.example-demo.2 | L | `.claude/rules/example-demo.md:9` The example README's text transcript block is that output | unknown | unknown |
+| L.example-demo.3 | L | `.claude/rules/example-demo.md:10` The demo refuses to run under -O/-OO, where Python | unknown | unknown |
+| L.example-demo.4 | L | `.claude/rules/example-demo.md:11` The demo deletes its temporary ledger, so every producing | unknown | unknown |
+| L.example-demo.5 | L | `.claude/rules/example-demo.md:12` Two clean runs export different bundle bytes at a | unknown | unknown |
+| L.example-demo.6 | L | `.claude/rules/example-demo.md:13` A test that grades a helper's RESULT does not | unknown | unknown |
+| L.example-demo.7 | L | `.claude/rules/example-demo.md:14` An end-to-end script needs its own integration pin, or | unknown | unknown |
+| L.example-demo.8 | L | `.claude/rules/example-demo.md:15` Example self-checks run only by hand ⇒ behavior worth | unknown | unknown |
+| L.example-demo.9 | L | `.claude/rules/example-demo.md:16` A probe copied into a worktree relocates its __file__, | unknown | unknown |
+| L.gate-checks.1 | L | `.claude/rules/gate-checks.md:39` .agent/gate (the gate command, .claude/rules/ops.md Env + Fast gate): | unknown | unknown |
+| L.gate-checks.2 | L | `.claude/rules/gate-checks.md:40` tests/test_read_capability_census.py (AST census: every transaction(write=False) block in system.py stays | unknown | unknown |
+| L.gate-checks.3 | L | `.claude/rules/gate-checks.md:41` .agent/spec-lint: .agent/spec-lint <(git show b8a0703:.agent/spec.md) → rc 1, :116 | unknown | unknown |
+| L.gate-checks.4 | L | `.claude/rules/gate-checks.md:42` .agent/decisions/m3-deferred-validate.py, each seed run in a disposable worktree at | unknown | unknown |
+| L.gate-checks.5 | L | `.claude/rules/gate-checks.md:43` D28 verdict cache (p78): planted red revision = a | unknown | unknown |
+| L.gate-checks.6 | L | `.claude/rules/gate-checks.md:44` D28 (tests/test_migration_battery.py): a seed costs one full suite per | unknown | unknown |
+| L.gate-checks.7 | L | `.claude/rules/gate-checks.md:45` D28 pairing (instrument_pruned(), tests/test_lifecycle_removal_battery.py L23 ×2, L26, L29, L30), | unknown | unknown |
+| L.gate-checks.8 | L | `.claude/rules/gate-checks.md:46` SWAPPED_ROOTS purge (MigrationBatteryTests.setUpClass): uv run python -m unittest tests.test_hospital_ocr_example | unknown | unknown |
+| L.gate-checks.9 | L | `.claude/rules/gate-checks.md:47` Static checks (pyproject.toml [tool.ruff] + [tool.mypy], gate steps format/lint/types): | unknown | unknown |
+| L.gate-checks.10 | L | `.claude/rules/gate-checks.md:48` uv audit (gate step audit): a scratch project with | unknown | unknown |
+| L.gate-checks.11 | L | `.claude/rules/gate-checks.md:49` .agent/gitleaks (gate step secrets, pinned binary by sha256 into | unknown | unknown |
+| L.gate-checks.12 | L | `.claude/rules/gate-checks.md:50` .agent/skip-census (gate step skips, p66 + p85): a copy | unknown | unknown |
+| L.gate-checks.13 | L | `.claude/rules/gate-checks.md:51` .agent/register-audit --gate (gate step register, p12 + p40): Run | unknown | unknown |
+| L.gate-checks.14 | L | `.claude/rules/gate-checks.md:52` .agent/replay-mutants (p02, closure tool, not a gate step): .agent/decisions/replay-mutants-seeds.jsonl | unknown | unknown |
+| L.gate-checks.15 | L | `.claude/rules/gate-checks.md:53` .agent/validate-anchors (p19, report validator, not a gate step): fixtures | unknown | unknown |
+| L.gate-checks.16 | L | `.claude/rules/gate-checks.md:54` .agent/contract-claims (p60, contract checker, not a gate step): fixtures | unknown | unknown |
+| L.gate-checks.17 | L | `.claude/rules/gate-checks.md:55` .agent/article-audit (p64; gate step articles, p130): .agent/gate with the | unknown | unknown |
+| L.gate-checks.18 | L | `.claude/rules/gate-checks.md:56` .agent/mutate (p74, credit tool, not a gate step): see | unknown | unknown |
+| L.gate-checks.19 | L | `.claude/rules/gate-checks.md:57` .agent/register-audit --gate CLI help (p92): simply inserted at the | unknown | unknown |
+| L.gate-checks.20 | L | `.claude/rules/gate-checks.md:58` .agent/decisions/m3-report-validate.py --all (gate step reports, p05): fixtures .agent/fixtures/report-anchors/ — | unknown | unknown |
+| L.gate-checks.21 | L | `.claude/rules/gate-checks.md:59` .agent/zizmor (gate step actions, zizmor 1.31.1 --offline over .github/, | unknown | unknown |
+| L.gate-checks.22 | L | `.claude/rules/gate-checks.md:60` .agent/shellcheck (gate step shell, ShellCheck 0.11.0, every severity, -x, | unknown | unknown |
+| L.gate-checks.23 | L | `.claude/rules/gate-checks.md:61` .agent/pins (p125, pin census, not a gate step; network | unknown | unknown |
+| L.history-gates.1 | L | `.claude/rules/history-gates.md:10` D28 (tests/test_migration_battery.py) replays the full suite at EVERY revision | unknown | unknown |
+| L.history-gates.2 | L | `.claude/rules/history-gates.md:11` Verdict cache (p78, equal-strength speed-up): D28 serves a revision | unknown | unknown |
+| L.history-gates.3 | L | `.claude/rules/history-gates.md:12` Launch the gate with SIGINT at SIG_DFL: a non-interactive | unknown | unknown |
+| L.history-gates.4 | L | `.claude/rules/history-gates.md:13` On a red branch each ADDITIONAL commit touching those | unknown | unknown |
+| L.history-gates.5 | L | `.claude/rules/history-gates.md:14` D28 is the ONLY gate grading history, and splitting | unknown | unknown |
+| L.history-gates.6 | L | `.claude/rules/history-gates.md:15` D28 unlinks tests/test_migration_battery.py from each checkout before the inner | unknown | unknown |
+| L.history-gates.7 | L | `.claude/rules/history-gates.md:16` _detached_worktree (every migration-battery checkout) lives in a run-scoped directory | unknown | unknown |
+| L.history-gates.8 | L | `.claude/rules/history-gates.md:17` m3u6a2-tripwires.json keys each pin + freeze on <file>:<test name> | unknown | unknown |
+| L.history-gates.9 | L | `.claude/rules/history-gates.md:18` Composition is the unit of gate truth. MigrationBatteryTests swaps | unknown | unknown |
+| L.human-facing.1 | L | `.claude/rules/human-facing.md:12` Re-derive every claim against SHIPPED CODE, never against the | unknown | unknown |
+| L.human-facing.2 | L | `.claude/rules/human-facing.md:13` State publication POSITIVELY: a reader must learn from prose | unknown | unknown |
+| L.human-facing.3 | L | `.claude/rules/human-facing.md:14` Every placeholder in a shipped command block needs a | unknown | unknown |
+| L.human-facing.4 | L | `.claude/rules/human-facing.md:15` A trust-model "Trusted" list must never name an artifact | unknown | unknown |
+| L.human-facing.5 | L | `.claude/rules/human-facing.md:16` Qualify a claim in one place and it stays | unknown | unknown |
+| L.human-facing.6 | L | `.claude/rules/human-facing.md:17` Never imply speed for resolve; cite the measured cold | unknown | unknown |
+| L.human-facing.7 | L | `.claude/rules/human-facing.md:18` Register audit = .agent/register-audit (p12 + p40); plain mode | unknown | unknown |
+| L.human-facing.8 | L | `.claude/rules/human-facing.md:19` Definite references = uv run python .agent/article-audit (p64; gate | unknown | unknown |
+| L.human-facing.9 | L | `.claude/rules/human-facing.md:20` Split bullets and table rows into their own units | unknown | unknown |
+| L.nucllei.1 | L | `.claude/rules/nucllei.md:13` Generated file: a change to src/cement_runtime/** or examples/nucllei/cement_nucllei.py → | unknown | unknown |
+| L.nucllei.2 | L | `.claude/rules/nucllei.md:14` Jail facts the command rests on (nucllei-sandbox v20261020-01): Python | unknown | unknown |
+| L.nucllei.3 | L | `.claude/rules/nucllei.md:15` Model-facing text = Japanese, llens style: a refusal = | unknown | unknown |
+| L.nucllei.4 | L | `.claude/rules/nucllei.md:16` Writers: proposals ← record alone (consumes its ticket); reviews, | unknown | unknown |
+| L.nucllei.5 | L | `.claude/rules/nucllei.md:17` Skills: switch is named by cement-switch.md alone (N8); its | unknown | unknown |
+| L.nucllei.6 | L | `.claude/rules/nucllei.md:18` README census: examples/nucllei/README.md sits in the tripwire DOCS + | unknown | unknown |
+| L.nucllei.7 | L | `.claude/rules/nucllei.md:19` Untrusted documents never pass through the shell: the chat | unknown | unknown |
+| L.nucllei.8 | L | `.claude/rules/nucllei.md:20` Shadow sampling = deferred (p142, owner): each /workspace is | unknown | unknown |
+| L.nucllei.9 | L | `.claude/rules/nucllei.md:21` Learning bookkeeping (raw inputs, grouping, merge, publish) = cement_runtime.learning, | unknown | unknown |
+| L.open-webui.1 | L | `.claude/rules/open-webui.md:11` Sources examples/open_webui/cement_*.py (importable with an installed cement_runtime + a | unknown | unknown |
+| L.open-webui.2 | L | `.claude/rules/open-webui.md:12` LOADER imports importlib.machinery before installing its finder: find_spec imports | unknown | unknown |
+| L.open-webui.3 | L | `.claude/rules/open-webui.md:13` Item ids: chat tool cement, learning tool cement_learning, filter | unknown | unknown |
+| L.open-webui.4 | L | `.claude/rules/open-webui.md:14` Valve operations = one line per operation, name: description | unknown | unknown |
+| L.open-webui.5 | L | `.claude/rules/open-webui.md:15` Writers: proposals ← the filter alone; reviews / supersessions | unknown | unknown |
+| L.open-webui.6 | L | `.claude/rules/open-webui.md:16` Shadow sampling (filter, p136): outlet only queues — _hits | unknown | unknown |
+| L.open-webui.7 | L | `.claude/rules/open-webui.md:17` Learning tool division (live-run finding, record § Learning passes): | unknown | unknown |
+| L.open-webui.8 | L | `.claude/rules/open-webui.md:18` Open WebUI 0.12.3, measured live: built-in search_tools (the model | unknown | unknown |
+| L.open-webui.9 | L | `.claude/rules/open-webui.md:19` Local regimen: uv run python examples/open_webui/local.py setup (installs examples/open_webui/local-requirements.txt | unknown | unknown |
+| L.open-webui.10 | L | `.claude/rules/open-webui.md:20` Guard firing records: freshness (test_w1_every_paste_in_equals_the_generator_output) fired unseeded in W5 | unknown | unknown |
+| L.ops.1 | L | `.claude/rules/ops.md:3` Env: stdlib-only Python ≥3.12 (the latest line + the | unknown | unknown |
+| L.ops.2 | L | `.claude/rules/ops.md:4` Gate = .agent/gate, one command, steps in order: format | unknown | unknown |
+| L.ops.3 | L | `.claude/rules/ops.md:5` Fast gate (adapts CLAUDE.md Execution Gate command parallel + | unknown | unknown |
+| L.ops.4 | L | `.claude/rules/ops.md:6` Static checks + scanners (owner-ruled; config = pyproject.toml, versions | unknown | unknown |
+| L.ops.5 | L | `.claude/rules/ops.md:7` Green report (Verification integrity): OUTER skipped = none on | unknown | unknown |
+| L.ops.6 | L | `.claude/rules/ops.md:8` Purpose-built gate checks ship the seed that reds them; | unknown | unknown |
+| L.ops.7 | L | `.claude/rules/ops.md:9` Tree censuses an ADDITION enters — check a new | unknown | unknown |
+| L.ops.8 | L | `.claude/rules/ops.md:10` Layout: .agent/spec.md = live state, each Tasks row carrying | unknown | unknown |
+| L.ops.9 | L | `.claude/rules/ops.md:11` Template rulings: CLAUDE.md, .claude/agents/ + .agent/spec-lint = template copies, | unknown | unknown |
+| L.ops.10 | L | `.claude/rules/ops.md:12` Tags (adapts CLAUDE.md Teammates close remove worktrees + branches): | unknown | unknown |
+| L.ops.11 | L | `.claude/rules/ops.md:13` Worktrees: .scratch/worktrees/<name> on wt/<name>; MAIN alone writes the primary | unknown | unknown |
+| L.ops.12 | L | `.claude/rules/ops.md:14` On-demand censuses (not gate steps; rerun after editing what | unknown | unknown |
+| L.ops.13 | L | `.claude/rules/ops.md:15` Shared mutable resources = one named holder per wave: | unknown | unknown |
+| L.ops.14 | L | `.claude/rules/ops.md:16` Settings: .claude/settings.local.json machine-local; no project .claude/settings.json with a path-keyed | unknown | unknown |
+| L.ops.15 | L | `.claude/rules/ops.md:17` Commits (adapts CLAUDE.md Execution Git): <scope> (<trace>): <cause> → | unknown | unknown |
+| L.ops.16 | L | `.claude/rules/ops.md:18` Read-and-conform-to set for every brief: the gate above · | unknown | unknown |
+| L.pins.1 | L | `.claude/rules/pins.md:20` Law (owner): every pin at its latest release; a | unknown | unknown |
+| L.pins.2 | L | `.claude/rules/pins.md:21` Where each lives: | unknown | unknown |
+| L.pins.3 | L | `.claude/rules/pins.md:28` Hash-pinned locks (build-constraints.txt, local-requirements.txt) regenerate by the header command | unknown | unknown |
+| L.pins.4 | L | `.claude/rules/pins.md:29` Python lines (owner-ruled) = the latest CPython line (CI | unknown | unknown |
+| L.pins.5 | L | `.claude/rules/pins.md:30` A uv.lock change re-keys every D28 verdict (the content | unknown | unknown |
+| L.prototype.1 | L | `.claude/rules/prototype.md:8` PROTOTYPE law for good (ops.md Template rulings (1)), outside | unknown | unknown |
+| L.prototype.2 | L | `.claude/rules/prototype.md:9` Server = uv run python prototype/webui-demo/app.py (port 8765). Static | unknown | unknown |
+| L.prototype.3 | L | `.claude/rules/prototype.md:10` capture.sh drives the story through the API (send → | unknown | unknown |
+| L.prototype.4 | L | `.claude/rules/prototype.md:11` Every shot height is MEASURED: both columns scroll internally, | unknown | unknown |
+| L.prototype.5 | L | `.claude/rules/prototype.md:12` Quality floor (p80) = quality.mjs <base> <report.json> (STATE = | unknown | unknown |
+| L.prototype.6 | L | `.claude/rules/prototype.md:13` density.mjs <url> = words on the first 1600×1000 screen | unknown | unknown |
+| L.prototype.7 | L | `.claude/rules/prototype.md:14` Story Back (p86, owner-ruled): each finished story step checkpoints | unknown | unknown |
+| L.prototype.8 | L | `.claude/rules/prototype.md:15` Browser = the prototype's own pinned Playwright Chromium (package.json | unknown | unknown |
+| L.prototype.9 | L | `.claude/rules/prototype.md:16` States capture.sh cannot reach (tour beats, Back, free clicks, | unknown | unknown |
+| L.prototype.10 | L | `.claude/rules/prototype.md:17` Japanese UI = static/i18n.js, loaded before app.js: under ?lang=ja | unknown | unknown |
+| L.runtime.1 | L | `.claude/rules/runtime.md:10` All 18 user tables are STRICT (sqlite_sequence excepted) ⇒ | unknown | unknown |
+| L.runtime.2 | L | `.claude/rules/runtime.md:11` Every stored INTEGER read = _stored_int(value, label, minimum=…, maximum=…) | unknown | unknown |
+| L.runtime.3 | L | `.claude/rules/runtime.md:12` A fresh System — which every CLI invocation constructs | unknown | unknown |
+| L.runtime.4 | L | `.claude/rules/runtime.md:13` A validator whose RESULT is discarded is not a | unknown | unknown |
+| L.runtime.5 | L | `.claude/rules/runtime.md:14` verify_drafts + promote_function read the caller's clock_us INSIDE BEGIN | unknown | unknown |
+| L.runtime.6 | L | `.claude/rules/runtime.md:15` Public writes carry a commit-then-raise window: a durable commit | unknown | unknown |
+| L.runtime.7 | L | `.claude/rules/runtime.md:16` Authorization or validation written as a loop over members | unknown | unknown |
+| L.runtime.8 | L | `.claude/rules/runtime.md:17` A second SQLite store (shadow.py ShadowStore) carries every Store | unknown | unknown |
+| L.runtime.9 | L | `.claude/rules/runtime.md:21` mode=ro protects ONLY the main database file — TEMP | unknown | unknown |
+| L.runtime.10 | L | `.claude/rules/runtime.md:22` Deny-by-default authorizer allowlists by NAME, split into a readable-bare | unknown | unknown |
+| L.runtime.11 | L | `.claude/rules/runtime.md:23` Classify on sqlite_errorcode alone: SQLITE_AUTH(23) is reachable only from | unknown | unknown |
+| L.runtime.12 | L | `.claude/rules/runtime.md:24` VACUUM inside a read block is refused by the | unknown | unknown |
+| L.runtime.13 | L | `.claude/rules/runtime.md:25` Convert a path to a file: URI with Path.absolute().as_uri(); | unknown | unknown |
+| L.runtime.14 | L | `.claude/rules/runtime.md:26` Test-only pragma injection (reverse_unordered_selects) uses a named helper that | unknown | unknown |
+| L.runtime.15 | L | `.claude/rules/runtime.md:27` Read-only proof and single-snapshot lifetime are separate guarantees: a | unknown | unknown |
+| L.runtime.16 | L | `.claude/rules/runtime.md:31` verify_function raises for EXACTLY five conditions (unregistered operation; malformed | unknown | unknown |
+| L.runtime.17 | L | `.claude/rules/runtime.md:32` Function identity = verified-content identity: entry_seal is cement-promotion-v2 minus | unknown | unknown |
+| L.runtime.18 | L | `.claude/rules/runtime.md:33` Draft eligibility is RECONSTRUCTION, not status filtering: current revision, | unknown | unknown |
+| L.runtime.19 | L | `.claude/rules/runtime.md:34` resolve pays full verification of the selected version on | unknown | unknown |
+| L.runtime.20 | L | `.claude/rules/runtime.md:35` serving(expected_function_hash=H) keys its own cache entry per H (_SERVING_CACHE_MAX | unknown | unknown |
+| L.runtime.21 | L | `.claude/rules/runtime.md:36` function_report's six detail lists each keep one documented order | unknown | unknown |
+| L.runtime.22 | L | `.claude/rules/runtime.md:37` Cursor pagination over per-call transactions is not a snapshot; | unknown | unknown |
+| L.runtime.23 | L | `.claude/rules/runtime.md:38` An exported bundle is NOT byte-reproducible across clean runs: | unknown | unknown |
+| L.runtime.24 | L | `.claude/rules/runtime.md:39` No cement_runtime submodule import is store-free — the package | unknown | unknown |
+| L.runtime.25 | L | `.claude/rules/runtime.md:43` ValidationError subclasses ValueError, so a helper raising its own | unknown | unknown |
+| L.runtime.26 | L | `.claude/rules/runtime.md:44` raise X from None INSIDE an except block leaves | unknown | unknown |
+| L.runtime.27 | L | `.claude/rules/runtime.md:45` Ownership, not exception class, decides translation: a caller's own | unknown | unknown |
+| L.runtime.28 | L | `.claude/rules/runtime.md:46` A guard protecting a window is meaningless for a | unknown | unknown |
+| L.runtime.29 | L | `.claude/rules/runtime.md:47` Filesystem writers: one os.lstat + stat.S_ISREG beats chained pathlib | unknown | unknown |
+| L.runtime.30 | L | `.claude/rules/runtime.md:51` Exit classes: 2 usage/validation, 3 absent, 4 conflict (the | unknown | unknown |
+| L.runtime.31 | L | `.claude/rules/runtime.md:52` argparse option abbreviation is OFF on every node (p49, | unknown | unknown |
+| L.runtime.32 | L | `.claude/rules/runtime.md:53` Derive the leaf census from _parser() inside the test, | unknown | unknown |
+| L.runtime.33 | L | `.claude/rules/runtime.md:54` Where one leaf routes the same argument to two | unknown | unknown |
+| L.runtime.34 | L | `.claude/rules/runtime.md:55` A CLI-owned bound over an unclamped library projection makes | unknown | unknown |
+| L.runtime.35 | L | `.claude/rules/runtime.md:56` Linux refuses an exec argument well below 1 MiB | unknown | unknown |
+| L.runtime.36 | L | `.claude/rules/runtime.md:57` Ledger creation: operation register alone constructs System(create=True), after grading | unknown | unknown |
+| L.runtime.37 | L | `.claude/rules/runtime.md:58` Interrupt (p25): the process entry entry (cement script + | unknown | unknown |
+| L.runtime.38 | L | `.claude/rules/runtime.md:59` stdout is never flushed by main (documented limit, README | unknown | unknown |
+| L.runtime.39 | L | `.claude/rules/runtime.md:60` Human-read renderings of stored values (function read text) pass | unknown | unknown |
+| L.runtime.40 | L | `.claude/rules/runtime.md:61` Entity ids: one grammar owner _entity_id(value, label) (_ENTITY_ID, bounded | unknown | unknown |
+| L.runtime.41 | L | `.claude/rules/runtime.md:65` System.events() dicts key the event name under kind; there | unknown | unknown |
+| L.runtime.42 | L | `.claude/rules/runtime.md:66` Every event producer and branch pins its own payload | unknown | unknown |
+
 ## Template refresh → agents@7e8ad36 (MAINTAIN, request) — target = the diff this commit lands, base `e7336bd`
 
 Template delta = `Authoring` `@path` bullet (NEW), MAINTAIN request kinds `+ a code review`, `.agent/spec-lint` SC2016 directive. The first copy dropped that directive (a local line since `95fb113`) → gate step `shell` rc 1; owner ruling at the session's question = fix upstream: agents@7e8ad36 carries it inline, recopied by `copy-template`. Owner ruling: README `~/.ssh/id_ed25519` (`:226`, `:228`, `:255`) = the reader's own key in a signing example, kept. MAIN alone; 10 lenses fixed before the diff was read.
