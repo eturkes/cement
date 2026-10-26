@@ -1,0 +1,2 @@
+{"catalogue": "cr1-nucllei-handover", "base": "6992036", "unittest": ["tests.test_nucllei_example"], "ran": 47, "expect": {"killed": 1, "superseded": [], "equivalent": {}}, "source": "code review L-row firing (MAIN)"}
+{"id": "L.nucllei.7", "file": "examples/nucllei/cement_nucllei.py", "line": 342, "old": "            _discard(handed)  # the chat skill's hand-over copy; the ticket keeps the input", "new": "            pass  # retain the chat hand-over file", "intent": "Keep a consumed document hand-over file under CEMENT_HOME/in instead of deleting it."}

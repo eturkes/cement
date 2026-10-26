@@ -1,0 +1,2 @@
+{"catalogue": "cr1-cli-interrupt", "base": "6992036", "unittest": ["tests.test_cli.CLITests.test_an_interrupt_exits_130_with_a_json_error_and_no_traceback"], "ran": 1, "expect": {"killed": 1, "superseded": [], "equivalent": {}}, "source": "code review L-row firing (MAIN)"}
+{"id": "L.runtime.37", "file": "src/cement_runtime/cli.py", "line": 1529, "old": "        return 130", "new": "        return 129", "intent": "Return 129 rather than 130 from the process KeyboardInterrupt handler."}
