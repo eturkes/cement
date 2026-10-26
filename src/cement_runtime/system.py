@@ -481,6 +481,16 @@ _ERASE_STEPS = (
 _MAX_AGE_SECONDS = (2**63 - 1) // 1_000_000
 
 
+def _stored_json(text: object, label: str, *, max_bytes: int = DEFAULT_MAX_BYTES) -> CanonicalJSON:
+    """Parse JSON read back from the ledger: bytes the parser refuses are corruption (exit 5),
+    never the caller's validation error (exit 2)."""
+
+    try:
+        return parse_json(str(text), max_bytes=max_bytes)
+    except ValidationError as exc:
+        raise IntegrityError(f"stored {label} is invalid") from exc
+
+
 def _event(
     connection: sqlite3.Connection,
     *,
@@ -517,7 +527,7 @@ def _stored_program(row: sqlite3.Row) -> ProjectionProgram:
 
 
 def _policy_from_text(text: str) -> CompilePolicy:
-    value = parse_json(text, max_bytes=16_384).value
+    value = _stored_json(text, "operation policy", max_bytes=16_384).value
     if type(value) is not dict:
         raise IntegrityError("stored policy is not an object")
     try:
@@ -644,7 +654,7 @@ def _structural_edit_leaves(program: ProjectionProgram, input_text: str, key_tex
     """Deleting the example's LAST structural line (contract §5) moves it off this case: body
     lines hold no label separator (the grammar), so that line is the last one carrying one."""
 
-    raw = parse_json(input_text).value
+    raw = _stored_json(input_text, "example input").value
     if type(raw) is dict and type(raw.get(program.text)) is str:
         lines, structural = label_lines(program, str(raw[program.text]))
         if not structural:
@@ -2209,7 +2219,7 @@ class System:
             raise IntegrityError("operation policy digest mismatch")
         policy = binding.policy
 
-        canonical_input = parse_json(input_json)
+        canonical_input = _stored_json(input_json, "example input")
         if canonical_input.text != input_json or canonical_input.digest != input_hash:
             raise IntegrityError("canonical input does not match its stored digest")
         reviewer_count = self._active_reviewer_count(
@@ -2249,7 +2259,7 @@ class System:
                 span_seconds=span_seconds,
             )
 
-        output_json = parse_json(str(assessment["output_text"]))
+        output_json = _stored_json(assessment["output_text"], "example output")
         try:
             artifact = build_exact_lookup(
                 partition=partition,
@@ -2769,7 +2779,7 @@ class System:
         else:
             if len(memo) >= _CASE_KEY_MEMO_MAX:
                 del memo[next(iter(memo))]
-            projected = project(program, parse_json(input_text).value)
+            projected = project(program, _stored_json(input_text, "input").value)
             memo[slot] = projected.key.text if projected.matched and projected.key else None
         cached: str | None = memo[slot]
         return cached
@@ -4290,7 +4300,9 @@ class System:
             )
             for kind, sql in sources:
                 for row in connection.execute(sql, (partition, operation, revision)):
-                    projected = project(parsed, parse_json(str(row["input_json"])).value)
+                    projected = project(
+                        parsed, _stored_json(row["input_json"], f"{kind} input").value
+                    )
                     key_hash = projected.key.digest if projected.key is not None else None
                     items.append(
                         {
@@ -4589,7 +4601,7 @@ class System:
                     "operation_revision": revision,
                 }
             examples = [
-                (str(row["id"]), parse_json(str(row["output_json"])).value)
+                (str(row["id"]), _stored_json(row["output_json"], "example output").value)
                 for row in connection.execute(
                     """
                     SELECT e.id, e.output_json FROM examples AS e
@@ -5512,7 +5524,7 @@ class System:
             for field in ("support", "reviewer_count", "span_seconds"):
                 if _stored_int(row[field], f"stored artifact {field}") != int(assessment[field]):
                     raise IntegrityError(f"artifact {field} does not match active evidence")
-        input_json = parse_json(str(row["input_json"]))
+        input_json = _stored_json(row["input_json"], "artifact input")
         expected_output = str(row["output_json"])
         replay_failures = 0
         structure_failures = 0
@@ -6516,8 +6528,8 @@ class System:
                 unsourced.append(
                     {
                         "proposal_id": proposal_id,
-                        "provenance": parse_json(
-                            str(row["provenance_json"]), max_bytes=PROVENANCE_MAX_BYTES
+                        "provenance": _stored_json(
+                            row["provenance_json"], "provenance", max_bytes=PROVENANCE_MAX_BYTES
                         ).value,
                     }
                 )
@@ -6582,7 +6594,7 @@ class System:
                     "shadow_proposal_ids": entry["shadow"],
                     "active_example_ids": entry["example"],
                     "outputs": [
-                        {"output": parse_json(text).value, **ids}
+                        {"output": _stored_json(text, "case output").value, **ids}
                         for text, ids in sorted(entry["outputs"].items())
                     ],
                     "support": build.support,
@@ -6712,7 +6724,7 @@ class System:
                         "confirmed_at_us": now,
                         "example_id": example_id,
                         "format": "cement-supersession-v1",
-                        "input": parse_json(str(old["input_json"])).value,
+                        "input": _stored_json(old["input_json"], "example input").value,
                         "note": note,
                         "operation": operation,
                         "operation_revision": _stored_int(
@@ -7041,7 +7053,7 @@ class System:
         """
 
         records = [
-            parse_json(str(row["payload_json"])).value
+            _stored_json(row["payload_json"], "event payload").value
             for row in connection.execute(
                 """
                 SELECT payload_json FROM events
@@ -7089,7 +7101,7 @@ class System:
                         row["created_at_us"], "stored operation created_at_us"
                     ),
                     "name": str(row["name"]),
-                    "policy": parse_json(str(row["policy_json"]), max_bytes=16_384).value,
+                    "policy": _stored_json(row["policy_json"], "policy", max_bytes=16_384).value,
                     "policy_hash": str(row["policy_hash"]),
                     "revision": _stored_int(
                         row["revision"], "stored operation revision", minimum=1
@@ -7141,13 +7153,13 @@ class System:
                         row["confirmed_at_us"], "stored example confirmed_at_us"
                     ),
                     "id": str(row["id"]),
-                    "input": parse_json(str(row["input_json"])).value,
+                    "input": _stored_json(row["input_json"], "example input").value,
                     "input_hash": str(row["input_hash"]),
                     "operation_revision": _stored_int(
                         row["operation_revision"], "stored example operation_revision", minimum=1
                     ),
                     "origin": str(row["origin"]),
-                    "output": parse_json(str(row["output_json"])).value,
+                    "output": _stored_json(row["output_json"], "example output").value,
                     "output_hash": str(row["output_hash"]),
                     "receipt_hash": str(row["receipt_hash"]),
                     "reviewer": str(row["reviewer"]),
@@ -7219,7 +7231,9 @@ class System:
                 self._validate_promoted(connection, row)
             # The summary's stored-field checks run before the document parse, as they always did.
             summary = self._artifact_summary(row)
-            document = parse_json(str(row["artifact_json"]), max_bytes=ARTIFACT_MAX_BYTES).value
+            document = _stored_json(
+                row["artifact_json"], "artifact", max_bytes=ARTIFACT_MAX_BYTES
+            ).value
             evidence_ids = [
                 str(item["example_id"])
                 for item in connection.execute(
@@ -7519,7 +7533,9 @@ class System:
                         row["created_at_us"], "stored event created_at_us"
                     ),
                     "kind": str(row["kind"]),
-                    "payload": parse_json(str(row["payload_json"]), max_bytes=262_144).value,
+                    "payload": _stored_json(
+                        row["payload_json"], "event payload", max_bytes=262_144
+                    ).value,
                     "sequence": _stored_int(row["sequence"], "stored event sequence", minimum=1),
                     "subject_id": str(row["subject_id"]),
                     "subject_type": str(row["subject_type"]),
@@ -7566,7 +7582,7 @@ class System:
         *,
         verify_test_set: bool = True,
     ) -> CanonicalJSON:
-        details = parse_json(str(row["details_json"]), max_bytes=262_144)
+        details = _stored_json(row["details_json"], "report details", max_bytes=262_144)
         if details.digest != row["details_hash"] or type(details.value) is not dict:
             raise IntegrityError("verification report details digest mismatch")
         test_count = _stored_int(row["test_count"], "stored report test_count", minimum=1)
@@ -7703,7 +7719,7 @@ class System:
 
     @staticmethod
     def _artifact_from_row(row: sqlite3.Row) -> ArtifactDocument:
-        parsed = parse_json(str(row["artifact_json"]), max_bytes=ARTIFACT_MAX_BYTES)
+        parsed = _stored_json(row["artifact_json"], "artifact", max_bytes=ARTIFACT_MAX_BYTES)
         if parsed.digest != row["artifact_hash"]:
             raise IntegrityError("artifact document digest mismatch")
         artifact = validate_artifact(parsed.value)
@@ -7716,7 +7732,7 @@ class System:
             or artifact.output.digest != row["output_hash"]
         ):
             raise IntegrityError("artifact projection mismatch")
-        policy = parse_json(str(row["policy_json"]), max_bytes=16_384)
+        policy = _stored_json(row["policy_json"], "policy", max_bytes=16_384)
         if policy.digest != row["policy_hash"]:
             raise IntegrityError("artifact policy digest mismatch")
         expected_build = build_digest(

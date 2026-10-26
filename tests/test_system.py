@@ -18450,5 +18450,91 @@ class QuarantineTests(unittest.TestCase):
         self.assertEqual(status, 3)
 
 
+def _cli_status(argv: list[str]) -> tuple[int, str]:
+    import contextlib
+    import io
+
+    from cement_runtime.cli import main
+
+    stderr = io.StringIO()
+    with contextlib.redirect_stderr(stderr), contextlib.redirect_stdout(io.StringIO()):
+        status = main(argv)
+    return status, stderr.getvalue()
+
+
+class StoredStateClassificationTests(unittest.TestCase):
+    """Bytes read back from the ledger are integrity failures (`IntegrityError`, CLI exit 5),
+    never the caller's validation error (exit 2)."""
+
+    PROGRAM = {
+        "abi": "cement-projection-v1", "text": "document", "keep": [],
+        "layouts": [{"name": "note", "title": "Note", "entries": [{"label": "Patient"}]}],
+    }
+
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+
+    def _seed(self, path: pathlib.Path) -> tuple[System, str, str]:
+        system = System(path, clock_us=lambda: 1_000_000)
+        system.register_operation("tenant", "op")
+        for value in ({"document": "Note\nPatient: 0"}, {"document": "Note\nPatient: 1"}, {"x": 1}, {"x": 1}):
+            proposal = system.submit_proposal(
+                "tenant", "op", value, candidate=Candidate(output={"name": "plan"}, provenance={})
+            )
+            system.review("tenant", proposal, reviewer="learning-pass", decision="accept")
+        artifact = system.compile("tenant", "op").created[0]
+        return system, artifact, system.verify("tenant", artifact, verified_by="learning-pass").id
+
+    @staticmethod
+    def _corrupt(path: pathlib.Path, table: str, column: str, trigger: str | None) -> None:
+        connection = sqlite3.connect(path)
+        try:
+            ddl = None
+            if trigger is not None:
+                ddl = connection.execute(
+                    "SELECT sql FROM sqlite_master WHERE name = ?", (trigger,)
+                ).fetchone()[0]
+                connection.execute(f'DROP TRIGGER "{trigger}"')
+            connection.execute(f'UPDATE "{table}" SET "{column}" = ?', ("{",))
+            if ddl is not None:
+                connection.execute(ddl)
+            connection.commit()
+        finally:
+            connection.close()
+
+    def test_stored_json_the_parser_refuses_is_integrity_on_every_reader(self) -> None:
+        comparator = {"abi": "cement-comparator-v1", "rules": [{"path": ["name"], "rule": "text"}]}
+        cases = (
+            ("operations", "operations", "policy_json", None, lambda s, a, r: s.operations("tenant")),
+            ("test_projection", "operations", "policy_json", None,
+             lambda s, a, r: s.test_projection("tenant", "op", self.PROGRAM)),
+            ("examples", "examples", "output_json", "examples_no_update",
+             lambda s, a, r: s.examples("tenant", "op")),
+            ("set_comparator", "examples", "output_json", "examples_no_update",
+             lambda s, a, r: s.set_comparator("tenant", "op", comparator, actor="learning-pass")),
+            ("artifact", "artifacts", "artifact_json", "artifacts_build_fields_immutable",
+             lambda s, a, r: s.artifact("tenant", a)),
+            ("report", "test_reports", "details_json", "test_reports_no_update",
+             lambda s, a, r: s.report("tenant", r)),
+            ("reports", "test_reports", "details_json", "test_reports_no_update",
+             lambda s, a, r: s.reports("tenant")),
+            ("events", "events", "payload_json", "events_no_update", lambda s, a, r: s.events("tenant")),
+        )
+        for name, table, column, trigger, read in cases:
+            with self.subTest(reader=name):
+                path = pathlib.Path(self.temporary.name) / f"{name}.db"
+                system, artifact, report = self._seed(path)
+                if name != "set_comparator":
+                    read(system, artifact, report)  # positive control: the intact ledger answers
+                self._corrupt(path, table, column, trigger)
+                with self.assertRaises(IntegrityError):
+                    read(System(path, create=False), artifact, report)
+        status, stderr = _cli_status(
+            ["--db", str(pathlib.Path(self.temporary.name) / "operations.db"),
+             "--partition", "tenant", "operation", "list"]
+        )
+        self.assertEqual(status, 5, stderr)
+
 if __name__ == "__main__":
     unittest.main()
