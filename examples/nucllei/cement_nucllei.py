@@ -21,7 +21,7 @@ import secrets
 import sys
 import time
 from collections.abc import Callable
-from typing import Any
+from typing import Any, NoReturn
 
 from cement_runtime import (
     Candidate,
@@ -750,6 +750,8 @@ def _switch(args: argparse.Namespace) -> int:
     )
     if state.mode == "off":
         _say(f"{args.operation} をオフにした。この種類の頼みにはモデルが答える。")
+    elif state.mode == "follow" and not versions:
+        _say(f"{args.operation} をオンにした。まだ版が無いので、版が公開されるまでモデルが答える。")
     elif state.mode == "follow":
         _say(f"{args.operation} をオンにした。最新の版 (いまは版 {len(versions)}) が答える。")
     else:
@@ -760,10 +762,18 @@ def _switch(args: argparse.Namespace) -> int:
 # -- command line ------------------------------------------------------------
 
 
+class _Parser(argparse.ArgumentParser):
+    """argparse with llens-style refusals: the model reads every line this command prints."""
+
+    def error(self, message: str) -> NoReturn:
+        _say(f"中止: コマンドの書き方が違う ({message})。", NEXT[2])
+        sys.exit(2)
+
+
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = _Parser(
         prog=COMMAND,
-        description="Cement for one nucllei user: learned functions in /workspace/.cement.",
+        description="nucllei の利用者 1 人の Cement: 学習した関数は /workspace/.cement に置く。",
         allow_abbrev=False,
     )
     commands = parser.add_subparsers(dest="command", required=True)
@@ -774,51 +784,51 @@ def _parser() -> argparse.ArgumentParser:
         sub.set_defaults(handler=handler)
         return sub
 
-    use = command("use", _use, "answer one request from the switched-on function, or mint a ticket")
+    use = command("use", _use, "オンの関数で頼みに 1 回答えるか、控えを出す")
     use.add_argument("operation")
-    use.add_argument("--field", help="read stdin as the text of this one input field")
-    use.add_argument("--input-file", help="read the input from this file instead of stdin")
-    record = command("record", _record, "retain the output that answered a ticket's request")
+    use.add_argument("--field", help="標準入力を、この入力欄 1 つの文として読む")
+    use.add_argument("--input-file", help="入力を標準入力でなくこのファイルから読む")
+    record = command("record", _record, "控えの頼みに答えた出力を記録する")
     record.add_argument("ticket")
-    record.add_argument("--request", help="the user's request, as written")
-    record.add_argument("--output-file", help="read the output from this file instead of stdin")
-    learn = command("learn", _learn, "list the learning work of one operation")
+    record.add_argument("--request", help="ユーザーの頼みの文 (書かれたとおり)")
+    record.add_argument("--output-file", help="出力を標準入力でなくこのファイルから読む")
+    learn = command("learn", _learn, "操作 1 つの学習の仕事を一覧にする")
     learn.add_argument("operation")
     learn.add_argument("--projectable", **projectable)
-    show = command("show", _show, "show one retained proposal")
+    show = command("show", _show, "記録した提案を 1 つ見せる")
     show.add_argument("proposal_id")
-    merge = command("merge", _merge, "confirm the merged output of one case")
+    merge = command("merge", _merge, "場合 1 つのまとめた出力を確定する")
     merge.add_argument("operation")
     merge.add_argument("--projectable", **projectable)
     # A model copies the flag of a case that has no ids of that kind, so a bare flag = no ids.
     merge.add_argument(
-        "--proposals", nargs="?", const="", help="the case's pending proposal ids, comma-separated"
+        "--proposals", nargs="?", const="", help="その場合の保留中の提案の ID (カンマ区切り)"
     )
     merge.add_argument(
-        "--examples", nargs="?", const="", help="the case's active example ids, comma-separated"
+        "--examples", nargs="?", const="", help="その場合の有効な例の ID (カンマ区切り)"
     )
-    merge.add_argument("--note", required=True, help="what the merge kept or added")
-    merge.add_argument("--output-file", help="read the merged output from this file")
-    reject = command("reject", _reject, "reject one pending proposal")
+    merge.add_argument("--note", required=True, help="まとめで残したものと足したもの")
+    merge.add_argument("--output-file", help="まとめた出力をこのファイルから読む")
+    reject = command("reject", _reject, "保留中の提案を 1 つ却下する")
     reject.add_argument("proposal_id")
     reject.add_argument("--note", required=True)
-    revoke = command("revoke", _revoke, "withdraw one wrong confirmed example")
+    revoke = command("revoke", _revoke, "確定した例のうち誤ったものを 1 つ取り下げる")
     revoke.add_argument("example_id")
     revoke.add_argument("--reason", required=True)
-    publish = command("publish", _publish, "compile, verify and promote a new version")
+    publish = command("publish", _publish, "新しい版をコンパイルし、検証し、公開する")
     publish.add_argument("operation")
     publish.add_argument("--projectable", **projectable)
-    versions = command("versions", _list_versions, "list the versions of one operation")
+    versions = command("versions", _list_versions, "操作 1 つの版を一覧にする")
     versions.add_argument("operation")
-    diff = command("diff", _diff, "compare two versions by number")
+    diff = command("diff", _diff, "版を 2 つ番号で比べる")
     diff.add_argument("operation")
     diff.add_argument("old", type=int)
     diff.add_argument("new", type=int)
-    read = command("read", _read_version, "show the cases of one version")
+    read = command("read", _read_version, "版 1 つの場合を見せる")
     read.add_argument("operation")
     read.add_argument("version", type=int, nargs="?")
-    command("status", _show_status, "show each operation's switch and versions")
-    switch = command("switch", _switch, "switch one operation off, on (follow) or to a version")
+    command("status", _show_status, "各操作のスイッチと版を見せる")
+    switch = command("switch", _switch, "操作 1 つをオフ、オン (最新に追従)、または版の固定にする")
     switch.add_argument("operation")
     switch.add_argument("state", choices=("off", "follow", "pin"))
     switch.add_argument("version", type=int, nargs="?")

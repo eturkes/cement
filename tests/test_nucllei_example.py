@@ -6,6 +6,7 @@ user in `CEMENT_HOME`; the chat model runs it through `run_shell` and reads its 
 
 from __future__ import annotations
 
+import argparse
 import ast
 import contextlib
 import importlib.util
@@ -519,6 +520,44 @@ class StateFileBattery(_Jail):
             json.loads((self.home / "state.json").read_text(encoding="utf-8"))["projectable"],
             {"operation_a": False, "operation_b": True},
         )
+
+
+class JapaneseOutputBattery(_Jail):
+    """The model reads every line the command prints, argparse's own refusals + help included."""
+
+    def test_a_malformed_command_line_refuses_in_llens_style(self) -> None:
+        for argv in (["use"], ["switch", OP, "sideways"], ["no-such-command"]):
+            with self.subTest(argv=argv):
+                out, err = io.StringIO(), io.StringIO()
+                with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                    with self.assertRaises(SystemExit) as stop:
+                        CEMENT.main(argv)
+                self.assertEqual(stop.exception.code, 2)
+                lines = out.getvalue().splitlines()
+                self.assertTrue(lines[0].startswith("中止: コマンドの書き方が違う ("), lines)
+                self.assertEqual(lines[-1], CEMENT.NEXT[2])
+                self.assertEqual(err.getvalue(), "")
+
+    def test_every_help_text_is_japanese(self) -> None:
+        parser = CEMENT._parser()
+        subparsers = next(
+            action for action in parser._actions if isinstance(action, argparse._SubParsersAction)
+        )
+        texts = [parser.description] + [
+            text
+            for name, sub in subparsers.choices.items()
+            for text in [sub.description, *(a.help for a in sub._actions if a.help and a.dest != "help")]
+        ]
+        for text in texts:
+            with self.subTest(text=text):
+                self.assertRegex(str(text), "[\u3040-\u30ff\u4e00-\u9fff]")
+
+    def test_follow_before_any_version_says_the_model_answers(self) -> None:
+        self.run_cement("use", OP, "--field", "document", stdin=NOTE_A)
+        status, text = self.run_cement("switch", OP, "follow")
+        self.assertEqual(status, 0, text)
+        self.assertIn("まだ版が無いので、版が公開されるまでモデルが答える。", text)
+        self.assertNotIn("版 0", text)
 
 
 class SwitchBattery(_Jail):
