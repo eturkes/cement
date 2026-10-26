@@ -232,7 +232,14 @@ def provision(client: _Client, model: str, paths: dict[str, pathlib.Path]) -> No
             client.ok(
                 "POST", f"{root}/id/{identifier}/update" if exists else f"{root}/create", body
             )
-            client.ok("POST", f"{root}/id/{identifier}/valves/update", form["valves"])
+            valves = form["valves"]
+            if exists:
+                # A valves update REPLACES the saved dict (0.12.3): keep what an admin set (shadow
+                # sampling) and rewrite only the wiring this launcher owns.
+                status, saved = client.call("GET", f"{root}/id/{identifier}/valves")
+                if status == 200 and isinstance(saved, dict):
+                    valves = saved | valves
+            client.ok("POST", f"{root}/id/{identifier}/valves/update", valves)
             if kind == "function" and not client.ok("GET", f"{root}/id/{identifier}")["is_active"]:
                 client.ok("POST", f"{root}/id/{identifier}/toggle")
         elif kind == "skill":

@@ -188,6 +188,33 @@ class LocalLauncherBattery(unittest.TestCase):
         self.assertEqual(path.stat().st_mode & 0o777, 0o600)
         return path.read_text(encoding="utf-8")
 
+    def test_s1_a_reprovision_keeps_the_valves_an_admin_set(self) -> None:
+        # 0.12.3's valves update replaces the saved dict, so a restart must merge, not overwrite.
+        class Saved(FakeInstance):
+            def __init__(self, users: dict[str, str]) -> None:
+                super().__init__(users)
+                self.valves: dict[str, dict[str, object]] = {}
+
+            def call(self, method: str, path: str, body: object = None) -> tuple[int, object]:
+                if path.endswith("/valves/update") and self.token in self.users:
+                    self.valves[path.removesuffix("/update")] = dict(body)  # type: ignore[arg-type]
+                    return 200, dict(body)  # type: ignore[arg-type]
+                if path.endswith("/valves") and self.token in self.users:
+                    return 200, self.valves.get(path)
+                return super().call(method, path, body)
+
+        instance = Saved({})
+        LOCAL.provision(instance, "m-1", self.paths)
+        filter_valves = "/api/v1/functions/id/cement_filter/valves"
+        instance.valves[filter_valves] |= {"shadow_model": "shadow-custom", "shadow_queue": 7}
+        instance.token = None
+        LOCAL.provision(instance, "m-1", self.paths)
+        self.assertEqual(
+            {key: instance.valves[filter_valves][key] for key in ("shadow_model", "shadow_queue")},
+            {"shadow_model": "shadow-custom", "shadow_queue": 7},
+        )
+        self.assertEqual(instance.valves[filter_valves]["ledger_path"], str(self.paths["ledger"]))
+
     def test_s1_a_new_instance_gets_one_admin_with_a_random_kept_password(self) -> None:
         self.paths["data"].mkdir(parents=True)
         instance, stopped = self._provisioned({})
