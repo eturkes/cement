@@ -20,8 +20,8 @@ from pydantic import BaseModel, Field
 # The embedded source keeps its own line breaks; one of its pragma comments runs past 100
 # columns inside the string, where ruff reads no pragma.
 # ruff: noqa: E501
-_CEMENT_PACKAGE = "_cement_runtime_05b5765057cb49b4"
-_CEMENT_DIGEST = "05b5765057cb49b4cb6ae68a916de40688f21d3b4a6932aabd92a8bf9db85ca0"
+_CEMENT_PACKAGE = "_cement_runtime_f95fef706ac11cf0"
+_CEMENT_DIGEST = "f95fef706ac11cf02552c251d30975ba9c32f295a1d8aa8ea3fcf090c357b055"
 _CEMENT_SOURCES = {
     "__init__": r'''
 """Cement public API."""
@@ -4554,12 +4554,13 @@ def _execute_schema(connection: sqlite3.Connection) -> None:
 
 
 def _schema_objects(connection: sqlite3.Connection) -> dict[tuple[str, str], str]:
+    # `_` is a LIKE wildcard: unescaped, a user object named `sqliteXhidden` left the census.
     return {
         (str(row[0]), str(row[1])): str(row[2])
         for row in connection.execute(
-            """
+            r"""
             SELECT type, name, sql FROM sqlite_schema
-            WHERE name NOT LIKE 'sqlite_%' AND sql IS NOT NULL
+            WHERE name NOT LIKE 'sqlite\_%' ESCAPE '\' AND sql IS NOT NULL
             ORDER BY type, name
             """
         ).fetchall()

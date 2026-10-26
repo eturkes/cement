@@ -1245,6 +1245,31 @@ class SystemTests(unittest.TestCase):
         with self.assertRaises(IntegrityError):
             System(clean)
 
+    def test_an_added_object_named_like_an_internal_one_fails_at_open(self) -> None:
+        # SQLite reserves the `sqlite_` prefix alone; `_` in a LIKE pattern matches any character.
+        ledger = str(pathlib.Path(self.temporary.name) / "schema-addition.db")
+        System(ledger)
+        for name in ("hidden", "sqliteXhidden", "SQLITEXhidden"):
+            with self.subTest(name=name):
+                connection = sqlite3.connect(ledger)
+                try:
+                    connection.execute(
+                        f"CREATE TRIGGER {name} AFTER INSERT ON events BEGIN SELECT 1; END"
+                    )
+                    connection.commit()
+                finally:
+                    connection.close()
+                for create in (True, False):
+                    with self.assertRaises(IntegrityError):
+                        System(ledger, create=create)
+                connection = sqlite3.connect(ledger)
+                try:
+                    connection.execute(f"DROP TRIGGER {name}")
+                    connection.commit()
+                finally:
+                    connection.close()
+                System(ledger, create=False)
+
     def test_concurrent_first_open_is_atomic_and_idempotent(self) -> None:
         concurrent = str(pathlib.Path(self.temporary.name) / "concurrent.db")
         barrier = threading.Barrier(12)

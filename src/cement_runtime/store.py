@@ -549,12 +549,13 @@ def _execute_schema(connection: sqlite3.Connection) -> None:
 
 
 def _schema_objects(connection: sqlite3.Connection) -> dict[tuple[str, str], str]:
+    # `_` is a LIKE wildcard: unescaped, a user object named `sqliteXhidden` left the census.
     return {
         (str(row[0]), str(row[1])): str(row[2])
         for row in connection.execute(
-            """
+            r"""
             SELECT type, name, sql FROM sqlite_schema
-            WHERE name NOT LIKE 'sqlite_%' AND sql IS NOT NULL
+            WHERE name NOT LIKE 'sqlite\_%' ESCAPE '\' AND sql IS NOT NULL
             ORDER BY type, name
             """
         ).fetchall()
