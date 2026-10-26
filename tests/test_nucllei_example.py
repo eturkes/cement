@@ -483,6 +483,44 @@ class LearningBattery(_Jail):
         self.assertFalse((self.home / "ledger.db").exists())
 
 
+class StateFileBattery(_Jail):
+    def test_two_concurrent_passes_keep_both_projectability_rulings(self) -> None:
+        # Each worker reads the state file, then waits until the other has read too (a barrier
+        # with a timeout, so a serialized read-modify-write still finishes): without the lock the
+        # later write drops the earlier ruling.
+        import multiprocessing
+        import threading
+
+        self.home.mkdir(parents=True)
+        context = multiprocessing.get_context("fork")
+        barrier = context.Barrier(2)
+        read_state = CEMENT._state
+
+        def read_then_wait() -> dict[str, Any]:
+            state = read_state()
+            with contextlib.suppress(threading.BrokenBarrierError):
+                barrier.wait(timeout=1)
+            return state
+
+        def remember(operation: str, value: bool) -> None:
+            with mock.patch.object(CEMENT, "_state", read_then_wait):
+                os._exit(0 if CEMENT._remember(operation, value) == [] else 1)
+
+        workers = [
+            context.Process(target=remember, args=(operation, value))
+            for operation, value in (("operation_a", False), ("operation_b", True))
+        ]
+        for worker in workers:
+            worker.start()
+        for worker in workers:
+            worker.join(timeout=10)
+            self.assertEqual(worker.exitcode, 0)
+        self.assertEqual(
+            json.loads((self.home / "state.json").read_text(encoding="utf-8"))["projectable"],
+            {"operation_a": False, "operation_b": True},
+        )
+
+
 class SwitchBattery(_Jail):
     def two_versions(self) -> None:
         self.use()

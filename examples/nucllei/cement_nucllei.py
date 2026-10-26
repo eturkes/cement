@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import datetime
+import fcntl
 import json
 import os
 import pathlib
@@ -156,13 +157,19 @@ def _projectable_state(operation: str) -> bool | None:
 
 
 def _remember(operation: str, projectable: bool) -> list[str]:
-    """Store the pass's ruling; a failure follows durable writes, so it becomes a line."""
+    """Store the pass's ruling; a failure follows durable writes, so it becomes a line.
 
-    state = _state()
-    known = state.get("projectable")
-    state["projectable"] = (known if isinstance(known, dict) else {}) | {operation: projectable}
+    The read-modify-write holds an exclusive lock: two passes of one user (two chats) would
+    otherwise both read the old file and the later write would drop the other's ruling."""
+
     try:
-        _write(_home() / "state.json", state)
+        with open(_home() / ".state.lock", "a", encoding="utf-8") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            state = _state()
+            known = state.get("projectable")
+            rulings = known if isinstance(known, dict) else {}
+            state["projectable"] = rulings | {operation: projectable}
+            _write(_home() / "state.json", state)
     except OSError as exc:
         return [f"(用紙の形でまとめるかの判断は保存できなかった: {exc.__class__.__name__})"]
     return []
