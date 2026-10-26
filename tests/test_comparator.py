@@ -276,7 +276,7 @@ class SetComparatorTests(_Ledger):
         before = pathlib.Path(self.db).read_bytes()
         for comparator, message in (
             (_c(_rule(["missing"], "text")), r"comparator rule at \['missing'\] names no text value"),
-            (_c(_rule(["codes", "*"], "text")), r"comparator rule at \['codes', '\*'\] names no value") if False else (_c(_rule(["nope", "*"], "text")), "names no text value"),
+            (_c(_rule(["nope", "*"], "text")), "names no text value"),
             (_c(_rule(["name"], "ignore"), _rule(["note"], "ignore"), _rule(["codes"], "ignore")), "ignores the whole answer of example ex_"),
             (_c(_rule(["codes"], "text")), r"names no text value"),  # a list, not a string
             (_c(_rule(["name"], "tolerance", "1")), r"names no tolerance value"),

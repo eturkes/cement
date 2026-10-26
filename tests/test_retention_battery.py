@@ -401,10 +401,8 @@ class PruneTests(_Ledger):
         self.assertEqual(result.cutoff_us, self.t0 + 1)
         deleted = sorted([self.pending_old, self.rejected_old])
         self.assertEqual((result.count, result.proposal_ids), (2, tuple(deleted)))
-        self.assertEqual(
-            result.proposal_ids_hash,
-            _digest_strings("cement-id-list-v1", deleted) if False else result.proposal_ids_hash,
-        )
+        # `deleted` is sorted: the id-list ABI digests the sorted set under its own domain.
+        self.assertEqual(result.proposal_ids_hash, _digest_strings("cement-id-list-v1", deleted))
         self.assertEqual(self._ids("tenant_a"), {self.pending_edge, self.accepted_old, self.corrected_old})
         for partition, ident in zip(("tenantXa", "Tenant_a"), self.neighbours):
             self.assertEqual(self._ids(partition), {ident})

@@ -3528,14 +3528,14 @@ class CLITests(unittest.TestCase):
             function_hash="d" * 64,
             checks=(FunctionCheck(key="probe", passed=False, detail="negative"),),
         )
-        cases: tuple[tuple[BaseException | None, int], ...] = (
-            (ValidationError("invalid"), 2),
-            (NotFoundError("missing"), 3),
-            (StateError("state"), 4),
-            (IntegrityError("integrity"), 5),
-            (None, 6),
+        cases: tuple[tuple[BaseException | None, int, str], ...] = (
+            (ValidationError("invalid"), 2, "invalid"),
+            (NotFoundError("missing"), 3, "not_found"),
+            (StateError("state"), 4, "conflict"),
+            (IntegrityError("integrity"), 5, "integrity"),
+            (None, 6, "unverified"),
         )
-        for exception, expected in cases:
+        for exception, expected, token in cases:
             with self.subTest(expected=expected):
                 replacement: typing.Any
                 if exception is None:
@@ -3549,10 +3549,7 @@ class CLITests(unittest.TestCase):
                 self.assertEqual(run.status, expected)
                 self.assertEqual(run.stdout_bytes, b"")
                 self.assertIsInstance(run.stderr_json, dict)
-                self.assertEqual(
-                    self.error(run)["error"],
-                    "unverified" if expected == 6 else self.error(run)["error"],
-                )
+                self.assertEqual(self.error(run)["error"], token)
 
     def test_function_export_rejects_an_unregistered_or_foreign_operation(self) -> None:
         self.promoted_operation("echo_1", 2)

@@ -338,7 +338,7 @@ class RecordTests(_Case):
         before = _ledger_counts(self.db)
         record = self.record(admission.id, {"y": 9, "note": "n"})
         after = _ledger_counts(self.db)
-        self.assertEqual({k: after[k] - before[k] for k in after if after[k] != before[k]}, {"proposals": 1, "events": 1, "sqlite_sequence": 0} if False else {"proposals": 1, "events": 1})
+        self.assertEqual({k: after[k] - before[k] for k in after if after[k] != before[k]}, {"proposals": 1, "events": 1})
         proposal = self.system.proposal(P, record["proposal_id"])
         self.assertEqual((proposal["status"], proposal["input"], proposal["proposed_output"]), ("pending", {"x": 1}, {"y": 9, "note": "n"}))
         self.assertEqual(
