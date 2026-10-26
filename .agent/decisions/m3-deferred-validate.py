@@ -122,7 +122,12 @@ def unfilled(parts: list[str]) -> bool:
     and forced the row to reword away from the bytes it cites (p65).
     """
     head, _, accept = parts[0].partition("Accept: ")
-    cells = [head.strip(), accept.strip(), *(part.removeprefix("- ").strip() for part in parts[1:])]
+    cells = [head.strip(), accept.strip()]
+    for part in parts[1:]:
+        # An acceptance moved to a continuation line is graded as one (`Accept: unknown.` there
+        # passed while the same text inline failed).
+        line = part.strip().removeprefix("- ").strip()
+        cells.append(line.removeprefix("Accept: ").strip())
     return any(cell.lower() in PLACEHOLDER for cell in cells)
 
 
