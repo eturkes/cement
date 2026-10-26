@@ -80,7 +80,9 @@ def _aliases(trees: list[ast.Module]) -> None:
                     kind = _name(node.value)
                     pairs = [(t.id, kind) for t in node.targets if isinstance(t, ast.Name)]
                 for local, kind in pairs:
-                    if kind in SKIP_NAMES and local != kind and ALIASES.get(local) != kind:
+                    # First binding wins: names are global here, and two modules binding one name
+                    # to two skip kinds flipped it forever. Either kind is still a skip.
+                    if kind in SKIP_NAMES and local != kind and local not in ALIASES:
                         ALIASES[local] = kind
                         changed = True
 
