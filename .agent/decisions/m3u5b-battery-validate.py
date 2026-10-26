@@ -57,6 +57,7 @@ import io
 import json
 import pathlib
 import re
+import runpy
 import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -67,7 +68,7 @@ DEFAULT_CONTROLS = HERE / "m3u5b-mutants.json"
 MARKER = "UNFILLED"
 UNKNOWN = "unknown"
 
-ASSERTING = re.compile(r"\bself\.(assert|fail)\w*\(")
+has_assertion = runpy.run_path(str(HERE / "battery_ast.py"))["has_assertion"]
 SKIPPING = re.compile(r"\bself\.skipTest\(|@unittest\.skip|@skip(?:If|Unless)?\b")
 
 # `**Dnn**` or `**Dnn — TITLE**` at column 0. The obligations are paragraphs here, not the
@@ -394,7 +395,7 @@ def grade(battery: pathlib.Path, controls: pathlib.Path) -> int:
         if MARKER in segment:
             unfilled.append(key)
             continue
-        if not ASSERTING.search(segment):
+        if not has_assertion(node):
             assertionless.append(key)
 
     uncovered = sorted(key for key, name in wanted.items() if name not in found)

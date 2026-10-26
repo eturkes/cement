@@ -28,6 +28,7 @@ import ast
 import json
 import pathlib
 import re
+import runpy
 import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -35,7 +36,7 @@ TABLE = HERE / "m3u5a-verdicts.json"
 DEFAULT_SUITE = HERE.parents[1] / "tests" / "test_cli_channels.py"
 MARKER = "UNFILLED"
 
-ASSERTING = re.compile(r"\bself\.(assert|fail)\w*\(")
+has_assertion = runpy.run_path(str(HERE / "battery_ast.py"))["has_assertion"]
 
 
 def _rows() -> list[dict[str, str]]:
@@ -128,7 +129,7 @@ def grade(path: pathlib.Path) -> int:
         if MARKER in source:
             unfilled.append(by_name.get(name, name))
             continue
-        if not ASSERTING.search(source):
+        if not has_assertion(node):
             assertionless.append(by_name.get(name, name))
 
     uncovered = sorted(rid for rid, name in wanted.items() if name not in found)

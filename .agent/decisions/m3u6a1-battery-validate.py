@@ -28,6 +28,7 @@ import argparse
 import ast
 import pathlib
 import re
+import runpy
 import shutil
 import subprocess
 import sys
@@ -54,7 +55,7 @@ ID_TOKEN = re.compile(r"\b(D\d+[a-z]?)\b")
 # foreign; ids without one are this contract's.
 FOREIGN = re.compile(r"M\d+(?:\.\d+)?[a-z]?\d*(?:'s)?\s+$")
 
-ASSERTING = re.compile(r"\bself\.(assert\w*|fail\w*)\(")
+has_assertion = runpy.run_path(str(HERE / "battery_ast.py"))["has_assertion"]
 SKIPPING = re.compile(r"\bself\.skipTest\(|@unittest\.skip|@skip(?:If|Unless)?\b")
 UNFILLED_MARKER = "UNFILLED:"
 CORRECTED_BY = re.compile(r"\bCORRECTED-BY\s+((?:C\d+(?:,\s*)?)+)")
@@ -270,7 +271,7 @@ def grade(battery: pathlib.Path, root: pathlib.Path) -> int:
                 continue
             if SKIPPING.search(text):
                 skipped.append(node.name)
-            if not ASSERTING.search(text):
+            if not has_assertion(node):
                 assertionless.append(node.name)
             expected = bound.get(obligation_id, [])
             if expected:

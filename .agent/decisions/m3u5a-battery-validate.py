@@ -35,6 +35,7 @@ import argparse
 import ast
 import pathlib
 import re
+import runpy
 import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -42,7 +43,7 @@ CONTRACT = HERE / "m3u5a-contract.md"
 DEFAULT_BATTERY = HERE.parents[1] / "tests" / "test_cli_channels_battery.py"
 MARKER = "UNFILLED"
 
-ASSERTING = re.compile(r"\bself\.(assert|fail)\w*\(")
+has_assertion = runpy.run_path(str(HERE / "battery_ast.py"))["has_assertion"]
 SKIPPING = re.compile(r"\bself\.skipTest\(|@unittest\.skip|@skip(?:If|Unless)?\b")
 
 OBLIGATION = re.compile(r"^- \*\*(D\d{2})\*\* (.*)$")
@@ -196,7 +197,7 @@ def grade(path: pathlib.Path) -> int:
         if MARKER in segment:
             unfilled.append(oid)
             continue
-        if not ASSERTING.search(segment):
+        if not has_assertion(node):
             assertionless.append(oid)
 
     uncovered = sorted(oid for oid, name in wanted.items() if name not in found)
