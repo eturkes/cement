@@ -12796,6 +12796,7 @@ ShadowStore = _cement_module("shadow").ShadowStore
 admit = _cement_module("shadow").admit
 drop = _cement_module("shadow").drop
 fail = _cement_module("shadow").fail
+finish_shadow = _cement_module("shadow").finish_shadow
 record_shadow = _cement_module("shadow").record_shadow
 shadow_path = _cement_module("shadow").shadow_path
 PROVENANCE_MAX_BYTES = _cement_module("system").PROVENANCE_MAX_BYTES
@@ -13133,7 +13134,14 @@ class Filter:
             observed_at_us=hit["observed_at_us"],
         )
         if not admission.admitted:
-            self._count("duplicate")
+            # A replayed completion re-delivers its hits. A disagreement whose proposal write
+            # failed stays `prepared`: finish it here, with no second model call.
+            try:
+                await asyncio.to_thread(finish_shadow, system, store, admission.id)
+            except ConflictError:  # not prepared (the usual duplicate), or a mismatched proposal
+                self._count("duplicate")
+            else:
+                self._count("finished")
             return
         description = _operations(self.valves.operations).get(hit["operation"], "")
         messages, revision = _shadow_prompt(hit["operation"], description, hit["input"])

@@ -128,6 +128,23 @@ class ShadowSamplingTests(_Example):
         self.assertEqual(sh.drift(sh.ShadowStore(sh.shadow_path(self.db)), P, OP)["duplicates"], 1)
         self.assertEqual(self.rows()[0]["observation_id"], "ward-7:chat-1:msg-1:call-1")
 
+    def test_s5_a_replay_finishes_a_disagreement_whose_proposal_write_failed(self) -> None:
+        # The first proposal write fails after the shadow file holds the disagreement
+        # (`prepared`); a re-delivered completion finishes it without asking the model again.
+        from cement_runtime import StateError
+
+        self.publish(DOC)
+        body = self.body(1, DOC)
+        disagree = self.answering({"": {"fields": ["other"]}})  # "" is in every prompt
+        with mock.patch.object(System, "submit_proposal", side_effect=StateError("busy")):
+            asyncio.run(self.drive([body], disagree))
+        self.assertEqual([row["state"] for row in self.rows()], ["prepared"])
+        asyncio.run(self.drive([copy.deepcopy(body)], disagree))
+        self.assertEqual([row["state"] for row in self.rows()], ["disagreed"])
+        self.assertEqual(len(self.asked), 1)
+        self.assertEqual(len(self.system.proposals(P, status="pending")), 1)
+        self.assertEqual(self.filter.shadow_counts.get("finished"), 1)
+
     def test_s5_a_blocked_shadow_call_never_holds_the_reply(self) -> None:
         self.publish(DOC)
         body = self.body(1, DOC)
