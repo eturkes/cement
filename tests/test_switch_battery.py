@@ -356,5 +356,61 @@ class SwitchBattery(unittest.TestCase):
         self.assertEqual((served.verification.passed, served.verification.entries), (True, 7))
         self.assertEqual(served.match.output, {"f": 6})
 
+    def test_w14_a_corrupt_projection_program_fails_the_pin_and_never_raises(self) -> None:
+        operation = "plan"
+        self.system.register_operation(P, operation, policy=POLICY)
+        for name in ("A", "B"):
+            proposal = self.system.submit_proposal(
+                P, operation, {"document": f"FORM\nPatient: {name}"},
+                candidate=Candidate(output={"take": "Patient"}, provenance={}),
+            )
+            self.system.review(P, proposal, reviewer="learning-pass", decision="accept")
+        program = {
+            "abi": "cement-projection-v1", "text": "document", "keep": [],
+            "layouts": [{"name": "form", "title": "FORM", "entries": [{"label": "Patient"}]}],
+        }
+        self.system.set_projection(P, operation, program, actor="learning-pass")
+        self.system.compile(P, operation)
+        self.system.verify_drafts(P, operation, verified_by="learning-pass")
+        manifest = self.system.inspect_function_promotion(P, operation)
+        self.system.promote_function(
+            P, operation, expected_function_hash=manifest.function_hash, promoted_by="learning-pass"
+        )
+        self.system.set_switch(
+            P, operation, mode="pinned", actor="person", function_hash=manifest.function_hash
+        )
+        value = {"document": "FORM\nPatient: C"}
+        self.assertTrue(self.system.resolve(P, operation, value).match.matched)
+        connection = sqlite3.connect(self.db)
+        try:
+            trigger = connection.execute(
+                "SELECT sql FROM sqlite_master WHERE name = 'projection_programs_no_update'"
+            ).fetchone()[0]
+            connection.execute("DROP TRIGGER projection_programs_no_update")
+            self.assertEqual(
+                connection.execute("UPDATE projection_programs SET program_json = '{}'").rowcount, 1
+            )
+            connection.execute(trigger)
+            connection.commit()
+        finally:
+            connection.close()
+        system = System(self.db, create=False)
+        served = system.resolve(P, operation, value)
+        self.assertIsNone(served.match)
+        self.assertFalse(served.verification.passed)
+        self.assertIsNone(served.verification.document)
+        self.assertEqual(
+            [(check.key, check.passed) for check in served.verification.checks],
+            [
+                ("pinned-receipt-rebuilds", False),
+                ("pinned-evidence-unrevoked", True),
+                ("pinned-members-unsuspended", True),
+                ("pinned-no-counterexample", False),
+            ],
+        )
+        self.assertEqual(served.verification.checks[3].detail, "stored projection program is invalid")
+        versions = system.function_versions(P, operation, check=True).versions
+        self.assertEqual([version.servable for version in versions], [False])
+
 if __name__ == "__main__":
     unittest.main()

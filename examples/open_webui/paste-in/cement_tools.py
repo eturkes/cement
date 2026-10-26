@@ -18,8 +18,8 @@ from pydantic import BaseModel, Field
 # The embedded source keeps its own line breaks; one of its pragma comments runs past 100
 # columns inside the string, where ruff reads no pragma.
 # ruff: noqa: E501
-_CEMENT_PACKAGE = "_cement_runtime_f95fef706ac11cf0"
-_CEMENT_DIGEST = "f95fef706ac11cf02552c251d30975ba9c32f295a1d8aa8ea3fcf090c357b055"
+_CEMENT_PACKAGE = "_cement_runtime_2ba7717e39d3dd88"
+_CEMENT_DIGEST = "2ba7717e39d3dd8878f3a814526530d9c40555743d8377fd74bf52a050c9ca76"
 _CEMENT_SOURCES = {
     "__init__": r'''
 """Cement public API."""
@@ -9727,7 +9727,7 @@ class System:
                 raise IntegrityError("pinned receipt rebuilds a different function")
             document = reconstruction.document
             checks.append(FunctionCheck(key="pinned-receipt-rebuilds", passed=True, detail="ok"))
-        except IntegrityError as exc:
+        except (IntegrityError, ValidationError) as exc:
             checks.append(
                 FunctionCheck(key="pinned-receipt-rebuilds", passed=False, detail=str(exc)[:200])
             )
@@ -9781,49 +9781,20 @@ class System:
               AND a.projection_hash IS NULL
             """
         )
+        counter_failure: str | None = None
         if receipt_row is not None and receipt_row["projection_hash"] is not None:
-            # P-d under the RECEIPT's own program: a counterexample reaches a member's key
-            # through projection, never through the raw input digest.
-            program = self._program_by_hash(connection, str(receipt_row["projection_hash"]))
-            members = {
-                str(row["input_json"]): str(row["output_json"])
-                for row in connection.execute(
-                    """
-                    SELECT a.input_json, a.output_json FROM function_memberships AS m
-                    JOIN artifacts AS a ON a.id = m.artifact_id
-                    WHERE m.receipt_id = ?
-                    """,
-                    (receipt_id,),
-                )
-            }
-            for example in connection.execute(
-                """
-                SELECT c.input_json, c.input_hash, c.output_json FROM examples AS c
-                LEFT JOIN example_revocations AS x ON x.example_id = c.id
-                WHERE c.partition = ? AND c.operation = ? AND c.operation_revision = ?
-                  AND c.origin = 'challenge' AND x.example_id IS NULL
-                  AND NOT EXISTS (SELECT 1 FROM examples AS s WHERE s.supersedes_example_id = c.id)
-                """,
-                (
-                    receipt_row["partition"],
-                    receipt_row["operation"],
-                    receipt_row["operation_revision"],
-                ),
-            ):
-                key = (
-                    None
-                    if program is None
-                    else self._case_key_text(
-                        program, str(example["input_json"]), str(example["input_hash"])
-                    )
-                )
-                if key in members and members[key] != example["output_json"]:
-                    counter += 1
+            # A corrupt stored program or input fails this check, as reconstruction's failure
+            # fails its own: the pin's verdict is a value, never a raise.
+            try:
+                counter += self._projected_counterexamples(connection, receipt_row)
+            except (IntegrityError, ValidationError) as exc:
+                counter_failure = str(exc)[:200]
         checks.append(
             FunctionCheck(
                 key="pinned-no-counterexample",
-                passed=counter == 0,
-                detail="ok" if counter == 0 else f"{counter} counterexample(s) on member keys",
+                passed=counter == 0 and counter_failure is None,
+                detail=counter_failure
+                or ("ok" if counter == 0 else f"{counter} counterexample(s) on member keys"),
             )
         )
         if expected_function_hash is not None:
@@ -9843,6 +9814,44 @@ class System:
             function_hash=function_hash,
             checks=tuple(checks),
         )
+
+    def _projected_counterexamples(
+        self, connection: sqlite3.Connection, receipt_row: sqlite3.Row
+    ) -> int:
+        """P-d under the RECEIPT's own program: a counterexample reaches a member's key through
+        projection, never through the raw input digest."""
+
+        program = self._program_by_hash(connection, str(receipt_row["projection_hash"]))
+        if program is None:
+            return 0
+        members = {
+            str(row["input_json"]): str(row["output_json"])
+            for row in connection.execute(
+                """
+                SELECT a.input_json, a.output_json FROM function_memberships AS m
+                JOIN artifacts AS a ON a.id = m.artifact_id
+                WHERE m.receipt_id = ?
+                """,
+                (str(receipt_row["id"]),),
+            )
+        }
+        counter = 0
+        for example in connection.execute(
+            """
+            SELECT c.input_json, c.input_hash, c.output_json FROM examples AS c
+            LEFT JOIN example_revocations AS x ON x.example_id = c.id
+            WHERE c.partition = ? AND c.operation = ? AND c.operation_revision = ?
+              AND c.origin = 'challenge' AND x.example_id IS NULL
+              AND NOT EXISTS (SELECT 1 FROM examples AS s WHERE s.supersedes_example_id = c.id)
+            """,
+            (receipt_row["partition"], receipt_row["operation"], receipt_row["operation_revision"]),
+        ):
+            key = self._case_key_text(
+                program, str(example["input_json"]), str(example["input_hash"])
+            )
+            if key in members and members[key] != example["output_json"]:
+                counter += 1
+        return counter
 
     def function_versions(
         self,
