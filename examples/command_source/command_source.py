@@ -32,7 +32,14 @@ from cement_runtime.errors import (
     StateError,
     ValidationError,
 )
-from cement_runtime.json_value import DEFAULT_MAX_BYTES, JSONValue, canonicalize, parse_json
+from cement_runtime.json_value import (
+    DEFAULT_MAX_BYTES,
+    DEFAULT_MAX_DEPTH,
+    DEFAULT_MAX_ITEMS,
+    JSONValue,
+    canonicalize,
+    parse_json,
+)
 from cement_runtime.models import Candidate, CandidateRequest
 
 SOURCE_PROTOCOL = "cement-candidate-v2"
@@ -135,7 +142,14 @@ class CommandCandidateSource:
             "partition": request.partition,
             "protocol": SOURCE_PROTOCOL,
         }
-        request_bytes = canonicalize(envelope, max_bytes=2_097_152).text.encode("utf-8")
+        # The envelope nests the input one level down beside its own keys: a value the library
+        # accepted stays inside the protocol's limits.
+        request_bytes = canonicalize(
+            envelope,
+            max_bytes=2_097_152,
+            max_depth=DEFAULT_MAX_DEPTH + 1,
+            max_items=DEFAULT_MAX_ITEMS + len(envelope),
+        ).text.encode("utf-8")
         environment = None
         if self._environment is not None:
             # Explicit environments are exact: ambient credentials are excluded.
@@ -285,8 +299,13 @@ class CommandCandidateSource:
             raise CandidateSourceError(f"candidate command exited with status {process.returncode}")
 
         try:
+            # `output` + `provenance` sit one level down, beside their two keys; each keeps the
+            # limits the library grades it by (provenance: at most 64 KiB, so fewer items).
             response = parse_json(
-                bytes(raw).decode("utf-8"), max_bytes=self._max_output_bytes
+                bytes(raw).decode("utf-8"),
+                max_bytes=self._max_output_bytes,
+                max_depth=DEFAULT_MAX_DEPTH + 1,
+                max_items=DEFAULT_MAX_ITEMS + 2 + 65_536,
             ).value
         except (UnicodeDecodeError, ValidationError) as exc:
             raise CandidateSourceError("candidate command returned invalid JSON") from exc

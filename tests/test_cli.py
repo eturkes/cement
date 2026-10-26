@@ -3254,6 +3254,19 @@ class CLITests(unittest.TestCase):
         self.assertEqual(text_host.stdout_bytes, expected)
         self.assertEqual(text_host.status, 0)
 
+    def test_function_export_writes_a_basename_near_the_name_limit_in_multibyte_text(self) -> None:
+        # The temporary beside the target takes 64 BYTES of its name: 61 four-byte characters
+        # (244 bytes) once produced a 258-byte temporary name past NAME_MAX.
+        self.promoted_operation("echo", 2)
+        System(self.database).set_switch("tenant", "echo", mode="follow", actor="operator")
+        target = pathlib.Path(self.database).parent / ("\U0001f331" * 61)
+        self.assertEqual(len(os.fsencode(target.name)), 244)
+        target.write_bytes(b"previous")
+        run = self.run_cli("function", "export", "echo", "--out", str(target))
+        self.assertEqual(run.status, 0, run.stderr_text)
+        self.assertEqual(target.read_bytes(), self.live_document("echo").encode("utf-8"))
+        self.assertEqual(sorted(path.name for path in target.parent.iterdir() if path.name.startswith(".")), [])
+
     # p15: the M2.4c5a diff-blind export probes no shipped test subsumed, ported.
     def test_function_export_requires_db_and_partition(self) -> None:
         cases = (

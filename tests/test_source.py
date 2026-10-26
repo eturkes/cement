@@ -38,6 +38,24 @@ class CommandCandidateSourceTests(unittest.TestCase):
         self.assertEqual(candidate.provenance["source_id"], "test-source")
         self.assertEqual(candidate.provenance["reported"], {"model": "fake"})
 
+    def test_values_at_the_library_limits_cross_the_protocol_both_ways(self) -> None:
+        # The request + response envelopes nest a value one level down beside their own keys.
+        from cement_runtime.json_value import DEFAULT_MAX_DEPTH, DEFAULT_MAX_ITEMS
+
+        script = (
+            "import json,sys; r=json.load(sys.stdin); "
+            "json.dump({'output':r['input'],'provenance':{}},sys.stdout)"
+        )
+        source = CommandCandidateSource([sys.executable, "-c", script])
+        deep: object = 0
+        for _ in range(DEFAULT_MAX_DEPTH):
+            deep = [deep]
+        for kind, value in (("depth", deep), ("items", [0] * (DEFAULT_MAX_ITEMS - 1))):
+            with self.subTest(kind=kind):
+                request = CandidateRequest(partition="tenant", operation="echo", operation_revision=1,
+                                           input=value)
+                self.assertEqual(source.propose(request).output, value)
+
     def test_nonzero_stderr_is_not_reflected(self) -> None:
         source = CommandCandidateSource(
             [sys.executable, "-c", "import sys;sys.stderr.write('SECRET');sys.exit(7)"]

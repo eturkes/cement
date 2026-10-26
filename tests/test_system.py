@@ -18605,5 +18605,54 @@ class FileModeTests(unittest.TestCase):
         self.assertEqual([row["name"] for row in System(ledger, create=False).operations("tenant")], ["op"])
         ShadowStore(shadow, create=False)
 
+
+class ReceiptEnvelopeTests(unittest.TestCase):
+    """Every value the library accepts at its limits confirms and supersedes: the receipt that
+    embeds it adds its own level + keys on top of the value limits."""
+
+    @staticmethod
+    def _nested(depth: int) -> object:
+        value: object = 0
+        for _ in range(depth):
+            value = [value]
+        return value
+
+    def setUp(self) -> None:
+        from cement_runtime.json_value import DEFAULT_MAX_DEPTH, DEFAULT_MAX_ITEMS
+
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.system = System(pathlib.Path(temporary.name) / "ledger.db")
+        self.system.register_operation("p", "op")
+        self.depth, self.items = DEFAULT_MAX_DEPTH, DEFAULT_MAX_ITEMS
+
+    def _confirm(self, value: object, output: object, *, correct: bool = False) -> str:
+        proposal = self.system.submit_proposal(
+            "p", "op", value, candidate=Candidate(output=0 if correct else output, provenance={})
+        )
+        result = self.system.review(
+            "p", proposal, reviewer="learning-pass", decision="correct" if correct else "accept",
+            **({"corrected_output": output} if correct else {}),
+        )
+        self.assertEqual(result.output, output)
+        return str(result.example_id)
+
+    def test_values_at_the_depth_and_item_limits_confirm_supersede_and_compile(self) -> None:
+        deep = self._nested(self.depth)
+        first = self._confirm(deep, 0)
+        self._confirm(deep, 0)
+        self._confirm({"k": 1}, deep, correct=True)
+        self._confirm([0] * (self.items // 2), [1] * (self.items // 2))
+        # The receipts read back during compile; the deep case then meets the artifact's own
+        # aggregate limit (pinned elsewhere) and is blocked, never an integrity failure.
+        compiled = self.system.compile("p", "op")
+        deep_hash = canonicalize(deep).digest
+        blocked = {scope["input_hash"]: scope["reasons"] for scope in compiled.blocked}
+        self.assertEqual(blocked[deep_hash], ["artifact constraint: JSON exceeds maximum depth 64"])
+        superseding = self.system.supersede_examples(
+            "p", "op", example_ids=[first], output=1, reviewer="learning-pass"
+        )
+        self.assertEqual(len(superseding), 1)
+
 if __name__ == "__main__":
     unittest.main()

@@ -653,7 +653,9 @@ def _export_temporary(target: pathlib.Path) -> tuple[int, pathlib.Path]:
     names up to the filesystem maximum.
     """
     for _ in range(_EXPORT_ATTEMPTS):
-        candidate = target.with_name(f".{target.name[:64]}.{os.urandom(6).hex()}")
+        # 64 BYTES of the name (not characters: 64 four-byte characters are 256 bytes).
+        prefix = os.fsdecode(os.fsencode(target.name)[:64])
+        candidate = target.with_name(f".{prefix}.{os.urandom(6).hex()}")
         if candidate == target:
             continue
         try:

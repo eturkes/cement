@@ -20,6 +20,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 BASE = "93007ac"  # the M3.6b squash on main
+MOVED_AT = "635a473"  # the M3.7 close: the commit that moved the runtime
 SURFACE = "examples/command_source"
 MOVED = {
     "src/cement_runtime/_command_supervisor.py": f"{SURFACE}/_command_supervisor.py",
@@ -65,9 +66,11 @@ class RelocationBattery(unittest.TestCase):
                 self.assertIn(new, tracked)
 
     def test_r2_the_class_span_is_byte_identical(self) -> None:
+        # The move is a closed transition: both endpoints from git (M3.7 close = 635a473), so the
+        # shipped example may evolve after it (owner standing approval, `.agent/spec.md` Pin repairs).
         base = _class_span(_git("show", f"{BASE}:src/cement_runtime/source.py"), "CommandCandidateSource")
         moved = _class_span(
-            (ROOT / SURFACE / "command_source.py").read_text(encoding="utf-8"), "CommandCandidateSource"
+            _git("show", f"{MOVED_AT}:{SURFACE}/command_source.py"), "CommandCandidateSource"
         )
         self.assertEqual(moved, base)
 

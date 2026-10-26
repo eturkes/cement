@@ -54,6 +54,8 @@ from .function import (
 from .json_value import (
     CANONICALIZER,
     DEFAULT_MAX_BYTES,
+    DEFAULT_MAX_DEPTH,
+    DEFAULT_MAX_ITEMS,
     CanonicalJSON,
     JSONValue,
     canonicalize,
@@ -124,6 +126,13 @@ _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}\Z")
 _ENTITY_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}\Z")
 _UNSET = object()
 _RECEIPT_MAX_BYTES = 3 * DEFAULT_MAX_BYTES
+# A receipt embeds one input + one output, each up to the value limits, under its own object:
+# one more level and its own keys on top, so a value the library accepted always confirms.
+_RECEIPT_LIMITS = {
+    "max_bytes": _RECEIPT_MAX_BYTES,
+    "max_depth": DEFAULT_MAX_DEPTH + 1,
+    "max_items": 2 * DEFAULT_MAX_ITEMS + 32,
+}
 _CASE_KEY_MEMO_MAX = 65_536
 _MAX_SQLITE_INTEGER = 2**63 - 1
 
@@ -2076,7 +2085,7 @@ class System:
                 "resolution": proposal_status,
                 "reviewer": reviewer,
             }
-            receipt = canonicalize(receipt_value, max_bytes=_RECEIPT_MAX_BYTES)
+            receipt = canonicalize(receipt_value, **_RECEIPT_LIMITS)
             proposal_update = connection.execute(
                 """
                 UPDATE proposals
@@ -2611,7 +2620,7 @@ class System:
             try:
                 input_json = parse_json(str(row["input_json"]))
                 output_json = parse_json(str(row["output_json"]))
-                receipt = parse_json(str(row["receipt_json"]), max_bytes=_RECEIPT_MAX_BYTES)
+                receipt = parse_json(str(row["receipt_json"]), **_RECEIPT_LIMITS)
             except ValidationError as exc:
                 integrity_failure(f"example {row['id']} contains invalid canonical JSON: {exc}")
                 continue
@@ -6336,7 +6345,7 @@ class System:
                     "resolution": "challenge",
                     "reviewer": reviewer,
                 },
-                max_bytes=_RECEIPT_MAX_BYTES,
+                **_RECEIPT_LIMITS,
             )
             connection.execute(
                 """
@@ -6737,7 +6746,7 @@ class System:
                         "reviewer": reviewer,
                         "supersedes_example_id": old_id,
                     },
-                    max_bytes=_RECEIPT_MAX_BYTES,
+                    **_RECEIPT_LIMITS,
                 )
                 connection.execute(
                     """
