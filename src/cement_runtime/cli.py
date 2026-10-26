@@ -915,6 +915,11 @@ def _function_listing(
         "receipt_id": receipt.id,
         "function_hash": receipt.function_hash,
         "projection_hash": reconstruction.document.projection_hash,
+        "projection": (
+            None
+            if reconstruction.document.projection is None
+            else reconstruction.document.projection.canonical.value
+        ),
         "comparator": system.comparator(
             partition, operation, operation_revision=receipt.operation_revision
         ),
@@ -981,6 +986,34 @@ def _comparator_lines(record: Any, revision: int) -> list[str]:
     return lines
 
 
+def _projection_lines(program: dict[str, Any], program_hash: str) -> list[str]:
+    """The version's projection as code, and the assumption it rests on (M4: Read states it)."""
+
+    def text(value: Any) -> str:
+        return _visible(canonicalize(value).text)
+
+    full_width = "\N{FULLWIDTH COLON}"
+    ends = f"':' or '{full_width}'" if program["abi"] == "cement-projection-v2" else "':'"
+    lines = [
+        f"# Each input maps to its case through projection {program_hash} ({program['abi']}).",
+        "# The learning pass ruled that the answer depends on the form's structure alone: its",
+        "# title and its labels, never the values the form holds. Cement checks the program, not",
+        "# that ruling.",
+        "def case_of(input):",
+        f"    form = layout(input[{text(program['text'])}])  # title + labels ending at {ends}",
+    ]
+    for layout in program["layouts"]:
+        structure = ", ".join(
+            f"{kind} {text(key)}" for entry in layout["entries"] for kind, key in entry.items()
+        )
+        name = text(layout["name"])
+        lines.append(f"    if form == ({text(layout['title'])}, [{structure}]):  # layout {name}")
+        kept = ", ".join(f"{text(field)}: input[{text(field)}]" for field in program["keep"])
+        lines.append(f"        return (form, {{{kept}}})")
+    lines += ["    return None  # no layout matches: the LLM answers", ""]
+    return lines
+
+
 def _render_listing(listing: dict[str, Any]) -> str:
     """The human reading of `_function_listing`: one guarded branch per case, then the miss."""
 
@@ -1003,10 +1036,8 @@ def _render_listing(listing: dict[str, Any]) -> str:
         f"# switch {listing['switch']}: {serving}",
         "# Cement seals exact cases and runs no code; this listing renders them.",
     ]
-    if listing["projection_hash"] is not None:
-        lines.append(
-            f"# Each input maps to its case through projection {listing['projection_hash']}."
-        )
+    if listing["projection"] is not None:
+        lines += _projection_lines(listing["projection"], listing["projection_hash"])
     lines += _comparator_lines(listing["comparator"], listing["operation_revision"])
     lines.append("")
     for case in listing["cases"]:

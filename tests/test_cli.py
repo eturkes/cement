@@ -4164,6 +4164,38 @@ class CLITests(unittest.TestCase):
             self.run_cli("function", "read", "read-me", "--receipt-id", first.id).stdout_text,
         )
 
+    def test_function_read_shows_a_projected_version_s_program_and_its_assumption(self) -> None:
+        # M4 (spec Decisions): the Read view shows the projection as code and states the
+        # learning pass's structure-only assumption before a person switches the version on.
+        from cement_runtime.learning import merge_case, publish
+
+        system = System(self.database)
+        system.register_operation("tenant", "form")
+        proposals = [
+            system.submit_proposal(
+                "tenant", "form", {"document": f"FORM\nName: {name}"},
+                candidate=Candidate(output={"extract": "Name"}, provenance={}),
+            )
+            for name in ("Ada", "Bea")
+        ]
+        merge_case(system, "tenant", "form", {"extract": "Name"}, note="n", proposal_ids=proposals,
+                   projectable=True)
+        self.assertTrue(publish(system, "tenant", "form", projectable=True).published)
+        listing = self.payload(self.run_cli("function", "read", "form", "--json"))
+        self.assertEqual(listing["projection"], system.projection("tenant", "form")["program"])
+        text = self.run_cli("function", "read", "form").stdout_text
+        for line in (
+            "# The learning pass ruled that the answer depends on the form's structure alone: its\n",
+            "# title and its labels, never the values the form holds. Cement checks the program, not\n",
+            "def case_of(input):\n",
+            '    form = layout(input["document"])  # title + labels ending at \':\'\n',
+            '    if form == ("FORM", [label "Name"]):  # layout "form"\n',
+            "    return None  # no layout matches: the LLM answers\n",
+        ):
+            self.assertIn(line, text)
+        self._read_fixture()  # an exact-mode version carries no program
+        self.assertIsNone(self.payload(self.run_cli("function", "read", "read-me", "--json"))["projection"])
+
     def test_function_read_exits_3_without_a_promoted_version(self) -> None:
         System(self.database).register_operation("tenant", "unread")
         for flags in ((), ("--json",)):
