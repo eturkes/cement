@@ -896,7 +896,19 @@ def _function_listing(
                 "examples_without_proposal": unproposed,
             }
         )
-    answers = receipt.id == (state.receipt_id if state.mode == "pinned" else newest)
+    selected = state.mode != "off" and receipt.id == (
+        state.receipt_id if state.mode == "pinned" else newest
+    )
+    answers = False
+    if selected:
+        # Selection is not serving: the version answers only while `serving` verifies it, so a
+        # suspended member, revoked evidence or a damaged row reads as answering nothing.
+        _, verification = system.serving(partition, operation)
+        answers = (
+            verification is not None
+            and verification.passed
+            and verification.function_hash == receipt.function_hash
+        )
     return {
         "operation": operation,
         "operation_revision": receipt.operation_revision,
@@ -907,7 +919,8 @@ def _function_listing(
             partition, operation, operation_revision=receipt.operation_revision
         ),
         "switch": state.mode,
-        "answers": answers and state.mode != "off",
+        "selected": selected,
+        "answers": answers,
         "newest": receipt.id == newest,
         "cases": cases,
     }
@@ -980,8 +993,10 @@ def _render_listing(listing: dict[str, Any]) -> str:
         serving = "no version answers yet" + (
             "; this is the newest version" if listing["newest"] else ""
         )
+    elif listing["selected"]:
+        serving = "the switch selects this version, but it fails verification and answers nothing"
     else:
-        serving = "a different version answers"
+        serving = "the switch selects a different version"
     lines = [
         f"# function {listing['operation']}, version {listing['function_hash']}",
         f"# receipt {listing['receipt_id']}, operation revision {listing['operation_revision']}",

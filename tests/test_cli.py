@@ -4126,13 +4126,43 @@ class CLITests(unittest.TestCase):
             "tenant", "read-me", mode="pinned", actor="person", function_hash=first.function_hash
         )
         pinned = self.payload(self.run_cli("function", "read", "read-me", "--json"))
-        self.assertEqual((pinned["receipt_id"], pinned["answers"]), (first.id, True))
+        # The first version's evidence was revoked + a member suspended: `serving` refuses the pin
+        # (`function versions --check` servable False), so Read says it answers nothing.
+        self.assertEqual(
+            (pinned["receipt_id"], pinned["selected"], pinned["answers"]), (first.id, True, False)
+        )
         by_id = self.payload(
             self.run_cli("function", "read", "read-me", "--receipt-id", first.id, "--json")
         )
         self.assertEqual(by_id["receipt_id"], first.id)
         missing = self.run_cli("function", "read", "read-me", "--receipt-id", "fpr_absent")
         self.assertEqual((missing.status, missing.stdout_bytes), (3, b""))
+
+    def test_function_read_says_a_selected_version_that_fails_verification_answers_nothing(self) -> None:
+        system, _ = self._read_fixture()
+        newest, first = (
+            version.receipt for version in system.function_versions("tenant", "read-me").versions
+        )
+        system.set_switch("tenant", "read-me", mode="follow", actor="person")
+        member = system.function_report("tenant", "read-me").function_anchor.members[0].artifact_id
+        system.suspend_artifact("tenant", member, suspended_by="person", reason="withdrawn")
+        self.assertFalse(system.serving("tenant", "read-me")[1].passed)
+        listing = self.payload(self.run_cli("function", "read", "read-me", "--json"))
+        self.assertEqual((listing["receipt_id"], listing["selected"], listing["answers"]),
+                         (newest.id, True, False))
+        self.assertIn(
+            "# switch follow: the switch selects this version, but it fails verification and"
+            " answers nothing\n",
+            self.run_cli("function", "read", "read-me").stdout_text,
+        )
+        other = self.payload(
+            self.run_cli("function", "read", "read-me", "--receipt-id", first.id, "--json")
+        )
+        self.assertEqual((other["selected"], other["answers"]), (False, False))
+        self.assertIn(
+            "# switch follow: the switch selects a different version\n",
+            self.run_cli("function", "read", "read-me", "--receipt-id", first.id).stdout_text,
+        )
 
     def test_function_read_exits_3_without_a_promoted_version(self) -> None:
         System(self.database).register_operation("tenant", "unread")
