@@ -4,7 +4,7 @@
 Usage: uv run python .agent/seeds [--rev REV] [--only S01 ...] [--list]
        uv run python .agent/seeds --self-test
 
-S01–S26 group the implemented recipes, with a result per executed case. Coverage
+S01–S27 group the implemented recipes, with a result per executed case. Coverage
 excludes wheel failure seeds, embedded-copy/umask replay, and owui-audit hold recipes.
 rc 0 = every selected expectation matched and every worktree restored; 1 = a
 verdict differs; 2 = setup/restoration failure. --self-test repeats the selected
@@ -67,6 +67,7 @@ GROUPS = [
     ("S24", "`.agent/law-census` (", "law census", False),
     ("S25", "`.agent/decisions/p03-stored-int-census.py` + ", "stored ints, anchors, revisions", False),
     ("S26", "`.agent/owui-audit --no-holds` (", "build constraints audit", False),
+    ("S27", "`.agent/decisions/p10-scratch-census.py` (", "scratch citations", False),
 ]
 
 
@@ -677,6 +678,20 @@ unittest.main()
             with changed(local, substitute(local.read_text(), r"(?m)^ +# Fixed arguments: .*\n +# another line .*\n", "")):
                 self.python(sid, "bare-suppression", root, census, 1,
                             [r"^REASONS: examples/open_webui/local\.py:\d+: noqa: S603 without a reason"])
+
+    def S27(self):
+        sid = "S27"
+        census = ".agent/decisions/p10-scratch-census.py"
+        with self.tree() as root:
+            self.python(sid, "shipped", root, census, 0, [r"unmarked 0$"])
+            docs = root / "docs/architecture.md"
+            with changed(docs, docs.read_text() + "\nSee `.scratch/s27-seed/notes.md`.\n"):
+                self.python(sid, "unmarked", root, census, 1, [r"^UNMARKED docs/architecture\.md:\d+: See `\.scratch/s27-seed/notes\.md`"])
+            contract = root / ".agent/decisions/p136-store-contract.md"
+            text = contract.read_text()
+            marker = text.index("Machine-local: each `.scratch/` path in this file")
+            with changed(contract, text[:marker]):
+                self.python(sid, "marker-gone", root, census, 1, [r"^UNMARKED \.agent/decisions/p136-store-contract\.md:\d+:"])
 
     def S26(self):
         sid = "S26"

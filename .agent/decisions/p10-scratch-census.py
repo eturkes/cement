@@ -29,6 +29,8 @@ OPERATIONAL = {
     "prototype/webui-demo/README.md": "capture output directory (gitignored by design)",
     ".agent/spec.md": "the queue run's RESUME row names its helpers; the row leaves at the run's close",
     "tests/test_cli_removal_battery.py": "D25 pins the p12 row's own text",
+    ".claude/rules/gate-checks.md": "the census's firing record names its seed citation",
+    ".agent/seeds": "the census's seed group (S27) plants a citation",
 }
 HISTORY = (".agent/archive/", ".agent/deferred.md", ".gitignore")
 MARKED_JSON = {

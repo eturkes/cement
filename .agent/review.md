@@ -21,6 +21,18 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p151 close (MAINTAIN queue run 4, born at p143; owner-approved gate change; tier `data`: a citation census) — target = the commit landing this section
+
+Check set = the row's acceptance A1-A4 + C1 (the census's own records), fixed before the diff was reread. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | step `scratch` in both branches of `.agent/gate` | pass | after `revisions` in the full + `--omit-d28` branches; shipped → rc 0 `unmarked 0`. |
+| A2 | a planted unmarked citation reds the step; the shipped tree passes | pass | seed 9d2f1d6 → CI run 40530418078: both legs `scratch 1`, every other step 0; the closing CI gate = this commit's body. |
+| A3 | `.agent/seeds` group + `gate-checks.md` bullet + `paths:` | pass | S27 3/3 MATCH (shipped, docs citation, marker removed); bullet + `paths:` entry; S01-S27 header (p145 took S26, so the prepared group moved to S27 at landing). |
+| A4 | `ops.md` Gate list + `spec.md` Artifacts | pass | both name the step; the on-demand bullet became the census bullet. |
+| C1 | the census's own records | pass | its first run on the prepared branch reddened its own new `gate-checks.md` bullet (`.scratch/` in the seed text) → `OPERATIONAL` gains `gate-checks.md` (firing record) + `.agent/seeds` (seed group; it had passed only because it quotes the `MARKER` sentence), each with its reason. |
+
 ## p137 agent part 2 (MAINTAIN queue run 4, tier `data`: audit holds; the row stays open on its trigger) — target = the commit landing this section
 
 Same check set as `## p137 agent part` (A1 holds = findings, A2 row text, A3 p144 facts, C1 no hold widened), fixed before the diff was reread. MAIN alone.

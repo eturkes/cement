@@ -36,6 +36,7 @@ if [ "${1:-}" = "--omit-d28" ]; then
   step stored-ints uv run python .agent/decisions/p03-stored-int-census.py
   step anchors uv run python .agent/decisions/p76-anchor-census.py --quiet
   step revisions uv run python .agent/decisions/p94-sha-census.py
+  step scratch uv run python .agent/decisions/p10-scratch-census.py
   step queue uv run python .agent/decisions/m3-deferred-validate.py
   step reports uv run python .agent/decisions/m3-report-validate.py --all
   step unittest uv run python .agent/suite --omit-d28 "${durations[@]}"
@@ -54,6 +55,7 @@ elif [ $# -eq 0 ]; then
   step stored-ints uv run python .agent/decisions/p03-stored-int-census.py
   step anchors uv run python .agent/decisions/p76-anchor-census.py --quiet
   step revisions uv run python .agent/decisions/p94-sha-census.py
+  step scratch uv run python .agent/decisions/p10-scratch-census.py
   step queue uv run python .agent/decisions/m3-deferred-validate.py
   step reports uv run python .agent/decisions/m3-report-validate.py --all
   step unittest uv run python -m unittest discover -s tests -t . "${durations[@]}"
