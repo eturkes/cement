@@ -21,6 +21,18 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p152 close (MAINTAIN queue run 4, born at p149; tier `data`: closed-unit graders) — target = the commit landing this section
+
+Check set = the row's acceptance A1-A3 + C1 (callers + self-tests) + K1 (cleanup: one helper), fixed before the diff was reread. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | the three named default to close objects, live behind a flag | pass | m3u4 `7864274`, reamend `--check` via the validator's `36f7890`, m3u5b `1146421` (all reads staged, self-test included); `--worktree` reds m3u4 + reamend (the drift the row measured); m3u5b stays green both ways (latent). |
+| A2 | rc 0 on a clean clone; m3u5b self-test reds its plants | pass | fresh clone + the 10 files, `python3 -I`: rc 0 × 9 (+ crosswalk); m3u5b `--self-test` 11/11 controls fired before and after. |
+| A3 | the rest of the census classified | pass | three more graders/censuses of closed units converted (m3u3 `32c2d11`, m3u6a1-census `dc4ab5e` — red at HEAD, self-test 2/4 controls dead at HEAD → 4/4, m3u2b crosswalk `02dd892`); the remaining 12 = sweeps, burden runs, probes, a corpus: live-range by design, recorded in `assurance.md` Tripwires. |
+| C1 | callers + self-tests | pass | `cr1-read-cache.py` GREEN; reamend apply mode refuses an unnamed target (rc 2) instead of rewriting the live battery from a close read; `--emit-stub` / `--emit` keep writing the live files (each unit's own seed step), stdout stubs carry no `SOURCE` line. |
+| K1 | cleanup | pass | one helper replaces p149's two `_read` copies + m3u6a1's `_git_object`; `p94-sha-census.py` rc 0 (four new constants in HEAD's history). |
+
 ## p147 close (MAINTAIN queue run 4, live regimen; tier `docs`: skill text proven by a sampled run) — target = the commit landing this section
 
 Check set = the row's acceptance A1 (Open WebUI pass), A2 (nucllei pass), A3 (records) + C1 (the evidence is the run's, not the teammate's summary), fixed before the records were reread. Teammates: operator-1 (Open WebUI), operator-2 (nucllei); each verdict below = MAIN's read of the raw files they saved.

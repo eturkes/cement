@@ -2,7 +2,7 @@
 """Obligation grader for the M3.3 battery. Discharges contract D30.
 
 Usage:
-  uv run python .agent/decisions/m3u3-battery-validate.py
+  uv run python .agent/decisions/m3u3-battery-validate.py [--worktree]
   uv run python .agent/decisions/m3u3-battery-validate.py --emit-stub
 
 The graded artifact is ``tests/test_submission_battery.py``. Every obligation the
@@ -23,6 +23,10 @@ edge of an obligation adds ``test_<id>_<other_slug>`` and the count rises.
 Exit 0 = every obligation covered at its required count AND no test left
 unfilled AND every test carrying a docstring that states its obligation. Exit 1 =
 any gap. Exit 2 = the artifact is missing or unparseable.
+
+Grading reads the battery as committed at M3.3's close (`CLOSE`) by default: later units extend it,
+so a working-tree read grades a question the unit no longer owns (p152, the p149 form).
+`--worktree` grades the live file. `--emit-stub` writes the live file (the unit's own seed step).
 """
 
 from __future__ import annotations
@@ -30,10 +34,13 @@ from __future__ import annotations
 import argparse
 import ast
 import re
+import runpy
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+CLOSE = "32c2d11"  # M3.3's close: `roadmap (M3.3): … → discharge all six and set the unit DONE`
+closed_unit = runpy.run_path(str(Path(__file__).resolve().parent / "closed_unit.py"))
 BATTERY = ROOT / "tests" / "test_submission_battery.py"
 CONTRACT = ROOT / ".agent" / "decisions" / "m3u3-contract.md"
 
@@ -163,12 +170,13 @@ def _is_unfilled(node: ast.FunctionDef) -> bool:
     return False
 
 
-def grade() -> int:
-    if not BATTERY.exists():
+def grade(rev: str | None) -> int:
+    print(f"SOURCE: {'working tree' if rev is None else rev + ' (M3.3 close)'}")
+    if rev is None and not BATTERY.exists():
         _fail(f"{BATTERY.relative_to(ROOT)} is missing; run --emit-stub first")
         return 2
     try:
-        tree = ast.parse(BATTERY.read_text(encoding="utf-8"))
+        tree = ast.parse(closed_unit["read"](rev, BATTERY))
     except SyntaxError as error:
         _fail(f"{BATTERY.relative_to(ROOT)} does not parse: {error}")
         return 2
@@ -229,8 +237,9 @@ def grade() -> int:
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--emit-stub", action="store_true", help="write the all-UNFILLED seed")
+    parser.add_argument("--worktree", action="store_true", help="grade the live battery")
     args = parser.parse_args(argv)
-    return emit_stub() if args.emit_stub else grade()
+    return emit_stub() if args.emit_stub else grade(None if args.worktree else CLOSE)
 
 
 if __name__ == "__main__":

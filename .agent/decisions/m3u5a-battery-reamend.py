@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Re-inject the CURRENT contract's docstrings into the obligation battery, keeping every body.
 
-    uv run python .agent/decisions/m3u5a-battery-reamend.py [BATTERY] [--check]
+    uv run python .agent/decisions/m3u5a-battery-reamend.py [BATTERY | --worktree] [--check]
 
 The battery is authored DIFF-BLIND against the contract as it stood at dispatch. MAIN then rules
 the attack table, which supersedes obligations the author already encoded — M3.5a's S4 grew the
@@ -16,6 +16,10 @@ still fails against correct code; that red is the specification question MAIN an
 this script must never be mistaken for answering it.
 
 Idempotent: a second run reports `NO-OP`. `--check` is the in-sync gate.
+
+With no BATTERY, `--check` grades the battery as committed at M3.5a's close (the validator's
+`CLOSE`; later units rewrote docstrings the unit settled, p152) and a rewrite needs `--worktree`
+or an explicit BATTERY path: the live file is written only when named.
 """
 
 from __future__ import annotations
@@ -51,17 +55,28 @@ def _docstring(validator, row: dict[str, str], binding) -> list[str]:
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("battery", nargs="?", default=str(DEFAULT_BATTERY))
+    parser.add_argument("battery", nargs="?", default=None)
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--worktree", action="store_true", help="read (and rewrite) the live battery")
     args = parser.parse_args(argv[1:])
 
     validator = _validator()
+    if args.worktree:
+        validator.REV = None
+    if args.battery is None and not args.worktree and not args.check:
+        print("ABORT   a rewrite names its target: pass BATTERY or --worktree")
+        return 2
     rows = validator._obligations()
     binding = validator._amendments()
     wanted = {validator._name(row): row for row in rows}
 
-    path = pathlib.Path(args.battery)
-    lines = path.read_text(encoding="utf-8").splitlines()
+    path = pathlib.Path(args.battery or DEFAULT_BATTERY)
+    if args.battery is None and not args.worktree:
+        print(f"SOURCE: {validator.CLOSE} (M3.5a close)")
+        lines = validator._read(DEFAULT_BATTERY).splitlines()
+    else:
+        print(f"SOURCE: {path}")
+        lines = path.read_text(encoding="utf-8").splitlines()
     tree = ast.parse("\n".join(lines))
 
     # Collect edits first, then apply BOTTOM-UP so earlier line numbers stay valid.

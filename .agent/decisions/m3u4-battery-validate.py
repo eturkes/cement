@@ -2,7 +2,7 @@
 
 Usage:
   uv run python .agent/decisions/m3u4-battery-validate.py --emit-stub
-  uv run python .agent/decisions/m3u4-battery-validate.py
+  uv run python .agent/decisions/m3u4-battery-validate.py [--worktree]
 
 Every obligation of ``.agent/decisions/m3u4-contract.md`` needs at least one filled
 test in ``tests/test_proposal_binding_battery.py``, named ``test_<id>_<slug>``.
@@ -15,6 +15,10 @@ D01-D27, plus B28-B38 for the obligations sections 14 and 15 added and for the
 sixteen lenses ``m3u4-attack.json`` deferred to S3. Section 14 and 15 rulings GOVERN
 where they disagree with a numbered obligation, so every subject below is written in
 its ruled form.
+
+Grading reads the battery as committed at M3.4's close (`CLOSE`) by default: later units add tests
+to it, so a working-tree read grades a question the unit no longer owns (p152, the p149 form).
+`--worktree` grades the live file. `--emit-stub` writes the live file (the unit's own seed step).
 """
 
 from __future__ import annotations
@@ -22,11 +26,14 @@ from __future__ import annotations
 import argparse
 import ast
 import re
+import runpy
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 BATTERY = ROOT / "tests" / "test_proposal_binding_battery.py"
+CLOSE = "7864274"  # M3.4's close: `roadmap (M3.4): … → close the unit`
+closed_unit = runpy.run_path(str(Path(__file__).resolve().parent / "closed_unit.py"))
 
 UNFILLED = "UNFILLED"
 DOCSTRING_MIN = 40
@@ -149,12 +156,13 @@ def _is_unfilled(node: ast.FunctionDef) -> bool:
     return False
 
 
-def grade() -> int:
-    if not BATTERY.exists():
+def grade(rev: str | None) -> int:
+    print(f"SOURCE: {'working tree' if rev is None else rev + ' (M3.4 close)'}")
+    if rev is None and not BATTERY.exists():
         _fail(f"{BATTERY.relative_to(ROOT)} is missing; run --emit-stub first")
         return 2
     try:
-        tree = ast.parse(BATTERY.read_text(encoding="utf-8"))
+        tree = ast.parse(closed_unit["read"](rev, BATTERY))
     except SyntaxError as error:
         _fail(f"{BATTERY.relative_to(ROOT)} does not parse: {error}")
         return 2
@@ -220,8 +228,9 @@ def grade() -> int:
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--emit-stub", action="store_true", help="write the all-UNFILLED seed")
+    parser.add_argument("--worktree", action="store_true", help="grade the live battery")
     args = parser.parse_args(argv)
-    return emit_stub() if args.emit_stub else grade()
+    return emit_stub() if args.emit_stub else grade(None if args.worktree else CLOSE)
 
 
 if __name__ == "__main__":

@@ -34,7 +34,6 @@ import json
 import pathlib
 import re
 import runpy
-import subprocess
 import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -47,21 +46,11 @@ REV: str | None = CLOSE
 
 
 def _read(path: pathlib.Path) -> str:
-    if REV is None:
-        return path.read_text(encoding="utf-8")
-    relpath = path.relative_to(ROOT).as_posix()
-    result = subprocess.run(
-        ["git", "-C", str(ROOT), "show", f"{REV}:{relpath}"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        raise SystemExit(f"ABORT   {REV}:{relpath}: {result.stderr.strip()}")
-    return result.stdout
+    return closed_unit["read"](REV, path)
 MARKER = "UNFILLED"
 
 has_assertion = runpy.run_path(str(HERE / "battery_ast.py"))["has_assertion"]
+closed_unit = runpy.run_path(str(HERE / "closed_unit.py"))
 
 
 def _rows() -> list[dict[str, str]]:

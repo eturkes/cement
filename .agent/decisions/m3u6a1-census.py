@@ -20,6 +20,10 @@ what a migration must preserve.
              request identifier across two calls. The lifecycle IS the subject,
              so M3.6a2 deletes the test rather than re-basing it.
 
+Default input = `tests/`, `examples/` and the disposition table as committed at M3.6a1's close
+(`CLOSE`): M3.6a2 deleted the lifecycle API and its sites, so a working-tree survey grades a
+question this unit settled (p152, the p149 form). `--worktree` surveys the live tree.
+
 Usage:
     uv run python .agent/decisions/m3u6a1-census.py            # grade
     uv run python .agent/decisions/m3u6a1-census.py --emit     # write the JSON
@@ -38,10 +42,14 @@ import argparse
 import ast
 import json
 import pathlib
+import runpy
 import sys
+import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 TABLE = pathlib.Path(__file__).with_name("m3u6a1-census.json")
+CLOSE = "dc4ab5e"  # M3.6a1's close: `roadmap (M3.6a1): … → DONE`
+closed_unit = runpy.run_path(str(pathlib.Path(__file__).with_name("closed_unit.py")))
 
 LIFECYCLE_API = ("handle", "request_status")
 
@@ -461,19 +469,31 @@ def self_test(root: pathlib.Path) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", default=str(ROOT))
+    sources = parser.add_mutually_exclusive_group()
+    sources.add_argument("--root", default=None)
+    sources.add_argument("--worktree", action="store_true", help="survey the live working tree")
     parser.add_argument("--emit", action="store_true")
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args(argv)
-    root = pathlib.Path(args.root).resolve()
 
-    if args.emit:
-        TABLE.write_text(json.dumps(emit(root), indent=2, sort_keys=True) + "\n")
-        print(f"wrote {TABLE}")
-        return 0
-    if args.self_test:
-        return self_test(root)
-    return grade(root, TABLE)
+    with tempfile.TemporaryDirectory(prefix="m3u6a1-census-close-") as raw:
+        table = TABLE
+        if args.root is not None:
+            root = pathlib.Path(args.root).resolve()
+        elif args.worktree:
+            root = ROOT
+        else:
+            root = closed_unit["archive"](CLOSE, list(SCAN_ROOTS), pathlib.Path(raw))
+            table = root / "m3u6a1-census.json"
+            table.write_text(closed_unit["read"](CLOSE, TABLE), encoding="utf-8")
+        print(f"SOURCE: {'root ' + str(root) if args.root else 'working tree' if args.worktree else CLOSE + ' (M3.6a1 close)'}")
+        if args.emit:
+            TABLE.write_text(json.dumps(emit(root), indent=2, sort_keys=True) + "\n")
+            print(f"wrote {TABLE}")
+            return 0
+        if args.self_test:
+            return self_test(root)
+        return grade(root, table)
 
 
 if __name__ == "__main__":

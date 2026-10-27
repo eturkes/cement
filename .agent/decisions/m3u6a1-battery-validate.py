@@ -62,6 +62,7 @@ ID_TOKEN = re.compile(r"\b(D\d+[a-z]?)\b")
 FOREIGN = re.compile(r"M\d+(?:\.\d+)?[a-z]?\d*(?:'s)?\s+$")
 
 has_assertion = runpy.run_path(str(HERE / "battery_ast.py"))["has_assertion"]
+closed_unit = runpy.run_path(str(HERE / "closed_unit.py"))
 SKIPPING = re.compile(r"\bself\.skipTest\(|@unittest\.skip|@skip(?:If|Unless)?\b")
 UNFILLED_MARKER = "UNFILLED:"
 CORRECTED_BY = re.compile(r"\bCORRECTED-BY\s+((?:C\d+(?:,\s*)?)+)")
@@ -77,25 +78,11 @@ def _contract_lines(root: pathlib.Path) -> list[str]:
     return path.read_text(encoding="utf-8").splitlines()
 
 
-def _git_object(relpath: pathlib.Path) -> str:
-    result = subprocess.run(
-        ["git", "-C", str(ROOT), "show", f"{CLOSE}:{relpath.as_posix()}"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        raise SystemExit(f"ABORT   {CLOSE}:{relpath.as_posix()}: {result.stderr.strip()}")
-    return result.stdout
-
-
 def _stage_close(stage: pathlib.Path, relpaths: tuple[pathlib.Path, ...]) -> pathlib.Path:
     """Write each `CLOSE` object under `stage` at its repo-relative path; return `stage`."""
     for relpath in relpaths:
-        target = stage / relpath
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(_git_object(relpath), encoding="utf-8")
-    return stage
+        closed_unit["read"](CLOSE, ROOT / relpath)  # SystemExit when `CLOSE` lacks it
+    return closed_unit["stage"](CLOSE, [relpath.as_posix() for relpath in relpaths], stage)
 
 
 def _fold(lines: list[str], start: int, pattern: re.Pattern[str]) -> tuple[str, int]:

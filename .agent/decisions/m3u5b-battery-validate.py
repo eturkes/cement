@@ -46,6 +46,11 @@ obligation goes red against correct code.
 
 This validator grades SHAPE only. The red/green credential is a separate artifact, produced by
 `m3u5b-mutants.py`, exactly as contract X33 and X34 require.
+
+Every read (contract, battery, controls, verdict modules) takes the git objects at M3.5b's close
+(`CLOSE`) by default, the self-test included: later units extend the battery and its neighbours,
+so a working-tree read grades a question the unit no longer owns (p152, the p149 form).
+`--worktree` reads the live tree; explicit BATTERY / CONTROLS paths grade those files.
 """
 
 from __future__ import annotations
@@ -59,12 +64,15 @@ import pathlib
 import re
 import runpy
 import sys
+import tempfile
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 CONTRACT = HERE / "m3u5b-contract.md"
 DEFAULT_BATTERY = ROOT / "tests" / "test_cli_removal_battery.py"
 DEFAULT_CONTROLS = HERE / "m3u5b-mutants.json"
+CLOSE = "1146421"  # M3.5b's close: `gate (M3.5b): … → close M3.5b with S3 DONE`
+closed_unit = runpy.run_path(str(HERE / "closed_unit.py"))
 MARKER = "UNFILLED"
 UNKNOWN = "unknown"
 
@@ -587,23 +595,42 @@ def self_test() -> int:
     return 1 if failures else 0
 
 
+def _use_root(root: pathlib.Path) -> None:
+    """Point every module-level input at `root` (a staged `CLOSE` tree)."""
+    global ROOT, CONTRACT, DEFAULT_BATTERY, DEFAULT_CONTROLS
+    ROOT = root
+    CONTRACT = root / CONTRACT.relative_to(HERE.parents[1])
+    DEFAULT_BATTERY = root / DEFAULT_BATTERY.relative_to(HERE.parents[1])
+    DEFAULT_CONTROLS = root / DEFAULT_CONTROLS.relative_to(HERE.parents[1])
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--emit-stub", action="store_true")
     parser.add_argument("--emit-controls", action="store_true")
     parser.add_argument("--self-test", action="store_true")
-    parser.add_argument("battery", nargs="?", default=str(DEFAULT_BATTERY))
-    parser.add_argument("controls", nargs="?", default=str(DEFAULT_CONTROLS))
+    parser.add_argument("--worktree", action="store_true", help="read the live working tree")
+    parser.add_argument("battery", nargs="?", default=None)
+    parser.add_argument("controls", nargs="?", default=None)
     args = parser.parse_args(argv[1:])
-    if args.emit_stub:
-        sys.stdout.write(emit_stub())
-        return 0
-    if args.emit_controls:
-        sys.stdout.write(emit_controls())
-        return 0
-    if args.self_test:
-        return self_test()
-    return grade(pathlib.Path(args.battery), pathlib.Path(args.controls))
+    with tempfile.TemporaryDirectory(prefix="m3u5b-close-") as raw:
+        if not args.worktree:
+            relpaths = [CONTRACT, DEFAULT_BATTERY, DEFAULT_CONTROLS]
+            relpaths += [ROOT / "tests" / f"{module}.py" for module in VERDICT_MODULES]
+            for required in relpaths[:3]:
+                closed_unit["read"](CLOSE, required)  # SystemExit when `CLOSE` lacks it
+            staged = [path.relative_to(ROOT).as_posix() for path in relpaths]
+            _use_root(closed_unit["stage"](CLOSE, staged, pathlib.Path(raw)))
+        if args.emit_stub:
+            sys.stdout.write(emit_stub())
+            return 0
+        if args.emit_controls:
+            sys.stdout.write(emit_controls())
+            return 0
+        if args.self_test:
+            return self_test()
+        print(f"SOURCE: {'working tree' if args.worktree else CLOSE + ' (M3.5b close)'}")
+        return grade(pathlib.Path(args.battery or DEFAULT_BATTERY), pathlib.Path(args.controls or DEFAULT_CONTROLS))
 
 
 if __name__ == "__main__":

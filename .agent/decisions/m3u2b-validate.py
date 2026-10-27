@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Structural validator for M3.2b wave-1 artifacts.
 
-Usage: uv run python .agent/decisions/m3u2b-validate.py <artifact.json>
+Usage: uv run python .agent/decisions/m3u2b-validate.py <artifact.json> [--worktree]
 
 The artifact's top-level ``kind`` selects the schema:
 
@@ -24,6 +24,10 @@ mismatch is the measurement this unit buys, so it is reported and counted.
 The schemas below are the seedable skeleton. A first tool call that writes every
 required id with every value ``unknown`` produces a valid file whose UNKNOWN-CELLS
 count is the flush metric, and each filled cell lowers it.
+
+A "smoke-crosswalk" names committed tests by id; it resolves them against `tests/` as committed at
+M3.2b's close (`CLOSE`) by default, since later units rename and add tests (p152, the p149 form);
+`--worktree` resolves them against the live tree.
 """
 
 from __future__ import annotations
@@ -31,8 +35,14 @@ from __future__ import annotations
 import ast
 import json
 import math
+import runpy
 import sys
+import tempfile
 from pathlib import Path
+
+CLOSE = "02dd892"  # M3.2b's close: `roadmap (M3.2b): the unit closed with four instruments … DONE`
+closed_unit = runpy.run_path(str(Path(__file__).resolve().parent / "closed_unit.py"))
+WORKTREE = False
 
 UNKNOWN = "unknown"
 OUTCOMES = {"ok", "denied", "error", "differs", UNKNOWN}
@@ -267,7 +277,12 @@ def check_crosswalk(payload: dict) -> tuple[int, int]:
     rows = payload.get("rows")
     if not isinstance(rows, list) or not rows:
         fail("smoke-crosswalk requires a non-empty `rows` list")
-    known = _tracked_test_ids(Path(__file__).resolve().parents[2])
+    if WORKTREE:
+        known = _tracked_test_ids(Path(__file__).resolve().parents[2])
+    else:
+        with tempfile.TemporaryDirectory(prefix="m3u2b-close-") as raw:
+            known = _tracked_test_ids(closed_unit["archive"](CLOSE, ["tests"], Path(raw)))
+    print(f"TEST-SOURCE: {'working tree' if WORKTREE else CLOSE + ' (M3.2b close)'}")
     if not known:
         fail("no committed test ids were found; the crosswalk cannot be graded")
     unknown = 0
@@ -324,6 +339,9 @@ def _report_scaling(points: dict) -> None:
 
 
 def main(argv: list[str]) -> int:
+    global WORKTREE
+    WORKTREE = "--worktree" in argv
+    argv = [arg for arg in argv if arg != "--worktree"]
     if len(argv) != 2:
         print(__doc__)
         return 1
