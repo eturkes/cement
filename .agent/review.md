@@ -21,6 +21,18 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p145 close (MAINTAIN queue run 4, owner-approved gate change; tier `data`: a dependency scanner) — target = the commit landing this section
+
+Check set = the row's acceptance A1-A3 + C1 (the tool's other modes) + C2 (prose readers), fixed before the diff was reread. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | the full gate audits `build-constraints.txt` (OSV, hashes required, no holds, rc 1 on a finding) | pass | step `constraints` after `audit` in both `.agent/gate` branches = `.agent/owui-audit --lock examples/command_source/build-constraints.txt --no-holds` (pip-audit `--require-hashes --disable-pip`); shipped → `PASS (0 findings)`. |
+| A2 | a seed pinning `jinja2==2.10` + hashes reds that step | pass | seed ae9c2a1 → CI run 40527846144: both legs `constraints 1`, every other step 0 (`ci/p145-seed` deleted); `.agent/seeds` S26: hashed → rc 1 (6 findings), unhashed → rc 2, shipped → rc 0, 3/3 MATCH. |
+| A3 | step + seed recorded; owner approval first | pass | owner: "Approve" (the run's question); `gate-checks.md` S26 bullet + `paths:`, `ops.md` Gate list + Static checks, `pins.md`, `spec.md` Artifacts + Decisions (Gate tooling), README `## Development`. |
+| C1 | the tool's other modes | pass | default (Open WebUI lock + holds) unchanged — it reads its default absolute path (a new authlib advisory reds it, held by the p137 commit after this one); `--no-holds` + `--emit-holds` → argparse refuses (mutually exclusive); a relative `--lock` resolved before pip-audit's temporary working directory (the first relative run read no report, rc 2). |
+| C2 | prose readers | pass | register-audit `--gate` rc 0, article-audit 0 ungrounded, tripwires PASS; fast gate over the 12 modules reading README or the constraints → Ran 414, OK. |
+
 ## p152 close (MAINTAIN queue run 4, born at p149; tier `data`: closed-unit graders) — target = the commit landing this section
 
 Check set = the row's acceptance A1-A3 + C1 (callers + self-tests) + K1 (cleanup: one helper), fixed before the diff was reread. MAIN alone.

@@ -810,7 +810,8 @@ uv sync
 ```
 
 `.agent/gate` runs every check in order. First come format, lint, and type check (`ruff`, `mypy`).
-Then come the dependency audit (`uv audit`), the secret scan (`gitleaks`), a CI workflow scan
+Then come two dependency audits (`uv audit` for `uv.lock`, `pip-audit` for
+`examples/command_source/build-constraints.txt`), the secret scan (`gitleaks`), a CI workflow scan
 (`zizmor`), a shell script check (`ShellCheck`), and the skip census. The prose register audit, an
 audit of definite references, and the report anchor check follow. The test suite, the package build, a
 check that installs both wheels and runs the provider command, and the spec check run last. The command prints each step's exit status and time, and it

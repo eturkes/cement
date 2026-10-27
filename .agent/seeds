@@ -4,8 +4,8 @@
 Usage: uv run python .agent/seeds [--rev REV] [--only S01 ...] [--list]
        uv run python .agent/seeds --self-test
 
-S01–S25 group the implemented recipes, with a result per executed case. Coverage
-excludes wheel failure seeds, embedded-copy/umask replay, and owui-audit recipes.
+S01–S26 group the implemented recipes, with a result per executed case. Coverage
+excludes wheel failure seeds, embedded-copy/umask replay, and owui-audit hold recipes.
 rc 0 = every selected expectation matched and every worktree restored; 1 = a
 verdict differs; 2 = setup/restoration failure. --self-test repeats the selected
 set after neutralizing skip-census: exactly S12's four red seeds must change.
@@ -66,6 +66,7 @@ GROUPS = [
     ("S23", "`.agent/pins` (", "pin census", False),
     ("S24", "`.agent/law-census` (", "law census", False),
     ("S25", "`.agent/decisions/p03-stored-int-census.py` + ", "stored ints, anchors, revisions", False),
+    ("S26", "`.agent/owui-audit --no-holds` (", "build constraints audit", False),
 ]
 
 
@@ -676,6 +677,24 @@ unittest.main()
             with changed(local, substitute(local.read_text(), r"(?m)^ +# Fixed arguments: .*\n +# another line .*\n", "")):
                 self.python(sid, "bare-suppression", root, census, 1,
                             [r"^REASONS: examples/open_webui/local\.py:\d+: noqa: S603 without a reason"])
+
+    def S26(self):
+        sid = "S26"
+        # jinja2 2.10's two PyPI release files (wheel, sdist): known-vulnerable, hash-pinned.
+        seed = ("jinja2==2.10 \\\n"
+                "    --hash=sha256:74c935a1b8bb9a3947c50a54766a969d4846290e1e788ea44c1392163723c3bd \\\n"
+                "    --hash=sha256:f84be1bb0040caca4cea721fcbbbbd61f9be9464ca236387158b0feea01914a4\n")
+        command = [sys.executable, ".agent/owui-audit", "--lock",
+                   "examples/command_source/build-constraints.txt", "--no-holds"]
+        with self.tree() as root:
+            self.case(sid, "shipped", root, command, 0, [r"^owui-audit: PASS \(0 findings\)$"])
+            constraints = root / "examples/command_source/build-constraints.txt"
+            text = constraints.read_text()
+            with changed(constraints, text + seed):
+                self.case(sid, "vulnerable", root, command, 1,
+                          [r"^  FINDING jinja2 \S+ 2\.10$", r"^owui-audit: FAIL \(\d+ findings\)$"])
+            with changed(constraints, text + "jinja2==2.10\n"):
+                self.case(sid, "unhashed", root, command, 2, [r"^owui-audit: no report"])
 
     def S25(self):
         sid = "S25"

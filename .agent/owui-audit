@@ -8,10 +8,13 @@ required) and compares each finding with `.agent/decisions/owui-audit-holds.json
 → `{version, row}` (one advisory id can name several packages). A finding passes only while its hold names the same package + version and
 its row is open in `.agent/deferred.md`; a hold the audit no longer reports is stale.
 
-Usage: uv run python .agent/owui-audit [--lock PATH] [--emit-holds ROW]
+Usage: uv run python .agent/owui-audit [--lock PATH] [--emit-holds ROW | --no-holds]
 rc 0 = every finding held by an open row; 1 = an unheld finding, a hold for another version, a hold
 whose row is not open, or a stale hold; 2 = the auditor failed (network, a changed output shape).
 `--emit-holds ROW` writes every current finding as a hold on ROW (review the diff before committing).
+`--no-holds` reads no holds file, so every finding fails: gate step `constraints` audits the
+provider's build constraints this way (`examples/command_source/build-constraints.txt`, which the
+gate's `wheels` step builds with and `uv audit` never reads, p145).
 """
 
 from __future__ import annotations
@@ -53,10 +56,13 @@ def findings(lock: pathlib.Path) -> dict[str, str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--lock", type=pathlib.Path, default=LOCK)
-    parser.add_argument("--emit-holds")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--emit-holds")
+    mode.add_argument("--no-holds", action="store_true")
     args = parser.parse_args()
     try:
-        found = findings(args.lock)
+        # pip-audit runs in a temporary directory, so a relative path must resolve here first.
+        found = findings(args.lock.resolve())
     except SystemExit as error:
         print(error, file=sys.stderr)
         return 2
@@ -66,6 +72,12 @@ def main() -> int:
                                     indent=2, sort_keys=True) + "\n", encoding="utf-8")
         print(f"owui-audit: wrote {len(found)} holds on {args.emit_holds}")
         return 0
+    if args.no_holds:
+        print(f"owui-audit: {len(found)} findings in {args.lock.name} ({PIP_AUDIT}); no holds")
+        for key, version in sorted(found.items()):
+            print(f"  FINDING {key} {version}")
+        print(f"owui-audit: {'FAIL' if found else 'PASS'} ({len(found)} findings)")
+        return 1 if found else 0
     holds = json.loads(HOLDS.read_text(encoding="utf-8"))
     open_rows = set(re.findall(r"^- `(p\d+)` ", (ROOT / ".agent/deferred.md").read_text(encoding="utf-8"), re.M))
     problems = []
