@@ -107,19 +107,11 @@
     "row": "p137",
     "version": "12.3.0"
   },
-  "pillow CVE-2026-112392": {
-    "row": "p137",
-    "version": "12.3.0"
-  },
   "pillow CVE-2026-112393": {
     "row": "p137",
     "version": "12.3.0"
   },
   "pillow CVE-2026-112395": {
-    "row": "p137",
-    "version": "12.3.0"
-  },
-  "pillow CVE-2026-112396": {
     "row": "p137",
     "version": "12.3.0"
   },
@@ -244,6 +236,18 @@
     "version": "12.3.0"
   },
   "pillow GHSA-78g4-xqwv-q3g8": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow PYSEC-2026-4326": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow PYSEC-2026-4327": {
+    "row": "p137",
+    "version": "12.3.0"
+  },
+  "pillow PYSEC-2026-4328": {
     "row": "p137",
     "version": "12.3.0"
   },

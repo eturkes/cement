@@ -21,6 +21,17 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p137 agent part (MAINTAIN queue run 4, tier `data`: audit holds; the row stays open on its trigger) — target = the commit landing this section
+
+Check set fixed before the diff was reread: A1 holds = the audit's current findings; A2 the row restates the count + names the new advisory; A3 p144's measured facts re-derived; C1 no hold widened. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | holds = findings | pass | before: `.agent/owui-audit` rc 1 (`UNHELD pillow PYSEC-2026-4326/4327/4328`, `STALE pillow CVE-2026-112392/112396`); `--emit-holds p137` → 128 holds; after: rc 0 `128 findings in 15 packages`, `PASS (0 problems)`. |
+| A2 | row text | pass | OSV `api.osv.dev/v1/vulns/<id>`: PYSEC-2026-4326 aliases CVE-2026-112392, PYSEC-2026-4328 aliases CVE-2026-112396 (re-keyed), PYSEC-2026-4327 aliases CVE-2026-112394 (new: P;2L/P;4L raw decoders read past the buffer end), each `fixed` 13.0.0; row = 128 findings, the new id named, the re-key mechanism stated. |
+| A3 | p144 facts | pass | `echo open-webui==0.12.4 \| uv pip compile --python-version 3.12 --universal --generate-hashes` → `.agent/owui-audit --lock` = 30 findings in 9 packages, 98 STALE + 3 MOVED (row: from 128, 98 stale, 3 move). |
+| C1 | no hold widened | pass | holds diff = 2 pillow keys removed, 3 pillow keys added, each `version` 12.3.0, `row` p137; `gate-checks.md` S23 shipped case 127 → 128. |
+
 ## Template refresh → agents@a08b211 (MAINTAIN, request) — target = the diff this commit lands, base `123f08d`
 
 Template delta = agents@7e8ad36..a08b211: `Engineering` IMPLEMENT survivor ruler (`consultant` before close), `Teammates` fit reasons (+ `navigator`, `janitor`) + split stop, `Session flow` `Code review` (replacing `Closing-diff reviewer`), PROTOTYPE + ITERATE rewrite (builds, `janitor`, `navigator`, variant floor), IMPLEMENT orientation steps + unit fits, debugging fan-out, advisor on costly decisions; roles `reviewer` + `tester` changed, `janitor` + `navigator` new; `.agent/spec-lint` unchanged. MAIN alone; 11 lenses fixed before the diff was read.
