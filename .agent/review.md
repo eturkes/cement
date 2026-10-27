@@ -15,11 +15,29 @@ own body's `Teammates:` / `dispatch:` line — the 17 closes of `a8109eb..162353
 neither (six listed there with their reasons). A finding inside the artifact's acceptance contract is
 fixed before the close it reviews; a finding outside it is born as a `.agent/deferred.md`
 row with its acceptance check. The one open row this ledger holds = an IMPLEMENT mutation
-survivor its unit left unruled, open until the closing-diff `reviewer` rules it against the
-contract (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
+survivor its unit left unruled, open until a `consultant` rules it against the contract before
+the phase closes (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
 against its acceptance check alone. A pass here is a reviewer's opinion about the repository: neither a
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
+
+## Template refresh → agents@a08b211 (MAINTAIN, request) — target = the diff this commit lands, base `123f08d`
+
+Template delta = agents@7e8ad36..a08b211: `Engineering` IMPLEMENT survivor ruler (`consultant` before close), `Teammates` fit reasons (+ `navigator`, `janitor`) + split stop, `Session flow` `Code review` (replacing `Closing-diff reviewer`), PROTOTYPE + ITERATE rewrite (builds, `janitor`, `navigator`, variant floor), IMPLEMENT orientation steps + unit fits, debugging fan-out, advisor on costly decisions; roles `reviewer` + `tester` changed, `janitor` + `navigator` new; `.agent/spec-lint` unchanged. MAIN alone; 11 lenses fixed before the diff was read.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | template fidelity | pass | `cmp` rc 0 vs agents@a08b211: `CLAUDE.md` (`claude/CLAUDE.project.md`), 8 roles, `.agent/spec-lint` (0 bytes changed, 100755 kept); `copy-template --check` → `The template files are current.`; HEAD's copies `cmp`-equal agents@7e8ad36 ⇒ delta = upstream `7e8ad36..a08b211` alone. |
+| R2 | obligation coverage (each delta clause → practice or a named ruling) | pass | O1 survivor ruler → preamble follows; O2 + `navigator`/`janitor` = template roles, their phase-timed fits bind at their next occurrence, `.gitignore` already holds janitor's repo entries; O3 split stop → ruling (3)'s `the template's count` → ``where `Code review` names a fit`` (upstream 81a609b retired counts); O4 `Closing-diff reviewer` → `Code review`: ruling (3) re-keyed; O5 PROTOTYPE + ITERATE rewrite → binds from the next PROTOTYPE/ITERATE session; ruling (1)'s `PROTOTYPE law` = the template's Verification-integrity term (outside every gate) ⇒ MAINTAIN prototype edits keep unit depth (6 latest prototype commits: MAIN alone or `operator`/`reviewer`); O6 deep `tester` suites + debugging fan-out → `assurance.md` Diff-blind authorship + `ops.md` Worktrees hold; O7 IMPLEMENT orientation steps → next IMPLEMENT orientation (Phase = MAINTAIN), spec layout unchanged; O8 `IMPLEMENT unit fits` → next IMPLEMENT unit; O9 advisor on costly decisions → practice holds; O10 `tester` sources + characterization green ↔ `assurance.md` preservation credential (`.agent/mutate`), `reviewer` fit ↔ ruling (3). |
+| R3 | old forms | pass | 15 old forms, `rg --hidden -g '!.git' -n -F` → 0 live hits; 1 history hit (`IMPLEMENT phase fits` = `.agent/review.md:265`, code-review check-set row L.cl.66); `git grep -F … HEAD` controls ≥ 1 each. |
+| R4 | spec preservation | pass | `.agent/spec.md` diff 0 bytes (layout clauses + `.agent/spec-lint` unchanged); `.agent/spec-lint` rc 0. |
+| R5 | check strength (every check reading an edited file) | pass | no check edited. Readers: `law` frontmatter (tracked files ⇒ graded `janitor.md` + `navigator.md` once staged → 0 violations), `imports` (`CLAUDE.md:1` `@.agent/spec.md`), `portable`; `shell` (`.agent/spec-lint` unchanged); `p73-review-coverage.py` (ledger headings, one added). No test reads the preamble (`rg -F '.agent/review.md' tests/` = 1 docstring). |
+| R6 | law consistency (edited lines vs template, `assurance.md`, each other) | pass | ruling (3) key = the live `Code review` clause; its fit wording matches `reviewer.md`; every-close pass agrees with the template's IMPLEMENT `per unit + at close`. Preamble ``a `consultant` … before the phase closes`` = template ``a `consultant` rules it before close`` for a row its unit left unruled + upstream `implement.md` Met when (`.agent/review.md` holds no open row); `assurance.md` Survivor scope (non-author ruling) holds. |
+| R7 | nothing lost (ruling (3) adaptation, preamble, ledger headings) | pass | ruling (3) keeps the every-close pass, MAIN's dispatch call + both carriers; preamble diff = 2 lines; ledger headings 159 → 160, set diff = this section alone (`## Code review`, `## Security review 2` intact). |
+| R8 | portability + settings | pass | `law` `portable` 0; sweep (home paths, `.local/app`, owner login, scheduler + browser tools) → README `~/.ssh/id_ed25519` (`:230`, `:232`, `:259`, owner-kept reader key) + the repo's own public GitHub URL; no project `.claude/settings*.json`. |
+| R9 | rules upkeep (restated template, retired mechanics, `upstream-sync.md`) | pass | 11 rule files read whole; none only restates the template or retired mechanics (ruling (4) = a live portability fact holding the numbering `(5)` citations use); `upstream-sync.md` deleted by `9194f41`. |
+| R10 | load probe | pass | fresh `claude -p --output-format stream-json --verbose` (spec-only question: the `route` task's operation) → `intake_queue`, 1 turn, 0 `tool_use`; `intake_queue` occurs in `.agent/spec.md` alone among session-start files. |
+| R11 | queue | pass | no finding outside the contract ⇒ no row born; on-demand `p10-scratch-census.py` rc 1 (`unmarked 5`) reproduces at `123f08d` = open p143; grader PASS (`COMMITTED-FLOOR: 149`). |
 
 ## Code review (MAINTAIN, request) — target = the implementation at `686e86e`, fixes = the commits after it that name this section
 
