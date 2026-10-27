@@ -117,3 +117,26 @@ route `/api/v1/functions/id/cement_filter/valves/update`.
   `serve` re-pasted the regenerated paste-ins on the same instance + ledger; note a04 in a new chat → covered → observation 4
   `agreed`, `gpt-6-luna`, 5,077 ms; the shadow call = keys `messages`, `model`, `stream`, no tools; zero warnings after
   the restart (positive control: the whole log still holds the one earlier warning).
+
+## Support after publish (p147, MAINTAIN queue run 4)
+
+The skill's step 6 reads each case's support from a `learn_cases` listing taken AFTER
+`publish_version` (`6a70852`); the code review's live pass (operator B8) had reported `support 1`
+for a case at 2 from the pre-merge listing. Instance = Open WebUI 0.12.3 on CPython 3.12.15,
+SQLite 3.53.1, no `cement_runtime` in its venv, `local.py setup` → `serve --fresh` → `provision
+--model gpt-6-luna`; REST driver (scratch), one chat per turn. The operation was registered with
+the CLI (actor `open-webui:cli-standin`) instead of the admin Action, which this check does not
+exercise.
+
+| # | model | input | s | calls | outcome |
+|---|---|---|---|---|---|
+| 1 | cement-chat | progress note A01 | 23.0 | search_tools, use_learned_function, search_tools, record_answer | miss (off), accepted; pending 1 |
+| 2 | cement-chat | progress note A02 | 26.5 | same | miss (off), accepted; pending 2 |
+| L | cement-learning | "Run a Cement learning pass for extraction_plan." | 34.6 | search_tools, learn_cases, search_tools, learn_cases (projectable), merge_case, publish_version, search_tools ×3, function_versions, learn_cases (projectable) | v1 `0d5be2c8…`, 1 case, not selected |
+
+Before the merge the case listed support 0 (both answers pending); the listing after `publish_version`
+and the CLI `learn cases extraction_plan` both list support 2 (2 active examples, 0 pending). The
+reply (verbatim): "**Case:** Physician Progress Note layout; support is now **2**." → equal. It ends
+"The new version is ready. Read it, then use the Cement switch button to switch it on." One sampled
+gpt-6-luna pass, one case: no claim about Kimi or repeated runs.
+

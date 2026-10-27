@@ -87,3 +87,28 @@ files deleted by `use`, tickets consumed); `status` = v1 answering, switch on.
 - Reply form varies: bare JSON (t1, n1, n8) vs list/table (n4, n5); the skill asks for the usual
   reply form. n8 omitted the learning line that n2 included.
 - In-turn learning costs the user 43-78 s on those turns (the owner-ruled trade-off).
+
+## Support after publish (p147, MAINTAIN queue run 4)
+
+`skills/cement-learn.md` step 6: in a user-requested pass the reply states each case's `support`,
+read by re-running `learn` after `publish` (`6a70852`). Same stack as above (nucllei + nucllei-sandbox
+`v20261020-01`, rootful podman, `ext/bin` bound read-only, jail Python 3.12.15 + SQLite 3.40.1, preset
+= llens `llens-thinking.md` + the seven builtin tool groups + the three skills), gpt-6-luna, fresh
+users, a fresh workspace volume.
+
+- Retention: a first user's two chat turns (A01, A02) ran, and A02's record triggered the automatic
+  in-turn pass, whose reply by design states no support. So a second fresh user (`qr4seed`) received
+  A01 + A02 through the sandbox `/exec` API (`use` + `record`, rc 0 each; the two plans differ by the
+  Provider field). Listing before the pass: one case (PHYSICIAN PROGRESS NOTE), support 0, 2 pending.
+- Pass (user-requested, 37.8 s): `extraction_plan の学習をして。` → load_skill(cement-learn), learn
+  `--projectable no`, learn `--projectable yes`, write_file (the merged plan), merge `--projectable yes`,
+  publish `--projectable yes`, learn `--projectable yes`. v1 (`3032438053fb…`), switch off.
+- Reply (verbatim): "extraction_plan の学習を行い、**版 1** を作成しました。対象の用紙形式は **PHYSICIAN
+  PROGRESS NOTE** で、Patient・MRN・Provider の抽出手順をまとめています。確認済みの例は 2 件です。" +
+  the `/cement-switch` line. The post-publish listing (the model's own re-run and an independent
+  `/exec` re-run, JSON-equal) = support 2, 2 active examples, 0 pending → equal. The reply names the
+  three fields but not that Provider was added (the merge note does).
+- Observed, not a defect: the first user's automatic pass chose `--projectable no` and merged A02
+  alone, so it published nothing and left A01 pending — the skill asks it to judge projectability
+  and to merge every case, also one at support 1 (step 4); one sample, gpt-6-luna.
+

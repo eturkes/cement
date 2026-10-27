@@ -65,7 +65,7 @@ paste-in byte-identical.
 4. Jail stand-in: `.agent/decisions/nucllei-jail-smoke.sh` in `python:3.12-slim-bookworm`
    (podman, `--network none --read-only --user 65534:65534`, tmpfs `/workspace`) → full cycle.
 5. Full gate `.agent/gate`.
-6. Live run on nucllei v20261020-01 + nucllei-sandbox → `.agent/decisions/nucllei-live-e2e.md`.
+6. Live run on nucllei v20261020-01 + nucllei-sandbox → `.agent/decisions/nucllei-live-e2e.md`. The learning skill's post-publish support report (p147) → that record's `## Support after publish`.
 
 Red: gate 1 at `00dc010` with this battery alone → `FileNotFoundError` (no
 `examples/nucllei/cement_nucllei.py`), every test unrun. Closing review (reviewer-1 on `e325bdc`):

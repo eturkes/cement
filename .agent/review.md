@@ -21,6 +21,18 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p147 close (MAINTAIN queue run 4, live regimen; tier `docs`: skill text proven by a sampled run) — target = the commit landing this section
+
+Check set = the row's acceptance A1 (Open WebUI pass), A2 (nucllei pass), A3 (records) + C1 (the evidence is the run's, not the teammate's summary), fixed before the records were reread. Teammates: operator-1 (Open WebUI), operator-2 (nucllei); each verdict below = MAIN's read of the raw files they saved.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | Open WebUI: reply support = listing after `publish` | pass | `learn-reply.txt` (737 bytes): "support is now **2**"; `cases-after.json`: support 2, 2 active, 0 pending; the turn's calls end `publish_version` → `function_versions` → `learn_cases`; pre-merge listing support 0, so the reply did not repeat the stale count. |
+| A2 | nucllei: reply support = listing after `publish` | pass | `learn-reply.txt`: "確認済みの例は 2 件です。"; `listing-before.txt` support 0 / 2 pending, `listing-after.txt` support 2 / 2 active / 0 pending; `learn-calls.json` ends `publish` → `learn --projectable yes` (the step-6 re-run). |
+| A3 | recorded | pass | `owui-live-e2e.md` + `nucllei-live-e2e.md` `## Support after publish`; `nucllei-contract.md` gate 6 points at it (the row named the contract; the rule's live record is the e2e file). |
+| C1 | evidence integrity | pass | both deliverables' `unknown` census → 0; replies quoted from the saved raw bytes, not the reports; operator-1 registered the operation through the CLI stand-in (setup only; the admin Action stays proven by the W6 + B8 runs); operator-2 seeded the second user through `/exec` because the chat route auto-learns (stated in the record). Credential scans 0 hits with positive controls (both). |
+| O1 | observation | recorded | nucllei's automatic in-turn pass chose `--projectable no` and merged A02 alone (no version, A01 left pending) against step 4's merge-every-case rule — one gpt-6-luna sample; recorded under the record's pass, no row (model judgment the owner assigned to the learning pass). |
+
 ## p149 close (MAINTAIN queue run 4, tier `data`: closed-unit shape graders; the units' claims re-check from git) — target = the commit landing this section
 
 Check set = the row's acceptance A1-A3 + C1 (callers) + C2 (one source per clause) + Q1 (the class), fixed before the diff was reread. MAIN alone.
