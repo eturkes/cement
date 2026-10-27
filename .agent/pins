@@ -8,14 +8,23 @@ pins: every `==` dev dependency, every `uses:` action, every `.agent/<tool>` tha
 `fetch_tool`. A pin held below latest needs an open `.agent/deferred.md` row naming its
 blocker: `HELD` maps the pin to that row.
 
-Usage: uv run python .agent/pins
-rc 0 = every pin at latest or held by an open row; 1 = a pin behind with no open row, or a hold
-whose row is gone; 2 = a source failed to answer (network, `gh` auth, a changed file shape).
+Cooldown (owner, MAINTAIN queue run 4; Dependabot's `cooldown`, zizmor's 7-day floor): a pin
+behind only releases younger than `COOLDOWN` reads `cooldown until <date>` (rc 0), unless OSV lists
+an advisory against its CURRENT version — a security bump never waits. A release older than
+`COOLDOWN` between current and latest, a source with no release dates (Python lines, runner,
+nucllei tag), or an unparseable version reads BEHIND. Lock rows grade each drifted package alike.
+
+Usage: uv run python .agent/pins [--self-test]
+rc 0 = every pin at latest, cooling down or held by an open row; 1 = a pin behind with no open row
+(or with an advisory against its current version), or a hold whose row is gone; 2 = a source failed
+to answer (network, `gh` auth, a changed file shape). `--self-test` grades the cooldown rules on
+synthetic releases + advisories (no network).
 """
 
 from __future__ import annotations
 
 import concurrent.futures
+import datetime
 import json
 import pathlib
 import re
@@ -29,6 +38,9 @@ CONSTRAINTS = "examples/command_source/build-constraints.txt"
 OWUI_LOCK = "examples/open_webui/local-requirements.txt"
 # pin name -> the open queue row that holds it below latest.
 HELD: dict[str, str] = {"open-webui target": "p144"}
+COOLDOWN = datetime.timedelta(days=7)
+# A fetched binary's advisory feed in OSV; shellcheck has none (a bump of it waits like any other).
+TOOL_FEEDS: dict[str, tuple[str, str]] = {"zizmor": ("PyPI", "zizmor"), "gitleaks": ("Go", "github.com/zricethezav/gitleaks/v8")}
 
 
 class SourceError(Exception):
@@ -57,6 +69,101 @@ def http_json(url: str) -> dict:
 
 def pypi(name: str) -> str:
     return http_json(f"https://pypi.org/pypi/{name}/json")["info"]["version"]
+
+
+def instant(text: str) -> datetime.datetime:
+    return datetime.datetime.fromisoformat(text.replace("Z", "+00:00"))
+
+
+def pypi_dates(name: str) -> dict[str, datetime.datetime]:
+    releases = http_json(f"https://pypi.org/pypi/{name}/json")["releases"]
+    return {version: min(instant(file["upload_time_iso_8601"]) for file in files)
+            for version, files in releases.items() if files and not all(file.get("yanked") for file in files)}
+
+
+def npm_dates(name: str) -> dict[str, datetime.datetime]:
+    document = http_json(f"https://registry.npmjs.org/{name}")
+    return {version: instant(when) for version, when in document["time"].items() if version in document["versions"]}
+
+
+def gh_dates(repo: str) -> dict[str, datetime.datetime]:
+    listing = run("gh", "api", f"repos/{repo}/releases?per_page=100", "--jq",
+                  '.[] | select(.draft == false and .prerelease == false) | "\\(.tag_name) \\(.published_at)"')
+    return {tag: instant(when) for tag, when in (line.split() for line in listing.splitlines())}
+
+
+def version_key(text: str) -> tuple[int, ...] | None:
+    """A stable release's numeric key (`v` prefix allowed); a pre-release or other shape → None."""
+
+    match = re.fullmatch(r"v?(\d+(?:\.\d+)*)", text)
+    return tuple(int(part) for part in match.group(1).split(".")) if match else None
+
+
+def osv_post(body: dict) -> dict:
+    request = urllib.request.Request("https://api.osv.dev/v1/query", data=json.dumps(body).encode(),
+                                     headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310 fixed https host
+            return json.load(response)
+    except OSError as error:
+        raise SourceError(f"api.osv.dev: {error}") from None
+
+
+def in_ranges(vulnerability: dict, ecosystem: str, name: str, version: str) -> bool:
+    """`version` inside an ECOSYSTEM/SEMVER range of `vulnerability` (an unorderable bound counts as inside)."""
+
+    key = version_key(version)
+    for affected in vulnerability.get("affected", []):
+        package = affected.get("package", {})
+        if package.get("ecosystem") != ecosystem or package.get("name", "").lower() != name.lower():
+            continue
+        if version in affected.get("versions", []):
+            return True
+        for span in affected.get("ranges", []):
+            if span.get("type") not in ("ECOSYSTEM", "SEMVER"):
+                continue
+            inside = False
+            for event in span.get("events", []):
+                (kind, bound), = event.items()
+                bound_key = (0,) if bound == "0" else version_key(bound)
+                if key is None or bound_key is None:
+                    return True
+                if kind == "introduced" and key >= bound_key:
+                    inside = True
+                elif (kind == "fixed" and key >= bound_key) or (kind == "last_affected" and key > bound_key):
+                    inside = False
+            if inside:
+                return True
+    return False
+
+
+def advisories(ecosystem: str, name: str, version: str) -> list[str]:
+    """OSV advisories against `version`. OSV matches a version itself where it can order the
+    ecosystem; GitHub Actions advisories carry ECOSYSTEM ranges over tags it does not order."""
+
+    if ecosystem != "GitHub Actions":
+        found = osv_post({"version": version, "package": {"name": name, "ecosystem": ecosystem}})
+        return sorted(vulnerability["id"] for vulnerability in found.get("vulns", []))
+    found = osv_post({"package": {"name": name, "ecosystem": ecosystem}})
+    return sorted(vulnerability["id"] for vulnerability in found.get("vulns", [])
+                  if in_ranges(vulnerability, ecosystem, name, version))
+
+
+def classify(current: str, latest: str, dates: dict[str, datetime.datetime] | None, security: list[str],
+             now: datetime.datetime) -> tuple[str, int, datetime.datetime | None]:
+    """(status, rc, cooldown end) for a pin behind latest: security → BEHIND; every newer stable
+    release younger than `COOLDOWN` → cooling down until the oldest one ages out; else BEHIND."""
+
+    if security:
+        return f"BEHIND (security: {', '.join(security)})", 1, None
+    low, high = version_key(current), version_key(latest)
+    newer = [when for version, when in (dates or {}).items()
+             if low is not None and high is not None and (key := version_key(version)) is not None
+             and low < key <= high]
+    if not newer or min(newer) + COOLDOWN <= now:
+        return "BEHIND (no queue row)", 1, None
+    until = min(newer) + COOLDOWN
+    return f"cooldown until {until:%Y-%m-%d}", 0, until
 
 
 def npm(name: str) -> str:
@@ -104,22 +211,29 @@ def run(*argv: str) -> str:
     return result.stdout + result.stderr
 
 
-def lock_status() -> str:
+class Drift(list):
+    """A lock's drifted entries `(name, marker, old, new)`; prints as the census always has."""
+
+    def __str__(self) -> str:
+        return "; ".join(f"{name}{marker} {old} -> {new}" for name, marker, old, new in self) or "locked"
+
+
+def lock_status() -> Drift:
     output = run("uv", "lock", "--upgrade", "--dry-run")
-    updates = re.findall(r"^Update (\S+ v\S+ -> v\S+)", output, re.M)
-    return "; ".join(updates) if updates else "locked"
+    return Drift((name, "", "v" + old, "v" + new)
+                 for name, old, new in re.findall(r"^Update (\S+) v(\S+) -> v(\S+)", output, re.M))
 
 
-def compile_drift(path: str, requirement: str, python: str) -> str:
+def compile_drift(path: str, requirement: str, python: str) -> Drift:
     """Drift of a hash-pinned lock against a fresh compile of its own header requirement.
 
     Keys = name + environment marker: a universal compile writes `name==v ; marker` (torch's
     CUDA stack, uvloop, pywin32), and a fork by marker lists one name twice.
     """
 
-    def entries(text: str, tail: str) -> dict[str, str]:
+    def entries(text: str, tail: str) -> dict[tuple[str, str], str]:
         found = re.findall(rf"^([a-z0-9-]+)==(\S+)((?: ; [^\\\n]+?)?){tail}$", text, re.M)
-        return {name + marker: version for name, version, marker in found}
+        return {(name, marker): version for name, version, marker in found}
 
     pinned = entries(read(path), r" \\")
     argv = ["uv", "pip", "compile", "--python-version", python, "--universal", "--no-header",
@@ -131,84 +245,158 @@ def compile_drift(path: str, requirement: str, python: str) -> str:
     fresh = entries(result.stdout, "")
     if not pinned or not fresh:
         raise SourceError(f"{path}: {len(pinned)} pinned vs {len(fresh)} compiled entries")
-    drift = [f"{key} {pinned.get(key)} -> {version}" for key, version in sorted(fresh.items())
-             if pinned.get(key) != version]
-    drift += [f"{key} {version} -> gone" for key, version in sorted(pinned.items()) if key not in fresh]
-    return "; ".join(drift) if drift else "locked"
+    drift = Drift((name, marker, str(pinned.get((name, marker))), version)
+                  for (name, marker), version in sorted(fresh.items()) if pinned.get((name, marker)) != version)
+    drift += [(name, marker, version, "gone") for (name, marker), version in sorted(pinned.items())
+              if (name, marker) not in fresh]
+    return drift
 
 
-def pins() -> list[tuple[str, str, object, str]]:
-    """(name, current, latest thunk, source) — latest thunks run in parallel."""
+DRIFT = "drift"  # feed of a lock row: each drifted entry is a PyPI package
 
-    rows: list[tuple[str, str, object, str]] = []
+
+def pypi_feed(name: str) -> tuple[object, tuple[str, str]]:
+    return (lambda: pypi_dates(name)), ("PyPI", name)
+
+
+def npm_feed(name: str) -> tuple[object, tuple[str, str]]:
+    return (lambda: npm_dates(name)), ("npm", name)
+
+
+def pins() -> list[tuple[str, str, object, str, object]]:
+    """(name, current, latest thunk, source, feed) — latest thunks run in parallel; feed = (dates
+    thunk, OSV package) | `DRIFT` | None (no release dates, no advisory feed)."""
+
+    rows: list[tuple[str, str, object, str, object]] = []
     pyproject = read("pyproject.toml")
     for name, version in re.findall(r'^\s+"([A-Za-z0-9_.-]+)==([^"]+)",$', pyproject, re.M):
-        rows.append((name, version, lambda n=name: pypi(n), f"PyPI {name}"))
+        rows.append((name, version, lambda n=name: pypi(n), f"PyPI {name}", pypi_feed(name)))
     floor = one(r'"uv_build>=([0-9.]+),', pyproject, "pyproject.toml")
-    rows.append(("uv_build floor", floor, lambda: pypi("uv_build"), "PyPI uv_build"))
-    rows.append(("uv.lock transitive", "locked", lock_status, "uv lock --upgrade --dry-run"))
+    rows.append(("uv_build floor", floor, lambda: pypi("uv_build"), "PyPI uv_build", pypi_feed("uv_build")))
+    rows.append(("uv.lock transitive", "locked", lock_status, "uv lock --upgrade --dry-run", DRIFT))
     provider = read(PROVIDER)
     backend = one(r'^requires = \["(hatchling==[0-9.]+)"\]$', provider, PROVIDER)
     provider_floor = one(r'^requires-python = ">=(3\.\d+)"$', provider, PROVIDER)
     rows.append(("command-source hatchling", backend.split("==")[1], lambda: pypi("hatchling"),
-                 "PyPI hatchling"))
+                 "PyPI hatchling", pypi_feed("hatchling")))
     rows.append(("command-source build constraints", "locked",
-                 lambda: compile_drift(CONSTRAINTS, backend, provider_floor), f"uv pip compile ({CONSTRAINTS})"))
+                 lambda: compile_drift(CONSTRAINTS, backend, provider_floor), f"uv pip compile ({CONSTRAINTS})", DRIFT))
     for tool in sorted((ROOT / ".agent").iterdir()):
         text = tool.read_text(encoding="utf-8") if tool.is_file() else ""
         if tool.name == "fetch-tool" or "\nfetch_tool " not in text:
             continue
         version = one(r"^version=(\S+)$", text, f".agent/{tool.name}")
         repo = one(r"https://github\.com/([^/]+/[^/]+)/releases/download", text, f".agent/{tool.name}")
-        rows.append((tool.name, version, lambda r=repo: gh_release(r).removeprefix("v"), f"GitHub {repo}"))
+        rows.append((tool.name, version, lambda r=repo: gh_release(r).removeprefix("v"), f"GitHub {repo}",
+                     ((lambda r=repo: gh_dates(r)), TOOL_FEEDS.get(tool.name))))
     workflow = read(".github/workflows/gate.yml")
     actions = sorted(set(re.findall(r"uses: ([\w.-]+/[\w.-]+)(?:/[\w./-]+)?@[0-9a-f]{40} # (v\S+)", workflow)))
     for repo, tag in actions:
-        rows.append((repo, tag, lambda r=repo: gh_release(r), f"GitHub {repo}"))
+        rows.append((repo, tag, lambda r=repo: gh_release(r), f"GitHub {repo}",
+                     ((lambda r=repo: gh_dates(r)), ("GitHub Actions", repo))))
     uv = sorted(set(re.findall(r'^\s+version: "([0-9.]+)"$', workflow, re.M)))
     if len(uv) != 1:
         raise SourceError(f"gate.yml: setup-uv versions {uv}")
-    rows.append(("setup-uv uv", uv[0], lambda: pypi("uv"), "PyPI uv"))
+    rows.append(("setup-uv uv", uv[0], lambda: pypi("uv"), "PyPI uv", pypi_feed("uv")))
     runners = sorted(set(re.findall(r"runs-on: (\S+)", workflow)))
     for runner in runners:
-        rows.append((f"runner {runner}", runner, newest_runner, "actions/runner-images README"))
+        rows.append((f"runner {runner}", runner, newest_runner, "actions/runner-images README", None))
     # Supported Python (owner-ruled) = the latest line (full leg, D28) + the Kimi target's line,
     # the nucllei jail's (split leg + the `requires-python` floor).
     jail = one(r"docker\.io/library/python:(3\.\d+)-slim", read(".agent/decisions/nucllei-jail-smoke.sh"), "nucllei-jail-smoke.sh")
     full = one(r'^\s+python-version: "(3\.\d+)"$', workflow, "gate.yml full leg")
     split = " ".join(re.findall(r'^\s+- "(3\.\d+)"$', workflow, re.M))
     floor = one(r'^requires-python = ">=(3\.\d+)"$', pyproject, "pyproject.toml")
-    rows.append(("python full leg", full, newest_cpython_line, "uv python list --only-downloads"))
-    rows.append(("python split leg", split, lambda: jail, "nucllei jail stand-in"))
-    rows.append(("requires-python floor", floor, lambda: jail, "nucllei jail stand-in"))
+    rows.append(("python full leg", full, newest_cpython_line, "uv python list --only-downloads", None))
+    rows.append(("python split leg", split, lambda: jail, "nucllei jail stand-in", None))
+    rows.append(("requires-python floor", floor, lambda: jail, "nucllei jail stand-in", None))
     package = json.loads(read("prototype/webui-demo/package.json"))
-    rows.append(("playwright", package["devDependencies"]["playwright"], lambda: npm("playwright"), "npm playwright"))
+    rows.append(("playwright", package["devDependencies"]["playwright"], lambda: npm("playwright"), "npm playwright",
+                 npm_feed("playwright")))
     vendor = [p.name for p in (ROOT / "prototype/webui-demo/static/vendor").iterdir()]
     driver = one(r"^driver\.js-(\S+)$", "\n".join(vendor), "static/vendor")
-    rows.append(("driver.js", driver, lambda: npm("driver.js"), "npm driver.js"))
+    rows.append(("driver.js", driver, lambda: npm("driver.js"), "npm driver.js", npm_feed("driver.js")))
     readme = read("prototype/webui-demo/README.md")
     for font in ("space-grotesk", "jetbrains-mono"):
         version = one(rf"`@fontsource/{font}` ([0-9.]+)", readme, "prototype README")
-        rows.append((f"@fontsource/{font}", version, lambda f=font: npm(f"@fontsource/{f}"), f"npm @fontsource/{font}"))
+        rows.append((f"@fontsource/{font}", version, lambda f=font: npm(f"@fontsource/{f}"), f"npm @fontsource/{font}",
+                     npm_feed(f"@fontsource/{font}")))
     local = read("examples/open_webui/local.py")
     webui = one(r'^OPEN_WEBUI = "open-webui==([0-9.]+)"$', local, "local.py")
-    rows.append(("open-webui target", webui, lambda: pypi("open-webui"), "PyPI open-webui"))
+    rows.append(("open-webui target", webui, lambda: pypi("open-webui"), "PyPI open-webui", pypi_feed("open-webui")))
     mirror = one(r'^PYTHON = "(3\.\d+)"$', local, "local.py")
     # The Open WebUI target runs Cement's supported line, the Kimi target's (`Decisions`; p126).
-    rows.append(("open-webui mirror python", mirror, lambda: jail, "the Kimi target line (nucllei jail stand-in)"))
+    rows.append(("open-webui mirror python", mirror, lambda: jail, "the Kimi target line (nucllei jail stand-in)", None))
     rows.append(("open-webui lock transitive", "locked",
-                 lambda: compile_drift(OWUI_LOCK, f"open-webui=={webui}", mirror), f"uv pip compile ({OWUI_LOCK})"))
+                 lambda: compile_drift(OWUI_LOCK, f"open-webui=={webui}", mirror), f"uv pip compile ({OWUI_LOCK})", DRIFT))
     auditor = one(r'^PIP_AUDIT = "pip-audit==([0-9.]+)"$', read(".agent/owui-audit"), ".agent/owui-audit")
-    rows.append(("pip-audit (owui-audit)", auditor, lambda: pypi("pip-audit"), "PyPI pip-audit"))
+    rows.append(("pip-audit (owui-audit)", auditor, lambda: pypi("pip-audit"), "PyPI pip-audit", pypi_feed("pip-audit")))
     nucllei = one(r"nucllei-sandbox (v\d{8}-\d\d)", read(".claude/rules/nucllei.md"), "nucllei.md")
-    rows.append(("nucllei target", nucllei, lambda: gh_tag("technoplasm/nucllei"), "GitHub technoplasm/nucllei tags"))
+    rows.append(("nucllei target", nucllei, lambda: gh_tag("technoplasm/nucllei"), "GitHub technoplasm/nucllei tags", None))
     rows.append(("nucllei jail stand-in python", jail,
                  lambda: dockerfile_python("technoplasm/nucllei", "sandbox/Dockerfile", nucllei),
-                 f"technoplasm/nucllei sandbox/Dockerfile @ {nucllei}"))
+                 f"technoplasm/nucllei sandbox/Dockerfile @ {nucllei}", None))
     return rows
 
 
+def grade(feed: object, current: str, latest: object, now: datetime.datetime) -> tuple[str, int]:
+    """Status + rc of a pin behind latest, held by no row (`classify` per pin or per drifted entry)."""
+
+    if feed == DRIFT:
+        verdicts = []
+        for name, marker, old, new in latest:
+            if "gone" in (old, new) or version_key(old) is None:
+                verdicts.append((f"{name}{marker} {old} -> {new}", 1, None))
+                continue
+            security = advisories("PyPI", name, old.removeprefix("v"))
+            status, code, until = classify(old, new, None if security else pypi_dates(name), security, now)
+            verdicts.append((f"{name}{marker} {status}", code, until))
+        failing = [text for text, code, _ in verdicts if code]
+        if failing:
+            return f"BEHIND ({'; '.join(failing)})", 1
+        return f"cooldown until {min(until for _, _, until in verdicts):%Y-%m-%d}", 0
+    if feed is None:
+        return "BEHIND (no queue row)", 1
+    dates, package = feed
+    security = advisories(*package, current) if package else []
+    status, code, _ = classify(current, str(latest), None if security else dates(), security, now)
+    return status, code
+
+
+def self_test() -> int:
+    """The cooldown rules on synthetic releases + advisories; rc 0 = every case as expected."""
+
+    now = datetime.datetime(2026, 11, 1, tzinfo=datetime.timezone.utc)
+    day = datetime.timedelta(days=1)
+    action = {"id": "SEED-1", "affected": [{"package": {"name": "a/b", "ecosystem": "GitHub Actions"},
+                                            "ranges": [{"type": "ECOSYSTEM", "events": [{"introduced": "0"}, {"fixed": "46.0.1"}]}]}]}
+    cases = [
+        ("young latest", classify("1.1", "1.2", {"1.2": now - 2 * day}, [], now)[:2], ("cooldown until 2026-11-06", 0)),
+        ("aged latest", classify("1.1", "1.2", {"1.2": now - 8 * day}, [], now)[:2], ("BEHIND (no queue row)", 1)),
+        ("aged release between", classify("1.0", "1.2", {"1.1": now - 10 * day, "1.2": now - 2 * day}, [], now)[:2],
+         ("BEHIND (no queue row)", 1)),
+        ("pre-release ignored", classify("1.1", "1.2", {"1.2rc1": now - 30 * day, "1.2": now - 2 * day}, [], now)[:2],
+         ("cooldown until 2026-11-06", 0)),
+        ("older release ignored", classify("1.1", "1.2", {"1.0": now - 90 * day, "1.2": now - 2 * day}, [], now)[:2],
+         ("cooldown until 2026-11-06", 0)),
+        ("security", classify("1.1", "1.2", {"1.2": now - 2 * day}, ["SEED-1"], now)[:2], ("BEHIND (security: SEED-1)", 1)),
+        ("undated", classify("3.12", "3.13", None, [], now)[:2], ("BEHIND (no queue row)", 1)),
+        ("unorderable", classify("ubuntu-24.04", "ubuntu-26.04", {}, [], now)[:2], ("BEHIND (no queue row)", 1)),
+        ("tag range inside", in_ranges(action, "GitHub Actions", "a/b", "v45.0.7"), True),
+        ("tag range fixed", in_ranges(action, "GitHub Actions", "a/b", "v46.0.1"), False),
+        ("tag range other package", in_ranges(action, "GitHub Actions", "a/c", "v45.0.7"), False),
+    ]
+    failures = 0
+    for label, got, want in cases:
+        failures += got != want
+        print(f"{'OK  ' if got == want else 'FAIL'} {label}: {got!r}" + ("" if got == want else f" != {want!r}"))
+    print(f"SELF-TEST: {'PASS' if failures == 0 else 'FAIL'} ({len(cases)} cases, {failures} failed)")
+    return 1 if failures else 0
+
+
 def main() -> int:
+    if sys.argv[1:] == ["--self-test"]:
+        return self_test()
     try:
         rows = pins()
     except SourceError as error:
@@ -217,30 +405,31 @@ def main() -> int:
     queue = read(".agent/deferred.md")
     open_rows = set(re.findall(r"^- `(p\d+)` ", queue, re.M))
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
-        futures = [pool.submit(latest) for _, _, latest, _ in rows]
+        futures = [pool.submit(latest) for _, _, latest, _, _ in rows]
+    now = datetime.datetime.now(datetime.timezone.utc)
     rc = 0
     print(f"{'pin':32} {'current':16} {'latest':16} status / source")
-    for (name, current, _, source), future in zip(rows, futures, strict=True):
+    for (name, current, _, source, feed), future in zip(rows, futures, strict=True):
         try:
             latest = future.result()
+            same = current == str(latest)
+            hold = HELD.get(name)
+            if same and hold is None:
+                status = "ok"
+            elif hold is None:
+                status, code = grade(feed, current, latest, now)
+                rc = max(rc, code)
+            elif hold not in open_rows:
+                status, rc = f"HOLD-GONE ({hold} not open)", max(rc, 1)
+            else:
+                status = f"held {hold}" if not same else f"held {hold}, now at latest"
         except SourceError as error:
             print(f"{name:32} {current:16} {'?':16} ERROR {error}")
             rc = max(rc, 2)
             continue
-        same = current == latest
-        hold = HELD.get(name)
-        if same and hold is None:
-            status = "ok"
-        elif hold is None:
-            status, rc = "BEHIND (no queue row)", max(rc, 1)
-        elif hold not in open_rows:
-            status, rc = f"HOLD-GONE ({hold} not open)", max(rc, 1)
-        else:
-            status = f"held {hold}" if not same else f"held {hold}, now at latest"
-        print(f"{name:32} {current:16} {latest:16} {status} / {source}")
+        print(f"{name:32} {current:16} {str(latest):16} {status} / {source}")
     print(f"pins: {len(rows)} pins, rc {rc}")
     return rc
-
 
 if __name__ == "__main__":
     sys.exit(main())

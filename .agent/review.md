@@ -21,6 +21,18 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p150 agent part (MAINTAIN queue run 4, owner ruling: "honor the cooldown except for security releases"; tier `data`: a pin census) — target = the commit landing this section
+
+Check set fixed before the diff was reread: R1 the ruling's two halves (cooldown, security at once); R2 the census both ways; R3 every row kind graded; R4 records; C1 classic pitfalls. The row stays open on its trigger (the bumps after 2026-11-03). MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | cooldown + security exception | pass | `classify`: every stable release between current and latest younger than 7 days → `cooldown until <oldest + 7 d>` (rc 0); an older release in between, an undated source, an unorderable version → BEHIND; any OSV advisory against the CURRENT version → `BEHIND (security: <ids>)` before any date is read. |
+| R2 | both ways | pass | `--self-test` 11/11 (synthetic releases, advisories, GitHub Actions tag ranges); its security branch disabled → `FAIL security`, rc 1 (seed S23 `security-off`); live `zizmor 1.0.0` still BEHIND (aged releases between); S23 10/10 MATCH. |
+| R3 | every row kind | pass | PyPI (dev deps, uv_build, uv, hatchling, pip-audit, open-webui) + npm (playwright, driver.js, fonts) → release dates + OSV by version; GitHub releases (tools, actions) → `gh` release dates, OSV: zizmor → PyPI, gitleaks → Go module, shellcheck none, actions → a package query + tag-range evaluation (OSV orders no GitHub Actions versions: `tj-actions/changed-files` 45.0.7 by version → 0 hits, its advisory carries ECOSYSTEM ranges); lock rows → per drifted entry (PyPI dates + OSV); Python lines, runner, nucllei tag → undated → BEHIND. OSV positive controls: jinja2 2.10 → 12, pillow 12.3.0 → 44, golang.org/x/net 0.0.1 → 34, playwright 1.0.0 → 1. |
+| R4 | records | pass | `pins.md` law (owner ruling quoted) + rc table; `gate-checks.md` S23 bullet (10 cases); `spec.md` Decisions Gate tooling; p150 row re-scoped (trigger 2026-11-03 or an advisory). Live: rc 0, ruff / uv_build / setup-uv uv `cooldown until 2026-11-03`, Open WebUI lock `cooldown until 2026-11-02`. |
+| C1 | pitfalls | pass | lock drift is structured (`Drift` keeps the old display, so the census output and S23's regexes are unchanged); a dropped entry (`gone`) or a newly required package (`None`) → BEHIND; per-row network errors stay rc 2; pre-releases never start a cooldown (`version_key` → None). |
+
 ## p151 close (MAINTAIN queue run 4, born at p143; owner-approved gate change; tier `data`: a citation census) — target = the commit landing this section
 
 Check set = the row's acceptance A1-A4 + C1 (the census's own records), fixed before the diff was reread. MAIN alone.

@@ -652,6 +652,12 @@ unittest.main()
             with changed(lock, substitute(lock.read_text(), r"(?m)^pywin32==\S+ ; ", "pywin32==1 ; ")):
                 self.case("S23", "owui-lock-marker", root, [sys.executable, ".agent/pins"], 1,
                           [r"^open-webui lock transitive .*pywin32 ; sys_platform == 'win32' 1 -> \S+.* BEHIND"])
+            # Cooldown rules (p150) on synthetic releases: both ways — the security branch disabled reds them.
+            self.case("S23", "self-test", root, [sys.executable, ".agent/pins", "--self-test"], 0,
+                      [r"^SELF-TEST: PASS \(11 cases, 0 failed\)$"])
+            with changed(census, replace(census.read_text(), "    if security:\n", "    if False:\n")):
+                self.case("S23", "security-off", root, [sys.executable, ".agent/pins", "--self-test"], 1,
+                          [r"^FAIL security: ", r"^SELF-TEST: FAIL \(11 cases, 1 failed\)$"])
             self.case("S23", "shipped", root, [sys.executable, ".agent/pins"], 0,
                       [r"^pins: \d+ pins, rc 0$"])
 
