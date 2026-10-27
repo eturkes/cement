@@ -21,6 +21,21 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## MAINTAIN queue run 4 close — target = the commit landing this section
+
+Check set (the body's `Met when`), fixed before the run's record was reread: R1 every row present at the run's base `e8c1fa5` + every row born after it closed by its acceptance in its own commit, blocked on the owner with what it owes, waiting on its trigger, or routed; R2 the queue + ledger grader; R3 the standing censuses + audits; R4 the full gate on a clean tree at the closing commit. Teammates: operator-1 + operator-2 (p147 live runs, harvested; both stopped after their DONE markers).
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | acceptance | pass | 10 rows open at `e8c1fa5`, 3 born (p150-p152). Closed, each in its own commit with its `Closed:` line: p143, p148, p149, p147, p152 (born p149), p145 + p151 (born p143; owner-approved gate changes, seeds fired through CI). Agent parts, row open: p137 ×2 (pillow re-key + PYSEC-2026-4327; authlib CVE-2026-96760 — both target-pinned, held), p150 (owner ruling → cooldown census; the bumps wait). Waiting on a trigger: p52 (a map row about to become a durable claim), p137 (the Open WebUI release production moves to), p140 (a llens backend signer, or the owner reopens), p142 (the owner reopens with a route), p144 (production moves past 0.12.3), p150 (2026-11-03, or an advisory against a current version). Blocked on the owner: none (the run's one question answered p145, p151, p150). Routed: none. |
+| R2 | acceptance | pass | `uv run python .agent/decisions/m3-deferred-validate.py` → `VERDICT: PASS`. |
+| R3 | integrity | pass | rc 0 each: `p03-stored-int-census.py` (UNGUARDED 0), `p10-scratch-census.py` (unmarked 0; now gate step `scratch`), `p76-anchor-census.py --quiet` (failures 0), `p94-sha-census.py` (unreachable 0), `p73-review-coverage.py`, tripwires PASS, `m3-report-validate.py --all` (5 graded, 0 failed), `.agent/owui-audit` (129 findings in 16 packages held on p137), `.agent/pins` (28 pins: 3 rows + the Open WebUI lock cooling down, open-webui target held p144), `.agent/seeds --only S23 S26 S27` 10 + 3 + 3 MATCH. |
+| R4 | acceptance | see the commit body | the closing gate runs on the closing commit (a commit cannot carry its own gate result). |
+
+Rules upkeep (each `.claude/rules/` file re-read against `Authoring`): `ops.md` (Gate list + the census bullet), `gate-checks.md` (S26, S27, S23), `pins.md` (cooldown law), `assurance.md` (closed-unit graders) carry this run's law; no dead law, misplaced area law or origin story found in the other seven.
+
+Cleanup: the cited seed commits ae9c2a1 (p145) + 9d2f1d6 (p151) are kept by local tags `archive/p145-seed` + `archive/p151-seed` (unpublished, `ops.md` Tags); the three prepared worktrees + `wip/*` branches removed; the operators' evidence stays gitignored scratch (no tracked file cites it).
+
 ## p150 agent part (MAINTAIN queue run 4, owner ruling: "honor the cooldown except for security releases"; tier `data`: a pin census) — target = the commit landing this section
 
 Check set fixed before the diff was reread: R1 the ruling's two halves (cooldown, security at once); R2 the census both ways; R3 every row kind graded; R4 records; C1 classic pitfalls. The row stays open on its trigger (the bumps after 2026-11-03). MAIN alone.
