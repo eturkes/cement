@@ -17,7 +17,7 @@ I’ll verify each row against current first-party documentation, then ground th
 | R8 | **Future only; do not add publishing in this phase.** Use separate build and publish jobs. Build with `uv build --no-sources`, smoke-test the wheel and sdist, then transfer `dist/` as a workflow artifact. Give only the publish job `environment: pypi` and `permissions: id-token: write`; run `uv publish --trusted-publishing always`. Trusted Publishing is the current credentialless recommendation. Before the first publish, complete release metadata, configure the PyPI publisher to match owner `eturkes`, repository `cement`, the exact workflow filename, and environment `pypi`, and protect that environment. A pending publisher can create `cement-runtime` on first publication, but it does not reserve the name. | [uv packaging](https://docs.astral.sh/uv/guides/package/) · [uv GitHub release workflow](https://docs.astral.sh/uv/guides/integration/github/) · [PyPI pending publishers](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/) |
 | R9 | GitHub schedules use five-field POSIX cron. Supported operators are `*`, `,`, `-`, and `/`; aliases such as `@weekly` are unsupported. The minimum interval is five minutes. Schedules use UTC by default, may specify an IANA timezone, run only from the latest default-branch commit, and can be delayed or dropped during peak load. Use an off-hour minute such as `17 6 * * 1`. In a **public** repository, GitHub disables scheduled workflows after **60 days without repository activity**. | [schedule event](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule) · [workflow disabling](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/disable-and-enable-workflows) |
 
-## R10 — `/home/eturkes/Projects/cement/.github/workflows/gate.yml`
+## R10 — `.github/workflows/gate.yml`
 
 ```yaml
 name: Gate
@@ -100,7 +100,7 @@ jobs:
         run: uv build
 ```
 
-## R10 — `/home/eturkes/Projects/cement/.github/dependabot.yml`
+## R10 — `.github/dependabot.yml`
 
 ```yaml
 version: 2
@@ -145,11 +145,11 @@ If the project later centralizes the uv pin, this is sufficient:
 required-version = "==0.12.9"
 ```
 
-Then omit `with.version`; `setup-uv` discovers the pin automatically. The current `/home/eturkes/Projects/cement/pyproject.toml` has no such entry.
+Then omit `with.version`; `setup-uv` discovers the pin automatically. The current `pyproject.toml` has no such entry.
 
 ### R3
 
-The full-history checkout is deliberate. `/home/eturkes/Projects/cement/tests/test_migration_battery.py` walks earlier repository revisions, so the default one-commit checkout would invalidate the gate.
+The full-history checkout is deliberate. `tests/test_migration_battery.py` walks earlier repository revisions, so the default one-commit checkout would invalidate the gate.
 
 The current tree has no configured linter or type checker. Once p01 lands, add one non-matrix `static` job with a short timeout. Run it in parallel with `test`; the hosted runner remains isolated.
 
@@ -196,7 +196,7 @@ The future publish boundary should be:
 
 PyPI’s own documentation currently prefers `pypa/gh-action-pypi-publish` over custom OIDC protocol code. Astral separately documents native Trusted Publishing through `uv publish`. Either client must use the same narrowly scoped OIDC publisher.
 
-Before publication, the project must also close its existing release-metadata gap: `/home/eturkes/Projects/cement/pyproject.toml` currently lacks license, ownership, and project URL metadata. The project specification already requires a license and absolute URLs before publication.
+Before publication, the project must also close its existing release-metadata gap: `pyproject.toml` currently lacks license, ownership, and project URL metadata. The project specification already requires a license and absolute URLs before publication.
 
 Repository scope remained read-only. I did not run the ~500-second gate or `uv build`. The primary tree acquired unrelated battery-test modifications from other work while this research ran; I did not inspect or modify them.
 

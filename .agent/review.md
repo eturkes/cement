@@ -21,6 +21,17 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p148 close (MAINTAIN queue run 4, tier `docs`: historical records) — target = the commit landing this section
+
+Check set = the row's acceptance A1-A2 + C1 (record readers still pass) + C2 (verbatim evidence stays honest), fixed before the diff was reread. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | each citation repo-relative or marked | pass | 12 lines in 4 files before (`rg -n "/home/[A-Za-z0-9_.-]+" .agent/decisions`); after: 2 lines, `m45-consultant-1.md:86` + `:88`, both marked. |
+| A2 | substance restated beside marked citations | pass | `:86` quotes the v0.12.3 `utils/middleware.py` lines (3805-3819, 3823, 3752-3753) with their pinned GitHub URL; `:88` quotes the Filter documentation's two sentences with their URL; the marker names both. |
+| C1 | readers still pass | pass | `m3u6a2-dispositions-validate.py` PASS (0 findings); `m3u6a2-rule-dispositions.py --check` rc 0, apply twice → `cmp`-identical (serialization round-trips; the patcher never reads `symptom`); `m3-report-validate.py --all` 5 graded, 0 failed; `m3u10-gate-tooling.md`'s pointer to `m3u10-ci-research.md` resolves. |
+| C2 | verbatim evidence | pass | commands + the quoted error keep their text with `<repo>` standing for the checkout path, and each `.md` says so; prose headings + citations in `m3u10-ci-research.md` became plain repo paths. No count, verdict or excerpt changed. |
+
 ## p143 close (MAINTAIN queue run 4, tier `docs`: record markers + a census entry) — target = the commit landing this section
 
 Check set = the row's acceptance A1-A3 + C1 (the census edit still fires) + Q1 (new finds), fixed before the diff was reread. MAIN alone.

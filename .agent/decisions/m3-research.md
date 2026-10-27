@@ -93,18 +93,18 @@ The version check runs before schema creation. A mismatch raises `IntegrityError
 
 ### Exact probe transcript
 
-Probe script actually run: `/tmp/res-m3-q3-probe.sh`.
+Probe script actually run: `/tmp/res-m3-q3-probe.sh`; `<repo>` = the clone's root, written in place of the author's checkout path (p148).
 
 ```text
 $ bash /tmp/res-m3-q3-probe.sh
-$ PYTHONPATH=/home/eturkes/Projects/cement/src UV_CACHE_DIR=/tmp/res-m3-q3-uv-cache uv run --no-project python -m cement_runtime --db /tmp/res-m3-q3-ledger.db --partition probe operation list
+$ PYTHONPATH=<repo>/src UV_CACHE_DIR=/tmp/res-m3-q3-uv-cache uv run --no-project python -m cement_runtime --db /tmp/res-m3-q3-ledger.db --partition probe operation list
 stdout:
 []
 stderr:
 exit_code=0
 $ UV_CACHE_DIR=/tmp/res-m3-q3-uv-cache uv run --no-project python -c <set-PRAGMA-user_version-to-1> /tmp/res-m3-q3-ledger.db
 user_version=1
-$ PYTHONPATH=/home/eturkes/Projects/cement/src UV_CACHE_DIR=/tmp/res-m3-q3-uv-cache uv run --no-project python -m cement_runtime --db /tmp/res-m3-q3-ledger.db --partition probe operation list
+$ PYTHONPATH=<repo>/src UV_CACHE_DIR=/tmp/res-m3-q3-uv-cache uv run --no-project python -m cement_runtime --db /tmp/res-m3-q3-ledger.db --partition probe operation list
 stdout:
 stderr:
 {

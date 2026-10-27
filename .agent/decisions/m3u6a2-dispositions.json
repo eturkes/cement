@@ -35,7 +35,7 @@
       "klass": "ResolveBatteryTests",
       "test": "test_b04",
       "kind": "ERROR",
-      "symptom": "AttributeError: <module 'cement_runtime.system' from '/home/eturkes/Projects/cement/src/cement_runtime/system.py'> does not have the attribute 'Resolved'",
+      "symptom": "AttributeError: <module 'cement_runtime.system' from '<repo>/src/cement_runtime/system.py'> does not have the attribute 'Resolved'",
       "disposition": "rebase",
       "grounds": "Mixed subject: the `handle`/FunctionResolution cross-wire half is deleted; the surviving half still proves `resolve` returns exact `FunctionResolution` and cannot reach a legacy `Resolved` constructor because the runtime module exposes none.",
       "covering_test": "",
