@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Grade the M3.5a obligation battery against the contract's own D01-D30 bullets.
 
-    uv run python .agent/decisions/m3u5a-battery-validate.py [BATTERY]
+    uv run python .agent/decisions/m3u5a-battery-validate.py [BATTERY] [--worktree]
     uv run python .agent/decisions/m3u5a-battery-validate.py --emit-stub \
         > tests/test_cli_channels_battery.py
 
@@ -27,6 +27,11 @@ obligation goes red against correct code. The amendment must stay in front of th
 
 The battery must be RED at the pre-implementation base and GREEN against the shipped
 implementation. This validator grades SHAPE only; redness is the runner's job.
+
+Default input = the git objects at M3.5a's close (`CLOSE`), contract and battery alike: later
+units amend the battery, so a working-tree read grades a question the unit no longer owns
+(`.claude/rules/assurance.md` Tripwires, p149). `--worktree` reads both from the live tree; a
+BATTERY path grades that file against the selected contract.
 """
 
 from __future__ import annotations
@@ -36,11 +41,31 @@ import ast
 import pathlib
 import re
 import runpy
+import subprocess
 import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
+ROOT = HERE.parents[1]
 CONTRACT = HERE / "m3u5a-contract.md"
-DEFAULT_BATTERY = HERE.parents[1] / "tests" / "test_cli_channels_battery.py"
+DEFAULT_BATTERY = ROOT / "tests" / "test_cli_channels_battery.py"
+CLOSE = "36f7890"  # M3.5a's close: `roadmap (M3.5a): … → land S4 DONE`
+# The source every read takes: `CLOSE`'s objects, or the working tree under `--worktree` (None).
+REV: str | None = CLOSE
+
+
+def _read(path: pathlib.Path) -> str:
+    if REV is None:
+        return path.read_text(encoding="utf-8")
+    relpath = path.relative_to(ROOT).as_posix()
+    result = subprocess.run(
+        ["git", "-C", str(ROOT), "show", f"{REV}:{relpath}"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise SystemExit(f"ABORT   {REV}:{relpath}: {result.stderr.strip()}")
+    return result.stdout
 MARKER = "UNFILLED"
 
 has_assertion = runpy.run_path(str(HERE / "battery_ast.py"))["has_assertion"]
@@ -57,7 +82,7 @@ def _bullets(pattern: re.Pattern[str]) -> list[tuple[str, str, str]]:
     """Collect `- **ID** text` bullets, folding their indented continuation lines."""
     found: list[tuple[str, str, str]] = []
     current: list[str] | None = None
-    for line in CONTRACT.read_text(encoding="utf-8").splitlines():
+    for line in _read(CONTRACT).splitlines():
         match = pattern.match(line)
         if match:
             groups = match.groups()
@@ -163,10 +188,13 @@ def emit_stub() -> str:
 def grade(path: pathlib.Path) -> int:
     if not path.is_file():
         raise SystemExit(f"ABORT   no battery at {path}; seed it with --emit-stub")
+    return grade_source(path.read_text(encoding="utf-8"), str(path))
+
+
+def grade_source(source: str, label: str) -> int:
     rows = _obligations()
     binding = _amendments()
     wanted = {row["id"]: _name(row) for row in rows}
-    source = path.read_text(encoding="utf-8")
     tree = ast.parse(source)
 
     found: dict[str, ast.FunctionDef] = {}
@@ -203,7 +231,8 @@ def grade(path: pathlib.Path) -> int:
     uncovered = sorted(oid for oid, name in wanted.items() if name not in found)
     orphans = sorted(name for name in found if name not in by_name)
 
-    print(f"BATTERY: {path}")
+    print(f"SOURCE: {'working tree' if REV is None else REV + ' (M3.5a close)'}")
+    print(f"BATTERY: {label}")
     print(f"OBLIGATIONS: {len(rows)}")
     print(f"TESTS: {len(found)}")
     print(f"UNFILLED-TESTS: {len(unfilled)} {sorted(unfilled)}")
@@ -218,14 +247,21 @@ def grade(path: pathlib.Path) -> int:
 
 
 def main(argv: list[str]) -> int:
+    global REV
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--emit-stub", action="store_true")
-    parser.add_argument("battery", nargs="?", default=str(DEFAULT_BATTERY))
+    parser.add_argument("--worktree", action="store_true", help="read the live working tree")
+    parser.add_argument("battery", nargs="?", default=None)
     args = parser.parse_args(argv[1:])
+    if args.worktree:
+        REV = None
     if args.emit_stub:
         sys.stdout.write(emit_stub())
         return 0
-    return grade(pathlib.Path(args.battery))
+    if args.battery is not None:
+        return grade(pathlib.Path(args.battery))
+    label = str(DEFAULT_BATTERY) if REV is None else f"{REV}:{DEFAULT_BATTERY.relative_to(ROOT)}"
+    return grade_source(_read(DEFAULT_BATTERY), label)
 
 
 if __name__ == "__main__":

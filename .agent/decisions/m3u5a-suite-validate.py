@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Grade the M3.5a phase-2 red suite against MAIN's ruled verdict table.
 
-    uv run python .agent/decisions/m3u5a-suite-validate.py [SUITE]
+    uv run python .agent/decisions/m3u5a-suite-validate.py [SUITE] [--worktree]
     uv run python .agent/decisions/m3u5a-suite-validate.py --emit-stub > tests/test_cli_channels.py
 
 `--emit-stub` is the seed's SINGLE SOURCE OF TRUTH: it derives one test per ruled row from
@@ -19,6 +19,11 @@ turn a red test green, and a body with no assertion passes silently forever.
 
 The suite must be RED at the worktree base and GREEN against the shipped implementation.
 This validator grades SHAPE only; redness is the suite runner's job.
+
+Default input = the git objects at M3.5a's close (`CLOSE`), table and suite alike: later units
+extend the suite (X23's rename), so a working-tree read grades a question the unit no longer
+owns (`.claude/rules/assurance.md` Tripwires, p149). `--worktree` reads both from the live tree;
+a SUITE path grades that file against the selected table.
 """
 
 from __future__ import annotations
@@ -29,18 +34,38 @@ import json
 import pathlib
 import re
 import runpy
+import subprocess
 import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
+ROOT = HERE.parents[1]
 TABLE = HERE / "m3u5a-verdicts.json"
-DEFAULT_SUITE = HERE.parents[1] / "tests" / "test_cli_channels.py"
+DEFAULT_SUITE = ROOT / "tests" / "test_cli_channels.py"
+CLOSE = "36f7890"  # M3.5a's close: `roadmap (M3.5a): … → land S4 DONE`
+# The source every read takes: `CLOSE`'s objects, or the working tree under `--worktree` (None).
+REV: str | None = CLOSE
+
+
+def _read(path: pathlib.Path) -> str:
+    if REV is None:
+        return path.read_text(encoding="utf-8")
+    relpath = path.relative_to(ROOT).as_posix()
+    result = subprocess.run(
+        ["git", "-C", str(ROOT), "show", f"{REV}:{relpath}"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise SystemExit(f"ABORT   {REV}:{relpath}: {result.stderr.strip()}")
+    return result.stdout
 MARKER = "UNFILLED"
 
 has_assertion = runpy.run_path(str(HERE / "battery_ast.py"))["has_assertion"]
 
 
 def _rows() -> list[dict[str, str]]:
-    payload = json.loads(TABLE.read_text(encoding="utf-8"))
+    payload = json.loads(_read(TABLE))
     rows = payload["rows"]
     unruled = [row["id"] for row in rows if not row.get("main_verdict")]
     if unruled:
@@ -112,9 +137,12 @@ def emit_stub() -> str:
 
 
 def grade(path: pathlib.Path) -> int:
+    return grade_source(path.read_text(encoding="utf-8"), str(path))
+
+
+def grade_source(source: str, label: str) -> int:
     rows = _rows()
     wanted = {row["id"]: _name(row) for row in rows}
-    source = path.read_text(encoding="utf-8")
     tree = ast.parse(source)
 
     found: dict[str, ast.FunctionDef] = {}
@@ -136,7 +164,8 @@ def grade(path: pathlib.Path) -> int:
     uncovered = sorted(rid for rid, name in wanted.items() if name not in found)
     orphans = sorted(name for name in found if name not in by_name)
 
-    print(f"SUITE: {path}")
+    print(f"SOURCE: {'working tree' if REV is None else REV + ' (M3.5a close)'}")
+    print(f"SUITE: {label}")
     print(f"ROWS: {len(rows)}")
     print(f"TESTS: {len(found)}")
     print(f"UNFILLED-TESTS: {len(unfilled)} {sorted(unfilled)}")
@@ -149,14 +178,21 @@ def grade(path: pathlib.Path) -> int:
 
 
 def main(argv: list[str]) -> int:
+    global REV
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--emit-stub", action="store_true")
-    parser.add_argument("suite", nargs="?", default=str(DEFAULT_SUITE))
+    parser.add_argument("--worktree", action="store_true", help="read the live working tree")
+    parser.add_argument("suite", nargs="?", default=None)
     args = parser.parse_args(argv[1:])
+    if args.worktree:
+        REV = None
     if args.emit_stub:
         sys.stdout.write(emit_stub())
         return 0
-    return grade(pathlib.Path(args.suite))
+    if args.suite is not None:
+        return grade(pathlib.Path(args.suite))
+    label = str(DEFAULT_SUITE) if REV is None else f"{REV}:{DEFAULT_SUITE.relative_to(ROOT)}"
+    return grade_source(_read(DEFAULT_SUITE), label)
 
 
 if __name__ == "__main__":

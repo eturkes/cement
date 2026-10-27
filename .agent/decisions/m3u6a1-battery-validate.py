@@ -16,9 +16,14 @@ superseded form.
 Control lines, all zero for PASS: UNFILLED, UNCOVERED, ORPHAN, ASSERTIONLESS,
 SKIPPED, CORRECTION-UNCITED.
 
+Default input = the git objects at M3.6a1's close (`CLOSE`): the unit settled its battery
+against its contract there, and later units extend both, so a working-tree read grades a
+question the unit no longer owns (`.claude/rules/assurance.md` Tripwires, p149). `--worktree`
+grades the live tree; `--root DIR` a staged copy (the self-test's channel).
+
 Usage:
     m3u6a1-battery-validate.py --emit-stub [> tests/test_migration_battery.py]
-    m3u6a1-battery-validate.py [--battery PATH] [--root DIR]
+    m3u6a1-battery-validate.py [--battery PATH] [--root DIR | --worktree]
     m3u6a1-battery-validate.py --self-test
 """
 
@@ -29,7 +34,6 @@ import ast
 import pathlib
 import re
 import runpy
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -38,7 +42,9 @@ import textwrap
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 CONTRACT_NAME = "m3u6a1-contract.md"
+CONTRACT_RELPATH = pathlib.Path(".agent") / "decisions" / CONTRACT_NAME
 BATTERY_RELPATH = pathlib.Path("tests") / "test_migration_battery.py"
+CLOSE = "dc4ab5e"  # M3.6a1's close: `roadmap (M3.6a1): … → DONE`
 
 # `- **D01** text` / `- **D14a** text` at the start of a section-4 bullet. The id
 # pattern carries `\d+`, never `\d`: an `A\d` regex silently dropped every id past
@@ -67,8 +73,29 @@ CLASS_NAME = "MigrationBatteryTests"
 
 
 def _contract_lines(root: pathlib.Path) -> list[str]:
-    path = root / ".agent" / "decisions" / CONTRACT_NAME
+    path = root / CONTRACT_RELPATH
     return path.read_text(encoding="utf-8").splitlines()
+
+
+def _git_object(relpath: pathlib.Path) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(ROOT), "show", f"{CLOSE}:{relpath.as_posix()}"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise SystemExit(f"ABORT   {CLOSE}:{relpath.as_posix()}: {result.stderr.strip()}")
+    return result.stdout
+
+
+def _stage_close(stage: pathlib.Path, relpaths: tuple[pathlib.Path, ...]) -> pathlib.Path:
+    """Write each `CLOSE` object under `stage` at its repo-relative path; return `stage`."""
+    for relpath in relpaths:
+        target = stage / relpath
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(_git_object(relpath), encoding="utf-8")
+    return stage
 
 
 def _fold(lines: list[str], start: int, pattern: re.Pattern[str]) -> tuple[str, int]:
@@ -347,9 +374,7 @@ def self_test() -> int:
     failures = 0
     with tempfile.TemporaryDirectory() as raw:
         stage = pathlib.Path(raw)
-        decisions = stage / ".agent" / "decisions"
-        decisions.mkdir(parents=True)
-        shutil.copy2(ROOT / ".agent" / "decisions" / CONTRACT_NAME, decisions / CONTRACT_NAME)
+        _stage_close(stage, (CONTRACT_RELPATH,))
         (stage / "tests").mkdir()
         battery = stage / BATTERY_RELPATH
 
@@ -452,17 +477,27 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--emit-stub", action="store_true")
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--battery", type=pathlib.Path, default=None)
-    parser.add_argument("--root", type=pathlib.Path, default=None)
+    sources = parser.add_mutually_exclusive_group()
+    sources.add_argument("--root", type=pathlib.Path, default=None)
+    sources.add_argument("--worktree", action="store_true", help="grade the live working tree")
     args = parser.parse_args(argv)
 
-    root = (args.root or ROOT).resolve()
     if args.self_test:
         return self_test()
-    if args.emit_stub:
-        sys.stdout.write(emit_stub(root))
-        return 0
-    battery = args.battery or (root / BATTERY_RELPATH)
-    return grade(battery.resolve(), root)
+    with tempfile.TemporaryDirectory(prefix="m3u6a1-close-") as raw:
+        if args.root is not None:
+            root = args.root.resolve()
+        elif args.worktree:
+            root = ROOT
+        else:
+            relpaths = (CONTRACT_RELPATH,) if args.battery else (CONTRACT_RELPATH, BATTERY_RELPATH)
+            root = _stage_close(pathlib.Path(raw), relpaths)
+        if args.emit_stub:
+            sys.stdout.write(emit_stub(root))
+            return 0
+        print(f"SOURCE: {'root ' + str(root) if args.root else 'working tree' if args.worktree else CLOSE + ' (M3.6a1 close)'}")
+        battery = args.battery or (root / BATTERY_RELPATH)
+        return grade(battery.resolve(), root)
 
 
 if __name__ == "__main__":

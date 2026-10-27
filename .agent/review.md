@@ -21,6 +21,19 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p149 close (MAINTAIN queue run 4, tier `data`: closed-unit shape graders; the units' claims re-check from git) — target = the commit landing this section
+
+Check set = the row's acceptance A1-A3 + C1 (callers) + C2 (one source per clause) + Q1 (the class), fixed before the diff was reread. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | default input = close objects; live tree behind a named flag | pass | `CLOSE` + `git show` (m3u5a pair: module `REV`, `--worktree` sets `None`; m3u6a1: `_stage_close` into a temporary root, `--worktree` / `--root` mutually exclusive); `SOURCE:` line printed per grade (never into `--emit-stub` output). |
+| A2 | rc 0 by default on a clean checkout | pass | primary tree: rc 0 × 3; fresh `git clone` + the three files, `python3 -I` → rc 0 × 3 with `SOURCE: 36f7890` / `dc4ab5e`; `--worktree` → rc 1 × 3 (the row's drift). |
+| A3 | each `--self-test` still reds its planted defect | pass | m3u6a1 (the only one with `--self-test`): 10/10 controls `OK`, `SELF-TEST: PASS`; the m3u5a pair fired by planted inputs: stub → `UNFILLED-TESTS` 30 / 60, close suite minus X01 → `ROWS-UNCOVERED: 1 ['X01']`. |
+| C1 | callers fit | pass | `cr1-read-cache.py` runpy's `emit_stub` + `grade(path)`: `grade` keeps its path signature (one read, then `grade_source`), GREEN; `m3u5a-battery-reamend.py` imports `_obligations` / `_amendments` / `_wrap`: `--check` output `cmp`-identical before/after (the contract is unchanged since `36f7890`). |
+| C2 | one source per clause | pass | contract/table AND battery/suite come from the same `CLOSE` (m3u6a1-contract.md moved 3× after `dc4ab5e`); an explicit BATTERY path pairs with the selected contract source. |
+| Q1 | the class | row born | `rg -l '"tests"' .agent/decisions/*.py` minus git-object readers → 18 tree readers; graded by default: `m3u4-battery-validate.py` rc 1, `m3u5a-battery-reamend.py --check` rc 1, `m3u5b-battery-validate.py` rc 0 (latent), `m3u3-battery-validate.py` rc 0 → p152 (the three named; the rest classified there). |
+
 ## p148 close (MAINTAIN queue run 4, tier `docs`: historical records) — target = the commit landing this section
 
 Check set = the row's acceptance A1-A2 + C1 (record readers still pass) + C2 (verbatim evidence stays honest), fixed before the diff was reread. MAIN alone.
