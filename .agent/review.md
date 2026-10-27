@@ -21,6 +21,17 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p137 agent part 2 (MAINTAIN queue run 4, tier `data`: audit holds; the row stays open on its trigger) — target = the commit landing this section
+
+Same check set as `## p137 agent part` (A1 holds = findings, A2 row text, A3 p144 facts, C1 no hold widened), fixed before the diff was reread. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | holds = findings | pass | `.agent/owui-audit` rc 1 `UNHELD authlib CVE-2026-96760 1.7.2` (first seen at the p145 close); `--emit-holds p137` → 129 holds; rc 0 `PASS`. |
+| A2 | row text | pass | OSV `v1/query` authlib 1.7.2 → GHSA-6v38-4h7w-rj9h (alias CVE-2026-96760, fixed 1.9.0; summary: a signature-verification bypass); PyPI `requires_dist`: open-webui 0.12.3 AND 0.12.4 both `authlib==1.7.2` ⇒ target-pinned (the owner's track-only ruling), no lock bump fixes it. Row = 129 findings in 16 packages, authlib named. |
+| A3 | p144 facts | pass | fresh 0.12.4 compile → `--lock`: 31 findings in 10 packages, 98 STALE + 3 MOVED; the authlib hold stays. |
+| C1 | no hold widened | pass | holds diff = one key added (`authlib CVE-2026-96760`, 1.7.2, p137); `gate-checks.md` S23 shipped case 128/15 → 129/16. |
+
 ## p145 close (MAINTAIN queue run 4, owner-approved gate change; tier `data`: a dependency scanner) — target = the commit landing this section
 
 Check set = the row's acceptance A1-A3 + C1 (the tool's other modes) + C2 (prose readers), fixed before the diff was reread. MAIN alone.

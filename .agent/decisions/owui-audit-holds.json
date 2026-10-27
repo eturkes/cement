@@ -43,6 +43,10 @@
     "row": "p137",
     "version": "0.86.0"
   },
+  "authlib CVE-2026-96760": {
+    "row": "p137",
+    "version": "1.7.2"
+  },
   "black CVE-2026-114134": {
     "row": "p137",
     "version": "26.5.1"
