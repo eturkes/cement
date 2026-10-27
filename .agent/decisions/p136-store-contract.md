@@ -128,3 +128,5 @@ honest two-file retention.
 
 Erratum (closing review, reviewer-1 R1): S9's `without constructing a `System`` describes the shadow
 read itself; p51 precedes it, so both leaves open the ledger existing-only first (exit 5 when absent).
+
+Machine-local: each `.scratch/` path in this file names a gitignored input or output of the session that wrote it; no clone retrieves it, and the file states the substance it relied on (p10). Here: consultant-2's verdicts = `.agent/review.md` `## p136-store close`, rows N1-N8, each re-derived by MAIN.

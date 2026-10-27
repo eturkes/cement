@@ -21,6 +21,18 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## p143 close (MAINTAIN queue run 4, tier `docs`: record markers + a census entry) — target = the commit landing this section
+
+Check set = the row's acceptance A1-A3 + C1 (the census edit still fires) + Q1 (new finds), fixed before the diff was reread. MAIN alone.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| A1 | census rc 0, `unmarked 0` | pass | `uv run python .agent/decisions/p10-scratch-census.py` → rc 0, `CITATIONS: 199 {'operational': 11, 'history': 51, 'marked': 125, 'json': 12} unmarked 0`. |
+| A2 | the four modules green | pass | `.agent/gate tests.test_shadow tests.test_signature tests.test_comparator tests.test_retention_battery` → Ran 93, OK; format, lint, types, spec-lint rc 0. They cite the contracts in docstrings alone (`rg` over `tests/`), so no byte pin moved. |
+| A3 | substance restated or marked | pass | each contract's appended marker names where its cited substance lives: consultant verdicts = `.agent/review.md` p135-e3 K1-K8, p136-cmp L1-L6, p136-store N1-N8 (rows read: each carries the verdict + MAIN's re-derivation); the byte probe = p135-e3 R6 (16 copies vs 0); the spike = p135-e5 F3 (210 Wycheproof tests, 0 mismatches) + `test_wycheproof_under_the_strict_policy` at the pinned sha256. `.agent/contract-claims` on each contract → rc 0 (the marker lines carry no count). |
+| C1 | census edit fires | pass | p136-store marker removed → rc 1 `UNMARKED …p136-store-contract.md:10`; the census at `HEAD` (without the janitor entry) → rc 1 `UNMARKED .claude/agents/janitor.md:11`; restored → rc 0. The janitor citation = a template copy's ignore-entry list (`.claude/agents/` overwritten whole at each refresh, `ops.md` Template rulings), so `OPERATIONAL` classifies it beside `CLAUDE.md`. |
+| Q1 | finds | rows born | p150 (pins drift, `.agent/pins` rc 1 at the run's base), p151 (wire the census as a gate step: a gate change, owner approval first); `ops.md`'s on-demand bullet names p151. |
+
 ## p137 agent part (MAINTAIN queue run 4, tier `data`: audit holds; the row stays open on its trigger) — target = the commit landing this section
 
 Check set fixed before the diff was reread: A1 holds = the audit's current findings; A2 the row restates the count + names the new advisory; A3 p144's measured facts re-derived; C1 no hold widened. MAIN alone.

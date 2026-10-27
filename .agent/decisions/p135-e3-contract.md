@@ -123,3 +123,5 @@ that opens too wide deletes evidence for good.
 106	256 / 257 bytes;	unchecked	an adjacent bound pair the gate pins	-
 109	3. Register + article audits rc 0;	unchecked	a gate expectation	-
 ```
+
+Machine-local: each `.scratch/` path in this file names a gitignored input or output of the session that wrote it; no clone retrieves it, and the file states the substance it relied on (p10). Here: consultant-1's verdicts = `.agent/review.md` `## p135-e3 close`, rows K1-K8, each re-derived by MAIN; the byte probe's measurement = R6 above.

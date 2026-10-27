@@ -139,3 +139,5 @@ Revision 2 → 3: G5 keeps the `_read_function_bundle(value: str) -> str` seam, 
 119	differential.py` (rc 0)	unchecked	a gate expectation of the unbuilt unit	0
 121	audits rc 0.	unchecked	a gate expectation of the unbuilt unit	0
 ```
+
+Machine-local: each `.scratch/` path in this file names a gitignored input or output of the session that wrote it; no clone retrieves it, and the file states the substance it relied on (p10). Here: the spike's result = F3 above, and the shipped oracle `tests/test_signature.py` `test_wycheproof_under_the_strict_policy` reruns the same vectors at their pinned sha256.

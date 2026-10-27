@@ -22,6 +22,7 @@ SELF = ".agent/decisions/p10-scratch-census.py"
 MARKER = "Machine-local: each `.scratch/` path in this file"
 OPERATIONAL = {
     "CLAUDE.md": "template: the teammate worktree location convention",
+    ".claude/agents/janitor.md": "template: the repo's own ignore entries the janitor checks",
     ".claude/rules/ops.md": "worktree location + the gitignore rule itself",
     ".claude/rules/prototype.md": "where a scratch capture driver goes",
     "prototype/webui-demo/capture.sh": "capture output directory (gitignored by design)",

@@ -113,3 +113,5 @@ witnesses, a 64 KiB budget, capped paths, the comparator captured at admission (
 
 Erratum (closing review, reviewer-1 R4): `set_comparator` returns a `ComparatorChange`
 (`changed`, `comparator_hash`, `operation_revision`), not the `ComparatorRecord` that `comparator` reads.
+
+Machine-local: each `.scratch/` path in this file names a gitignored input or output of the session that wrote it; no clone retrieves it, and the file states the substance it relied on (p10). Here: consultant-1's verdicts = `.agent/review.md` `## p136-cmp close`, rows L1-L6, each re-derived by MAIN.
