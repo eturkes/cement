@@ -21,6 +21,25 @@ against its acceptance check alone. A pass here is a reviewer's opinion about th
 replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
 names all three).
 
+## Template refresh → agents@e29f63a (MAINTAIN, request) — target = the diff this commit lands, base `03b6139`
+
+Template delta = agents@a08b211..e29f63a (a6c54c0, 9ca5f35, 5e742cc, e29f63a): first failed attempt escalates (`consultant`, deep work, advisor fit); `Code review` = `kernel` slices → two `reviewer`s + a MAINTAIN request's closing diff → one all-lens `reviewer` (`where needed` out); PROTOTYPE + ITERATE `researcher` per product-domain question + `operator` per variant batch; ≥5 `consultant`s on a costly-to-reverse ruling; acceptance-suite parenthetical out; unit fits → IMPLEMENT + MAINTAIN; advisor = IMPLEMENT + MAINTAIN low bar + wider fits; portability line positive; `Read` cap out; `navigator` + `tester` wording. Owner ruling: ops.md Template rulings (3) loses its dispatch sub-clause ("Follow the template"). Check set L1-L10 seeded before reviewer-1 (`reviewer`, every lens) read the diff; MAIN re-derived each row; R11 + R12 = MAIN's.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | template fidelity | pass | `cmp` rc 0 vs agents@e29f63a: `CLAUDE.md` (`claude/CLAUDE.project.md`), 8 roles, `.agent/spec-lint` (blob `e3f11e9`, 100755); HEAD's copies `cmp`-equal agents@a08b211 ⇒ delta = upstream `a08b211..e29f63a` alone; role sets 8 = 8. |
+| R2 | obligation coverage | pass | reviewer-1's own enumeration E01-E24 (written before it read MAIN's record) maps onto O1-O13 + steps 3-4; its E08 (`substantial` qualified the unit fit too) entered O5. |
+| R3 | dispositions | pass | O1-O13 vs rules + spec: O8 = owner ruling + this pass's `reviewer`; O7, O9, O10, O11 bind at their next code-review request / PROTOTYPE-ITERATE session / IMPLEMENT orientation; O5 overclaimed a files-before-commit call before it ran → corrected to the one call so far (transcript `server_tool_use` advisor line 197, result 198, `AskUserQuestion` 201), reviewer-1 rematched. |
+| R4 | old forms | pass | 18 forms, `rg --hidden -g '!.git' -n -F` → 0 live hits; history hits = `.agent/review.md` alone (this section's R4 + R5 rows quoting the forms, `:183` `IMPLEMENT unit fits`, `:1280` `nothing machine-specific`); `git grep -F … HEAD` controls ≥ 1 each. |
+| R5 | ruling (3) edit | pass | `git diff --word-diff` = one deletion, ``[-`reviewer` dispatch per close = MAIN's call where `Code review` names a fit;-]``, 1 hunk; the every-close adaptation + both carriers stay. |
+| R6 | spec preservation | pass | `.agent/spec.md`, `.agent/spec-lint`, `.agent/deferred.md` diff 0 bytes (`git diff --quiet` rc 0) ⇒ layout + unit ids unchanged. |
+| R7 | check strength | pass | no check edited; template readers = `law` (`@` imports, frontmatter, `portable`), S24 (`@.agent/spec.md` line 1, unchanged), `shell` (`.agent/spec-lint` unchanged), `p10-scratch-census.py` (operational `CLAUDE.md` = worktree convention, unchanged); test hits = comments + one docstring. |
+| R8 | rules upkeep | pass | 11 rule files read whole; none only restates the template or retired mechanics; no rule restates removed text; `upstream-sync.md` absent since `9194f41`. Rules upkeep (MAINTAIN request close): the rules tree is byte-identical to queue run 4's upkeep at `03b6139` apart from ruling (3)'s struck sub-clause, and this re-read found no dead law, misplaced area law or origin story. |
+| R9 | portability + settings | pass | `law` `portable` 0; sweep → README `:230`/`:232`/`:259` `~/.ssh/id_ed25519` (owner-kept reader key) + public upstream names (own GitHub URL, Open WebUI, `prism-hu/llens`); no project `.claude/settings*.json`. |
+| R10 | queue | pass | no finding outside the contract ⇒ no row born; reviewer-1 register empty. |
+| R11 | load probe | pass | fresh `claude -p --output-format stream-json --verbose` (spec-only: the `route` task's operation) → `intake_queue`, 1 turn, 0 `tool_use`; `intake_queue` occurs in `.agent/spec.md` alone among session-start files. |
+| R12 | full gate | see the commit body | the CI gate runs on the commit (a commit cannot carry its own gate result). |
+
 ## MAINTAIN queue run 4 close — target = the commit landing this section
 
 Check set (the body's `Met when`), fixed before the run's record was reread: R1 every row present at the run's base `e8c1fa5` + every row born after it closed by its acceptance in its own commit, blocked on the owner with what it owes, waiting on its trigger, or routed; R2 the queue + ledger grader; R3 the standing censuses + audits; R4 the full gate on a clean tree at the closing commit. Teammates: operator-1 + operator-2 (p147 live runs, harvested; both stopped after their DONE markers).
