@@ -8,7 +8,8 @@ Clauses (each a named check; rc 1 prints every violation, rc 0 prints one count 
   imports      every `@path` line of `CLAUDE.md` names a tracked file (`CLAUDE.md` Authoring)
   settings     no tracked project `.claude/settings.json` (`.claude/rules/ops.md` Settings)
   symlinks     no tracked symbolic link points at nothing (`CLAUDE.md` Execution task close)
-  portable     live law, config, code + docs name no machine path (`CLAUDE.md` Authoring)
+  home-paths   live law, config, code + docs name no home-directory path: a machine-only + private
+               fact, routed to the gitignored `CLAUDE.local.md` in this public repo (`CLAUDE.md` Authoring)
   reasons      every `noqa` / `type: ignore` in `src/` + `examples/` carries its reason on its line
                or in the comment that heads its paragraph (`.claude/rules/ops.md` Static checks)
 Usage: .agent/law-census [--root DIR] [--self-test]
@@ -28,8 +29,8 @@ import tempfile
 
 SPECIAL = tuple("[{}],&*!|>%@#:`\"")
 MACHINE = re.compile(r"/home/[A-Za-z0-9_.-]+|/Users/[A-Za-z0-9_.-]+|[A-Z]:\\Users\\")
-PORTABLE = ("CLAUDE.md", "README.md", "pyproject.toml", ".agent/spec.md")
-PORTABLE_DIRS = (".claude/", ".github/", "src/", "examples/", "docs/", "skills/")
+LIVE = ("CLAUDE.md", "README.md", "pyproject.toml", ".agent/spec.md")
+LIVE_DIRS = (".claude/", ".github/", "src/", "examples/", "docs/", "skills/")
 SUPPRESSION = re.compile(r"#\s*(noqa(?::\s*[A-Z0-9, ]+)?|type:\s*ignore(?:\[[^\]]*\])?)(.*)$")
 
 
@@ -91,10 +92,10 @@ def symlinks(root: pathlib.Path, files: list[str]) -> list[str]:
     ]
 
 
-def portable(root: pathlib.Path, files: list[str]) -> list[str]:
+def home_paths(root: pathlib.Path, files: list[str]) -> list[str]:
     bad: list[str] = []
     for name in files:
-        if not (name in PORTABLE or name.startswith(PORTABLE_DIRS)) or os.path.islink(root / name):
+        if not (name in LIVE or name.startswith(LIVE_DIRS)) or os.path.islink(root / name):
             continue
         try:
             text = (root / name).read_text(encoding="utf-8")
@@ -137,7 +138,7 @@ CHECKS = {
     "imports": imports,
     "settings": settings,
     "symlinks": symlinks,
-    "portable": portable,
+    "home-paths": home_paths,
     "reasons": reasons,
 }
 PLANTS = {
@@ -145,7 +146,7 @@ PLANTS = {
     "imports": ("CLAUDE.md", "@.agent/no-such-file.md\n"),
     "settings": (".claude/settings.json", "{}\n"),
     "symlinks": ("docs/zz-seed-link", None),
-    "portable": ("docs/zz-seed.md", "Run /home/someone/bin/tool here.\n"),
+    "home-paths": ("docs/zz-seed.md", "Run /home/someone/bin/tool here.\n"),
     "reasons": ("src/zz_seed.py", "import os  # noqa: F401\n"),
 }
 

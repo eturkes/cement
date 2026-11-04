@@ -1,13 +1,32 @@
 #!/usr/bin/env bash
-# gate — the repo's check chain (`.claude/rules/ops.md` Env), each step's rc + wall-clock + the
-# suite's 10 slowest tests; rc 0 only when every step passes.
+# gate — the repo's check chain (`.claude/rules/ops.md` Env), each step's rc + wall-clock +
+# verdict + the suite's 10 slowest tests; rc 0 only when every step passes. A full or split run
+# appends one row per step to the step ledger (`.claude/rules/ops.md` Step ledger) and prints each
+# row as a `gate-ledger<TAB>` line, which `.agent/ci-gate` imports from a CI log.
 #   .agent/gate                  full gate: static checks + scanners + unittest discover (D28
 #                                included) + uv build + spec-lint
-#   .agent/gate <tests.module>…  fast gate: static checks + those modules + spec-lint; iteration only
+#   .agent/gate <tests.module>…  fast gate: static checks + those tests minus D28 (a history
+#                                replay) + spec-lint; iteration only, no ledger rows
 #   .agent/gate --omit-d28       full gate with the suite minus D28, NAMED as a split run
 #                                (`.claude/rules/history-gates.md`); CI's split leg
 set -u
 cd "$(dirname "$0")/.." || exit 2
+case "${1:-}" in
+  "") mode="full" ;;
+  --omit-d28) mode="split" ;;
+  *) mode="fast" ;;
+esac
+ledger=${CEMENT_GATE_LEDGER:-$(git rev-parse --path-format=absolute --git-common-dir)/cement-gate-ledger.tsv}
+started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+tree=unknown
+if [ "$mode" != fast ]; then
+  # The graded tree = the working tree's own tree id (`HEAD^{tree}` when clean), written through
+  # a scratch copy of the index so the real one stays untouched.
+  index=$(mktemp)
+  cp "$(git rev-parse --git-path index)" "$index" 2> /dev/null || rm -f "$index"
+  GIT_INDEX_FILE=$index git add -A 2> /dev/null && tree=$(GIT_INDEX_FILE=$index git write-tree)
+  rm -f "$index"
+fi
 names=() rcs=() secs=()
 step() { # step <name> <cmd…>
   local name=$1 t0=$EPOCHREALTIME rc
@@ -62,13 +81,26 @@ elif [ $# -eq 0 ]; then
   step build uv build
   step wheels .agent/decisions/p34-two-wheel-smoke.sh
 else
-  step unittest uv run python -m unittest "${durations[@]}" "$@"
+  step unittest uv run python .agent/suite --omit-d28 "${durations[@]}" "$@"
 fi
 step spec-lint .agent/spec-lint
-printf '\n%-10s %4s %9s\n' step rc seconds
-fail=0
+printf '\n%-10s %4s %9s  %s\n' step rc seconds verdict
+fail=0 rows=()
 for i in "${!names[@]}"; do
-  printf '%-10s %4s %9s\n' "${names[$i]}" "${rcs[$i]}" "${secs[$i]}"
-  [ "${rcs[$i]}" -eq 0 ] || fail=1
+  verdict=green class=-
+  [ "${rcs[$i]}" -eq 0 ] || verdict=red class=unclassified fail=1
+  printf '%-10s %4s %9s  %s\n' "${names[$i]}" "${rcs[$i]}" "${secs[$i]}" "$verdict"
+  printf -v row '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t-' "$started" "$tree" "$mode" "${names[$i]}" \
+    "${secs[$i]}" "${rcs[$i]}" "$verdict" "$class"
+  rows+=("$row")
 done
+if [ "$mode" != fast ]; then
+  [ -s "$ledger" ] || printf '#date\ttree\tmode\tstep\tseconds\trc\tverdict\tclass\tnote\n' >> "$ledger"
+  printf '%s\n' "${rows[@]}" >> "$ledger"
+  printf '\n'
+  printf 'gate-ledger\t%s\n' "${rows[@]}"
+  open=$(awk -F '\t' '$7 == "red" && $8 == "unclassified"' "$ledger" | wc -l)
+  printf 'ledger: %d rows → %s; %d unclassified red(s) → uv run python .agent/gate-ledger\n' \
+    "${#rows[@]}" "$ledger" "$open"
+fi
 exit "$fail"

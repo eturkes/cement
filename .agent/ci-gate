@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ci-gate <unit> — the full gate as CI's parallel fan-out (`.claude/rules/ops.md` Template
 # rulings (5)): push HEAD to `ci/<unit>`, watch the Gate run of exactly that commit, print each
-# leg + D28's replay line, delete the branch once green.
+# leg + D28's replay line, import both legs' step-ledger rows, delete the branch once green.
 # rc 0 = every leg green, branch deleted; 1 = a leg red (branch kept: fix, amend, rerun);
 # 2 = usage, a tracked change outside HEAD, or no run for the pushed commit.
 set -euo pipefail
@@ -24,8 +24,13 @@ echo "ci-gate: $branch commit $sha tree $(git rev-parse 'HEAD^{tree}') run $run"
 rc=0
 gh run watch "$run" --exit-status --interval 30 > /dev/null || rc=1
 gh run view "$run" --json jobs --jq '.jobs[] | "\(.conclusion)\t\(.name)"'
-d28=$(gh run view "$run" --log 2> /dev/null | grep -o -m 1 'D28: [0-9]* revisions.*' || true)
+log=$(mktemp)
+trap 'rm -f "$log"' EXIT
+gh run view "$run" --log > "$log" 2> /dev/null || true
+d28=$(grep -o -m 1 'D28: [0-9]* revisions.*' "$log" || true)
 echo "${d28:-D28 line: absent}"
+# Both legs' step rows enter the local step ledger (`.claude/rules/ops.md` Step ledger).
+uv run python .agent/gate-ledger import < "$log" || echo "ci-gate: ledger import failed" >&2
 if [ "$rc" -eq 0 ]; then
   git push -q origin --delete "$branch"
   echo "ci-gate: green, $branch deleted"

@@ -1,0 +1,203 @@
+#!/usr/bin/env python3
+"""gate-ledger — the gate's step ledger (`.claude/rules/ops.md` Step ledger).
+
+Ledger = `<git-common-dir>/cement-gate-ledger.tsv` (`CEMENT_GATE_LEDGER` overrides): `.agent/gate`
+appends one row per step of each full or split run — date, tree, mode, step, seconds, rc,
+verdict, class, note — and a red row enters class `unclassified`.
+
+Usage: uv run python .agent/gate-ledger [reds]                    unclassified red rows (rc 1 if any)
+       uv run python .agent/gate-ledger classify ROW CLASS NOTE…  rule one red row: product | gate | flake | planted
+       uv run python .agent/gate-ledger summary                   per mode + step: runs, seconds, reds by class
+       uv run python .agent/gate-ledger import < LOG               the `gate-ledger<TAB>` rows a CI log printed, new ones only
+       uv run python .agent/gate-ledger --self-test
+ROW = the ledger line number `reds` prints. rc 2 = a malformed row or a refused argument.
+"""
+
+from __future__ import annotations
+
+import collections
+import io
+import os
+import pathlib
+import subprocess
+import sys
+import tempfile
+from collections.abc import Iterable
+from typing import TextIO
+
+COLUMNS = ("date", "tree", "mode", "step", "seconds", "rc", "verdict", "class", "note")
+HEADER = "#" + "\t".join(COLUMNS)
+CLASSES = ("product", "gate", "flake", "planted")
+PREFIX = "gate-ledger\t"
+
+
+class Refused(Exception):
+    pass
+
+
+def ledger_path() -> pathlib.Path:
+    if os.environ.get("CEMENT_GATE_LEDGER"):
+        return pathlib.Path(os.environ["CEMENT_GATE_LEDGER"])
+    out = subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                         check=True, capture_output=True, text=True)
+    return pathlib.Path(out.stdout.strip()) / "cement-gate-ledger.tsv"
+
+
+def parse(line: str, where: str) -> list[str]:
+    fields = line.split("\t")
+    if len(fields) != len(COLUMNS) or fields[6] not in ("green", "red"):
+        raise Refused(f"{where}: malformed row {line!r}")
+    if fields[6] == "red" and fields[7] not in ("unclassified", *CLASSES):
+        raise Refused(f"{where}: red row with class {fields[7]!r}")
+    return fields
+
+
+def rows(path: pathlib.Path) -> list[tuple[int, list[str]]]:
+    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    return [(number, parse(line, f"{path}:{number}")) for number, line in enumerate(lines, 1)
+            if line and not line.startswith("#")]
+
+
+def write(path: pathlib.Path, lines: list[str]) -> None:
+    # Whole-file replace through a sibling temp file: an interrupted rewrite leaves the old ledger.
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as handle:
+        handle.write("".join(line + "\n" for line in lines))
+    os.replace(handle.name, path)
+
+
+def reds(path: pathlib.Path, out: TextIO) -> int:
+    open_rows = [(number, fields) for number, fields in rows(path)
+                 if fields[6] == "red" and fields[7] == "unclassified"]
+    for number, fields in open_rows:
+        print(f"{number}\t" + "\t".join(fields[:7]), file=out)
+    print(f"gate-ledger: {len(open_rows)} unclassified red row(s) in {path}", file=out)
+    return 1 if open_rows else 0
+
+
+def classify(path: pathlib.Path, number: int, kind: str, note: str, out: TextIO) -> int:
+    if kind not in CLASSES:
+        raise Refused(f"class {kind!r} is not one of {', '.join(CLASSES)}")
+    note = " ".join(note.split())
+    if not note:
+        raise Refused("a classification carries a note (what decided it)")
+    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    if not 1 <= number <= len(lines) or lines[number - 1].startswith("#"):
+        raise Refused(f"row {number} is not a ledger row")
+    fields = parse(lines[number - 1], f"{path}:{number}")
+    if fields[6] != "red":
+        raise Refused(f"row {number} is green; only a red row takes a class")
+    fields[7], fields[8] = kind, note
+    lines[number - 1] = "\t".join(fields)
+    write(path, lines)
+    print(f"gate-ledger: row {number} {fields[3]} → {kind}", file=out)
+    return 0
+
+
+def summary(path: pathlib.Path, out: TextIO) -> int:
+    runs: dict[tuple[str, str, str], list[list[str]]] = collections.defaultdict(list)
+    for _, fields in rows(path):
+        runs[(fields[0], fields[1], fields[2])].append(fields)
+    table: dict[tuple[str, str], collections.Counter[str]] = collections.defaultdict(collections.Counter)
+    seconds: dict[tuple[str, str], float] = collections.defaultdict(float)
+    for run in runs.values():
+        product = [fields for fields in run if fields[7] == "product"]
+        for fields in run:
+            key = (fields[2], fields[3])
+            table[key]["runs"] += 1
+            seconds[key] += float(fields[4])
+            if fields[6] == "red":
+                table[key][fields[7]] += 1
+            # A sole catch = this step alone reported the run's product defect.
+            if product == [fields]:
+                table[key]["sole"] += 1
+    heads = ("runs", *CLASSES, "unclassified", "sole")
+    print("mode\tstep\tseconds\t" + "\t".join(heads), file=out)
+    for key in sorted(table):
+        print(f"{key[0]}\t{key[1]}\t{seconds[key]:.1f}\t" + "\t".join(str(table[key][head]) for head in heads),
+              file=out)
+    print(f"gate-ledger: {len(runs)} run(s) in {path}", file=out)
+    return 0
+
+
+def import_rows(path: pathlib.Path, log: Iterable[str], out: TextIO) -> int:
+    present = {tuple(fields[:4]) for _, fields in rows(path)}
+    new: list[str] = []
+    for number, line in enumerate(log, 1):
+        start = line.find(PREFIX)
+        if start < 0:
+            continue
+        row = line[start + len(PREFIX):].rstrip("\r\n")
+        fields = parse(row, f"log:{number}")
+        if tuple(fields[:4]) not in present:
+            present.add(tuple(fields[:4]))
+            new.append(row)
+    if new:
+        with path.open("a", encoding="utf-8") as handle:
+            if path.stat().st_size == 0:
+                handle.write(HEADER + "\n")
+            handle.write("".join(row + "\n" for row in new))
+    print(f"gate-ledger: imported {len(new)} row(s) into {path}", file=out)
+    return 0
+
+
+def run(argv: list[str], path: pathlib.Path, stdin: Iterable[str], out: TextIO) -> int:
+    try:
+        if argv in ([], ["reds"]):
+            return reds(path, out)
+        if argv[0] == "classify" and len(argv) >= 4 and argv[1].isdigit():
+            return classify(path, int(argv[1]), argv[2], " ".join(argv[3:]), out)
+        if argv == ["summary"]:
+            return summary(path, out)
+        if argv == ["import"]:
+            return import_rows(path, stdin, out)
+        raise Refused("usage: [reds] | classify ROW CLASS NOTE… | summary | import | --self-test")
+    except Refused as refusal:
+        print(f"gate-ledger: refused: {refusal}", file=out)
+        return 2
+
+
+def self_test() -> int:
+    def row(date: str, step: str, rc: int) -> str:
+        verdict, kind = ("green", "-") if rc == 0 else ("red", "unclassified")
+        return "\t".join((date, "a" * 40, "full", step, "1.5", str(rc), verdict, kind, "-"))
+
+    cases: list[tuple[str, list[str], int, str]] = []
+    with tempfile.TemporaryDirectory() as scratch:
+        path = pathlib.Path(scratch) / "ledger.tsv"
+        path.write_text("\n".join((HEADER, row("D1", "lint", 1), row("D1", "unittest", 0),
+                                   row("D2", "lint", 0), row("D2", "unittest", 1))) + "\n")
+        log = [f"job\tstep\t2026Z {PREFIX}{row('D3', 'lint', 0)}\r\n", "noise\n",
+               f"job\tstep\t2026Z {PREFIX}{row('D2', 'lint', 0)}\n"]
+
+        def check(name: str, argv: list[str], rc: int, token: str, stdin: Iterable[str] = ()) -> None:
+            out = io.StringIO()
+            got = run(argv, path, stdin, out)
+            ok = got == rc and token in out.getvalue()
+            cases.append((name, argv, ok, out.getvalue().strip().splitlines()[-1]))
+            print(f"SELF-TEST {name}: {'ok' if ok else f'WRONG rc={got}'} | {cases[-1][3]}")
+
+        check("reds-open", [], 1, "2 unclassified red row(s)")
+        check("bad-class", ["classify", "2", "load", "x"], 2, "is not one of")
+        check("no-note", ["classify", "2", "flake"], 2, "usage")
+        check("green-row", ["classify", "3", "flake", "x"], 2, "only a red row")
+        check("header-row", ["classify", "1", "flake", "x"], 2, "not a ledger row")
+        check("classify", ["classify", "2", "planted", "self-test seed"], 0, "lint → planted")
+        check("reds-one", ["reds"], 1, "1 unclassified red row(s)")
+        check("import", ["import"], 0, "imported 1 row(s)", log)
+        check("import-again", ["import"], 0, "imported 0 row(s)", log)
+        check("summary", ["summary"], 0, "3 run(s)")
+        path.write_text(path.read_text() + "D9\tbroken\n")
+        check("malformed", ["reds"], 2, "malformed row")
+    failed = sum(1 for case in cases if not case[2])
+    print(f"SELF-TEST: {'PASS' if not failed else 'FAIL'} ({len(cases)} cases, {failed} failed)")
+    return 1 if failed else 0
+
+
+def main() -> int:
+    if sys.argv[1:] == ["--self-test"]:
+        return self_test()
+    return run(sys.argv[1:], ledger_path(), sys.stdin, sys.stdout)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

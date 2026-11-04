@@ -13,13 +13,34 @@ name (added by the close itself, or naming its SHA); every other commit keeps it
 own body's `Teammates:` / `dispatch:` line — the 17 closes of `a8109eb..1623535` among them — and
 `uv run python .agent/decisions/p73-review-coverage.py` prints any commit since `a8109eb` with
 neither (six listed there with their reasons). A finding inside the artifact's acceptance contract is
-fixed before the close it reviews; a finding outside it is born as a `.agent/deferred.md`
-row with its acceptance check. The one open row this ledger holds = an IMPLEMENT mutation
+fixed before the close it reviews — a behavior finding once a red test proves it, that test's
+expected value traced to the contract or an independent oracle; a finding outside it is born as a
+`.agent/deferred.md` row with its acceptance check. A fix earns ONE re-review round against its
+acceptance check alone. Open rows = an issue still open after that round + an IMPLEMENT mutation
 survivor its unit left unruled, open until a `consultant` rules it against the contract before
-the phase closes (`CLAUDE.md` `Engineering` Verification integrity). A fix earns ONE re-review round
-against its acceptance check alone. A pass here is a reviewer's opinion about the repository: neither a
-replay verdict nor a promotion receipt (`docs/architecture.md` `## Stability and verification claims`
-names all three).
+the phase closes (`CLAUDE.md` `Engineering` Review + Verification integrity). A pass here is a
+reviewer's opinion about the repository: neither a replay verdict nor a promotion receipt
+(`docs/architecture.md` `## Stability and verification claims` names all three).
+
+## Template refresh → agents@a65c273 (MAINTAIN, request) — target = the diff this commit lands, base `48be1b3`
+
+Template delta = agents@55d8bf1..a65c273: every action granted, questions only where no option is clearly correct; step ledger + red classification (product | gate | flake | planted) + campaign tier, latency-bounded fast gate, full gate once per unit in the background; property-based test form + fuzz targets for untrusted byte-level readers; grading-check changes in their own unit on contract evidence; review = a fallible lead finder, behavior findings proven by a red test with a traced expectation, issues open at the bound stay open rows; MAIN writes the code (code-writing teammates = `tester` + variant/spike builders); heavy dispatch at about half; `Artifacts` carry smoke probes, PROTOTYPE + ITERATE gate by them; the portability clause out, `CLAUDE.local.md` = machine-only + private facts; role edits (`navigator` marks the clearly correct option, `operator` human-gate split, `reviewer` traced red test). Obligations O1-O24 + A1-A3 + steps 1-6 = the commit body. Reviewer = MAIN alone (`CLAUDE.md` `Session flow`: this diff reaches no `kernel` code, public interface or persisted data). Check set R1-R13 fixed in scratch before the first edit.
+
+| id | lens | verdict | basis (MAIN-verified) |
+|---|---|---|---|
+| R1 | template fidelity | pass | `cmp` rc 0 vs agents@a65c273: `CLAUDE.md` (`claude/CLAUDE.project.md`), 9 roles, `.agent/spec-lint` (unchanged); HEAD's 11 copies `cmp`-equal agents@55d8bf1 ⇒ delta = upstream `55d8bf1..a65c273` alone. |
+| R2 | obligation coverage | pass | every `-`/`+` line of `git diff HEAD -U0 -- CLAUDE.md .claude/agents` (13 CLAUDE.md hunks → O1-O2, O3-O6, O7, O8, O9, O10, O11, O12-O14, O15-O16, O17-O18, O19, O20-O21, O22-O24; 3 role hunks → A1-A3); upstream 365bb85's migration list (ledger, fast gate, background full gate, red classes, campaign tier, smoke probes) each lands in O4-O6 + O17. |
+| R3 | dispositions + timing | pass | practice: O2, O3, O5, O10, O13-O16, O23, A1-A3; repo edits: O1, O4, O6-O9, O11, O12, O17; keyed rulings: `ops.md` Step ledger (ledger home, fast runs excluded, campaign tier), `assurance.md` Pin repairs; phase-timed: O21-O22 (next PROTOTYPE/ITERATE), O24 (next IMPLEMENT orientation); no rule to follow: O18-O20. |
+| R4 | old forms | pass | F1-F33 + R1-R8, whitespace-agnostic, `rg --hidden -g '!.git' -n -U` + `CLAUDE.local.md` apart: live hits 0; history hits = `.agent/review.md` sections at line ≥ 25 + `.agent/archive/deferred-closed.md`; every control = 1. |
+| R5 | edited checks | pass | each fired before (`48be1b3`) + after — S01 fast cases, new `fast-omits-d28` + `ledger-red` + `ledger-self-test` (+ its neutralized refusal → `FAIL (11 cases, 1 failed)`), `full-table` via CI (before = main run 41478260550; after = this commit's CI gate); S12 5/5 + S24 6/6 before, after on this commit (body); pre-flight split run (pool, 3.12) 22/22 rc 0 with 22 ledger rows imported, re-import 0; `ci-gate` rc 2 ×3; no grading case loosened: S01's old tokens kept, the census regex + file set unchanged, the skip allowlist unchanged. |
+| R6 | spec preservation | pass | script: `Intent`, `Decisions`, `Tasks`, `Phase` byte-identical; `Tasks` ids {p01, p61} = before; queue ids before ⊆ after (+ p153-p156); `Artifacts` word diff = additions alone. |
+| R7 | rules | pass | 11 files read whole; approval restatements + the retired portability term followed (O1, O7); `scripted-surgery teammate` followed (O12); none only restates the template; no local edit held repo law (R1); `upstream-sync.md` absent; keyed-rulings index current. |
+| R8 | `CLAUDE.local.md` | pass | portable run forms → `ops.md` Gate (`UV_PYTHON=3.15 .agent/gate`, `UV_PYTHON=3.12 .agent/gate --omit-d28`); offload wrappers, nixbox facts, build strings, host check + seeds slot kept; store facts current (3.13.14 on the pre-`5ae4d9f` lock; `.venv` 3.13.17). |
+| R9 | settings | pass | no project `.claude/settings*.json` (`ls` none; `law` `settings` 0). |
+| R10 | queue rows | pass | p153-p156 fresh (max over queue + ledger + archive + committed history = p152); `m3-deferred-validate.py` PASS; leads re-derived in-repo (run 40174765857 73 min / 36 cold revisions; `sys.executable` inner replay; p70's numbers; `main` rerun 3-4 min per leg ⇒ no row). |
+| R11 | body claims | pass | every number, id + SHA in the body re-derived from its command output this session (cmp, sweep, probe, pre-flight, row facts, CI runs 41478260550 / 40854669364 / 40174765857); the amend adds the CI gate + after-seeds lines verbatim from their output. |
+| R12 | load probe | pass | `intake_queue`, 1 turn, 0 `tool_use`; control 121. |
+| R13 | full gate | in the commit body | CI gate on this commit's tree. |
 
 ## Template refresh → agents@55d8bf1 (MAINTAIN, request) — target = the diff this commit lands, base `75f7cd0`
 

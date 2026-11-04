@@ -23,8 +23,9 @@ import sys
 
 # `ast.unparse` spelling (single quotes), which is what the census compares.
 PLATFORM_GUARD = "sys.platform.startswith('linux') and pathlib.Path('/proc').is_dir()"
-# (file, test id, kind, condition) -> reason class. A new member = an owner-approved gate change
-# with its `.agent/deferred.md` row (`CLAUDE.md` `Engineering` Verification integrity).
+# (file, test id, kind, condition) -> reason class. A new member = a gate change in its own unit,
+# its `.agent/deferred.md` row (reason + the check that restores it) first (`CLAUDE.md`
+# `Engineering` Verification integrity).
 ALLOWED = {
     (
         "tests/test_source.py",

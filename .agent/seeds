@@ -273,10 +273,28 @@ class Runner:
             # p132: `--durations` = the requires-python floor, so every gate run prints the list.
             self.case(sid, "durations", root, [".agent/gate", "tests.test_read_capability_census"], 0,
                       ["Slowest test durations"])
+            # Latency-bounded fast gate: a named D28 is dropped, named, never replayed.
+            self.case(sid, "fast-omits-d28", root,
+                      [".agent/gate", "tests.test_read_capability_census", f"tests.test_migration_battery.MigrationBatteryTests.{D28}"],
+                      0, [r"SPLIT RUN — omits tests\.test_migration_battery\.", r"^Ran \d+ tests? in "])
+            # Step ledger: a full-chain run with every `uv` call answered by a shim (`ruff check` → 1).
+            shim = self.temp / "uv-shim"
+            shim.mkdir(exist_ok=True)
+            (shim / "uv").write_text('#!/bin/sh\ncase "$*" in *"ruff check"*) exit 1 ;; esac\nexit 0\n')
+            (shim / "uv").chmod(0o755)
+            self.case(sid, "ledger-red", root, [".agent/gate", "--omit-d28"], 1,
+                      [r"^lint\s+1\s+[0-9.]+\s+red$",
+                       r"^gate-ledger\t\S+\t[0-9a-f]{40}\tsplit\tlint\t[0-9.]+\t1\tred\tunclassified\t-$",
+                       r"^ledger: 22 rows → "],
+                      env={"PATH": str(shim) + os.pathsep + os.environ["PATH"],
+                           "CEMENT_GATE_LEDGER": str(self.temp / "ledger-red.tsv")})
+            self.case(sid, "ledger-self-test", root, [sys.executable, ".agent/gate-ledger", "--self-test"], 0,
+                      [r"^SELF-TEST: PASS \(11 cases, 0 failed\)$"])
             self.case(sid, "full-table", root, [".agent/gate"], 0,
                       [r"^unittest\s+0\s", r"^build\s+0\s", r"^spec-lint\s+0\s",
                        r"D28: \d+ revisions, \d+ replayed, \d+ from green verdicts",
-                       r"^Ran \d+ tests? in [^\n]+"])
+                       r"^Ran \d+ tests? in [^\n]+",
+                       r"^gate-ledger\t\S+\t[0-9a-f]{40}\tfull\tunittest\t[0-9.]+\t0\tgreen\t-\t-$"])
 
     def S02(self):
         with self.tree() as root:
@@ -668,7 +686,7 @@ unittest.main()
             self.python(sid, "shipped", root, census, 0, [r"^frontmatter: 0 violation", r"^reasons: 0 violation"])
             self.case(sid, "self-test", root, [sys.executable, census, "--self-test"], 0,
                       [rf"^SELF-TEST {name}: fires alone$" for name in
-                       ("frontmatter", "imports", "settings", "symlinks", "portable", "reasons")])
+                       ("frontmatter", "imports", "settings", "symlinks", "home-paths", "reasons")])
             rule = root / ".claude/rules/open-webui.md"
             with changed(rule, replace(rule.read_text(), '  - "examples/open_webui/**"\n', "  - examples/open_webui/**\n")):
                 self.python(sid, "unquoted-glob", root, census, 1,
@@ -678,7 +696,7 @@ unittest.main()
                 self.python(sid, "dead-import", root, census, 1, [r"^IMPORTS: CLAUDE\.md:1: @\.agent/specs\.md"])
             docs = root / "docs/architecture.md"
             with changed(docs, docs.read_text() + "\nRun /home/someone/bin/tool.\n"):
-                self.python(sid, "machine-path", root, census, 1, [r"^PORTABLE: docs/architecture\.md:\d+: machine path /home/someone"])
+                self.python(sid, "machine-path", root, census, 1, [r"^HOME-PATHS: docs/architecture\.md:\d+: machine path /home/someone"])
             # The reason heads the paragraph: deleting the comment block leaves the suppression bare.
             local = root / "examples/open_webui/local.py"
             with changed(local, substitute(local.read_text(), r"(?m)^ +# Fixed arguments: .*\n +# another line .*\n", "")):

@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-"""suite — `unittest discover -s tests -t .`, optionally minus D28 as a NAMED split run.
+"""suite — `unittest discover -s tests -t .` or the named tests, optionally minus D28 as a NAMED split run.
 
 D28 is the only gate grading history (`.claude/rules/history-gates.md`); a run without it says so
-on stderr and names the omitted id, so a split result never reads as the full gate.
+on stderr and names the omitted id, so a split result never reads as the full gate. With names
+(the fast gate, `.claude/rules/ops.md`) `--omit-d28` drops D28 only where a name reaches it: a
+history replay scales with every unverdicted revision, which a latency-bounded iteration excludes.
 
-Usage: uv run python .agent/suite [--omit-d28] [--durations N]
+Usage: uv run python .agent/suite [--omit-d28] [--durations N] [tests.module …]
 """
 
 from __future__ import annotations
 
+import argparse
+import os
 import sys
 import unittest
 from collections.abc import Iterator
@@ -28,17 +32,28 @@ def _flatten(suite: unittest.TestSuite) -> Iterator[unittest.TestCase]:
 
 
 def main(argv: list[str]) -> int:
-    omit = "--omit-d28" in argv
-    durations = int(argv[argv.index("--durations") + 1]) if "--durations" in argv else None
-    tests = list(_flatten(unittest.defaultTestLoader.discover("tests", top_level_dir=".")))
-    kept = [test for test in tests if not (omit and test.id() == D28)]
-    if omit:
-        if len(tests) - len(kept) != 1:
-            print(f"suite: expected to omit exactly one test ({D28}), omitted "
-                  f"{len(tests) - len(kept)}", file=sys.stderr)
+    parser = argparse.ArgumentParser(prog="suite")
+    parser.add_argument("--omit-d28", action="store_true")
+    parser.add_argument("--durations", type=int)
+    parser.add_argument("names", nargs="*")
+    args = parser.parse_args(argv[1:])
+    loader = unittest.defaultTestLoader
+    if args.names:
+        # `python -m unittest <names>` imports from the working directory; a script run puts its
+        # own directory first instead.
+        sys.path.insert(0, os.path.abspath("."))
+        tests = list(_flatten(loader.loadTestsFromNames(args.names)))
+    else:
+        tests = list(_flatten(loader.discover("tests", top_level_dir=".")))
+    kept = [test for test in tests if not (args.omit_d28 and test.id() == D28)]
+    omitted = len(tests) - len(kept)
+    if args.omit_d28:
+        if omitted > 1 or (omitted == 0 and not args.names):
+            print(f"suite: expected to omit exactly one test ({D28}), omitted {omitted}", file=sys.stderr)
             return 2
-        print(f"suite: SPLIT RUN — omits {D28}; history ungraded by this run", file=sys.stderr)
-    runner = (unittest.TextTestRunner(durations=durations) if durations is not None
+        if omitted:
+            print(f"suite: SPLIT RUN — omits {D28}; history ungraded by this run", file=sys.stderr)
+    runner = (unittest.TextTestRunner(durations=args.durations) if args.durations is not None
               else unittest.TextTestRunner())
     result = runner.run(unittest.TestSuite(kept))
     return 0 if result.wasSuccessful() else 1
