@@ -26,7 +26,7 @@ source-include = ["docs/**", "examples/**", "skills/**", "tests/**"]
 [dependency-groups]
 dev = [
     "cosmic-ray==8.7.0",
-    "mypy==2.4.0",
+    "mypy==2.4.1",
     "ruff==0.17.2",
 ]
 
