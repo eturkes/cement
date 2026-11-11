@@ -330,6 +330,19 @@ class Runner:
             self.case("S03", "history", root, [".agent/spec-lint", old], 1,
                       [r":116: .*89 line\(s\) of history"])
             self.case("S03", "shipped", root, [".agent/spec-lint"], 0)
+            # Fences close as Markdown closes them (template copy): a line opening on inline code
+            # opens none, and a closer repeats its opener's character at least as long.
+            spec = (root / ".agent/spec.md").read_text()
+            plants = {
+                "inline-opener": ("```x``` opens on inline code.\n\n## Bogus\n\n```y``` too.\n", 1,
+                                  [r"section `Bogus`, expected `Tasks`"]),
+                "longer-fence": ("````md\n```\n## Example\n```\n````\n", 0, []),
+                "tilde-backticks": ("~~~md\n```\n## Example\n~~~\n", 0, []),
+            }
+            for name, (block, rc, tokens) in plants.items():
+                plant = self.temp / f"spec-{name}.md"
+                plant.write_text(replace(spec, "\n## Tasks\n", f"\n{block}\n## Tasks\n"))
+                self.case("S03", name, root, [".agent/spec-lint", plant], rc, tokens)
 
     def S04(self):
         sid = "S04"
